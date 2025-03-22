@@ -1,0 +1,386 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { DOMSimplifier, BrowserAdapter } from "../src/domSimplifier";
+import { JSDOM } from "jsdom";
+
+describe("DOMSimplifier", () => {
+  let dom: JSDOM;
+  let document: Document;
+  let simplifier: DOMSimplifier;
+
+  beforeEach(() => {
+    // Create a fresh JSDOM instance for each test
+    dom = new JSDOM("<!DOCTYPE html><html><body></body></html>", {
+      url: "http://localhost",
+      pretendToBeVisual: true,
+    });
+
+    document = dom.window.document;
+
+    // Set up the global environment
+    global.document = document;
+    // @ts-ignore - JSDOM types don't match exactly but functionality is correct
+    global.window = dom.window;
+    global.HTMLElement = dom.window.HTMLElement;
+    global.HTMLInputElement = dom.window.HTMLInputElement;
+    global.HTMLTextAreaElement = dom.window.HTMLTextAreaElement;
+    global.HTMLSelectElement = dom.window.HTMLSelectElement;
+    global.Event = dom.window.Event;
+    global.getComputedStyle = dom.window.getComputedStyle;
+
+    simplifier = new DOMSimplifier(new BrowserAdapter());
+  });
+
+  describe("Basic Text Transformation", () => {
+    it("should transform simple text content", async () => {
+      document.body.innerHTML = `
+        <div>
+          <p>Hello World</p>
+          <p>This is a test</p>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain("Hello World");
+      expect(result.text).toContain("This is a test");
+      expect(result.references).toEqual({});
+    });
+
+    it("should handle nested elements", async () => {
+      document.body.innerHTML = `
+        <div>
+          <section>
+            <h1>Title</h1>
+            <p>Paragraph <span>with inline</span> elements</p>
+          </section>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain("# Title");
+      expect(result.text).toContain("Paragraph with inline elements");
+    });
+  });
+
+  describe("Element Preservation", () => {
+    it("should preserve interactive elements with attributes", async () => {
+      document.body.innerHTML = `
+        <div>
+          <button type="submit">Click me</button>
+          <input type="text" placeholder="Enter text">
+          <a href="#" title="Link">Link text</a>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(Object.keys(result.references).length).toBeGreaterThan(0);
+
+      // Check that elements are preserved with correct attributes
+      const references = Object.values(result.references);
+      expect(references.some((ref) => ref.tagName === "button")).toBe(true);
+      expect(references.some((ref) => ref.tagName === "input")).toBe(true);
+      expect(references.some((ref) => ref.tagName === "a")).toBe(true);
+    });
+  });
+
+  describe("Block Element Handling", () => {
+    it("should add appropriate spacing around block elements", async () => {
+      document.body.innerHTML = `
+        <div>First block</div>
+        <p>Second block</p>
+        <div>Third block</div>
+      `;
+
+      const result = await simplifier.transform("body");
+      const blocks = result.text.split("\n\n").filter(Boolean);
+      expect(blocks.length).toBe(3);
+      expect(blocks[0]).toBe("First block");
+      expect(blocks[1]).toBe("Second block");
+      expect(blocks[2]).toBe("Third block");
+    });
+  });
+
+  describe("Hidden Element Handling", () => {
+    it("should exclude hidden elements by default", async () => {
+      document.body.innerHTML = `
+        <div>Visible content</div>
+        <div style="display: none">Hidden content</div>
+        <div hidden>Also hidden</div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain("Visible content");
+      expect(result.text).not.toContain("Hidden content");
+      expect(result.text).not.toContain("Also hidden");
+    });
+
+    it("should include hidden elements when configured", async () => {
+      const simplifierWithHidden = new DOMSimplifier(new BrowserAdapter(), {
+        includeHiddenElements: true,
+      });
+
+      document.body.innerHTML = `
+        <div>Visible content</div>
+        <div style="display: none">Hidden content</div>
+      `;
+
+      const result = await simplifierWithHidden.transform("body");
+      expect(result.text).toContain("Visible content");
+      expect(result.text).toContain("Hidden content");
+    });
+  });
+
+  describe("Action Performing", () => {
+    it("should perform click actions", async () => {
+      document.body.innerHTML = '<button id="test-button">Click me</button>';
+
+      let clicked = false;
+      const button = document.getElementById("test-button");
+      button?.addEventListener("click", () => (clicked = true));
+
+      const result = await simplifier.transform("body");
+      const buttonRef = Object.values(result.references).find(
+        (ref) => ref.tagName === "button"
+      );
+
+      if (buttonRef) {
+        await simplifier.interactWithElement(1, "click");
+        expect(clicked).toBe(true);
+      }
+    });
+
+    it("should perform fill actions on input elements", async () => {
+      document.body.innerHTML = '<input type="text" id="test-input">';
+
+      const result = await simplifier.transform("body");
+      console.log("References:", result.references);
+      const id = Object.keys(result.references)[0];
+      console.log("Selected ID:", id);
+
+      if (id) {
+        const ref = result.references[parseInt(id)];
+        console.log("Using selector:", ref.selector);
+        const actionResult = await simplifier.interactWithElement(
+          parseInt(id),
+          "fill",
+          "test value"
+        );
+        console.log("Action Result:", actionResult);
+        const input = document.getElementById("test-input") as HTMLInputElement;
+        console.log("Input value after fill:", input.value);
+        expect(input.value).toBe("test value");
+      } else {
+        throw new Error("No input element reference found");
+      }
+    });
+  });
+
+  describe("Form Element Handling", () => {
+    it("should handle form elements with various states", async () => {
+      document.body.innerHTML = `
+        <form action="/submit" method="post">
+          <input type="text" value="test" disabled>
+          <input type="checkbox" checked>
+          <input type="radio" name="choice" checked>
+          <select>
+            <option value="1" selected>One</option>
+            <option value="2">Two</option>
+          </select>
+          <textarea placeholder="Enter text">Content</textarea>
+        </form>
+      `;
+
+      const result = await simplifier.transform("body");
+      const refs = Object.values(result.references);
+
+      // Check form attributes
+      const form = refs.find((ref) => ref.tagName === "form");
+      expect(form?.attributes.action).toBe("/submit");
+      expect(form?.attributes.method).toBe("post");
+
+      // Check input states
+      const textInput = refs.find(
+        (ref) => ref.tagName === "input" && ref.attributes.type === "text"
+      );
+      expect(textInput?.attributes.disabled).toBeTruthy();
+      expect(textInput?.attributes.value).toBe("test");
+
+      const checkbox = refs.find(
+        (ref) => ref.tagName === "input" && ref.attributes.type === "checkbox"
+      );
+      expect(checkbox?.attributes.checked).toBeTruthy();
+
+      const radio = refs.find(
+        (ref) => ref.tagName === "input" && ref.attributes.type === "radio"
+      );
+      expect(radio?.attributes.checked).toBeTruthy();
+
+      // Check select and option
+      const select = refs.find((ref) => ref.tagName === "select");
+      expect(select).toBeTruthy();
+      const option = refs.find(
+        (ref) => ref.tagName === "option" && ref.attributes.selected === "true"
+      );
+      expect(option?.attributes.value).toBe("1");
+
+      // Check textarea
+      const textarea = refs.find((ref) => ref.tagName === "textarea");
+      expect(textarea?.attributes.placeholder).toBe("Enter text");
+    });
+  });
+
+  describe("ARIA Role Handling", () => {
+    it("should preserve elements with actionable ARIA roles", async () => {
+      document.body.innerHTML = `
+        <div role="button" aria-label="Close">×</div>
+        <span role="checkbox" aria-checked="true">Accept terms</span>
+        <div role="tab" aria-selected="true">Tab 1</div>
+      `;
+
+      const result = await simplifier.transform("body");
+      const refs = Object.values(result.references);
+
+      expect(refs.some((ref) => ref.attributes.role === "button")).toBe(true);
+      expect(refs.some((ref) => ref.attributes.role === "checkbox")).toBe(true);
+      expect(refs.some((ref) => ref.attributes.role === "tab")).toBe(true);
+    });
+
+    it("should not preserve elements with non-actionable ARIA roles", async () => {
+      document.body.innerHTML = `
+        <div role="banner">Header</div>
+        <div role="contentinfo">Footer</div>
+      `;
+
+      const result = await simplifier.transform("body");
+      const refs = Object.values(result.references);
+
+      expect(refs.some((ref) => ref.attributes.role === "banner")).toBe(false);
+      expect(refs.some((ref) => ref.attributes.role === "contentinfo")).toBe(
+        false
+      );
+      expect(result.text).toContain("Header");
+      expect(result.text).toContain("Footer");
+    });
+  });
+
+  describe("List and Table Handling", () => {
+    it("should properly format ordered and unordered lists", async () => {
+      document.body.innerHTML = `
+        <ul>
+          <li>First item</li>
+          <li>Second item</li>
+        </ul>
+        <ol>
+          <li>Numbered one</li>
+          <li>Numbered two</li>
+        </ol>
+      `;
+
+      const result = await simplifier.transform("body");
+      const paragraphs = result.text.split("\n\n").filter(Boolean);
+
+      expect(paragraphs).toContain("First item");
+      expect(paragraphs).toContain("Second item");
+      expect(paragraphs).toContain("Numbered one");
+      expect(paragraphs).toContain("Numbered two");
+    });
+
+    it("should handle tables with proper spacing", async () => {
+      document.body.innerHTML = `
+        <table>
+          <tr><th>Header 1</th><th>Header 2</th></tr>
+          <tr><td>Cell 1</td><td>Cell 2</td></tr>
+        </table>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain("Header 1");
+      expect(result.text).toContain("Header 2");
+      expect(result.text).toContain("Cell 1");
+      expect(result.text).toContain("Cell 2");
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("should handle invalid selectors gracefully", async () => {
+      await expect(simplifier.transform("#nonexistent")).rejects.toThrow(
+        "Element not found"
+      );
+    });
+
+    it("should handle malformed HTML gracefully", async () => {
+      document.body.innerHTML = `
+        <div>
+          <p>Unclosed paragraph
+          <span>Unclosed span
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain("Unclosed paragraph");
+      expect(result.text).toContain("Unclosed span");
+    });
+
+    it("should handle empty elements gracefully", async () => {
+      document.body.innerHTML = `
+        <div></div>
+        <p>   </p>
+        <span> </span>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text.trim()).toBe("");
+    });
+  });
+
+  describe("Action Performing - Extended", () => {
+    it("should handle checkbox toggling", async () => {
+      document.body.innerHTML = '<input type="checkbox" id="test-checkbox">';
+
+      const result = await simplifier.transform("body");
+      const id = Object.keys(result.references)[0];
+
+      // Check the checkbox
+      await simplifier.interactWithElement(parseInt(id), "check");
+      const checkbox = document.getElementById(
+        "test-checkbox"
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(true);
+
+      // Uncheck the checkbox
+      await simplifier.interactWithElement(parseInt(id), "uncheck");
+      expect(checkbox.checked).toBe(false);
+    });
+
+    it("should handle select element interactions", async () => {
+      document.body.innerHTML = `
+        <select id="test-select">
+          <option value="1">One</option>
+          <option value="2">Two</option>
+        </select>
+      `;
+
+      const result = await simplifier.transform("body");
+      const id = Object.keys(result.references)[0];
+
+      await simplifier.interactWithElement(parseInt(id), "select", "2");
+      const select = document.getElementById(
+        "test-select"
+      ) as HTMLSelectElement;
+      expect(select.value).toBe("2");
+    });
+
+    it("should handle focus events", async () => {
+      document.body.innerHTML = '<input type="text" id="test-focus">';
+
+      let focused = false;
+      const input = document.getElementById("test-focus");
+      input?.addEventListener("focus", () => (focused = true));
+
+      const result = await simplifier.transform("body");
+      const id = Object.keys(result.references)[0];
+
+      await simplifier.interactWithElement(parseInt(id), "focus");
+      expect(focused).toBe(true);
+    });
+  });
+});

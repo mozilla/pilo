@@ -36,7 +36,7 @@ export function createActionPerformer() {
           }
           return {
             success: false,
-            error: `Cannot fill element of type ${element.tagName}`,
+            error: `Cannot fill element of type ${element.tagName.toLowerCase()}`,
           };
 
         case "select":
@@ -377,7 +377,16 @@ export function createDOMTransformer() {
       // Add configured attributes
       for (const attr of allowedAttrs) {
         if (node.hasAttribute(attr)) {
-          const value = node.getAttribute(attr) || "";
+          // Handle boolean attributes
+          const isBooleanAttr = [
+            "disabled",
+            "checked",
+            "selected",
+            "readonly",
+            "required",
+            "multiple",
+          ].includes(attr);
+          const value = isBooleanAttr ? "true" : node.getAttribute(attr) || "";
           attrsStr += ` ${attr}="${escapeHtml(value)}"`;
           attributes[attr] = value;
         }

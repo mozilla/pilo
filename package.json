@@ -8,16 +8,20 @@
     "start": "node dist/index.js",
     "dev": "node --no-warnings --loader ts-node/esm src/index.ts",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^20.11.24",
+    "jsdom": "^24.0.0",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.4.0"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.2.7",
