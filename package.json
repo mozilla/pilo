@@ -20,6 +20,11 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "playwright": "^1.51.1"
+    "@ai-sdk/openai": "^1.2.7",
+    "ai": "^4.1.66",
+    "chalk": "5",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.51.1",
+    "zod": "^3.24.2"
   }
 }

@@ -1,6 +1,6 @@
 import { Page, ElementHandle } from "playwright";
 
-type NodeType = "element" | "text" | "action";
+type NodeType = "element" | "text" | "action" | "empty" | "ignored" | "unknown";
 
 interface DOMNode {
   type: NodeType;
@@ -9,11 +9,12 @@ interface DOMNode {
   children?: DOMNode[];
   actionType?: string;
   visibleText?: string;
+  elementId?: number;
 }
 
 export class PageMapper {
   private page: Page;
-  private actionIdCounter: number = 0;
+  private actionableElements: Map<number, ElementHandle> = new Map();
 
   // Tags to ignore
   private readonly ignoredTags = new Set([
@@ -120,13 +121,13 @@ export class PageMapper {
     const title = await this.page.title();
     const url = this.page.url();
 
-    // Reset the action ID counter for a new snapshot
-    this.actionIdCounter = 0;
-
-    // Get the body element
     const body = await this.page.$("body");
     if (!body) {
-      throw new Error("Could not find body element");
+      return {
+        pageTitle: title,
+        url,
+        structure: { type: "element", name: "error", children: [] },
+      };
     }
 
     const structure = await this.extractDOMStructure(body);
@@ -141,345 +142,6 @@ export class PageMapper {
   /**
    * Creates a compact text representation of the DOM structure
    */
-  async createCompactSnapshot(): Promise<string> {
-    const snapshot = await this.createPageSnapshot();
-    const output = this.formatDOMStructure(snapshot.structure);
-    // Replace 2 or more newlines with exactly 2 newlines
-    return output.replace(/\n{2,}/g, "\n\n");
-  }
-
-  /**
-   * Gets a descriptive action type for an element
-   */
-  private getActionType(element: Element): string {
-    const tagName = element.tagName.toLowerCase();
-    const role = element.getAttribute("role")?.toUpperCase();
-    const type = element.getAttribute("type")?.toLowerCase();
-
-    // Handle elements with roles first
-    if (role) {
-      return role;
-    }
-
-    // Handle specific element types
-    switch (tagName) {
-      case "a":
-        return "LINK";
-      case "button":
-        return "BUTTON";
-      case "input":
-        switch (type) {
-          case "text":
-          case "email":
-          case "password":
-          case "tel":
-          case "url":
-          case "search":
-            return "INPUT";
-          case "checkbox":
-            return "CHECKBOX";
-          case "radio":
-            return "RADIO";
-          case "file":
-            return "FILE";
-          case "submit":
-            return "SUBMIT";
-          case "reset":
-            return "RESET";
-          case "button":
-            return "BUTTON";
-          case "number":
-            return "NUMBER";
-          case "range":
-            return "RANGE";
-          case "date":
-          case "time":
-          case "datetime-local":
-            return "DATE";
-          case "color":
-            return "COLOR";
-          case "hidden":
-            return "HIDDEN";
-          default:
-            return "INPUT";
-        }
-      case "select":
-        return "SELECT";
-      case "textarea":
-        return "TEXTAREA";
-      case "form":
-        return "FORM";
-      case "label":
-        return "LABEL";
-      default:
-        return tagName.toUpperCase();
-    }
-  }
-
-  /**
-   * Extracts the complete DOM structure from an element
-   */
-  private async extractDOMStructure(element: ElementHandle): Promise<DOMNode> {
-    try {
-      const context = {
-        ignoredTags: Array.from(this.ignoredTags),
-        blockElements: Array.from(this.blockElements),
-        actionElements: Array.from(this.actionElements),
-      };
-
-      const nodeInfo = await element.evaluate(
-        (
-          el: Element,
-          context: {
-            ignoredTags: string[];
-            blockElements: string[];
-            actionElements: string[];
-          }
-        ) => {
-          function processNode(node: Node): DOMNode | null {
-            if (node.nodeType === 3) {
-              // Text node
-              const text = node.textContent?.trim();
-              return text ? { type: "text", text } : null;
-            }
-
-            if (node.nodeType === 1) {
-              // Element node
-              const element = node as Element;
-              const tagName = element.tagName.toLowerCase();
-
-              // Check if element is visible
-              const style = window.getComputedStyle(element);
-              const isVisible =
-                style.display !== "none" &&
-                style.visibility !== "hidden" &&
-                style.opacity !== "0" &&
-                (element as HTMLElement).offsetWidth > 0 &&
-                (element as HTMLElement).offsetHeight > 0;
-
-              // Skip if element is not visible
-              if (!isVisible) {
-                return null;
-              }
-
-              // Handle images specially
-              if (tagName === "img") {
-                const altText = element.getAttribute("alt");
-                const titleText = element.getAttribute("title");
-                const ariaLabel = element.getAttribute("aria-label");
-
-                // Try to get meaningful text from the image
-                const text = altText || titleText || ariaLabel;
-                if (!text) return null; // Skip images with no text
-
-                return {
-                  type: "text",
-                  text: text,
-                };
-              }
-
-              // Skip ignored tags
-              if (context.ignoredTags.includes(tagName)) {
-                return null;
-              }
-
-              // Check if element is interactive (has role or is in actionElements)
-              const hasRole = element.hasAttribute("role");
-              const role = element.getAttribute("role");
-              const isActionElement =
-                context.actionElements.includes(tagName) ||
-                (hasRole &&
-                  context.actionElements.includes(`[role='${role}']`));
-
-              // Skip hidden inputs and forms
-              if (isActionElement) {
-                if (
-                  tagName === "input" &&
-                  element.getAttribute("type") === "hidden"
-                ) {
-                  return null;
-                }
-                if (tagName === "form") {
-                  return null;
-                }
-
-                // Try multiple fallbacks for visible text in order of preference
-                let visibleText = "";
-
-                // 1. Try aria-label first (most explicit)
-                visibleText = element.getAttribute("aria-label") || "";
-
-                // 2. Try aria-labelledby if no aria-label
-                if (!visibleText) {
-                  const labelledby = element.getAttribute("aria-labelledby");
-                  if (labelledby) {
-                    const labelElement = document.getElementById(labelledby);
-                    if (labelElement) {
-                      visibleText = labelElement.textContent?.trim() || "";
-                    }
-                  }
-                }
-
-                // 3. Try label element for form controls
-                if (
-                  !visibleText &&
-                  ["input", "select", "textarea"].includes(tagName)
-                ) {
-                  const id = element.getAttribute("id");
-                  if (id) {
-                    const label = document.querySelector(`label[for="${id}"]`);
-                    if (label) {
-                      visibleText = label.textContent?.trim() || "";
-                    }
-                  }
-                }
-
-                // 4. Try placeholder for inputs
-                if (!visibleText && tagName === "input") {
-                  visibleText = (element as HTMLInputElement).placeholder || "";
-                }
-
-                // 5. Try value for inputs and buttons
-                if (
-                  !visibleText &&
-                  (tagName === "input" || tagName === "button")
-                ) {
-                  visibleText =
-                    (element as HTMLInputElement | HTMLButtonElement).value ||
-                    "";
-                }
-
-                // 6. Try direct text content as last resort (excluding child elements)
-                if (!visibleText) {
-                  // Get only direct text nodes, excluding child elements
-                  const directTextNodes = Array.from(element.childNodes)
-                    .filter((node) => node.nodeType === 3)
-                    .map((node) => node.textContent?.trim())
-                    .filter((text) => text && !text.includes("{")); // Filter out CSS-like content
-                  visibleText = directTextNodes.join(" ").trim();
-                }
-
-                // Skip if no meaningful text
-                if (!visibleText) {
-                  return null;
-                }
-
-                // Get descriptive action type
-                const actionType = getActionType(element);
-
-                return {
-                  type: "action",
-                  name: tagName,
-                  actionType,
-                  visibleText,
-                };
-              }
-
-              // Process children
-              const children = Array.from(element.childNodes)
-                .map(processNode)
-                .filter((node): node is DOMNode => node !== null);
-
-              // If no children and no text content, skip this element
-              if (children.length === 0 && !element.textContent?.trim()) {
-                return null;
-              }
-
-              return {
-                type: "element",
-                name: tagName,
-                children,
-              };
-            }
-
-            return null;
-          }
-
-          // Helper function to get action type
-          function getActionType(element: Element): string {
-            const tagName = element.tagName.toLowerCase();
-            const role = element.getAttribute("role")?.toUpperCase();
-            const type = element.getAttribute("type")?.toLowerCase();
-
-            // Handle elements with roles first
-            if (role) {
-              return role;
-            }
-
-            // Handle specific element types
-            switch (tagName) {
-              case "a":
-                return "LINK";
-              case "button":
-                return "BUTTON";
-              case "input":
-                switch (type) {
-                  case "text":
-                  case "email":
-                  case "password":
-                  case "tel":
-                  case "url":
-                  case "search":
-                    return "INPUT";
-                  case "checkbox":
-                    return "CHECKBOX";
-                  case "radio":
-                    return "RADIO";
-                  case "file":
-                    return "FILE";
-                  case "submit":
-                    return "SUBMIT";
-                  case "reset":
-                    return "RESET";
-                  case "button":
-                    return "BUTTON";
-                  case "number":
-                    return "NUMBER";
-                  case "range":
-                    return "RANGE";
-                  case "date":
-                  case "time":
-                  case "datetime-local":
-                    return "DATE";
-                  case "color":
-                    return "COLOR";
-                  case "hidden":
-                    return "HIDDEN";
-                  default:
-                    return "INPUT";
-                }
-              case "select":
-                return "SELECT";
-              case "textarea":
-                return "TEXTAREA";
-              case "form":
-                return "FORM";
-              case "label":
-                return "LABEL";
-              default:
-                return tagName.toUpperCase();
-            }
-          }
-
-          return processNode(el) as DOMNode;
-        },
-        context
-      );
-
-      return nodeInfo;
-    } catch (error) {
-      console.error("Error extracting DOM structure:", error);
-      return {
-        type: "element",
-        name: "error",
-        children: [],
-      };
-    }
-  }
-
-  /**
-   * Formats the DOM structure into the new compact text format
-   */
   private formatDOMStructure(node: DOMNode, level: number = 0): string {
     let output = "";
 
@@ -488,11 +150,10 @@ export class PageMapper {
       if (normalizedText) {
         output += normalizedText + " ";
       }
-    } else if (node.type === "action") {
-      this.actionIdCounter++;
+    } else if (node.type === "action" && node.elementId) {
       const normalizedText = this.normalizeText(node.visibleText);
       if (normalizedText) {
-        output += `<% ${node.actionType}[${this.actionIdCounter}] "${normalizedText}" %> `;
+        output += `<% ${node.actionType}[${node.elementId}] "${normalizedText}" %> `;
       }
     } else if (node.type === "element") {
       const isBlock = this.blockElements.has(node.name || "");
@@ -530,7 +191,45 @@ export class PageMapper {
   }
 
   /**
-   * Use an element ID from the LLM to interact with the actual element
+   * Creates a compact snapshot and stores references to actionable elements
+   */
+  async createCompactSnapshot(): Promise<string> {
+    // Clear previous state
+    this.actionableElements.clear();
+
+    // First pass: Add our stable identifiers to actionable elements and collect them
+    const elements = await this.page.$$eval(
+      'input, button, select, textarea, a[href], [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"]',
+      (elements) => {
+        return elements
+          .filter((el) => {
+            const rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          })
+          .map((el, index) => {
+            const id = index + 1; // Start IDs at 1
+            el.classList.add(`spark-action-${id}`);
+            return id;
+          });
+      }
+    );
+
+    // Second pass: Get handles to the elements we marked
+    for (const id of elements) {
+      const element = await this.page.$(`.spark-action-${id}`);
+      if (element) {
+        this.actionableElements.set(id, element);
+      }
+    }
+
+    const snapshot = await this.createPageSnapshot();
+    let output = `# ${snapshot.pageTitle}\nURL: ${snapshot.url}\n\n`;
+    output += this.formatDOMStructure(snapshot.structure);
+    return output.replace(/\n{2,}/g, "\n\n");
+  }
+
+  /**
+   * Use an element ID to interact with the actual element
    */
   async interactWithElement(
     elementId: number,
@@ -538,60 +237,46 @@ export class PageMapper {
     value?: string
   ): Promise<boolean> {
     try {
-      // Find the element with the matching action ID and get its type
-      const elementInfo = await this.page.evaluate((id: number) => {
-        const elements = Array.from(
-          document.querySelectorAll(
-            "a, button, input, form, select, textarea, label"
-          )
-        );
-        let currentId = 0;
-
-        for (const el of elements) {
-          currentId++;
-          if (currentId === id) {
-            return {
-              tagName: el.tagName.toLowerCase(),
-              exists: true,
-            };
-          }
-        }
-        return {
-          tagName: "",
-          exists: false,
-        };
-      }, elementId);
-
-      if (!elementInfo.exists) {
+      const element = this.actionableElements.get(elementId);
+      if (!element) {
         throw new Error(`No element found with ID: ${elementId}`);
       }
 
-      // Create a selector to find the element
-      const selector = `a, button, input, form, select, textarea, label:nth-of-type(${elementId})`;
-      const element = await this.page.$(selector);
-
-      if (!element) {
-        throw new Error(`Could not find element with selector: ${selector}`);
-      }
+      // Get detailed element info for validation
+      const elementInfo = await element.evaluate((el: HTMLElement) => ({
+        tagName: el.tagName.toLowerCase(),
+        role: el.getAttribute("role")?.toLowerCase(),
+        type: el.getAttribute("type")?.toLowerCase(),
+        isInput: el instanceof HTMLInputElement,
+        isTextArea: el instanceof HTMLTextAreaElement,
+        isSelect: el instanceof HTMLSelectElement,
+      }));
 
       switch (action) {
         case "click":
           await element.click();
           break;
+
         case "fill":
           if (!value) throw new Error("Value required for fill action");
-          if (!["input", "textarea"].includes(elementInfo.tagName)) {
+          if (
+            !elementInfo.isInput &&
+            !elementInfo.isTextArea &&
+            elementInfo.role !== "searchbox" &&
+            elementInfo.role !== "textbox"
+          ) {
             throw new Error(
-              `Cannot fill element of type ${elementInfo.tagName}`
+              `Cannot fill element: ${JSON.stringify(elementInfo)}`
             );
           }
           await element.fill(value);
           break;
+
         case "select":
           if (!value) throw new Error("Value required for select action");
-          if (elementInfo.tagName !== "select") {
+          if (!elementInfo.isSelect) {
             throw new Error(
-              `Cannot select option on element of type ${elementInfo.tagName}`
+              `Cannot select option on element: ${JSON.stringify(elementInfo)}`
             );
           }
           await element.selectOption(value);
@@ -606,18 +291,118 @@ export class PageMapper {
       return false;
     }
   }
+
+  /**
+   * Extracts the complete DOM structure from an element
+   */
+  private async extractDOMStructure(element: ElementHandle): Promise<DOMNode> {
+    try {
+      const nodeInfo = await element.evaluate(
+        (el: HTMLElement, ignoredTags: string[]) => {
+          function getActionType(element: HTMLElement): string {
+            const tagName = element.tagName.toLowerCase();
+            const role = element.getAttribute("role")?.toLowerCase();
+            const type = element.getAttribute("type")?.toLowerCase();
+
+            if (type === "search" || role === "searchbox") return "SEARCHBOX";
+            if (type === "submit") return "SUBMIT";
+            if (role) return role.toUpperCase();
+            if (tagName === "a") return "LINK";
+            if (tagName === "button") return "BUTTON";
+            if (tagName === "select") return "SELECT";
+            if (tagName === "textarea") return "TEXTAREA";
+            if (tagName === "input") {
+              return type ? type.toUpperCase() : "INPUT";
+            }
+            return tagName.toUpperCase();
+          }
+
+          function getVisibleText(element: HTMLElement): string {
+            return (
+              element.getAttribute("aria-label") ||
+              element
+                .getAttribute("aria-labelledby")
+                ?.split(" ")
+                .map((id) => document.getElementById(id)?.textContent)
+                .filter(Boolean)
+                .join(" ") ||
+              (element.id &&
+                document.querySelector(`label[for="${element.id}"]`)
+                  ?.textContent) ||
+              (element instanceof HTMLInputElement && element.placeholder) ||
+              (element instanceof HTMLInputElement && element.value) ||
+              element.textContent ||
+              ""
+            );
+          }
+
+          function getActionId(element: HTMLElement): number {
+            const className = Array.from(element.classList).find((c) =>
+              c.startsWith("spark-action-")
+            );
+            if (!className) return 0;
+            return parseInt(className.replace("spark-action-", ""));
+          }
+
+          function processNode(node: Node): DOMNode {
+            if (node.nodeType === 3) {
+              // Text node
+              const text = node.textContent?.trim();
+              return text
+                ? { type: "text", text }
+                : { type: "element", name: "empty", children: [] };
+            }
+
+            if (node.nodeType === 1 && node instanceof HTMLElement) {
+              const tagName = node.tagName.toLowerCase();
+
+              // Skip ignored tags
+              if (ignoredTags.includes(tagName)) {
+                return { type: "element", name: "ignored", children: [] };
+              }
+
+              const className = Array.from(node.classList).find((c) =>
+                c.startsWith("spark-action-")
+              );
+              if (className) {
+                const visibleText = getVisibleText(node).trim();
+                if (visibleText) {
+                  return {
+                    type: "action",
+                    name: tagName,
+                    actionType: getActionType(node),
+                    visibleText,
+                    elementId: getActionId(node),
+                  };
+                }
+              }
+
+              // Process children
+              const children = Array.from(node.childNodes)
+                .map(processNode)
+                .filter(
+                  (node) => node.type !== "empty" && node.type !== "ignored"
+                );
+
+              return {
+                type: "element",
+                name: tagName,
+                children: children.length > 0 ? children : [],
+              };
+            }
+
+            return { type: "element", name: "unknown", children: [] };
+          }
+
+          return processNode(el);
+        },
+        Array.from(this.ignoredTags)
+      );
+
+      return nodeInfo;
+    } catch (error) {
+      console.error("Error extracting DOM structure:", error);
+      return { type: "element", name: "error", children: [] };
+    }
+  }
 }
-
-// Example usage:
-/*
-const browser = await playwright.chromium.launch();
-const page = await browser.newPage();
-await page.goto('https://example.com');
-
-const pageMapper = new PageMapper(page);
-const pageSnapshot = await pageMapper.createPageSnapshot();
-
-// Get the compact text representation
-const compactSnapshot = await pageMapper.createCompactSnapshot();
-console.log(compactSnapshot);
-*/
