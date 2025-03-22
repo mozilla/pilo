@@ -25,7 +25,7 @@ Action Types:
 - "done": Signal that the task is complete. Include the final result in the value field.
 
 Important Rules:
-1. The target number corresponds to the element ID shown in the page snapshot like: <% BUTTON[1] "Click me" %>
+1. The target number corresponds to the element ID shown in the page snapshot like: <button id="1">Click me</button> or <input id="2" type="text">
 2. Multiple actions can be specified and will be executed in order
 3. Never include actions after a "click" action in the array, as we need to wait and observe the page changes first
 4. When using "done", it should be the only action in the array and must include a value with the task result
@@ -61,7 +61,8 @@ ${plan}
 export const buildPageSnapshotPrompt = (pageSnapshot: string) =>
   `
 This is a plain text snapshot of the current page in the browser.
-Use this information to determine the next action to take.
+The snapshot includes HTML elements with numeric IDs that you can interact with.
+For example, <button id="1">Click me</button> can be clicked using target: 1.
 
 \`\`\`
 ${pageSnapshot}

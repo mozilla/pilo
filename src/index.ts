@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import { firefox, devices } from "playwright";
-import { PageMapper } from "./pageSnapshot.js";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
+import { DOMSimplifier, PlaywrightAdapter } from "./domSimplifier.js";
 
 // Load environment variables from .env file
 config();
@@ -128,8 +128,10 @@ let finalAnswer = null;
 // Start the loop
 while (!finalAnswer) {
   // Get the page snapshot
-  const pageMapper = new PageMapper(page);
-  const pageSnapshot = await pageMapper.createCompactSnapshot();
+  const adapter = new PlaywrightAdapter(page);
+  const domSimplifier = new DOMSimplifier(adapter);
+  const domResult = await domSimplifier.transform("body");
+  const pageSnapshot = domResult.text;
 
   if (DEBUG) {
     console.log(chalk.green.bold("\n📸 Page Snapshot:"));
@@ -178,8 +180,8 @@ while (!finalAnswer) {
       continue;
     }
 
-    // Execute the action using PageMapper
-    const success = await pageMapper.interactWithElement(
+    // Execute the action using DOMSimplifier
+    const success = await domSimplifier.interactWithElement(
       action.target!,
       action.action,
       action.value
