@@ -17,6 +17,7 @@ export class WebAgent {
   private messages: any[] = [];
   private llm = openai("gpt-4o");
   private DEBUG = false;
+  private elementReferences: Record<number, { selector: string }> = {};
 
   constructor(private browser: Browser, debug: boolean = false) {
     this.DEBUG = debug;
@@ -147,6 +148,9 @@ export class WebAgent {
       const domResult = await this.browser.simplifyDOM("body");
       const pageSnapshot = domResult.text;
 
+      // Store the element references for later use
+      this.elementReferences = domResult.references;
+
       if (this.DEBUG) {
         console.log(chalk.cyan.bold("\n🤔 Messages:"));
         console.log(chalk.gray(JSON.stringify(this.messages, null, 2)));
@@ -216,10 +220,33 @@ export class WebAgent {
         await this.browser.goBack();
       } else {
         // Execute the action using browser's performAction
-        // Convert numeric target to CSS selector with data attribute
-        const selector = `[data-simplifier-id="${result.action.target}"], .__SPARK_ID_${result.action.target}__`;
+        // Check if we have a valid target ID
+        if (result.action.target === undefined) {
+          console.error(
+            chalk.red.bold(`❌ Failed to execute action: missing target`)
+          );
+          this.messages.push({
+            role: "assistant",
+            content: `Failed to execute action: missing target`,
+          });
+          continue;
+        }
+
+        // Get the selector from the stored references
+        const reference = this.elementReferences[result.action.target];
+        if (!reference) {
+          console.error(
+            chalk.red.bold(`❌ Failed to execute action: element not found`)
+          );
+          this.messages.push({
+            role: "assistant",
+            content: `Failed to execute action: element not found`,
+          });
+          continue;
+        }
+
         const success = await this.browser.performAction(
-          selector,
+          reference.selector,
           result.action.action,
           result.action.value
         );

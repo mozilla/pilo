@@ -23,6 +23,7 @@ export interface Browser {
     selector: string,
     config?: Partial<SimplifierConfig>
   ): Promise<SimplifierResult>;
+
   performAction(
     selector: string,
     action: string,

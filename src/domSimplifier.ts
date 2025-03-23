@@ -367,18 +367,13 @@ export function createDOMTransformer() {
 
     /**
      * Generates a unique selector for an element
-     * Adds a special class to the element for reliable future selection
+     * Adds a data attribute for reliable future selection
      */
     function getUniqueSelector(element: Element, id: number): string {
-      // Add our special class to make selection easier and more reliable
-      const className = `__SPARK_ID_${id}__`;
-      element.classList.add(className);
-
-      // In JSDOM the class selector might not work properly,
-      // so we'll also add a data attribute as a fallback
+      // Add a data attribute for reliable element selection
       element.setAttribute("data-simplifier-id", id.toString());
 
-      // For tests, use the data attribute selector since it's more reliable in JSDOM
+      // Return the data attribute selector
       return `[data-simplifier-id="${id}"]`;
     }
 
@@ -1004,8 +999,8 @@ export class DOMSimplifier {
     action: string,
     value?: string
   ): Promise<boolean> {
-    // Find the selector for this element ID in the last transform result
-    const selector = `[data-simplifier-id="${id}"], .__SPARK_ID_${id}__`;
+    // Use only the data attribute for the selector
+    const selector = `[data-simplifier-id="${id}"]`;
 
     // Use the selector with browser.performAction
     const result = await this.browser.performAction(selector, action, value);
