@@ -50,10 +50,7 @@ function setupMessages(task: string, plan: string) {
 async function getNextActions(messages: any, pageSnapshot: string) {
   // Replace all previous snapshot messages with placeholders
   messages.forEach((msg: any) => {
-    if (
-      msg.role === "user" &&
-      msg.content.includes("This is a plain text snapshot")
-    ) {
+    if (msg.role === "user" && msg.content.includes("Current page snapshot")) {
       msg.content = "[Previous snapshot removed]";
     }
   });
@@ -70,7 +67,15 @@ async function getNextActions(messages: any, pageSnapshot: string) {
       observation: z.string(),
       thought: z.string(),
       action: z.object({
-        action: z.enum(["select", "fill", "click", "done", "wait"]),
+        action: z.enum([
+          "select",
+          "fill",
+          "click",
+          "done",
+          "wait",
+          "goto",
+          "back",
+        ]),
         target: z.number().optional(),
         value: z.string().optional(),
       }),
@@ -178,6 +183,18 @@ console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
         )
       );
       await wait(seconds);
+    } else if (result.action.action === "goto") {
+      if (result.action.value) {
+        console.log(
+          chalk.blue.bold(`🌐 Navigating to: ${result.action.value}`)
+        );
+        await page.goto(result.action.value);
+      } else {
+        console.error(chalk.red.bold(`❌ Failed to execute goto: missing URL`));
+      }
+    } else if (result.action.action === "back") {
+      console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
+      await page.goBack();
     } else {
       // Execute the action using DOMSimplifier
       const success = await domSimplifier.interactWithElement(
@@ -200,7 +217,9 @@ console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
     }
 
     // Wait for network idle after interactive actions
-    if (["click", "select", "fill"].includes(result.action.action)) {
+    if (
+      ["click", "select", "fill", "goto", "back"].includes(result.action.action)
+    ) {
       console.log(
         chalk.gray("   🌐 Waiting for network activity to settle...")
       );
