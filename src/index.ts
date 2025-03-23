@@ -18,7 +18,7 @@ config();
 // Debug flag - set to true to see page snapshots
 const DEBUG = false;
 
-// Setup the LLM
+// Setup LLM
 const llm = openai("gpt-4o");
 
 async function createPlan(task: string) {
@@ -76,6 +76,7 @@ async function getNextActions(messages: any, pageSnapshot: string) {
       }),
     }),
     messages,
+    temperature: 0,
   });
 
   return response.object;
@@ -130,14 +131,14 @@ console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
     const pageSnapshot = domResult.text;
 
     if (DEBUG) {
-      console.log(chalk.green.bold("\n📸 Page Snapshot:"));
-      console.log(chalk.gray(pageSnapshot));
+      // console.log(chalk.green.bold("\n📸 Page Snapshot:"));
+      // console.log(chalk.gray(pageSnapshot));
+
+      console.log(chalk.cyan.bold("\n🤔 Messages:"));
+      console.log(chalk.gray(JSON.stringify(messages, null, 2)));
     }
 
     console.log(chalk.cyan.bold("\n🤔 Thinking..."));
-
-    console.log(chalk.cyan.bold("\n🤔 Messages:"));
-    console.log(chalk.gray(JSON.stringify(messages, null, 2)));
 
     // Call LLM with the page snapshot
     const result = await getNextActions(messages, pageSnapshot);

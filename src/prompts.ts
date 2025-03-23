@@ -34,7 +34,7 @@ export const buildPlanPrompt = (task: string) =>
   `
 You are an expert at efficiently navigating the web. 
 Given the following task, provide high level outline of the plan. Don't imply specific features of the page, just provide a general outline of the steps.
-Choose a starting URL for the task. Starting URLs should be a top level domain (with no path).
+Choose a starting URL for the task. Starting URLs should be a top level domain (with no path) and always start with http:// or https://.
 
 Task:
 ${task}
