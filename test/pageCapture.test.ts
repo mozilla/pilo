@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DOMSimplifier, getDefaultConfig } from "../src/domSimplifier";
+import { PageCapture, getDefaultConfig } from "../src/pageCapture";
 import { MockBrowser } from "./MockBrowser";
 import { JSDOM } from "jsdom";
 
@@ -22,11 +22,10 @@ function applyJSDOMPatches() {
   }
 }
 
-describe("DOMSimplifier", () => {
-  let dom: JSDOM;
-  let document: Document;
-  let simplifier: DOMSimplifier;
+describe("PageCapture", () => {
+  let simplifier: PageCapture;
   let mockBrowser: MockBrowser;
+  let dom: JSDOM;
 
   beforeEach(() => {
     // Create a fresh JSDOM instance for each test
@@ -35,10 +34,8 @@ describe("DOMSimplifier", () => {
       pretendToBeVisual: true,
     });
 
-    document = dom.window.document;
-
     // Set up the global environment
-    global.document = document;
+    global.document = dom.window.document;
     // @ts-ignore - JSDOM types don't match exactly but functionality is correct
     global.window = dom.window;
     global.HTMLElement = dom.window.HTMLElement;
@@ -55,7 +52,7 @@ describe("DOMSimplifier", () => {
     mockBrowser = new MockBrowser();
 
     // Create a test-optimized simplifier with custom config
-    simplifier = new DOMSimplifier(mockBrowser, {
+    simplifier = new PageCapture(mockBrowser, {
       // We need to keep whitespace cleaner for testing
       cleanupWhitespace: false,
       // Handle hidden elements more simply in tests
@@ -65,7 +62,7 @@ describe("DOMSimplifier", () => {
 
   describe("Basic Text Transformation", () => {
     it("should transform simple text content", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <p>Hello World</p>
           <p>This is a test</p>
@@ -79,7 +76,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should handle nested elements", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <section>
             <h1>Title</h1>
@@ -95,7 +92,7 @@ describe("DOMSimplifier", () => {
 
     it("should handle inline elements with proper spacing", async () => {
       // Create a test DOM with inline elements
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <a href="#">Prime Video Direct</a>
           <a href="#">Video Distribution</a>
@@ -124,7 +121,7 @@ describe("DOMSimplifier", () => {
 
   describe("Element Preservation", () => {
     it("should preserve interactive elements with attributes", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <button type="submit">Click me</button>
           <input type="text" placeholder="Enter text">
@@ -145,7 +142,7 @@ describe("DOMSimplifier", () => {
 
   describe("Block Element Handling", () => {
     it("should add appropriate spacing around block elements", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>First block</div>
         <p>Second block</p>
         <div>Third block</div>
@@ -166,18 +163,18 @@ describe("DOMSimplifier", () => {
 
   describe("Hidden Element Handling", () => {
     it("should respect the includeHiddenElements flag", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>Visible content</div>
         <div hidden>Hidden content</div>
       `;
 
       // Create two simplifiers with different hidden element configurations
-      const includeHiddenSimplifier = new DOMSimplifier(mockBrowser, {
+      const includeHiddenSimplifier = new PageCapture(mockBrowser, {
         cleanupWhitespace: false,
         includeHiddenElements: true,
       });
 
-      const excludeHiddenSimplifier = new DOMSimplifier(mockBrowser, {
+      const excludeHiddenSimplifier = new PageCapture(mockBrowser, {
         cleanupWhitespace: false,
         includeHiddenElements: false,
       });
@@ -199,10 +196,11 @@ describe("DOMSimplifier", () => {
 
   describe("Action Performing", () => {
     it("should perform click actions", async () => {
-      document.body.innerHTML = '<button id="test-button">Click me</button>';
+      dom.window.document.body.innerHTML =
+        '<button id="test-button">Click me</button>';
 
       let clicked = false;
-      const button = document.getElementById("test-button");
+      const button = dom.window.document.getElementById("test-button");
       button?.addEventListener("click", () => (clicked = true));
 
       const result = await simplifier.transform("body");
@@ -217,7 +215,8 @@ describe("DOMSimplifier", () => {
     });
 
     it("should perform fill actions on input elements", async () => {
-      document.body.innerHTML = '<input type="text" id="test-input">';
+      dom.window.document.body.innerHTML =
+        '<input type="text" id="test-input">';
 
       const result = await simplifier.transform("body");
       console.log("References:", result.references);
@@ -233,7 +232,9 @@ describe("DOMSimplifier", () => {
           "test value"
         );
         console.log("Action Result:", actionResult);
-        const input = document.getElementById("test-input") as HTMLInputElement;
+        const input = dom.window.document.getElementById(
+          "test-input"
+        ) as HTMLInputElement;
         console.log("Input value after fill:", input.value);
         expect(input.value).toBe("test value");
       } else {
@@ -244,7 +245,7 @@ describe("DOMSimplifier", () => {
 
   describe("Form Element Handling", () => {
     it("should handle form elements with various states", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <form action="/submit" method="post">
           <input type="text" value="test" disabled>
           <input type="checkbox" checked>
@@ -297,7 +298,7 @@ describe("DOMSimplifier", () => {
 
   describe("ARIA Role Handling", () => {
     it("should preserve elements with actionable ARIA roles", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div role="button" aria-label="Close">×</div>
         <span role="checkbox" aria-checked="true">Accept terms</span>
         <div role="tab" aria-selected="true">Tab 1</div>
@@ -312,7 +313,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should not preserve elements with non-actionable ARIA roles", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div role="banner">Header</div>
         <div role="contentinfo">Footer</div>
       `;
@@ -331,7 +332,7 @@ describe("DOMSimplifier", () => {
 
   describe("List and Table Handling", () => {
     it("should properly format ordered and unordered lists", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <ul>
           <li>First item</li>
           <li>Second item</li>
@@ -352,7 +353,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should handle tables with proper spacing", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <table>
           <tr><th>Header 1</th><th>Header 2</th></tr>
           <tr><td>Cell 1</td><td>Cell 2</td></tr>
@@ -375,7 +376,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should handle malformed HTML gracefully", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <p>Unclosed paragraph
           <span>Unclosed span
@@ -388,7 +389,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should handle empty elements gracefully", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div></div>
         <p>   </p>
         <span> </span>
@@ -401,7 +402,7 @@ describe("DOMSimplifier", () => {
 
   describe("Empty Anchor Tag Handling", () => {
     it("should skip completely empty anchor tags", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <a href="#" title="Link">Link text</a>
           <a></a>
@@ -419,7 +420,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should skip anchor tags with only whitespace", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <a href="#" title="Link">Link text</a>
           <a>   </a>
@@ -437,7 +438,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should skip anchor tags with only attributes", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <a href="#" title="Link">Link text</a>
           <a href="#" id="no-content" title="Empty"></a>
@@ -457,7 +458,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should preserve anchor tags with actual content", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <div>
           <a href="#" title="Link">Link text</a>
           <a href="/signin" title="Sign in">Sign in</a>
@@ -477,7 +478,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should skip anchor tags with only presentational content", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <ul>
           <li>
             <a
@@ -501,7 +502,7 @@ describe("DOMSimplifier", () => {
       `;
 
       // Create a new simplifier that respects hidden elements
-      const hiddenRespectingSimplifier = new DOMSimplifier(mockBrowser, {
+      const hiddenRespectingSimplifier = new PageCapture(mockBrowser, {
         cleanupWhitespace: false,
         includeHiddenElements: false,
       });
@@ -524,14 +525,15 @@ describe("DOMSimplifier", () => {
 
   describe("Action Performing - Extended", () => {
     it("should handle checkbox toggling", async () => {
-      document.body.innerHTML = '<input type="checkbox" id="test-checkbox">';
+      dom.window.document.body.innerHTML =
+        '<input type="checkbox" id="test-checkbox">';
 
       const result = await simplifier.transform("body");
       const id = Object.keys(result.references)[0];
 
       // Check the checkbox
       await simplifier.interactWithElement(parseInt(id), "check");
-      const checkbox = document.getElementById(
+      const checkbox = dom.window.document.getElementById(
         "test-checkbox"
       ) as HTMLInputElement;
       expect(checkbox.checked).toBe(true);
@@ -542,7 +544,7 @@ describe("DOMSimplifier", () => {
     });
 
     it("should handle select element interactions", async () => {
-      document.body.innerHTML = `
+      dom.window.document.body.innerHTML = `
         <select id="test-select">
           <option value="1">One</option>
           <option value="2">Two</option>
@@ -553,17 +555,18 @@ describe("DOMSimplifier", () => {
       const id = Object.keys(result.references)[0];
 
       await simplifier.interactWithElement(parseInt(id), "select", "2");
-      const select = document.getElementById(
+      const select = dom.window.document.getElementById(
         "test-select"
       ) as HTMLSelectElement;
       expect(select.value).toBe("2");
     });
 
     it("should handle focus events", async () => {
-      document.body.innerHTML = '<input type="text" id="test-focus">';
+      dom.window.document.body.innerHTML =
+        '<input type="text" id="test-focus">';
 
       let focused = false;
-      const input = document.getElementById("test-focus");
+      const input = dom.window.document.getElementById("test-focus");
       input?.addEventListener("focus", () => (focused = true));
 
       const result = await simplifier.transform("body");
@@ -572,5 +575,43 @@ describe("DOMSimplifier", () => {
       await simplifier.interactWithElement(parseInt(id), "focus");
       expect(focused).toBe(true);
     });
+  });
+
+  describe("transform", () => {
+    it("handles empty selector gracefully", async () => {
+      await expect(simplifier.transform("")).rejects.toThrow();
+    });
+
+    it("returns the expected references", async () => {
+      // This test checks that references are properly stored
+      const result = await simplifier.transform("body");
+      const references = result.references;
+
+      // There should be at least one reference
+      expect(Object.keys(references).length).toBeGreaterThan(0);
+
+      // Each reference should have the expected structure
+      Object.values(references).forEach((ref) => {
+        expect(ref).toHaveProperty("selector");
+        expect(ref).toHaveProperty("tagName");
+        expect(ref).toHaveProperty("attributes");
+      });
+    });
+  });
+
+  describe("configuration", () => {
+    it("includes hidden elements when configured", async () => {
+      const includeHiddenSimplifier = new PageCapture(mockBrowser, {
+        includeHiddenElements: true,
+      });
+
+      const excludeHiddenSimplifier = new PageCapture(mockBrowser, {
+        includeHiddenElements: false,
+      });
+
+      // ... existing code ...
+    });
+
+    // ... existing code ...
   });
 });

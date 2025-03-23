@@ -1,5 +1,5 @@
 /**
- * DOM Simplifier - Transforms HTML DOM into simplified text with actionable elements
+ * PageCapture - Transforms HTML DOM into simplified text with actionable elements
  * This module provides functionality to:
  * 1. Transform complex HTML into a simplified text representation
  * 2. Preserve interactive elements (links, buttons, forms, etc.)
@@ -18,7 +18,7 @@ import {
 // Add type declarations for browser context
 declare global {
   interface Window {
-    domTransformer: typeof domTransformer;
+    pageTransformer: typeof pageTransformer;
     elementActionPerformer: typeof elementActionPerformer;
   }
 }
@@ -123,11 +123,11 @@ export function getDefaultConfig(): SimplifierConfig {
 }
 
 /**
- * Creates a self-contained DOM transformer function that can be serialized and injected
+ * Creates a self-contained page transformer function that can be serialized and injected
  * into any context (browser, Playwright, etc.)
  */
-export function createDOMTransformer() {
-  return function domTransformer(
+export function createPageTransformer() {
+  return function pageTransformer(
     selector: string,
     userConfig?: Partial<SimplifierConfig>
   ): SimplifierResult {
@@ -689,14 +689,14 @@ export function createDOMTransformer() {
         references: context.elementReferences,
       };
     } catch (error) {
-      console.error("Error in DOM transformation:", error);
+      console.error("Error in page transformation:", error);
       throw error;
     }
   };
 }
 
-// The serializable DOM transformer function
-export const domTransformer = createDOMTransformer();
+// The serializable page transformer function
+export const pageTransformer = createPageTransformer();
 
 /**
  * Create a self-contained action performer function
@@ -971,24 +971,24 @@ export function createActionPerformer() {
 export const elementActionPerformer = createActionPerformer();
 
 /**
- * Main DOM Simplifier class that provides a high-level interface
- * for transforming DOM elements and interacting with them
+ * Main PageCapture class that provides a high-level interface
+ * for transforming page content and interacting with elements
  */
-export class DOMSimplifier {
+export class PageCapture {
   private config: SimplifierConfig;
 
   /**
-   * Creates a new DOMSimplifier instance
+   * Creates a new PageCapture instance
    */
   constructor(private browser: Browser, config?: Partial<SimplifierConfig>) {
     this.config = this.mergeConfig(getDefaultConfig(), config || {});
   }
 
   /**
-   * Transforms a DOM element into simplified text
+   * Transforms a page element into simplified text
    */
   async transform(selector: string): Promise<SimplifierResult> {
-    return this.browser.simplifyDOM(selector, this.config);
+    return this.browser.capturePage(selector, this.config);
   }
 
   /**

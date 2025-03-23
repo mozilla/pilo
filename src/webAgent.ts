@@ -8,7 +8,7 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
-import { DOMSimplifier } from "./domSimplifier.js";
+import { PageCapture } from "./pageCapture.js";
 import { Browser } from "./browser/Browser";
 
 export class WebAgent {
@@ -143,13 +143,13 @@ export class WebAgent {
 
     // Start the loop
     while (!finalAnswer) {
-      // Get the page snapshot using the DOM simplifier
-      // Use browser's simplifyDOM directly instead of creating a new DOMSimplifier each time
-      const domResult = await this.browser.simplifyDOM("body");
-      const pageSnapshot = domResult.text;
+      // Get the page snapshot using the page capture
+      // Use browser's capturePage directly instead of creating a new PageCapture each time
+      const pageResult = await this.browser.capturePage("body");
+      const pageSnapshot = pageResult.text;
 
       // Store the element references for later use
-      this.elementReferences = domResult.references;
+      this.elementReferences = pageResult.references;
 
       if (this.DEBUG) {
         console.log(chalk.cyan.bold("\n🤔 Messages:"));

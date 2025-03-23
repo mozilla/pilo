@@ -2,7 +2,7 @@ import { SimplifierConfig, SimplifierResult, ActionResult } from "../types";
 
 /**
  * Browser interface that abstracts browser interactions
- * for both WebAgent and DOM simplification
+ * for both WebAgent and page simplification
  */
 export interface Browser {
   // Browser initialization and management
@@ -18,8 +18,8 @@ export interface Browser {
   getCurrentUrl(): Promise<string>;
   waitForSelector(selector: string, options?: any): Promise<void>;
 
-  // DOM simplifier functionality
-  simplifyDOM(
+  // Page capture functionality
+  capturePage(
     selector: string,
     config?: Partial<SimplifierConfig>
   ): Promise<SimplifierResult>;

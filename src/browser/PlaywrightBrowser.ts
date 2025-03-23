@@ -7,7 +7,7 @@ import {
 } from "playwright";
 import { Browser } from "./Browser";
 import { SimplifierConfig, SimplifierResult, ActionResult } from "../types";
-import { domTransformer, getDefaultConfig } from "../domSimplifier.js";
+import { pageTransformer, getDefaultConfig } from "../pageCapture.js";
 
 /**
  * PlaywrightBrowser - Browser implementation using Playwright
@@ -89,7 +89,7 @@ export class PlaywrightBrowser implements Browser {
     await this.page.waitForSelector(selector, options);
   }
 
-  async simplifyDOM(
+  async capturePage(
     selector: string,
     userConfig?: Partial<SimplifierConfig>
   ): Promise<SimplifierResult> {
@@ -98,11 +98,11 @@ export class PlaywrightBrowser implements Browser {
     // Pre-compute the default config
     const defaultConfig = getDefaultConfig();
 
-    // Inject the domTransformer function and pre-computed default config
+    // Inject the pageTransformer function and pre-computed default config
     await this.addScriptTag({
       content: `
         window.defaultConfig = ${JSON.stringify(defaultConfig)};
-        window.domTransformer = ${domTransformer.toString()};
+        window.pageTransformer = ${pageTransformer.toString()};
       `,
     });
 
@@ -124,7 +124,7 @@ export class PlaywrightBrowser implements Browser {
 
         // Use the transformer with the pre-computed config
         // @ts-ignore - Using the injected function
-        return window.domTransformer(selector, userConfig);
+        return window.pageTransformer(selector, userConfig);
       },
       { selector, userConfig }
     );

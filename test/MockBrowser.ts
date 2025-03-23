@@ -1,10 +1,10 @@
 import { Browser } from "../src/browser/Browser";
 import { SimplifierConfig, SimplifierResult, ActionResult } from "../src/types";
 import {
-  domTransformer,
+  pageTransformer,
   elementActionPerformer,
   getDefaultConfig,
-} from "../src/domSimplifier.js";
+} from "../src/pageCapture.js";
 
 /**
  * MockBrowser - A test implementation of the Browser interface
@@ -51,7 +51,7 @@ export class MockBrowser implements Browser {
     // No waiting needed in the mock
   }
 
-  async simplifyDOM(
+  async capturePage(
     selector: string,
     userConfig?: Partial<SimplifierConfig>
   ): Promise<SimplifierResult> {
@@ -61,8 +61,8 @@ export class MockBrowser implements Browser {
       cleanupWhitespace: false, // Keep whitespace for predictable test assertions
     };
 
-    // Pass the merged config to the domTransformer
-    return domTransformer(selector, {
+    // Pass the merged config to the pageTransformer
+    return pageTransformer(selector, {
       ...testDefaults,
       ...userConfig,
     });
