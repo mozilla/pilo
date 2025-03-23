@@ -142,9 +142,9 @@ export class WebAgent {
 
     // Start the loop
     while (!finalAnswer) {
-      // Get the page snapshot using the browser abstraction
-      const domSimplifier = new DOMSimplifier(this.browser);
-      const domResult = await domSimplifier.transform("body");
+      // Get the page snapshot using the DOM simplifier
+      // Use browser's simplifyDOM directly instead of creating a new DOMSimplifier each time
+      const domResult = await this.browser.simplifyDOM("body");
       const pageSnapshot = domResult.text;
 
       if (this.DEBUG) {
@@ -216,8 +216,10 @@ export class WebAgent {
         await this.browser.goBack();
       } else {
         // Execute the action using browser's performAction
+        // Convert numeric target to CSS selector with data attribute
+        const selector = `[data-simplifier-id="${result.action.target}"], .__SPARK_ID_${result.action.target}__`;
         const success = await this.browser.performAction(
-          result.action.target!,
+          selector,
           result.action.action,
           result.action.value
         );

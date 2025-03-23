@@ -3,6 +3,7 @@ import { SimplifierConfig, SimplifierResult, ActionResult } from "../src/types";
 import {
   domTransformer,
   elementActionPerformer,
+  getDefaultConfig,
 } from "../src/domSimplifier.js";
 
 /**
@@ -52,99 +53,26 @@ export class MockBrowser implements Browser {
 
   async simplifyDOM(
     selector: string,
-    config?: Partial<SimplifierConfig>
+    userConfig?: Partial<SimplifierConfig>
   ): Promise<SimplifierResult> {
-    // In the mock browser, we can call domTransformer directly
+    // For testing, we want a few test-specific defaults
+    const testDefaults: Partial<SimplifierConfig> = {
+      includeHiddenElements: true, // Always include hidden elements in tests
+      cleanupWhitespace: false, // Keep whitespace for predictable test assertions
+    };
+
+    // Pass the merged config to the domTransformer
     return domTransformer(selector, {
-      // Default test configuration
-      preserveElements: {
-        a: ["title", "role"],
-        button: ["type", "disabled", "role"],
-        input: ["type", "placeholder", "value", "checked", "disabled", "role"],
-        select: ["disabled", "role"],
-        option: ["value", "selected"],
-        textarea: ["placeholder", "disabled", "role"],
-        form: ["method", "role"],
-      },
-      blockElements: [
-        "div",
-        "p",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "ul",
-        "ol",
-        "li",
-        "table",
-        "tr",
-        "form",
-        "section",
-        "article",
-        "header",
-        "footer",
-        "nav",
-        "aside",
-        "blockquote",
-        "pre",
-        "hr",
-      ],
-      selfClosingElements: ["input", "hr", "meta", "link"],
-      removeElements: [
-        "script",
-        "style",
-        "noscript",
-        "template",
-        "iframe",
-        "svg",
-        "math",
-        "head",
-        "canvas",
-        "object",
-        "embed",
-        "video",
-        "audio",
-        "map",
-        "track",
-        "param",
-        "applet",
-        "br",
-        "meta",
-        "link",
-        "img",
-      ],
-      includeHiddenElements: true,
-      preserveAriaRoles: true,
-      actionableRoles: [
-        "button",
-        "link",
-        "checkbox",
-        "radio",
-        "textbox",
-        "combobox",
-        "listbox",
-        "menu",
-        "menuitem",
-        "tab",
-        "searchbox",
-        "switch",
-        "spinbutton",
-      ],
-      cleanupWhitespace: false,
-      ...config,
+      ...testDefaults,
+      ...userConfig,
     });
   }
 
   async performAction(
-    elementId: number,
+    selector: string,
     action: string,
     value?: string
   ): Promise<ActionResult> {
-    // Create the selector for the element using the data attribute
-    const selector = `[data-simplifier-id="${elementId}"]`;
-
     // In the mock browser, we can call elementActionPerformer directly
     return await elementActionPerformer(selector, action, value);
   }

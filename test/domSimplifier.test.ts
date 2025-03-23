@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DOMSimplifier } from "../src/domSimplifier";
+import { DOMSimplifier, getDefaultConfig } from "../src/domSimplifier";
 import { MockBrowser } from "./MockBrowser";
 import { JSDOM } from "jsdom";
 

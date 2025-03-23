@@ -24,14 +24,119 @@ declare global {
 }
 
 /**
+ * Default configuration for DOM simplification
+ */
+export function getDefaultConfig(): SimplifierConfig {
+  return {
+    // Elements to preserve with their allowed attributes
+    preserveElements: {
+      a: ["title", "role"],
+      button: ["type", "disabled", "role"],
+      input: ["type", "placeholder", "value", "checked", "disabled", "role"],
+      select: ["disabled", "role"],
+      option: ["value", "selected"],
+      textarea: ["placeholder", "disabled", "role"],
+      form: ["method", "role"],
+    },
+
+    // Elements considered as block elements (create text breaks)
+    blockElements: [
+      "div",
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "ul",
+      "ol",
+      "li",
+      "table",
+      "tr",
+      "form",
+      "section",
+      "article",
+      "header",
+      "footer",
+      "nav",
+      "aside",
+      "blockquote",
+      "pre",
+      "hr",
+    ],
+
+    // Self-closing elements
+    selfClosingElements: ["input", "hr", "meta", "link"],
+
+    // Elements to completely remove including their content
+    removeElements: [
+      "script",
+      "style",
+      "noscript",
+      "template",
+      "iframe",
+      "svg",
+      "math",
+      "head",
+      "canvas",
+      "object",
+      "embed",
+      "video",
+      "audio",
+      "map",
+      "track",
+      "param",
+      "applet",
+      "br",
+      "meta",
+      "link",
+      "img",
+    ],
+
+    // Whether to include hidden elements
+    includeHiddenElements: false,
+
+    // Whether to preserve elements with aria roles
+    preserveAriaRoles: true,
+
+    // Aria roles to consider actionable
+    actionableRoles: [
+      "button",
+      "link",
+      "checkbox",
+      "radio",
+      "textbox",
+      "combobox",
+      "listbox",
+      "menu",
+      "menuitem",
+      "tab",
+      "searchbox",
+      "switch",
+      "spinbutton",
+    ],
+
+    // Whether to clean up whitespace
+    cleanupWhitespace: true,
+  };
+}
+
+/**
  * Creates a self-contained DOM transformer function that can be serialized and injected
  * into any context (browser, Playwright, etc.)
  */
 export function createDOMTransformer() {
   return function domTransformer(
     selector: string,
-    config: SimplifierConfig
+    userConfig?: Partial<SimplifierConfig>
   ): SimplifierResult {
+    // Use default config merged with any provided user config
+    const config = {
+      ...getDefaultConfig(),
+      ...(userConfig || {}),
+    };
+
     // Cache for element visibility and preservation checks
     const visibilityCache = new WeakMap<Element, boolean>();
     const preservationCache = new WeakMap<Element, boolean>();
@@ -881,7 +986,7 @@ export class DOMSimplifier {
    * Creates a new DOMSimplifier instance
    */
   constructor(private browser: Browser, config?: Partial<SimplifierConfig>) {
-    this.config = this.mergeConfig(DOMSimplifier.defaultConfig(), config || {});
+    this.config = this.mergeConfig(getDefaultConfig(), config || {});
   }
 
   /**
@@ -899,7 +1004,11 @@ export class DOMSimplifier {
     action: string,
     value?: string
   ): Promise<boolean> {
-    const result = await this.browser.performAction(id, action, value);
+    // Find the selector for this element ID in the last transform result
+    const selector = `[data-simplifier-id="${id}"], .__SPARK_ID_${id}__`;
+
+    // Use the selector with browser.performAction
+    const result = await this.browser.performAction(selector, action, value);
     return result.success;
   }
 
@@ -935,110 +1044,5 @@ export class DOMSimplifier {
     }
 
     return result;
-  }
-
-  /**
-   * Returns the default configuration with:
-   * - Preserved elements and their attributes
-   * - Block elements
-   * - Self-closing elements
-   * - Elements to remove
-   * - Hidden element handling
-   * - ARIA role handling
-   */
-  static defaultConfig(): SimplifierConfig {
-    return {
-      // Elements to preserve with their allowed attributes
-      preserveElements: {
-        a: ["title", "role"],
-        button: ["type", "disabled", "role"],
-        input: ["type", "placeholder", "value", "checked", "disabled", "role"],
-        select: ["disabled", "role"],
-        option: ["value", "selected"],
-        textarea: ["placeholder", "disabled", "role"],
-        form: ["method", "role"],
-      },
-
-      // Elements considered as block elements (create text breaks)
-      blockElements: [
-        "div",
-        "p",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "ul",
-        "ol",
-        "li",
-        "table",
-        "tr",
-        "form",
-        "section",
-        "article",
-        "header",
-        "footer",
-        "nav",
-        "aside",
-        "blockquote",
-        "pre",
-        "hr",
-      ],
-
-      // Self-closing elements
-      selfClosingElements: ["input", "hr", "meta", "link"],
-
-      // Elements to completely remove including their content
-      removeElements: [
-        "script",
-        "style",
-        "noscript",
-        "template",
-        "iframe",
-        "svg",
-        "math",
-        "head",
-        "canvas",
-        "object",
-        "embed",
-        "video",
-        "audio",
-        "map",
-        "track",
-        "param",
-        "applet",
-        "br",
-        "meta",
-        "link",
-        "img",
-      ],
-
-      // Whether to include hidden elements
-      includeHiddenElements: false,
-
-      // Whether to preserve elements with aria roles
-      preserveAriaRoles: true,
-
-      // Aria roles to consider actionable
-      actionableRoles: [
-        "button",
-        "link",
-        "checkbox",
-        "radio",
-        "textbox",
-        "combobox",
-        "listbox",
-        "menu",
-        "menuitem",
-        "tab",
-        "searchbox",
-        "switch",
-        "spinbutton",
-      ],
-
-      // Whether to clean up whitespace
-      cleanupWhitespace: true,
-    };
   }
 }
