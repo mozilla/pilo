@@ -414,6 +414,30 @@ export function createDOMTransformer() {
         }
       }
 
+      // Special handling for input values - use the actual current value property
+      // rather than just the attribute which may be outdated
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select"
+      ) {
+        const inputElement = node as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | HTMLSelectElement;
+        // Only add value if it's allowed for this element type
+        if (allowedAttrs.includes("value")) {
+          // Get the current value from the property, not the attribute
+          const currentValue = inputElement.value || "";
+
+          // Override the value attribute with the current property value
+          if (currentValue) {
+            attrsStr += ` value="${escapeAttributeValue(currentValue)}"`;
+            attributes["value"] = currentValue;
+          }
+        }
+      }
+
       // Add aria role if configured
       if (config.preserveAriaRoles && node.hasAttribute("role")) {
         const role = node.getAttribute("role") || "";
@@ -732,9 +756,40 @@ export function createActionPerformer() {
 
             // Dispatch events that frameworks expect
             element.dispatchEvent(createEvent("focus"));
-            element.dispatchEvent(createEvent("input", { data: value }));
-            element.dispatchEvent(createEvent("change"));
+
+            // More robust input event with proper data
+            const inputEvent = createEvent("input", { data: value });
+            // For React and other frameworks that might read from target.value during event handling
+            Object.defineProperty(inputEvent, "target", {
+              writable: false,
+              value: element,
+            });
+            element.dispatchEvent(inputEvent);
+
+            // Ensure change event also has proper target with updated value
+            const changeEvent = createEvent("change");
+            Object.defineProperty(changeEvent, "target", {
+              writable: false,
+              value: element,
+            });
+            element.dispatchEvent(changeEvent);
+
+            // Set the value again to ensure it's updated
+            element.value = value || "";
+
             element.dispatchEvent(createEvent("blur"));
+
+            // Verify that the value was actually set
+            if (element.value !== value) {
+              // If value wasn't set, try again using different approach
+              element.value = value || "";
+              // For some frameworks, we need to manually trigger their change detection
+              setTimeout(() => {
+                element.dispatchEvent(createEvent("input", { data: value }));
+                element.dispatchEvent(createEvent("change"));
+              }, 0);
+            }
+
             return { success: true };
           }
           return {
@@ -965,7 +1020,7 @@ export class DOMSimplifier {
         select: ["disabled", "role"],
         option: ["value", "selected"],
         textarea: ["placeholder", "disabled", "role"],
-        form: ["method", "role", "action"],
+        form: ["method", "role"],
       },
 
       // Elements considered as block elements (create text breaks)
