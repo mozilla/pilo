@@ -206,7 +206,7 @@ while (!finalAnswer) {
         chalk.gray("   🌐 Waiting for network activity to settle...")
       );
       try {
-        await page.waitForLoadState("networkidle", { timeout: 5000 });
+        await page.waitForLoadState("networkidle", { timeout: 1000 });
       } catch (e) {
         // If timeout occurs, just continue - some clicks might not trigger network activity
       }

@@ -213,6 +213,29 @@ export function createDOMTransformer() {
     function shouldPreserveElement(node: Element): boolean {
       const tagName = node.tagName.toLowerCase();
 
+      // Skip empty anchor tags
+      if (tagName === "a") {
+        // Get visible text content only
+        let visibleText = "";
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (child.nodeType === Node.TEXT_NODE) {
+            visibleText += child.textContent || "";
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const element = child as Element;
+            // Skip hidden elements unless configured to include them
+            if (config.includeHiddenElements || !isElementHidden(element)) {
+              visibleText += element.textContent || "";
+            }
+          }
+        }
+
+        // If there's no visible text content, skip this anchor
+        if (!visibleText.trim()) {
+          return false;
+        }
+      }
+
       // Check if element type should be preserved
       if (tagName in config.preserveElements) {
         return true;
@@ -462,7 +485,7 @@ export function createDOMTransformer() {
 
       // Handle block elements - they create text breaks
       if (isBlock && buffer.trim()) {
-        buffer = buffer.trim() + "\n\n";
+        buffer = buffer.trim() + "\n";
       }
 
       // Process all children
@@ -473,7 +496,7 @@ export function createDOMTransformer() {
 
       // Add line break after block elements with content
       if (isBlock && result.trim() !== buffer.trim()) {
-        result = result.trim() + "\n\n";
+        result = result.trim() + "\n";
       }
 
       return result;
@@ -501,6 +524,22 @@ export function createDOMTransformer() {
       return buffer;
     }
 
+    /**
+     * Clean up whitespace in the final result
+     */
+    function cleanupWhitespace(text: string): string {
+      return (
+        text
+          // Remove extra line breaks
+          .replace(/\n{2,}/g, "\n") // Keep single line breaks, remove extras
+          // Clean up extra space in tags around text
+          .replace(/>\s+[a-z]+/gim, ">")
+          .replace(/[a-z]+\s+</gim, "<")
+          // Final trim
+          .trim()
+      );
+    }
+
     // Main execution starts here
     try {
       const rootElement = document.querySelector(selector);
@@ -516,7 +555,7 @@ export function createDOMTransformer() {
       const result = processNode(rootElement, "", context);
 
       return {
-        text: result.trim(),
+        text: cleanupWhitespace(result),
         references: context.elementReferences,
       };
     } catch (error) {
@@ -631,13 +670,13 @@ export class DOMSimplifier {
     return {
       // Elements to preserve with their allowed attributes
       preserveElements: {
-        a: ["title"],
-        button: ["type", "disabled"],
-        input: ["type", "placeholder", "value", "checked", "disabled"],
-        select: ["disabled"],
+        a: ["title", "role"],
+        button: ["type", "disabled", "role"],
+        input: ["type", "placeholder", "value", "checked", "disabled", "role"],
+        select: ["disabled", "role"],
         option: ["value", "selected"],
-        textarea: ["placeholder", "disabled"],
-        form: ["action", "method"],
+        textarea: ["placeholder", "disabled", "role"],
+        form: ["action", "method", "role"],
       },
 
       // Elements considered as block elements (create text breaks)
@@ -664,10 +703,11 @@ export class DOMSimplifier {
         "aside",
         "blockquote",
         "pre",
+        "hr",
       ],
 
       // Self-closing elements
-      selfClosingElements: ["input", "img", "br", "hr", "meta", "link"],
+      selfClosingElements: ["input", "hr", "meta", "link"],
 
       // Elements to completely remove including their content
       removeElements: [
@@ -688,6 +728,10 @@ export class DOMSimplifier {
         "track",
         "param",
         "applet",
+        "br",
+        "meta",
+        "link",
+        "img",
       ],
 
       // Whether to include hidden elements
@@ -708,6 +752,9 @@ export class DOMSimplifier {
         "menu",
         "menuitem",
         "tab",
+        "searchbox",
+        "switch",
+        "spinbutton",
       ],
     };
   }

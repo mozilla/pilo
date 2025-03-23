@@ -91,7 +91,7 @@ describe("DOMSimplifier", () => {
       `;
 
       const result = await simplifier.transform("body");
-      const blocks = result.text.split("\n\n").filter(Boolean);
+      const blocks = result.text.split("\n").filter(Boolean);
       expect(blocks.length).toBe(3);
       expect(blocks[0]).toBe("First block");
       expect(blocks[1]).toBe("Second block");
@@ -276,7 +276,7 @@ describe("DOMSimplifier", () => {
       `;
 
       const result = await simplifier.transform("body");
-      const paragraphs = result.text.split("\n\n").filter(Boolean);
+      const paragraphs = result.text.split("\n").filter(Boolean);
 
       expect(paragraphs).toContain("First item");
       expect(paragraphs).toContain("Second item");
@@ -328,6 +328,122 @@ describe("DOMSimplifier", () => {
       `;
 
       const result = await simplifier.transform("body");
+      expect(result.text.trim()).toBe("");
+    });
+  });
+
+  describe("Empty Anchor Tag Handling", () => {
+    it("should skip completely empty anchor tags", async () => {
+      document.body.innerHTML = `
+        <div>
+          <a href="#" title="Link">Link text</a>
+          <a></a>
+          <a href="#" id="empty"></a>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain('<a id="1" title="Link">Link text</a>');
+      expect(result.text).not.toContain("<a></a>");
+      expect(result.text).not.toContain('<a href="#" id="empty"></a>');
+      expect(
+        Object.values(result.references).filter((ref) => ref.tagName === "a")
+      ).toHaveLength(1);
+    });
+
+    it("should skip anchor tags with only whitespace", async () => {
+      document.body.innerHTML = `
+        <div>
+          <a href="#" title="Link">Link text</a>
+          <a>   </a>
+          <a href="#" id="whitespace">  </a>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain('<a id="1" title="Link">Link text</a>');
+      expect(result.text).not.toContain("<a>   </a>");
+      expect(result.text).not.toContain('<a href="#" id="whitespace">  </a>');
+      expect(
+        Object.values(result.references).filter((ref) => ref.tagName === "a")
+      ).toHaveLength(1);
+    });
+
+    it("should skip anchor tags with only attributes", async () => {
+      document.body.innerHTML = `
+        <div>
+          <a href="#" title="Link">Link text</a>
+          <a href="#" id="no-content" title="Empty"></a>
+          <a href="#" role="button"></a>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain('<a id="1" title="Link">Link text</a>');
+      expect(result.text).not.toContain(
+        '<a href="#" id="no-content" title="Empty"></a>'
+      );
+      expect(result.text).not.toContain('<a href="#" role="button"></a>');
+      expect(
+        Object.values(result.references).filter((ref) => ref.tagName === "a")
+      ).toHaveLength(1);
+    });
+
+    it("should preserve anchor tags with actual content", async () => {
+      document.body.innerHTML = `
+        <div>
+          <a href="#" title="Link">Link text</a>
+          <a href="/signin" title="Sign in">Sign in</a>
+          <a href="/orders" title="Orders">Orders & Returns</a>
+        </div>
+      `;
+
+      const result = await simplifier.transform("body");
+      expect(result.text).toContain('<a id="1" title="Link">Link text</a>');
+      expect(result.text).toContain('<a id="2" title="Sign in">Sign in</a>');
+      expect(result.text).toContain(
+        '<a id="3" title="Orders">Orders & Returns</a>'
+      );
+      expect(
+        Object.values(result.references).filter((ref) => ref.tagName === "a")
+      ).toHaveLength(3);
+    });
+
+    it("should skip anchor tags with only presentational content", async () => {
+      document.body.innerHTML = `
+        <ul>
+          <li>
+            <a
+              id="nav-assist-search"
+              role="link"
+              tabindex="-1"
+              class="nav-assistant-menu-item"
+              aria-label="Search, option, forward slash"
+            >
+              <div class="keyboard-shortcut-container" aria-hidden="true">
+                <span class="shortcut-name">Search</span>
+                <div class="shortcut-keys-container">
+                  <span class="shortcut-key">opt</span>
+                  <span>+</span>
+                  <span class="shortcut-key">/</span>
+                </div>
+              </div>
+            </a>
+          </li>
+        </ul>
+      `;
+
+      const result = await simplifier.transform("body");
+      // The anchor tag should not be preserved since its content is only presentational
+      expect(result.text).not.toContain('<a id="nav-assist-search"');
+      // The text content should NOT be preserved since it's in a hidden element
+      expect(result.text).not.toContain("Search");
+      expect(result.text).not.toContain("opt + /");
+      // No anchor references should be created
+      expect(
+        Object.values(result.references).filter((ref) => ref.tagName === "a")
+      ).toHaveLength(0);
+      // The output should be empty since all content was hidden
       expect(result.text.trim()).toBe("");
     });
   });
