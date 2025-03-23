@@ -18,6 +18,7 @@ export class WebAgent {
   private llm = openai("gpt-4o");
   private DEBUG = false;
   private elementReferences: Record<number, { selector: string }> = {};
+  private taskExplanation: string = "";
 
   constructor(private browser: Browser, debug: boolean = false) {
     this.DEBUG = debug;
@@ -27,12 +28,14 @@ export class WebAgent {
     const response = await generateObject({
       model: this.llm,
       schema: z.object({
+        explanation: z.string(),
         plan: z.string(),
         url: z.string(),
       }),
       prompt: buildPlanPrompt(task),
     });
 
+    this.taskExplanation = response.object.explanation;
     this.plan = response.object.plan;
     this.url = response.object.url;
 
@@ -103,6 +106,8 @@ export class WebAgent {
 
   logTaskInfo(task: string) {
     console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
+    console.log(chalk.yellow.bold("\n💡 Explanation:"));
+    console.log(chalk.whiteBright(this.taskExplanation));
     console.log(chalk.magenta.bold("\n📋 Plan:"));
     console.log(chalk.whiteBright(this.plan));
     console.log(
@@ -161,7 +166,7 @@ export class WebAgent {
       // Call LLM with the page snapshot
       const result = await this.getNextActions(pageSnapshot);
 
-      console.log(chalk.yellow.bold("👁  Observation:"));
+      console.log(chalk.yellow.bold("🔭 Observation:"));
       console.log(chalk.whiteBright("   " + result.observation));
 
       console.log(chalk.yellow.bold("\n💭 Thought:"));

@@ -2,13 +2,13 @@ export const actionLoopPrompt = `
 You are navigating a web browser to complete a multi-step task.
 Return a JSON object for each step with this structure:
 {
-    "observation": "Brief assessment of previous step's outcome",
-    "thought": "Reasoning for your next action. If an action fails, retry once then try an alternative",
-    "action": {
-        "action": "select" | "fill" | "click" | "wait" | "done" | "goto" | "back",
-        "target": number,  // Element ID (not needed for done/wait/goto/back)
-        "value": string    // Required for fill/select/goto, seconds for wait, result for done
-    }
+  "observation": "Brief assessment of previous step's outcome. Note important information you might need to complete the task.",
+  "thought": "Reasoning for your next action. If an action fails, retry once then try an alternative",
+  "action": {
+    "action": "select" | "fill" | "click" | "wait" | "done" | "goto" | "back",
+    "target": number,  // Element ID (not needed for done/wait/goto/back)
+    "value": string    // Required for fill/select/goto, seconds for wait, result for done
+  }
 }
 
 Actions:
@@ -30,18 +30,24 @@ Rules:
 
 export const buildPlanPrompt = (task: string) =>
   `
-Create a high-level plan for this web navigation task. 
-Focus on general steps without assuming specific page features.
-Provide a starting URL (must be a top-level domain with http:// or https://). 
+You are an expert at completing tasks using a web browser.
+Encourage the use of high quality sources and sites.
 
-Task:
-${task}
+Return a JSON plan for this web navigation task:
+{
+  "explanation": "Restate the task concisely but include all relevant details",
+  "plan": "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line.",
+  "url": "https://example.com/ (must be a real top-level domain – start with a duckduckgo search if needed: https://duckduckgo.com/q=search+query)"
+}
+
+Date: ${getCurrentFormattedDate()}
+Task: ${task}
 `.trim();
 
 export const buildTaskAndPlanPrompt = (task: string, plan: string) =>
   `
+Date: ${getCurrentFormattedDate()}
 Task: ${task}
-Current date: ${new Date().toISOString().split("T")[0]}
 Plan: ${plan}
 `.trim();
 
@@ -54,3 +60,12 @@ Example interaction: <button id="1">Click me</button> → target: 1
 ${pageSnapshot}
 \`\`\`
 `.trim();
+
+function getCurrentFormattedDate() {
+  const date = new Date();
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
