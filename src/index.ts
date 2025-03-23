@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import chalk from "chalk";
 import { WebAgent } from "./webAgent.js";
+import { PlaywrightBrowser } from "./browser/PlaywrightBrowser.js";
 
 // Load environment variables from .env file
 config();
@@ -19,8 +20,20 @@ const DEBUG = false;
 // Main execution
 (async () => {
   try {
-    const webAgent = new WebAgent(DEBUG);
+    // Create a browser instance with customized configuration
+    const browser = new PlaywrightBrowser({
+      headless: false,
+      device: "Desktop Firefox",
+      bypassCSP: true,
+    });
+
+    // Create WebAgent with the browser
+    const webAgent = new WebAgent(browser, DEBUG);
+
+    // Execute the task
     await webAgent.execute(task);
+
+    // Close the browser when done
     await webAgent.close();
   } catch (error) {
     console.error(chalk.red.bold("\n❌ Error:"), chalk.whiteBright(error));

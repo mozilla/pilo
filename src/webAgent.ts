@@ -1,4 +1,3 @@
-import { firefox, devices, Browser, BrowserContext, Page } from "playwright";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
@@ -9,19 +8,17 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
-import { DOMSimplifier, PlaywrightAdapter } from "./domSimplifier.js";
+import { DOMSimplifier } from "./domSimplifier.js";
+import { Browser } from "./browser/Browser";
 
 export class WebAgent {
   private plan: string = "";
   private url: string = "";
-  private browser: Browser | null = null;
-  private context: BrowserContext | null = null;
-  private page: Page | null = null;
   private messages: any[] = [];
   private llm = openai("gpt-4o");
   private DEBUG = false;
 
-  constructor(debug: boolean = false) {
+  constructor(private browser: Browser, debug: boolean = false) {
     this.DEBUG = debug;
   }
 
@@ -103,18 +100,6 @@ export class WebAgent {
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   }
 
-  async initBrowser() {
-    if (!this.browser) {
-      this.browser = await firefox.launch({ headless: false });
-      this.context = await this.browser.newContext({
-        ...devices["Desktop Firefox"],
-        bypassCSP: true,
-      });
-      this.page = await this.context.newPage();
-    }
-    return this.page;
-  }
-
   logTaskInfo(task: string) {
     console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
     console.log(chalk.magenta.bold("\n📋 Plan:"));
@@ -145,15 +130,11 @@ export class WebAgent {
     await this.createPlan(task);
     this.logTaskInfo(task);
 
-    // Start the browser if not already started
-    await this.initBrowser();
-    if (!this.page) {
-      console.error(chalk.red.bold("❌ Failed to initialize browser page."));
-      return null;
-    }
+    // Launch browser if not already started
+    await this.browser.launch({ headless: false });
 
     // Go to the starting URL
-    await this.page.goto(this.url);
+    await this.browser.goto(this.url);
 
     // Setup messages
     this.setupMessages(task);
@@ -161,9 +142,8 @@ export class WebAgent {
 
     // Start the loop
     while (!finalAnswer) {
-      // Get the page snapshot
-      const adapter = new PlaywrightAdapter(this.page);
-      const domSimplifier = new DOMSimplifier(adapter);
+      // Get the page snapshot using the browser abstraction
+      const domSimplifier = new DOMSimplifier(this.browser);
       const domResult = await domSimplifier.transform("body");
       const pageSnapshot = domResult.text;
 
@@ -225,7 +205,7 @@ export class WebAgent {
           console.log(
             chalk.blue.bold(`🌐 Navigating to: ${result.action.value}`)
           );
-          await this.page.goto(result.action.value);
+          await this.browser.goto(result.action.value);
         } else {
           console.error(
             chalk.red.bold(`❌ Failed to execute goto: missing URL`)
@@ -233,10 +213,10 @@ export class WebAgent {
         }
       } else if (result.action.action === "back") {
         console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
-        await this.page.goBack();
+        await this.browser.goBack();
       } else {
-        // Execute the action using DOMSimplifier
-        const success = await domSimplifier.interactWithElement(
+        // Execute the action using browser's performAction
+        const success = await this.browser.performAction(
           result.action.target!,
           result.action.action,
           result.action.value
@@ -268,10 +248,10 @@ export class WebAgent {
         );
         try {
           // Wait for both network idle and DOM to be stable
-          await Promise.all([
-            this.page.waitForLoadState("networkidle", { timeout: 2000 }),
-            this.page.waitForLoadState("domcontentloaded", { timeout: 2000 }),
-          ]);
+          await this.browser.waitForLoadState("networkidle", { timeout: 2000 });
+          await this.browser.waitForLoadState("domcontentloaded", {
+            timeout: 2000,
+          });
         } catch (e) {
           // If timeout occurs, just continue
           console.log(
@@ -298,11 +278,6 @@ export class WebAgent {
   }
 
   async close() {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.context = null;
-      this.page = null;
-    }
+    await this.browser.close();
   }
 }

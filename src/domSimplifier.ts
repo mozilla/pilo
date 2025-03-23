@@ -7,47 +7,13 @@
  * 4. Handle special cases like hidden elements and ARIA roles
  */
 
-// Type definitions for configuration and results
-export interface SimplifierConfig {
-  // Elements to preserve with their allowed attributes
-  // Key is the tag name, value is array of allowed attributes
-  preserveElements: Record<string, string[]>;
-  // Elements that create text breaks (like paragraphs)
-  blockElements: string[];
-  // Elements that don't have closing tags
-  selfClosingElements: string[];
-  // Elements to completely remove including their content
-  removeElements: string[];
-  // Whether to include elements hidden via CSS/attributes
-  includeHiddenElements: boolean;
-  // Whether to preserve elements with ARIA roles
-  preserveAriaRoles: boolean;
-  // List of ARIA roles to consider actionable
-  actionableRoles: string[];
-  // Whether to clean up whitespace
-  cleanupWhitespace: boolean;
-}
-
-export interface SimplifierResult {
-  // The simplified text representation
-  text: string;
-  // References to preserved elements for later interaction
-  references: Record<number, ElementReference>;
-}
-
-export interface ElementReference {
-  // CSS selector to find the element
-  selector: string;
-  // The element's tag name
-  tagName: string;
-  // Preserved attributes
-  attributes: Record<string, string>;
-}
-
-export interface ActionResult {
-  success: boolean;
-  error?: string;
-}
+import { Browser } from "./browser/Browser";
+import {
+  SimplifierConfig,
+  SimplifierResult,
+  ElementReference,
+  ActionResult,
+} from "./types";
 
 // Add type declarations for browser context
 declare global {
@@ -905,40 +871,16 @@ export function createActionPerformer() {
 export const elementActionPerformer = createActionPerformer();
 
 /**
- * DOM adapter interface - for different environments (browser, Playwright, etc.)
- */
-export interface DOMAdapter {
-  /**
-   * Transform a DOM structure into simplified text
-   */
-  transformDOM(
-    selector: string,
-    config: SimplifierConfig
-  ): Promise<SimplifierResult>;
-
-  /**
-   * Perform an action on a referenced element
-   */
-  performAction(
-    reference: ElementReference,
-    action: string,
-    value?: string
-  ): Promise<ActionResult>;
-}
-
-/**
  * Main DOM Simplifier class that provides a high-level interface
  * for transforming DOM elements and interacting with them
  */
 export class DOMSimplifier {
   private config: SimplifierConfig;
-  private adapter: DOMAdapter;
 
   /**
    * Creates a new DOMSimplifier instance
    */
-  constructor(adapter: DOMAdapter, config?: Partial<SimplifierConfig>) {
-    this.adapter = adapter;
+  constructor(private browser: Browser, config?: Partial<SimplifierConfig>) {
     this.config = this.mergeConfig(DOMSimplifier.defaultConfig(), config || {});
   }
 
@@ -946,7 +888,7 @@ export class DOMSimplifier {
    * Transforms a DOM element into simplified text
    */
   async transform(selector: string): Promise<SimplifierResult> {
-    return this.adapter.transformDOM(selector, this.config);
+    return this.browser.simplifyDOM(selector, this.config);
   }
 
   /**
@@ -956,15 +898,9 @@ export class DOMSimplifier {
     id: number,
     action: string,
     value?: string
-  ): Promise<ActionResult> {
-    const reference: ElementReference = {
-      // Use a selector that works reliably in both browser and test environments
-      selector: `[data-simplifier-id="${id}"]`,
-      tagName: "",
-      attributes: {},
-    };
-
-    return this.adapter.performAction(reference, action, value);
+  ): Promise<boolean> {
+    const result = await this.browser.performAction(id, action, value);
+    return result.success;
   }
 
   /**
@@ -1104,104 +1040,5 @@ export class DOMSimplifier {
       // Whether to clean up whitespace
       cleanupWhitespace: true,
     };
-  }
-}
-
-/**
- * Browser implementation of the DOM adapter
- * This is used when running directly in a browser context
- */
-export class BrowserAdapter implements DOMAdapter {
-  /**
-   * Transform a DOM structure into simplified text in browser context
-   */
-  async transformDOM(
-    selector: string,
-    config: SimplifierConfig
-  ): Promise<SimplifierResult> {
-    // In browser context, we can call the function directly
-    return domTransformer(selector, config);
-  }
-
-  /**
-   * Perform an action on a referenced element in browser context
-   */
-  async performAction(
-    reference: ElementReference,
-    action: string,
-    value?: string
-  ): Promise<ActionResult> {
-    // In browser context, we can call the function directly
-    return elementActionPerformer(reference.selector, action, value);
-  }
-}
-
-/**
- * Playwright implementation of the DOM adapter
- * This is used when running in a Playwright context
- */
-export class PlaywrightAdapter implements DOMAdapter {
-  private page: any; // Playwright Page object
-
-  /**
-   * Create a new PlaywrightAdapter
-   */
-  constructor(page: any) {
-    this.page = page;
-  }
-
-  /**
-   * Transform a DOM structure into simplified text in Playwright context
-   */
-  async transformDOM(
-    selector: string,
-    config: SimplifierConfig
-  ): Promise<SimplifierResult> {
-    // First inject our transformer function into the page context
-    await this.page.addScriptTag({
-      content: `window.domTransformer = ${domTransformer.toString()};`,
-    });
-
-    // Now we can safely call the injected function with args wrapped in an object
-    return await this.page.evaluate(
-      ({ selector, config }: { selector: string; config: SimplifierConfig }) =>
-        window.domTransformer(selector, config),
-      { selector, config }
-    );
-  }
-
-  /**
-   * Perform an action on a referenced element in Playwright context
-   */
-  async performAction(
-    reference: ElementReference,
-    action: string,
-    value?: string
-  ): Promise<ActionResult> {
-    try {
-      // Inject our action performer into the page context
-      await this.page.addScriptTag({
-        content: `window.elementActionPerformer = ${elementActionPerformer.toString()};`,
-      });
-
-      // Use our custom implementation for all actions
-      return await this.page.evaluate(
-        ({
-          selector,
-          action,
-          value,
-        }: {
-          selector: string;
-          action: string;
-          value?: string;
-        }) => window.elementActionPerformer(selector, action, value),
-        { selector: reference.selector, action, value }
-      );
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
   }
 }

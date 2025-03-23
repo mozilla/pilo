@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DOMSimplifier, BrowserAdapter } from "../src/domSimplifier";
+import { DOMSimplifier } from "../src/domSimplifier";
+import { MockBrowser } from "./MockBrowser";
 import { JSDOM } from "jsdom";
 
 // Patch for JSDOM environment compatibility
@@ -25,6 +26,7 @@ describe("DOMSimplifier", () => {
   let dom: JSDOM;
   let document: Document;
   let simplifier: DOMSimplifier;
+  let mockBrowser: MockBrowser;
 
   beforeEach(() => {
     // Create a fresh JSDOM instance for each test
@@ -49,8 +51,11 @@ describe("DOMSimplifier", () => {
     // Apply JSDOM compatibility patches
     applyJSDOMPatches();
 
+    // Create our mock browser
+    mockBrowser = new MockBrowser();
+
     // Create a test-optimized simplifier with custom config
-    simplifier = new DOMSimplifier(new BrowserAdapter(), {
+    simplifier = new DOMSimplifier(mockBrowser, {
       // We need to keep whitespace cleaner for testing
       cleanupWhitespace: false,
       // Handle hidden elements more simply in tests
@@ -167,12 +172,12 @@ describe("DOMSimplifier", () => {
       `;
 
       // Create two simplifiers with different hidden element configurations
-      const includeHiddenSimplifier = new DOMSimplifier(new BrowserAdapter(), {
+      const includeHiddenSimplifier = new DOMSimplifier(mockBrowser, {
         cleanupWhitespace: false,
         includeHiddenElements: true,
       });
 
-      const excludeHiddenSimplifier = new DOMSimplifier(new BrowserAdapter(), {
+      const excludeHiddenSimplifier = new DOMSimplifier(mockBrowser, {
         cleanupWhitespace: false,
         includeHiddenElements: false,
       });
@@ -496,13 +501,10 @@ describe("DOMSimplifier", () => {
       `;
 
       // Create a new simplifier that respects hidden elements
-      const hiddenRespectingSimplifier = new DOMSimplifier(
-        new BrowserAdapter(),
-        {
-          cleanupWhitespace: false,
-          includeHiddenElements: false,
-        }
-      );
+      const hiddenRespectingSimplifier = new DOMSimplifier(mockBrowser, {
+        cleanupWhitespace: false,
+        includeHiddenElements: false,
+      });
 
       const result = await hiddenRespectingSimplifier.transform("body");
 
