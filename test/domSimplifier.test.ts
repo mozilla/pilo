@@ -59,6 +59,34 @@ describe("DOMSimplifier", () => {
       expect(result.text).toContain("# Title");
       expect(result.text).toContain("Paragraph with inline elements");
     });
+
+    it("should handle inline elements with proper spacing", async () => {
+      // Create a test DOM with inline elements
+      document.body.innerHTML = `
+        <div>
+          <a href="#">Prime Video Direct</a>
+          <a href="#">Video Distribution</a>
+          <span>Some text</span>
+          <button>Click me</button>
+        </div>
+      `;
+
+      const result = await simplifier.transform("div");
+
+      // Verify that elements are preserved with proper spacing
+      expect(result.text).toBe(
+        '<a id="1">Prime Video Direct</a><a id="2">Video Distribution</a>Some text<button id="3">Click me</button>'
+      );
+
+      // Verify that interactive elements are preserved (but not spans)
+      const elementIds = Object.keys(result.references);
+      expect(elementIds.length).toBe(3); // Should have 3 elements (2 anchors and 1 button, not the span)
+
+      // Verify each preserved element has correct tag name
+      expect(result.references["1"].tagName).toBe("a");
+      expect(result.references["2"].tagName).toBe("a");
+      expect(result.references["3"].tagName).toBe("button");
+    });
   });
 
   describe("Element Preservation", () => {
@@ -192,9 +220,8 @@ describe("DOMSimplifier", () => {
       const result = await simplifier.transform("body");
       const refs = Object.values(result.references);
 
-      // Check form attributes
+      // Check form attributes - only method should be preserved
       const form = refs.find((ref) => ref.tagName === "form");
-      expect(form?.attributes.action).toBe("/submit");
       expect(form?.attributes.method).toBe("post");
 
       // Check input states

@@ -199,17 +199,24 @@ while (!finalAnswer) {
       });
       break;
     }
+  }
 
-    // Wait for network idle after actions that might trigger navigation
-    if (action.action === "click") {
-      console.log(
-        chalk.gray("   🌐 Waiting for network activity to settle...")
-      );
-      try {
-        await page.waitForLoadState("networkidle", { timeout: 1000 });
-      } catch (e) {
-        // If timeout occurs, just continue - some clicks might not trigger network activity
-      }
+  // Wait for network idle after all actions are complete
+  if (
+    result.actions.some((action) =>
+      ["click", "select", "fill"].includes(action.action)
+    )
+  ) {
+    console.log(chalk.gray("   🌐 Waiting for network activity to settle..."));
+    try {
+      // Wait for both network idle and DOM to be stable
+      await Promise.all([
+        page.waitForLoadState("networkidle", { timeout: 2000 }),
+        page.waitForLoadState("domcontentloaded", { timeout: 2000 }),
+      ]);
+    } catch (e) {
+      // If timeout occurs, just continue - some actions might not trigger network activity
+      console.log(chalk.gray("   ⚠️  Network wait timed out, continuing..."));
     }
   }
 

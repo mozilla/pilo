@@ -1,130 +1,44 @@
 /**
- * Create a self-contained action performer function
- * This can be serialized and injected into any context
- */
-export function createActionPerformer() {
-  return function elementActionPerformer(
-    selector: string,
-    action: string,
-    value?: string
-  ): ActionResult {
-    try {
-      // Find the element using the selector
-      const element = document.querySelector(selector);
-      if (!element) {
-        return {
-          success: false,
-          error: `Element not found: ${selector}`,
-        };
-      }
-
-      // Perform the action
-      switch (action.toLowerCase()) {
-        case "click":
-          (element as HTMLElement).click();
-          return { success: true };
-
-        case "fill":
-          if (
-            element instanceof HTMLInputElement ||
-            element instanceof HTMLTextAreaElement
-          ) {
-            element.value = value || "";
-            element.dispatchEvent(new Event("input", { bubbles: true }));
-            element.dispatchEvent(new Event("change", { bubbles: true }));
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: `Cannot fill element of type ${element.tagName.toLowerCase()}`,
-          };
-
-        case "select":
-          if (element instanceof HTMLSelectElement) {
-            element.value = value || "";
-            element.dispatchEvent(new Event("change", { bubbles: true }));
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a select element",
-          };
-
-        case "check":
-          if (
-            element instanceof HTMLInputElement &&
-            (element.type === "checkbox" || element.type === "radio")
-          ) {
-            if (!element.checked) {
-              element.click();
-            }
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a checkbox or radio input",
-          };
-
-        case "uncheck":
-          if (
-            element instanceof HTMLInputElement &&
-            element.type === "checkbox"
-          ) {
-            if (element.checked) {
-              element.click();
-            }
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a checkbox input",
-          };
-
-        case "focus":
-          (element as HTMLElement).focus();
-          return { success: true };
-
-        default:
-          return {
-            success: false,
-            error: `Unsupported action: ${action}`,
-          };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  };
-}
-
-// Create the action performer once
-export const elementActionPerformer = createActionPerformer();
-/**
  * DOM Simplifier - Transforms HTML DOM into simplified text with actionable elements
- * Using a clean architecture with a self-contained core function
+ * This module provides functionality to:
+ * 1. Transform complex HTML into a simplified text representation
+ * 2. Preserve interactive elements (links, buttons, forms, etc.)
+ * 3. Maintain proper spacing and formatting
+ * 4. Handle special cases like hidden elements and ARIA roles
  */
 
-// Type definitions
+// Type definitions for configuration and results
 export interface SimplifierConfig {
+  // Elements to preserve with their allowed attributes
+  // Key is the tag name, value is array of allowed attributes
   preserveElements: Record<string, string[]>;
+  // Elements that create text breaks (like paragraphs)
   blockElements: string[];
+  // Elements that don't have closing tags
   selfClosingElements: string[];
+  // Elements to completely remove including their content
   removeElements: string[];
+  // Whether to include elements hidden via CSS/attributes
   includeHiddenElements: boolean;
+  // Whether to preserve elements with ARIA roles
   preserveAriaRoles: boolean;
+  // List of ARIA roles to consider actionable
   actionableRoles: string[];
 }
 
 export interface SimplifierResult {
+  // The simplified text representation
   text: string;
+  // References to preserved elements for later interaction
   references: Record<number, ElementReference>;
 }
 
 export interface ElementReference {
+  // CSS selector to find the element
   selector: string;
+  // The element's tag name
   tagName: string;
+  // Preserved attributes
   attributes: Record<string, string>;
 }
 
@@ -133,7 +47,7 @@ export interface ActionResult {
   error?: string;
 }
 
-// Add type declarations at the top of the file
+// Add type declarations for browser context
 declare global {
   interface Window {
     domTransformer: typeof domTransformer;
@@ -142,19 +56,22 @@ declare global {
 }
 
 /**
- * The core DOM transformation function - designed to be self-contained
- * so it can be either called directly or serialized and injected into a page
+ * Creates a self-contained DOM transformer function that can be serialized and injected
+ * into any context (browser, Playwright, etc.)
  */
 export function createDOMTransformer() {
-  // This returns the actual transformer function
   return function domTransformer(
     selector: string,
     config: SimplifierConfig
   ): SimplifierResult {
-    // Inner utility functions that will be included when serialized
-
     /**
-     * Check if an element is hidden via CSS or attributes
+     * Checks if an element is hidden via CSS or attributes
+     * This includes:
+     * - hidden attribute
+     * - aria-hidden="true"
+     * - display: none
+     * - visibility: hidden
+     * - opacity: 0
      */
     function isElementHidden(element: Element): boolean {
       try {
@@ -201,19 +118,24 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Check if an element should be completely removed
+     * Checks if an element should be completely removed
+     * This is for elements like script, style, etc. that we never want to include
      */
     function shouldRemoveElement(tagName: string): boolean {
       return config.removeElements.includes(tagName);
     }
 
     /**
-     * Check if an element should be preserved
+     * Checks if an element should be preserved in the output
+     * This includes:
+     * 1. Elements in preserveElements config
+     * 2. Elements with actionable ARIA roles (if configured)
+     * 3. Anchor tags with actual content
      */
     function shouldPreserveElement(node: Element): boolean {
       const tagName = node.tagName.toLowerCase();
 
-      // Skip empty anchor tags
+      // Special handling for anchor tags - skip empty ones
       if (tagName === "a") {
         // Get visible text content only
         let visibleText = "";
@@ -254,42 +176,42 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Get allowed attributes for an element
+     * Gets the list of attributes that should be preserved for an element type
      */
     function getElementAllowedAttributes(tagName: string): string[] {
       return config.preserveElements[tagName] || [];
     }
 
     /**
-     * Check if an element is a block element
+     * Checks if an element is a block element (creates text breaks)
      */
     function isBlockElement(tagName: string): boolean {
       return config.blockElements.includes(tagName);
     }
 
     /**
-     * Check if an element is a heading
+     * Checks if an element is a heading (h1-h6)
      */
     function isHeadingElement(tagName: string): boolean {
       return /^h[1-6]$/.test(tagName);
     }
 
     /**
-     * Check if an element is self-closing
+     * Checks if an element is self-closing (no closing tag)
      */
     function isSelfClosingElement(tagName: string): boolean {
       return config.selfClosingElements.includes(tagName);
     }
 
     /**
-     * Normalize whitespace in text
+     * Normalizes whitespace in text (replaces multiple spaces with single space)
      */
     function normalizeWhitespace(text: string): string {
       return text.replace(/\s+/g, " ");
     }
 
     /**
-     * Escape HTML special characters
+     * Escapes HTML special characters to prevent XSS
      */
     function escapeHtml(str: string): string {
       return str
@@ -301,7 +223,11 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Generate a unique selector for an element
+     * Generates a unique selector for an element
+     * Priority:
+     * 1. ID if present
+     * 2. data-simplifier-id if already assigned
+     * 3. Generate new data attribute
      */
     function getUniqueSelector(element: Element): string {
       // Simple implementation - in production, you would want a more robust version
@@ -328,14 +254,15 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Process a text node
+     * Processes a text node, normalizing whitespace
      */
     function processTextNode(node: Text, buffer: string): string {
       return buffer + normalizeWhitespace(node.textContent || "");
     }
 
     /**
-     * Process a heading element
+     * Processes a heading element, converting to markdown style
+     * Example: <h1>Title</h1> -> # Title
      */
     function processHeadingElement(
       node: Element,
@@ -370,7 +297,12 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Serialize a preserved element
+     * Serializes a preserved element with its attributes and content
+     * This is where we:
+     * 1. Assign sequential IDs
+     * 2. Store references for later interaction
+     * 3. Handle self-closing elements
+     * 4. Process child content
      */
     function serializePreservedElement(
       node: Element,
@@ -445,7 +377,12 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Process an element node
+     * Processes an element node, handling:
+     * 1. Element removal
+     * 2. Hidden elements
+     * 3. Block elements
+     * 4. Preserved elements
+     * 5. Child content
      */
     function processElementNode(
       node: Element,
@@ -480,7 +417,32 @@ export function createDOMTransformer() {
         if (buffer.length > 0 && !buffer.match(/\s$/)) {
           buffer += " ";
         }
-        return buffer + serializePreservedElement(node, context);
+        const result = buffer + serializePreservedElement(node, context);
+
+        // Add two spaces after preserved elements if the next sibling is a preserved element
+        const nextSibling = node.nextSibling;
+        if (!isBlock && nextSibling) {
+          let nextPreserved = false;
+          let current: ChildNode | null = nextSibling;
+          while (current) {
+            if (current.nodeType === Node.ELEMENT_NODE) {
+              if (shouldPreserveElement(current as Element)) {
+                nextPreserved = true;
+                break;
+              }
+              break;
+            } else if (current.nodeType === Node.TEXT_NODE) {
+              if ((current as Text).textContent?.trim()) {
+                break;
+              }
+            }
+            current = current.nextSibling;
+          }
+          if (nextPreserved) {
+            return result + "  ";
+          }
+        }
+        return result;
       }
 
       // Handle block elements - they create text breaks
@@ -503,7 +465,7 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Process a DOM node
+     * Main node processing function that handles both text and element nodes
      */
     function processNode(
       node: Node,
@@ -525,16 +487,23 @@ export function createDOMTransformer() {
     }
 
     /**
-     * Clean up whitespace in the final result
+     * Cleans up whitespace in the final result:
+     * 1. Removes excessive line breaks
+     * 2. Removes excessive spaces
+     * 3. Trims leading/trailing whitespace
      */
     function cleanupWhitespace(text: string): string {
       return (
         text
           // Remove extra line breaks
           .replace(/\n{2,}/g, "\n") // Keep single line breaks, remove extras
-          // Clean up extra space in tags around text
-          .replace(/>\s+[a-z]+/gim, ">")
-          .replace(/[a-z]+\s+</gim, "<")
+          // Remove extra spaces
+          .replace(/[ ]{2,}/g, " ")
+          // Remove leading and trailing spaces
+          .replace(/^\s+|\s+$/gm, "")
+          // Remove extra spaces inside tags
+          .replace(/>[ ]+([<a-z])/gi, ">$1")
+          .replace(/([a-z>])[ ]+</gi, "$1<")
           // Final trim
           .trim()
       );
@@ -569,7 +538,132 @@ export function createDOMTransformer() {
 export const domTransformer = createDOMTransformer();
 
 /**
- * DOM adapter interface - for different environments
+ * Create a self-contained action performer function
+ * This can be serialized and injected into any context
+ */
+export function createActionPerformer() {
+  return async function elementActionPerformer(
+    selector: string,
+    action: string,
+    value?: string
+  ): Promise<ActionResult> {
+    try {
+      // Find the element using the selector
+      const element = document.querySelector(selector);
+      if (!element) {
+        return {
+          success: false,
+          error: `Element not found: ${selector}`,
+        };
+      }
+
+      // Perform the action
+      switch (action.toLowerCase()) {
+        case "click":
+          (element as HTMLElement).click();
+          return { success: true };
+
+        case "fill":
+          if (
+            element instanceof HTMLInputElement ||
+            element instanceof HTMLTextAreaElement
+          ) {
+            element.value = value || "";
+            element.dispatchEvent(new Event("input", { bubbles: true }));
+            element.dispatchEvent(new Event("change", { bubbles: true }));
+            return { success: true };
+          }
+          return {
+            success: false,
+            error: `Cannot fill element of type ${element.tagName.toLowerCase()}`,
+          };
+
+        case "select":
+          if (element instanceof HTMLSelectElement) {
+            // Store original value to check if change actually occurred
+            const originalValue = element.value;
+
+            // Set the new value
+            element.value = value || "";
+
+            // Create and dispatch both input and change events
+            const events = ["input", "change"];
+            events.forEach((eventType) => {
+              element.dispatchEvent(new Event(eventType, { bubbles: true }));
+            });
+
+            // Wait for a short time to ensure the change is processed
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Check if the value actually changed
+            if (element.value === originalValue) {
+              return {
+                success: false,
+                error: "Select value did not change after attempted selection",
+              };
+            }
+
+            return { success: true };
+          }
+          return {
+            success: false,
+            error: "Element is not a select element",
+          };
+
+        case "check":
+          if (
+            element instanceof HTMLInputElement &&
+            (element.type === "checkbox" || element.type === "radio")
+          ) {
+            if (!element.checked) {
+              element.click();
+            }
+            return { success: true };
+          }
+          return {
+            success: false,
+            error: "Element is not a checkbox or radio input",
+          };
+
+        case "uncheck":
+          if (
+            element instanceof HTMLInputElement &&
+            element.type === "checkbox"
+          ) {
+            if (element.checked) {
+              element.click();
+            }
+            return { success: true };
+          }
+          return {
+            success: false,
+            error: "Element is not a checkbox input",
+          };
+
+        case "focus":
+          (element as HTMLElement).focus();
+          return { success: true };
+
+        default:
+          return {
+            success: false,
+            error: `Unsupported action: ${action}`,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  };
+}
+
+// Create the action performer once
+export const elementActionPerformer = createActionPerformer();
+
+/**
+ * DOM adapter interface - for different environments (browser, Playwright, etc.)
  */
 export interface DOMAdapter {
   /**
@@ -591,7 +685,8 @@ export interface DOMAdapter {
 }
 
 /**
- * Main DOM Simplifier class
+ * Main DOM Simplifier class that provides a high-level interface
+ * for transforming DOM elements and interacting with them
  */
 export class DOMSimplifier {
   private config: SimplifierConfig;
@@ -630,7 +725,7 @@ export class DOMSimplifier {
   }
 
   /**
-   * Merges configuration objects
+   * Merges configuration objects, handling both primitive and object values
    */
   private mergeConfig(
     defaultConfig: SimplifierConfig,
@@ -664,7 +759,13 @@ export class DOMSimplifier {
   }
 
   /**
-   * Returns the default configuration
+   * Returns the default configuration with:
+   * - Preserved elements and their attributes
+   * - Block elements
+   * - Self-closing elements
+   * - Elements to remove
+   * - Hidden element handling
+   * - ARIA role handling
    */
   static defaultConfig(): SimplifierConfig {
     return {
@@ -676,7 +777,7 @@ export class DOMSimplifier {
         select: ["disabled", "role"],
         option: ["value", "selected"],
         textarea: ["placeholder", "disabled", "role"],
-        form: ["action", "method", "role"],
+        form: ["method", "role", "action"],
       },
 
       // Elements considered as block elements (create text breaks)
@@ -762,6 +863,7 @@ export class DOMSimplifier {
 
 /**
  * Browser implementation of the DOM adapter
+ * This is used when running directly in a browser context
  */
 export class BrowserAdapter implements DOMAdapter {
   /**
@@ -790,6 +892,7 @@ export class BrowserAdapter implements DOMAdapter {
 
 /**
  * Playwright implementation of the DOM adapter
+ * This is used when running in a Playwright context
  */
 export class PlaywrightAdapter implements DOMAdapter {
   private page: any; // Playwright Page object
@@ -830,76 +933,24 @@ export class PlaywrightAdapter implements DOMAdapter {
     value?: string
   ): Promise<ActionResult> {
     try {
-      // For simple actions, we can use Playwright's built-in methods
-      const locator = this.page.locator(reference.selector);
+      // Inject our action performer into the page context
+      await this.page.addScriptTag({
+        content: `window.elementActionPerformer = ${elementActionPerformer.toString()};`,
+      });
 
-      // For complex or custom actions, we can use our action performer
-      if (action.toLowerCase() === "custom") {
-        // First inject our action performer
-        await this.page.addScriptTag({
-          content: `window.elementActionPerformer = ${elementActionPerformer.toString()};`,
-        });
-
-        // Now we can safely call it with args wrapped in an object
-        return await this.page.evaluate(
-          ({
-            selector,
-            action,
-            value,
-          }: {
-            selector: string;
-            action: string;
-            value?: string;
-          }) => window.elementActionPerformer(selector, action, value),
-          { selector: reference.selector, action: "custom", value }
-        );
-      }
-
-      // Use Playwright's native methods for standard actions
-      switch (action.toLowerCase()) {
-        case "click":
-          await locator.click();
-          return { success: true };
-
-        case "fill":
-          await locator.fill(value || "");
-          return { success: true };
-
-        case "select":
-          await locator.selectOption(value || "");
-          return { success: true };
-
-        case "check":
-          await locator.check();
-          return { success: true };
-
-        case "uncheck":
-          await locator.uncheck();
-          return { success: true };
-
-        case "focus":
-          await locator.focus();
-          return { success: true };
-
-        default:
-          // For any other actions, inject and use our action performer
-          await this.page.addScriptTag({
-            content: `window.elementActionPerformer = ${elementActionPerformer.toString()};`,
-          });
-
-          return await this.page.evaluate(
-            ({
-              selector,
-              action,
-              value,
-            }: {
-              selector: string;
-              action: string;
-              value?: string;
-            }) => window.elementActionPerformer(selector, action, value),
-            { selector: reference.selector, action, value }
-          );
-      }
+      // Use our custom implementation for all actions
+      return await this.page.evaluate(
+        ({
+          selector,
+          action,
+          value,
+        }: {
+          selector: string;
+          action: string;
+          value?: string;
+        }) => window.elementActionPerformer(selector, action, value),
+        { selector: reference.selector, action, value }
+      );
     } catch (error) {
       return {
         success: false,
