@@ -16,7 +16,7 @@ import { DOMSimplifier, PlaywrightAdapter } from "./domSimplifier.js";
 config();
 
 // Debug flag - set to true to see page snapshots
-const DEBUG = true;
+const DEBUG = false;
 
 // Setup the LLM
 const llm = openai("gpt-4o");

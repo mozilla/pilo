@@ -8,9 +8,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "moduleResolution": "bundler"
   },
-  "include": ["src/**/*", "test/domSimplifier.test.ts"],
+  "include": ["src/**/*", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
