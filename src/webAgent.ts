@@ -8,7 +8,6 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
-import { PageCapture } from "./pageCapture.js";
 import { Browser } from "./browser/Browser.js";
 
 export class WebAgent {
@@ -132,12 +131,13 @@ export class WebAgent {
     // Reset state for new task
     this.resetState();
 
-    // Create plan and determine the starting URL
-    await this.createPlan(task);
-    this.logTaskInfo(task);
+    // Run plan creation and browser launch concurrently
+    await Promise.all([
+      this.createPlan(task),
+      this.browser.launch({ headless: false }),
+    ]);
 
-    // Launch browser if not already started
-    await this.browser.launch({ headless: false });
+    this.logTaskInfo(task);
 
     // Go to the starting URL
     await this.browser.goto(this.url);

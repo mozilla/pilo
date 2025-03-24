@@ -7,7 +7,7 @@ Return a JSON plan for this web navigation task:
 {
   "explanation": "Restate the task concisely but include all relevant details",
   "plan": "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line.",
-  "url": "https://example.com/ (must be a real top-level domain – start with a search if needed: https://duckduckgo.com/q=search+query)"
+  "url": "https://example.com/ (must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query)"
 }
 
 Date: ${getCurrentFormattedDate()}
