@@ -37,20 +37,20 @@ cp .env.example .env
 4. Run Spark:
 
 ```bash
-pnpm run spark "search for flights to Paris"
+pnpm run spark "what is the current temperature in London?"
 ```
 
 ## Examples
 
 ```bash
-# Compare products
-pnpm run spark "compare prices of gaming laptops on Amazon"
+# Get current weather
+pnpm run spark "is it raining in Tokyo"
 
-# Research topics
-pnpm run spark "find the best restaurants in San Francisco"
+# Check stock price
+pnpm run spark "what is the current price of AAPL stock"
 
-# Find travel information
-pnpm run spark "find the cheapest hotel in New York for next weekend"
+# Get latest news
+pnpm run spark "what is the top headline on Reuters"
 ```
 
 ## Development
