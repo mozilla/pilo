@@ -1,6 +1,10 @@
+const youArePrompt = `
+You are an expert at completing tasks using a web browser.
+`.trim();
+
 export const buildPlanPrompt = (task: string) =>
   `
-You are an expert at completing tasks using a web browser.
+${youArePrompt}
 Encourage the use of high quality sources and sites.
 
 Return a JSON plan for this web navigation task:
@@ -15,7 +19,7 @@ Task: ${task}
 `.trim();
 
 export const actionLoopPrompt = `
-You are navigating a web browser to complete a multi-step task.
+${youArePrompt}
 Return a JSON object for each step with this structure:
 {
   "observation": "Brief assessment of previous step's outcome. Note important information you might need to complete the task.",
@@ -44,16 +48,28 @@ Rules:
 5. Use "wait" for page loads, animations, or dynamic content
 `.trim();
 
-export const buildTaskAndPlanPrompt = (task: string, plan: string) =>
+export const buildTaskAndPlanPrompt = (
+  task: string,
+  explanation: string,
+  plan: string
+) =>
   `
-Date: ${getCurrentFormattedDate()}
-Task: ${task}
-Plan: ${plan}
+## Original Task
+${task}
+
+## Explanation
+${explanation}
+
+## Plan
+${plan}
+
+## Context
+Today's Date: ${getCurrentFormattedDate()}
 `.trim();
 
 export const buildPageSnapshotPrompt = (pageSnapshot: string) =>
   `
-Current page snapshot with interactive elements (numbered IDs).
+## Current page snapshot
 Example interaction: <button id="1">Click me</button> → target: 1
 
 \`\`\`

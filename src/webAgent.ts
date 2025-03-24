@@ -49,7 +49,7 @@ export class WebAgent {
       },
       {
         role: "user",
-        content: buildTaskAndPlanPrompt(task, this.plan),
+        content: buildTaskAndPlanPrompt(task, this.taskExplanation, this.plan),
       },
     ];
     return this.messages;
