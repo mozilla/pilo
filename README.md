@@ -74,7 +74,7 @@ pnpm run build
 
 ## License
 
-ISC
+MIT
 
 ## Contributing
 
