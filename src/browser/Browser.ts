@@ -1,4 +1,4 @@
-import { SimplifierConfig, SimplifierResult, ActionResult } from "../types";
+import { SimplifierConfig, SimplifierResult, ActionResult } from "../types.js";
 
 /**
  * Browser interface that abstracts browser interactions

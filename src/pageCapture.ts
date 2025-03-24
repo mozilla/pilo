@@ -7,13 +7,13 @@
  * 4. Handle special cases like hidden elements and ARIA roles
  */
 
-import { Browser } from "./browser/Browser";
+import { Browser } from "./browser/Browser.js";
 import {
   SimplifierConfig,
   SimplifierResult,
   ElementReference,
   ActionResult,
-} from "./types";
+} from "./types.js";
 
 // Add type declarations for browser context
 declare global {

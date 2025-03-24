@@ -1,15 +1,19 @@
 {
   "name": "spark",
   "version": "1.0.0",
-  "description": "",
+  "description": "Web automation agent CLI utility",
   "main": "dist/index.js",
   "type": "module",
+  "bin": {
+    "spark": "./dist/index.js"
+  },
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "node --no-warnings --loader ts-node/esm src/index.ts",
     "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "spark": "node --no-warnings --loader ts-node/esm src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "install-cli": "npm run build && chmod +x dist/index.js && npm install -g ."
   },
   "keywords": [],
   "author": "",

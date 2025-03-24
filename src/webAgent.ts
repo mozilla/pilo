@@ -9,7 +9,7 @@ import {
   buildPageSnapshotPrompt,
 } from "./prompts.js";
 import { PageCapture } from "./pageCapture.js";
-import { Browser } from "./browser/Browser";
+import { Browser } from "./browser/Browser.js";
 
 export class WebAgent {
   private plan: string = "";

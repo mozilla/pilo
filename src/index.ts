@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { config } from "dotenv";
 import chalk from "chalk";
 import { WebAgent } from "./webAgent.js";
@@ -10,7 +12,16 @@ config();
 const task = process.argv[2];
 
 if (!task) {
-  console.error(chalk.red.bold("❌ Please provide a task to complete."));
+  console.error(chalk.red.bold("❌ Error: Missing task argument"));
+  console.log("");
+  console.log(chalk.white.bold("Usage:"));
+  console.log(`  ${chalk.cyan("spark")} ${chalk.green("<task>")}`);
+  console.log("");
+  console.log(chalk.white.bold("Example:"));
+  console.log(
+    `  ${chalk.cyan("spark")} ${chalk.green('"search for flights to Paris"')}`
+  );
+  console.log("");
   process.exit(1);
 }
 
