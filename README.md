@@ -16,19 +16,25 @@ A powerful AI-powered web automation tool that helps you get answers and take ac
 1. Clone and install:
 
 ```bash
-git clone https://github.com/yourusername/spark.git
+git clone https://github.com/Mozilla-Ocho/spark.git
 cd spark
 pnpm install
 ```
 
-2. Set up your OpenAI API key:
+2. Install Playwright browsers:
+
+```bash
+pnpm playwright install firefox
+```
+
+3. Set up your OpenAI API key:
 
 ```bash
 cp .env.example .env
 # Edit .env and add your OpenAI API key
 ```
 
-3. Run Spark:
+4. Run Spark:
 
 ```bash
 pnpm run spark "search for flights to Paris"
@@ -49,7 +55,7 @@ pnpm run spark "find the cheapest hotel in New York for next weekend"
 
 ## Development
 
-Built with TypeScript, Playwright, and OpenAI's GPT-4o.
+Built with TypeScript, Playwright, and OpenAI's GPT-4.
 
 ```bash
 # Run tests
