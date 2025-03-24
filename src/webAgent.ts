@@ -32,6 +32,7 @@ export class WebAgent {
         url: z.string(),
       }),
       prompt: buildPlanPrompt(task),
+      temperature: 0,
     });
 
     this.taskExplanation = response.object.explanation;
