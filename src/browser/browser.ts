@@ -1,29 +1,57 @@
-import { SimplifierConfig, SimplifierResult, ActionResult } from "../types.js";
+import { ActionResult } from "../pageCapture.js";
 
 /**
- * Browser interface that abstracts browser interactions
- * for both WebAgent and page simplification
+ * Browser interface for web automation
  */
 export interface Browser {
-  // Browser initialization and management
+  /**
+   * Launch the browser
+   */
   launch(options?: any): Promise<void>;
+
+  /**
+   * Close the browser
+   */
   close(): Promise<void>;
 
-  // Basic page operations
+  /**
+   * Navigate to a URL
+   */
   goto(url: string): Promise<void>;
+
+  /**
+   * Evaluate a function in the browser context
+   */
   evaluate<T>(fn: Function, ...args: any[]): Promise<T>;
+
+  /**
+   * Add a script tag to the page
+   */
   addScriptTag(options: { content?: string }): Promise<void>;
+
+  /**
+   * Wait for a specific load state
+   */
   waitForLoadState(state: string, options?: any): Promise<void>;
+
+  /**
+   * Navigate back to the previous page
+   */
   goBack(): Promise<void>;
+
+  /**
+   * Get the current URL
+   */
   getCurrentUrl(): Promise<string>;
+
+  /**
+   * Wait for a selector to be available
+   */
   waitForSelector(selector: string, options?: any): Promise<void>;
 
-  // Page capture functionality
-  capturePage(
-    selector: string,
-    config?: Partial<SimplifierConfig>
-  ): Promise<SimplifierResult>;
-
+  /**
+   * Perform an action on an element
+   */
   performAction(
     selector: string,
     action: string,

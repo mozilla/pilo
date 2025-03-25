@@ -9,6 +9,7 @@ import {
   buildPageSnapshotPrompt,
 } from "./prompts.js";
 import { Browser } from "./browser/browser.js";
+import { PageCapture } from "./pageCapture.js";
 
 export class WebAgent {
   private plan: string = "";
@@ -16,7 +17,6 @@ export class WebAgent {
   private messages: any[] = [];
   private llm = openai("gpt-4o");
   private DEBUG = false;
-  private elementReferences: Record<number, { selector: string }> = {};
   private taskExplanation: string = "";
 
   constructor(private browser: Browser, debug: boolean = false) {
@@ -149,13 +149,11 @@ export class WebAgent {
 
     // Start the loop
     while (!finalAnswer) {
-      // Get the page snapshot using the page capture
-      // Use browser's capturePage directly instead of creating a new PageCapture each time
-      const pageResult = await this.browser.capturePage("body");
-      const pageSnapshot = pageResult.text;
+      // Create fresh PageCapture instance for this iteration
+      const pageCapture = new PageCapture(this.browser);
 
-      // Store the element references for later use
-      this.elementReferences = pageResult.references;
+      // Get the page snapshot using the page capture
+      const pageSnapshot = await pageCapture.capture();
 
       if (this.DEBUG) {
         console.log(chalk.cyan.bold("\n🤔 Messages:"));
@@ -225,7 +223,7 @@ export class WebAgent {
         console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
         await this.browser.goBack();
       } else {
-        // Execute the action using browser's performAction
+        // Execute the action using page capture
         // Check if we have a valid target ID
         if (result.action.target === undefined) {
           console.error(
@@ -238,29 +236,19 @@ export class WebAgent {
           continue;
         }
 
-        // Get the selector from the stored references
-        const reference = this.elementReferences[result.action.target];
-        if (!reference) {
-          console.error(
-            chalk.red.bold(`❌ Failed to execute action: element not found`)
-          );
-          this.messages.push({
-            role: "assistant",
-            content: `Failed to execute action: element not found`,
-          });
-          continue;
-        }
-
-        const success = await this.browser.performAction(
-          reference.selector,
+        // Use the PageCapture performAction method directly with the element ID
+        const actionResult = await pageCapture.performAction(
+          result.action.target,
           result.action.action,
           result.action.value
         );
 
-        if (!success) {
+        if (!actionResult.success) {
           console.error(
             chalk.red.bold(`❌ Failed to execute action: `),
-            chalk.whiteBright(JSON.stringify(result.action))
+            chalk.whiteBright(
+              actionResult.error || JSON.stringify(result.action)
+            )
           );
           // Add the failure to the messages for context
           this.messages.push({

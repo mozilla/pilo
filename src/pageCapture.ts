@@ -8,18 +8,67 @@
  */
 
 import { Browser } from "./browser/browser.js";
-import {
-  SimplifierConfig,
-  SimplifierResult,
-  ElementReference,
-  ActionResult,
-} from "./types.js";
+
+/**
+ * Configuration for DOM simplification
+ */
+export interface SimplifierConfig {
+  // Elements to preserve with their allowed attributes
+  // Key is the tag name, value is array of allowed attributes
+  preserveElements: Record<string, string[]>;
+  // Elements that create text breaks (like paragraphs)
+  blockElements: string[];
+  // Elements that don't have closing tags
+  selfClosingElements: string[];
+  // Elements to completely remove including their content
+  removeElements: string[];
+  // Whether to include elements hidden via CSS/attributes
+  includeHiddenElements: boolean;
+  // Whether to preserve elements with ARIA roles
+  preserveAriaRoles: boolean;
+  // List of ARIA roles to consider actionable
+  actionableRoles: string[];
+  // Whether to clean up whitespace
+  cleanupWhitespace: boolean;
+}
+
+/**
+ * Result of the page transformation
+ */
+export interface SimplifierResult {
+  // The simplified text representation
+  text: string;
+  // References to preserved elements for later interaction
+  references: Record<number, ElementReference>;
+}
+
+/**
+ * Reference to a preserved element in the page
+ */
+export interface ElementReference {
+  // CSS selector to find the element
+  selector: string;
+  // The element's tag name
+  tagName: string;
+  // Preserved attributes
+  attributes: Record<string, string>;
+}
+
+/**
+ * Result of an action performed on an element
+ */
+export interface ActionResult {
+  success: boolean;
+  error?: string;
+}
 
 // Add type declarations for browser context
 declare global {
   interface Window {
-    pageTransformer: typeof pageTransformer;
-    elementActionPerformer: typeof elementActionPerformer;
+    __PageCapture: {
+      config: SimplifierConfig;
+      transform: (selector: string) => SimplifierResult;
+    };
   }
 }
 
@@ -126,31 +175,14 @@ export function getDefaultConfig(): SimplifierConfig {
  * Creates a self-contained page transformer function that can be serialized and injected
  * into any context (browser, Playwright, etc.)
  */
-export function createPageTransformer() {
-  return function pageTransformer(
-    selector: string,
-    userConfig?: Partial<SimplifierConfig>
-  ): SimplifierResult {
-    // Use default config merged with any provided user config
-    const config = {
-      ...getDefaultConfig(),
-      ...(userConfig || {}),
-    };
-
+export function createPageTransformer(config: SimplifierConfig) {
+  return function pageTransformer(selector: string): SimplifierResult {
     // Cache for element visibility and preservation checks
     const visibilityCache = new WeakMap<Element, boolean>();
     const preservationCache = new WeakMap<Element, boolean>();
 
     /**
      * Checks if an element is hidden via CSS or attributes
-     * This includes:
-     * - hidden attribute
-     * - aria-hidden="true"
-     * - display: none
-     * - visibility: hidden
-     * - opacity: 0
-     * - zero dimensions (width/height = 0)
-     * - positioned outside viewport
      */
     function isElementHidden(element: Element): boolean {
       try {
@@ -253,7 +285,6 @@ export function createPageTransformer() {
 
     /**
      * Checks if an element should be completely removed
-     * This is for elements like script, style, etc. that we never want to include
      */
     function shouldRemoveElement(tagName: string): boolean {
       return config.removeElements.includes(tagName);
@@ -261,10 +292,6 @@ export function createPageTransformer() {
 
     /**
      * Checks if an element should be preserved in the output
-     * This includes:
-     * 1. Elements in preserveElements config
-     * 2. Elements with actionable ARIA roles (if configured)
-     * 3. Anchor tags with actual content
      */
     function shouldPreserveElement(node: Element): boolean {
       // Check cache first
@@ -434,11 +461,6 @@ export function createPageTransformer() {
 
     /**
      * Serializes a preserved element with its attributes and content
-     * This is where we:
-     * 1. Assign sequential IDs
-     * 2. Store references for later interaction
-     * 3. Handle self-closing elements
-     * 4. Process child content
      */
     function serializePreservedElement(
       node: Element,
@@ -480,8 +502,7 @@ export function createPageTransformer() {
         }
       }
 
-      // Special handling for input values - use the actual current value property
-      // rather than just the attribute which may be outdated
+      // Special handling for input values
       if (
         tagName === "input" ||
         tagName === "textarea" ||
@@ -534,12 +555,7 @@ export function createPageTransformer() {
     }
 
     /**
-     * Processes an element node, handling:
-     * 1. Element removal
-     * 2. Hidden elements
-     * 3. Block elements
-     * 4. Preserved elements
-     * 5. Child content
+     * Processes an element node
      */
     function processElementNode(
       node: Element,
@@ -644,10 +660,7 @@ export function createPageTransformer() {
     }
 
     /**
-     * Cleans up whitespace in the final result:
-     * 1. Removes excessive line breaks
-     * 2. Removes excessive spaces
-     * 3. Trims leading/trailing whitespace
+     * Cleans up whitespace in the final result
      */
     function cleanupWhitespace(text: string): string {
       if (!config.cleanupWhitespace) {
@@ -657,7 +670,7 @@ export function createPageTransformer() {
       return (
         text
           // Remove extra line breaks
-          .replace(/\n{2,}/g, "\n") // Keep single line breaks, remove extras
+          .replace(/\n{2,}/g, "\n\n")
           // Remove extra spaces
           .replace(/[ ]{2,}/g, " ")
           // Remove leading and trailing spaces
@@ -695,349 +708,107 @@ export function createPageTransformer() {
   };
 }
 
-// The serializable page transformer function
-export const pageTransformer = createPageTransformer();
-
-/**
- * Create a self-contained action performer function
- * This can be serialized and injected into any context
- */
-export function createActionPerformer() {
-  return async function elementActionPerformer(
-    selector: string,
-    action: string,
-    value?: string
-  ): Promise<ActionResult> {
-    try {
-      // Find the element using the selector
-      const element = document.querySelector(selector);
-      if (!element) {
-        return {
-          success: false,
-          error: `Element not found: ${selector}`,
-        };
-      }
-
-      // Helper to create rich event objects
-      function createEvent(type: string, options: any = {}) {
-        let event;
-
-        // JSDOM doesn't support all event constructors or has limited implementation
-        // Use simpler events in test environments
-        if (
-          typeof window.MouseEvent !== "function" ||
-          typeof window.InputEvent !== "function" ||
-          typeof window.FocusEvent !== "function"
-        ) {
-          event = document.createEvent("Event");
-          event.initEvent(type, true, true);
-          return event;
-        }
-
-        // Use appropriate event constructor based on event type
-        switch (type) {
-          case "click":
-          case "mousedown":
-          case "mouseup":
-          case "mouseover":
-          case "mouseout":
-          case "mousemove":
-            event = new MouseEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              detail: 1,
-              ...options,
-            });
-            break;
-
-          case "focus":
-          case "blur":
-            event = new FocusEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              ...options,
-            });
-            break;
-
-          case "input":
-          case "change":
-            // For frameworks that check for trustedEvents
-            // First try InputEvent if available
-            try {
-              event = new InputEvent(type, {
-                bubbles: true,
-                cancelable: true,
-                data: value || "",
-                inputType: "insertText",
-                ...options,
-              });
-            } catch (e) {
-              // Fall back to Event if InputEvent not supported
-              event = new Event(type, {
-                bubbles: true,
-                cancelable: true,
-                ...options,
-              });
-            }
-            break;
-
-          default:
-            event = new Event(type, {
-              bubbles: true,
-              cancelable: true,
-              ...options,
-            });
-        }
-
-        return event;
-      }
-
-      // Perform the action
-      switch (action.toLowerCase()) {
-        case "click":
-          // Create a more realistic click event flow
-          element.dispatchEvent(createEvent("mousedown"));
-          element.dispatchEvent(createEvent("mouseup"));
-          element.dispatchEvent(createEvent("click"));
-
-          // If it's a checkbox or radio, directly set checked state
-          if (
-            element instanceof HTMLInputElement &&
-            (element.type === "checkbox" || element.type === "radio")
-          ) {
-            element.checked = !element.checked;
-          }
-
-          return { success: true };
-
-        case "fill":
-          if (
-            element instanceof HTMLInputElement ||
-            element instanceof HTMLTextAreaElement
-          ) {
-            // Set value directly first
-            element.value = value || "";
-
-            // Dispatch events that frameworks expect
-            element.dispatchEvent(createEvent("focus"));
-
-            // More robust input event with proper data
-            const inputEvent = createEvent("input", { data: value });
-            // For React and other frameworks that might read from target.value during event handling
-            Object.defineProperty(inputEvent, "target", {
-              writable: false,
-              value: element,
-            });
-            element.dispatchEvent(inputEvent);
-
-            // Ensure change event also has proper target with updated value
-            const changeEvent = createEvent("change");
-            Object.defineProperty(changeEvent, "target", {
-              writable: false,
-              value: element,
-            });
-            element.dispatchEvent(changeEvent);
-
-            // Set the value again to ensure it's updated
-            element.value = value || "";
-
-            element.dispatchEvent(createEvent("blur"));
-
-            // Verify that the value was actually set
-            if (element.value !== value) {
-              // If value wasn't set, try again using different approach
-              element.value = value || "";
-              // For some frameworks, we need to manually trigger their change detection
-              setTimeout(() => {
-                element.dispatchEvent(createEvent("input", { data: value }));
-                element.dispatchEvent(createEvent("change"));
-              }, 0);
-            }
-
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: `Cannot fill element of type ${element.tagName.toLowerCase()}`,
-          };
-
-        case "select":
-          if (element instanceof HTMLSelectElement) {
-            // Store original value to check if change actually occurred
-            const originalValue = element.value;
-
-            // Set the new value
-            element.value = value || "";
-
-            // Create and dispatch events in the correct order
-            element.dispatchEvent(createEvent("focus"));
-            element.dispatchEvent(createEvent("input"));
-            element.dispatchEvent(createEvent("change"));
-            element.dispatchEvent(createEvent("blur"));
-
-            // For tests - set the value directly again to ensure it takes effect
-            if (element.value !== value) {
-              element.value = value || "";
-            }
-
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a select element",
-          };
-
-        case "check":
-          if (
-            element instanceof HTMLInputElement &&
-            (element.type === "checkbox" || element.type === "radio")
-          ) {
-            if (!element.checked) {
-              // Simulate a more realistic click for checkboxes/radios
-              element.dispatchEvent(createEvent("mousedown"));
-              element.dispatchEvent(createEvent("mouseup"));
-              element.dispatchEvent(createEvent("click"));
-
-              // Directly set checked state in case click doesn't work
-              if (!element.checked) {
-                element.checked = true;
-                element.dispatchEvent(createEvent("change"));
-              }
-            }
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a checkbox or radio input",
-          };
-
-        case "uncheck":
-          if (
-            element instanceof HTMLInputElement &&
-            element.type === "checkbox"
-          ) {
-            if (element.checked) {
-              // Simulate a more realistic click for checkboxes
-              element.dispatchEvent(createEvent("mousedown"));
-              element.dispatchEvent(createEvent("mouseup"));
-              element.dispatchEvent(createEvent("click"));
-
-              // Directly set unchecked state in case click doesn't work
-              if (element.checked) {
-                element.checked = false;
-                element.dispatchEvent(createEvent("change"));
-              }
-            }
-            return { success: true };
-          }
-          return {
-            success: false,
-            error: "Element is not a checkbox input",
-          };
-
-        case "focus":
-          (element as HTMLElement).focus();
-          element.dispatchEvent(createEvent("focus"));
-
-          // Special case for JSDOM which doesn't fully implement focus
-          if (
-            document.activeElement &&
-            typeof (document.activeElement as HTMLElement).focus !== "function"
-          ) {
-            // Manually mark the element as focused for tests
-            (element as any)._focused = true;
-          }
-
-          return { success: true };
-
-        default:
-          return {
-            success: false,
-            error: `Unsupported action: ${action}`,
-          };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  };
-}
-
-// Create the action performer once
-export const elementActionPerformer = createActionPerformer();
-
 /**
  * Main PageCapture class that provides a high-level interface
  * for transforming page content and interacting with elements
  */
 export class PageCapture {
   private config: SimplifierConfig;
+  private initialized = false;
+  private elementReferences: Record<number, ElementReference> = {};
 
   /**
    * Creates a new PageCapture instance
    */
   constructor(private browser: Browser, config?: Partial<SimplifierConfig>) {
-    this.config = this.mergeConfig(getDefaultConfig(), config || {});
+    this.config = { ...getDefaultConfig(), ...(config || {}) };
   }
 
   /**
-   * Transforms a page element into simplified text
+   * Initialize the browser with required functions
    */
-  async transform(selector: string): Promise<SimplifierResult> {
-    return this.browser.capturePage(selector, this.config);
+  private async initialize(): Promise<void> {
+    // Check if PageCapture is already defined in browser context
+    const isInitialized = await this.browser
+      .evaluate<boolean>(() => {
+        return (
+          typeof window.__PageCapture !== "undefined" &&
+          typeof window.__PageCapture.transform === "function"
+        );
+      })
+      .catch(() => false);
+
+    // If already properly initialized, just set the flag and return
+    if (isInitialized) {
+      this.initialized = true;
+      return;
+    }
+
+    // Reset the initialization flag since we need to reinitialize
+    this.initialized = false;
+
+    // Convert only the page transformer function to a string
+    const pageTransformerFn = createPageTransformer.toString();
+
+    // Inject just the transformer function and config
+    await this.browser.addScriptTag({
+      content: `
+        window.__PageCapture = {};
+        window.__PageCapture.config = ${JSON.stringify(this.config)};
+        window.__PageCapture.transform = (${pageTransformerFn})(window.__PageCapture.config);
+      `,
+    });
+
+    this.initialized = true;
   }
 
   /**
-   * Interacts with an element by its ID
+   * Captures the page content and stores element references
+   * @param selector CSS selector for the element to capture, defaults to "body"
+   * @returns The simplified page text
    */
-  async interactWithElement(
+  async capture(selector: string = "body"): Promise<string> {
+    await this.initialize();
+
+    const result = await this.browser.evaluate<SimplifierResult>(
+      (selector: string) => window.__PageCapture.transform(selector),
+      selector
+    );
+
+    // Store element references for later use
+    this.elementReferences = result.references;
+
+    return result.text;
+  }
+
+  /**
+   * Gets all the current element references captured
+   */
+  getElementReferences(): Record<number, ElementReference> {
+    return this.elementReferences;
+  }
+
+  /**
+   * Performs an action on an element by its ID
+   */
+  async performAction(
     id: number,
     action: string,
     value?: string
-  ): Promise<boolean> {
-    // Use only the data attribute for the selector
-    const selector = `[data-simplifier-id="${id}"]`;
+  ): Promise<ActionResult> {
+    // Ensure initialization before performing action
+    await this.initialize();
 
-    // Use the selector with browser.performAction
-    const result = await this.browser.performAction(selector, action, value);
-    return result.success;
-  }
-
-  /**
-   * Merges configuration objects, handling both primitive and object values
-   */
-  private mergeConfig(
-    defaultConfig: SimplifierConfig,
-    userConfig: Partial<SimplifierConfig>
-  ): SimplifierConfig {
-    const result = { ...defaultConfig };
-
-    for (const key in userConfig) {
-      if (userConfig.hasOwnProperty(key)) {
-        const typedKey = key as keyof SimplifierConfig;
-
-        if (
-          typeof userConfig[typedKey] === "object" &&
-          userConfig[typedKey] !== null &&
-          typeof defaultConfig[typedKey] === "object" &&
-          defaultConfig[typedKey] !== null
-        ) {
-          // @ts-ignore - This is safe since we checked types
-          result[typedKey] = {
-            ...defaultConfig[typedKey],
-            ...userConfig[typedKey],
-          };
-        } else {
-          // @ts-ignore - This is safe since we checked property exists
-          result[typedKey] = userConfig[typedKey];
-        }
-      }
+    // Check if the ID exists in our references
+    if (!this.elementReferences[id]) {
+      return {
+        success: false,
+        error: `Element with ID ${id} not found. Have you called capture() first?`,
+      };
     }
 
-    return result;
+    // Use the browser's native performAction method with the stored selector
+    const selector = this.elementReferences[id].selector;
+    return this.browser.performAction(selector, action, value);
   }
 }

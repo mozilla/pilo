@@ -6,8 +6,7 @@ import {
   Page,
 } from "playwright";
 import { Browser } from "./browser.js";
-import { SimplifierConfig, SimplifierResult, ActionResult } from "../types.js";
-import { pageTransformer, getDefaultConfig } from "../pageCapture.js";
+import { ActionResult } from "../pageCapture.js";
 
 /**
  * PlaywrightBrowser - Browser implementation using Playwright
@@ -87,47 +86,6 @@ export class PlaywrightBrowser implements Browser {
   async waitForSelector(selector: string, options?: any): Promise<void> {
     if (!this.page) throw new Error("Browser not launched");
     await this.page.waitForSelector(selector, options);
-  }
-
-  async capturePage(
-    selector: string,
-    userConfig?: Partial<SimplifierConfig>
-  ): Promise<SimplifierResult> {
-    if (!this.page) throw new Error("Browser not launched");
-
-    // Pre-compute the default config
-    const defaultConfig = getDefaultConfig();
-
-    // Inject the pageTransformer function and pre-computed default config
-    await this.addScriptTag({
-      content: `
-        window.defaultConfig = ${JSON.stringify(defaultConfig)};
-        window.pageTransformer = ${pageTransformer.toString()};
-      `,
-    });
-
-    // Execute the transformation with merged config
-    return await this.evaluate(
-      ({
-        selector,
-        userConfig,
-      }: {
-        selector: string;
-        userConfig?: Partial<SimplifierConfig>;
-      }) => {
-        // Create a function that returns the injected default config
-        // @ts-ignore - We're adding this property to the window
-        window.getDefaultConfig = function () {
-          // @ts-ignore - We're adding this property to the window
-          return window.defaultConfig;
-        };
-
-        // Use the transformer with the pre-computed config
-        // @ts-ignore - Using the injected function
-        return window.pageTransformer(selector, userConfig);
-      },
-      { selector, userConfig }
-    );
   }
 
   async performAction(
