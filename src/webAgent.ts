@@ -1,6 +1,5 @@
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { z } from "zod";
 import chalk from "chalk";
 import {
   actionLoopPrompt,
@@ -9,6 +8,7 @@ import {
   buildPageSnapshotPrompt,
 } from "./prompts.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
+import { planSchema, actionSchema, Plan, Action } from "./schemas.js";
 
 export class WebAgent {
   private plan: string = "";
@@ -33,11 +33,7 @@ export class WebAgent {
   async createPlan(task: string) {
     const response = await generateObject({
       model: this.llm,
-      schema: z.object({
-        explanation: z.string(),
-        plan: z.string(),
-        url: z.string(),
-      }),
+      schema: planSchema,
       prompt: buildPlanPrompt(task),
       temperature: 0,
     });
@@ -99,26 +95,7 @@ export class WebAgent {
 
     const response = await generateObject({
       model: this.llm,
-      schema: z.object({
-        observation: z.string(),
-        thought: z.string(),
-        action: z.object({
-          action: z.enum([
-            "select",
-            "fill",
-            "click",
-            "hover",
-            "done",
-            "wait",
-            "goto",
-            "back",
-            "check",
-            "uncheck",
-          ]),
-          ref: z.string().optional(),
-          value: z.string().optional(),
-        }),
-      }),
+      schema: actionSchema,
       messages: this.messages,
       temperature: 0,
     });

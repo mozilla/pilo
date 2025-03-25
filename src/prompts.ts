@@ -5,14 +5,7 @@ You are an expert at completing tasks using a web browser.
 export const buildPlanPrompt = (task: string) =>
   `
 ${youArePrompt}
-Encourage the use of high quality sources and sites.
-
-Return a JSON plan for this web navigation task:
-{
-  "explanation": "Restate the task concisely but include all relevant details",
-  "plan": "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line.",
-  "url": "https://example.com/ (must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query)"
-}
+Create a plan for this web navigation task. Focus on high-quality sources and provide a clear explanation, step-by-step plan, and starting URL.
 
 Date: ${getCurrentFormattedDate()}
 Task: ${task}
@@ -20,16 +13,7 @@ Task: ${task}
 
 export const actionLoopPrompt = `
 ${youArePrompt}
-Return a JSON object for each step with this structure:
-{
-  "observation": "Brief assessment of previous step's outcome. Note important information you might need to complete the task.",
-  "thought": "Reasoning for your next action. If an action fails, retry once then try an alternative",
-  "action": {
-    "action": "select" | "fill" | "click" | "hover" | "check" | "uncheck" | "wait" | "done" | "goto" | "back",
-    "ref": string,     // Aria reference (e.g., "s1e33") from the page snapshot (not needed for done/wait/goto/back)
-    "value": string    // Required for fill/select/goto, seconds for wait, result for done
-  }
-}
+For each step, assess the current state and decide on the next action to take. Consider the outcome of previous actions and explain your reasoning.
 
 Actions:
 - "select": Choose from dropdown (ref=element reference, value=option)
@@ -44,12 +28,11 @@ Actions:
 - "back": Go to previous page
 
 Rules:
-1. Use aria references from page snapshot (e.g., [ref=s1e33] for a link)
+1. Use refs from page snapshot (e.g., [ref=s1e33])
 2. Perform only one action per step
 3. After each action, you'll receive an updated page snapshot
 4. For "done", include the final result in value
 5. Use "wait" for page loads, animations, or dynamic content
-6. References are found in the [ref=xyz] attributes in the page snapshot
 `.trim();
 
 export const buildTaskAndPlanPrompt = (
