@@ -68,7 +68,7 @@ pnpm run build
 
 ## Requirements
 
-- Node.js 16+
+- Node.js 20+
 - OpenAI API key
 - Firefox browser (for Playwright)
 

@@ -5,7 +5,7 @@ import {
   BrowserContext,
   Page,
 } from "playwright";
-import { Browser } from "./Browser.js";
+import { Browser } from "./browser.js";
 import { SimplifierConfig, SimplifierResult, ActionResult } from "../types.js";
 import { pageTransformer, getDefaultConfig } from "../pageCapture.js";
 

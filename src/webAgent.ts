@@ -8,7 +8,7 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
-import { Browser } from "./browser/Browser.js";
+import { Browser } from "./browser/browser.js";
 
 export class WebAgent {
   private plan: string = "";

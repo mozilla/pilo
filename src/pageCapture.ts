@@ -7,7 +7,7 @@
  * 4. Handle special cases like hidden elements and ARIA roles
  */
 
-import { Browser } from "./browser/Browser.js";
+import { Browser } from "./browser/browser.js";
 import {
   SimplifierConfig,
   SimplifierResult,

@@ -3,7 +3,7 @@
 import { config } from "dotenv";
 import chalk from "chalk";
 import { WebAgent } from "./webAgent.js";
-import { PlaywrightBrowser } from "./browser/PlaywrightBrowser.js";
+import { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 
 // Load environment variables from .env file
 config();
