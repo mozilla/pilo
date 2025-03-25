@@ -8,8 +8,7 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
 } from "./prompts.js";
-import { Browser } from "./browser/browser.js";
-import { PageCapture } from "./pageCapture.js";
+import { AriaBrowser } from "./browser/ariaBrowser.js";
 
 export class WebAgent {
   private plan: string = "";
@@ -18,8 +17,16 @@ export class WebAgent {
   private llm = openai("gpt-4o");
   private DEBUG = false;
   private taskExplanation: string = "";
+  private readonly FILTERED_PREFIXES = ["/url:"];
+  private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
+    [/^listitem/g, "li"],
+    [/\[ref=/g, "["],
+    [/^link/g, "a"],
+    [/^text: (.*?)$/g, '"$1"'],
+    [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'],
+  ];
 
-  constructor(private browser: Browser, debug: boolean = false) {
+  constructor(private browser: AriaBrowser, debug: boolean = false) {
     this.DEBUG = debug;
   }
 
@@ -57,6 +64,23 @@ export class WebAgent {
   }
 
   async getNextActions(pageSnapshot: string) {
+    // Compress the snapshot before using it
+    const compressedSnapshot = this.compressSnapshot(pageSnapshot);
+
+    if (this.DEBUG) {
+      const originalSize = pageSnapshot.length;
+      const compressedSize = compressedSnapshot.length;
+      const compressionPercent = Math.round(
+        (1 - compressedSize / originalSize) * 100
+      );
+
+      console.log(
+        chalk.gray("\n📝 Compression:"),
+        chalk.green(`${compressionPercent}%`),
+        chalk.gray(`(${originalSize} → ${compressedSize} chars)`)
+      );
+    }
+
     // Replace all previous snapshot messages with placeholders
     this.messages.forEach((msg: any) => {
       if (
@@ -67,10 +91,10 @@ export class WebAgent {
       }
     });
 
-    // Add the new snapshot message
+    // Add the new snapshot message with compressed snapshot
     this.messages.push({
       role: "user",
-      content: buildPageSnapshotPrompt(pageSnapshot),
+      content: buildPageSnapshotPrompt(compressedSnapshot),
     });
 
     const response = await generateObject({
@@ -83,12 +107,15 @@ export class WebAgent {
             "select",
             "fill",
             "click",
+            "hover",
             "done",
             "wait",
             "goto",
             "back",
+            "check",
+            "uncheck",
           ]),
-          target: z.number().optional(),
+          ref: z.string().optional(),
           value: z.string().optional(),
         }),
       }),
@@ -133,10 +160,7 @@ export class WebAgent {
     this.resetState();
 
     // Run plan creation and browser launch concurrently
-    await Promise.all([
-      this.createPlan(task),
-      this.browser.launch({ headless: false }),
-    ]);
+    await Promise.all([this.createPlan(task), this.browser.start()]);
 
     this.logTaskInfo(task);
 
@@ -149,11 +173,8 @@ export class WebAgent {
 
     // Start the loop
     while (!finalAnswer) {
-      // Create fresh PageCapture instance for this iteration
-      const pageCapture = new PageCapture(this.browser);
-
-      // Get the page snapshot using the page capture
-      const pageSnapshot = await pageCapture.capture();
+      // Get the page snapshot directly from the browser
+      const pageSnapshot = await this.browser.getText();
 
       if (this.DEBUG) {
         console.log(chalk.cyan.bold("\n🤔 Messages:"));
@@ -174,9 +195,7 @@ export class WebAgent {
       console.log(chalk.yellow.bold("\n🎯 Actions:"));
       console.log(
         chalk.whiteBright(`   1. ${result.action.action.toUpperCase()}`),
-        result.action.target
-          ? chalk.cyan(`target: ${result.action.target}`)
-          : "",
+        result.action.ref ? chalk.cyan(`ref: ${result.action.ref}`) : "",
         result.action.value
           ? chalk.green(`value: "${result.action.value}"`)
           : ""
@@ -188,106 +207,107 @@ export class WebAgent {
         break;
       }
 
-      // Execute the single action
+      // Execute the action
       console.log(
         chalk.cyan.bold("\n▶️ Executing action:"),
         chalk.whiteBright(result.action.action.toUpperCase()),
-        result.action.target
-          ? chalk.cyan(`target: ${result.action.target}`)
-          : "",
+        result.action.ref ? chalk.cyan(`ref: ${result.action.ref}`) : "",
         result.action.value
           ? chalk.green(`value: "${result.action.value}"`)
           : ""
       );
 
-      if (result.action.action === "wait") {
-        const seconds = parseInt(result.action.value || "1", 10);
-        console.log(
-          chalk.yellow.bold(
-            `⏳ Waiting for ${seconds} second${seconds !== 1 ? "s" : ""}...`
+      try {
+        switch (result.action.action) {
+          case "wait":
+            const seconds = parseInt(result.action.value || "1", 10);
+            console.log(
+              chalk.yellow.bold(
+                `⏳ Waiting for ${seconds} second${seconds !== 1 ? "s" : ""}...`
+              )
+            );
+            await this.wait(seconds);
+            break;
+
+          case "goto":
+            if (result.action.value) {
+              console.log(
+                chalk.blue.bold(`🌐 Navigating to: ${result.action.value}`)
+              );
+              await this.browser.goto(result.action.value);
+            } else {
+              throw new Error("Missing URL for goto action");
+            }
+            break;
+
+          case "back":
+            console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
+            await this.browser.goBack();
+            break;
+
+          default:
+            if (!result.action.ref) {
+              throw new Error("Missing ref for action");
+            }
+            await this.browser.performAction(
+              result.action.ref,
+              result.action.action,
+              result.action.value
+            );
+        }
+
+        // For interactive actions, wait for the page to settle
+        if (
+          [
+            "click",
+            "select",
+            "fill",
+            "hover",
+            "check",
+            "uncheck",
+            "goto",
+            "back",
+          ].includes(result.action.action)
+        ) {
+          console.log(
+            chalk.gray("   🌐 Waiting for network activity to settle...")
+          );
+          try {
+            // Wait for both network idle and DOM to be stable
+            await this.browser.waitForLoadState("networkidle", {
+              timeout: 2000,
+            });
+            await this.browser.waitForLoadState("domcontentloaded", {
+              timeout: 2000,
+            });
+          } catch (e) {
+            // If timeout occurs, just continue
+            console.log(
+              chalk.gray("   ⚠️  Network wait timed out, continuing...")
+            );
+          }
+        }
+
+        // Add the successful result to messages for context
+        this.messages.push({
+          role: "assistant",
+          content: JSON.stringify(result),
+        });
+      } catch (error) {
+        console.error(
+          chalk.red.bold(`❌ Failed to execute action: `),
+          chalk.whiteBright(
+            error instanceof Error ? error.message : String(error)
           )
         );
-        await this.wait(seconds);
-      } else if (result.action.action === "goto") {
-        if (result.action.value) {
-          console.log(
-            chalk.blue.bold(`🌐 Navigating to: ${result.action.value}`)
-          );
-          await this.browser.goto(result.action.value);
-        } else {
-          console.error(
-            chalk.red.bold(`❌ Failed to execute goto: missing URL`)
-          );
-        }
-      } else if (result.action.action === "back") {
-        console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
-        await this.browser.goBack();
-      } else {
-        // Execute the action using page capture
-        // Check if we have a valid target ID
-        if (result.action.target === undefined) {
-          console.error(
-            chalk.red.bold(`❌ Failed to execute action: missing target`)
-          );
-          this.messages.push({
-            role: "assistant",
-            content: `Failed to execute action: missing target`,
-          });
-          continue;
-        }
-
-        // Use the PageCapture performAction method directly with the element ID
-        const actionResult = await pageCapture.performAction(
-          result.action.target,
-          result.action.action,
-          result.action.value
-        );
-
-        if (!actionResult.success) {
-          console.error(
-            chalk.red.bold(`❌ Failed to execute action: `),
-            chalk.whiteBright(
-              actionResult.error || JSON.stringify(result.action)
-            )
-          );
-          // Add the failure to the messages for context
-          this.messages.push({
-            role: "assistant",
-            content: `Failed to execute action: ${JSON.stringify(
-              result.action
-            )}`,
-          });
-        }
+        // Add the failure to the messages for context
+        this.messages.push({
+          role: "assistant",
+          content: `Failed to execute action: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
       }
-
-      // Wait for network idle after interactive actions
-      if (
-        ["click", "select", "fill", "goto", "back"].includes(
-          result.action.action
-        )
-      ) {
-        console.log(
-          chalk.gray("   🌐 Waiting for network activity to settle...")
-        );
-        try {
-          // Wait for both network idle and DOM to be stable
-          await this.browser.waitForLoadState("networkidle", { timeout: 2000 });
-          await this.browser.waitForLoadState("domcontentloaded", {
-            timeout: 2000,
-          });
-        } catch (e) {
-          // If timeout occurs, just continue
-          console.log(
-            chalk.gray("   ⚠️  Network wait timed out, continuing...")
-          );
-        }
-      }
-
-      // Add the result to messages for context
-      this.messages.push({
-        role: "assistant",
-        content: JSON.stringify(result),
-      });
     }
 
     if (finalAnswer) {
@@ -301,6 +321,46 @@ export class WebAgent {
   }
 
   async close() {
-    await this.browser.close();
+    await this.browser.shutdown();
+  }
+
+  /**
+   * Compresses the aria tree snapshot to reduce token usage while maintaining essential information
+   */
+  private compressSnapshot(snapshot: string): string {
+    // First apply all our normal transformations
+    const transformed = snapshot
+      .split("\n")
+      .map((line) => line.trim())
+      .map((line) => line.replace(/^- /, ""))
+      .filter(
+        (line) =>
+          !this.FILTERED_PREFIXES.some((start) => line.startsWith(start))
+      )
+      .map((line) => {
+        return this.ARIA_TRANSFORMATIONS.reduce(
+          (processed, [pattern, replacement]) =>
+            processed.replace(pattern, replacement),
+          line
+        );
+      })
+      .filter(Boolean);
+
+    // Then deduplicate repeated text by checking previous line
+    let lastQuotedText = "";
+    const deduped = transformed.map((line) => {
+      const match = line.match(/^([^"]*)"([^"]+)"(.*)$/);
+      if (!match) return line;
+
+      const [, prefix, quotedText, suffix] = match;
+      if (quotedText === lastQuotedText) {
+        return `${prefix}[same as above]${suffix}`;
+      }
+
+      lastQuotedText = quotedText;
+      return line;
+    });
+
+    return deduped.join("\n");
   }
 }

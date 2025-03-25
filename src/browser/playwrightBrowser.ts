@@ -5,13 +5,12 @@ import {
   BrowserContext,
   Page,
 } from "playwright";
-import { Browser } from "./browser.js";
-import { ActionResult } from "../pageCapture.js";
+import { AriaBrowser } from "./ariaBrowser.js";
 
 /**
- * PlaywrightBrowser - Browser implementation using Playwright
+ * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
  */
-export class PlaywrightBrowser implements Browser {
+export class PlaywrightBrowser implements AriaBrowser {
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
@@ -24,11 +23,10 @@ export class PlaywrightBrowser implements Browser {
     } = {}
   ) {}
 
-  async launch(launchOptions?: any): Promise<void> {
+  async start(): Promise<void> {
     // Merge constructor options with launch options
     const mergedOptions = {
       headless: this.options.headless ?? false,
-      ...launchOptions,
     };
 
     this.browser = await firefox.launch(mergedOptions);
@@ -46,7 +44,7 @@ export class PlaywrightBrowser implements Browser {
     this.page = await this.context.newPage();
   }
 
-  async close(): Promise<void> {
+  async shutdown(): Promise<void> {
     if (this.browser) await this.browser.close();
     this.browser = null;
     this.context = null;
@@ -54,86 +52,98 @@ export class PlaywrightBrowser implements Browser {
   }
 
   async goto(url: string): Promise<void> {
-    if (!this.page) throw new Error("Browser not launched");
+    if (!this.page) throw new Error("Browser not started");
     await this.page.goto(url);
   }
 
-  async evaluate<T>(fn: Function, ...args: any[]): Promise<T> {
-    if (!this.page) throw new Error("Browser not launched");
-    return await this.page.evaluate(fn as any, ...args);
-  }
-
-  async addScriptTag(options: { content?: string }): Promise<void> {
-    if (!this.page) throw new Error("Browser not launched");
-    await this.page.addScriptTag(options);
-  }
-
-  async waitForLoadState(state: string, options?: any): Promise<void> {
-    if (!this.page) throw new Error("Browser not launched");
-    await this.page.waitForLoadState(state as any, options);
-  }
-
   async goBack(): Promise<void> {
-    if (!this.page) throw new Error("Browser not launched");
+    if (!this.page) throw new Error("Browser not started");
     await this.page.goBack();
   }
 
-  async getCurrentUrl(): Promise<string> {
-    if (!this.page) throw new Error("Browser not launched");
+  async goForward(): Promise<void> {
+    if (!this.page) throw new Error("Browser not started");
+    await this.page.goForward();
+  }
+
+  async getUrl(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
     return this.page.url();
   }
 
-  async waitForSelector(selector: string, options?: any): Promise<void> {
-    if (!this.page) throw new Error("Browser not launched");
-    await this.page.waitForSelector(selector, options);
+  async getTitle(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+    return this.page.title();
+  }
+
+  async getText(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+    return await this.page.locator("html").ariaSnapshot({ ref: true });
+  }
+
+  async getScreenshot(): Promise<Buffer> {
+    if (!this.page) throw new Error("Browser not started");
+    return await this.page.screenshot();
+  }
+
+  async waitForLoadState(
+    state: "networkidle" | "domcontentloaded" | "load",
+    options?: { timeout?: number }
+  ): Promise<void> {
+    if (!this.page) throw new Error("Browser not started");
+    await this.page.waitForLoadState(state, options);
   }
 
   async performAction(
-    selector: string,
+    ref: string,
     action: string,
     value?: string
-  ): Promise<ActionResult> {
-    if (!this.page) throw new Error("Browser not launched");
+  ): Promise<void> {
+    if (!this.page) throw new Error("Browser not started");
+
+    const element = this.page.locator(`aria-ref=${ref}`);
 
     try {
-      // Use native Playwright methods instead of injecting code
       switch (action.toLowerCase()) {
         case "click":
-          await this.page.click(selector);
-          return { success: true };
+          await element.click();
+          break;
+
+        case "hover":
+          await element.hover();
+          break;
 
         case "fill":
-          await this.page.fill(selector, value || "");
-          return { success: true };
-
-        case "select":
-          await this.page.selectOption(selector, value || "");
-          return { success: true };
-
-        case "check":
-          await this.page.check(selector);
-          return { success: true };
-
-        case "uncheck":
-          await this.page.uncheck(selector);
-          return { success: true };
+          if (!value) throw new Error("Value required for fill action");
+          await element.fill(value);
+          break;
 
         case "focus":
-          await this.page.focus(selector);
-          return { success: true };
+          await element.focus();
+          break;
+
+        case "check":
+          await element.check();
+          break;
+
+        case "uncheck":
+          await element.uncheck();
+          break;
+
+        case "select":
+          if (!value) throw new Error("Value required for select action");
+          await element.selectOption(value);
+          break;
 
         default:
-          return {
-            success: false,
-            error: `Unsupported action: ${action}`,
-          };
+          throw new Error(`Unsupported action: ${action}`);
       }
     } catch (error) {
-      console.error("Error performing action:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
+      throw new Error(
+        `Failed to perform action: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 }
