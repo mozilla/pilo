@@ -40,6 +40,10 @@ Rules:
 3. After each action, you'll receive an updated page snapshot
 4. For "done", include the final result in value
 5. Use "wait" for page loads, animations, or dynamic content
+
+Best Practices:
+- Use click instead of goto when possible
+
 `.trim();
 
 export const buildTaskAndPlanPrompt = (
