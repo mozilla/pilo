@@ -36,7 +36,13 @@ const DEBUG = false;
       headless: false,
       device: "Desktop Firefox",
       bypassCSP: true,
-      adBlocking: true,
+      blockAds: true,
+      blockResources: [
+        "image", // Block images
+        "font", // Block fonts
+        "media", // Block audio and video content
+        "manifest", // Block web app manifests
+      ],
     });
 
     // Create WebAgent with the browser

@@ -22,7 +22,10 @@ export class PlaywrightBrowser implements AriaBrowser {
       headless?: boolean;
       device?: string;
       bypassCSP?: boolean;
-      adBlocking?: boolean;
+      blockAds?: boolean;
+      blockResources?: Array<
+        "image" | "stylesheet" | "font" | "media" | "manifest"
+      >;
     } = {}
   ) {}
 
@@ -47,9 +50,24 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.page = await this.context.newPage();
 
     // Enable ad blocking if requested
-    if (this.options.adBlocking) {
+    if (this.options.blockAds) {
       const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
       blocker.enableBlockingInPage(this.page);
+    }
+
+    // Set up resource blocking based on options
+    if (this.options.blockResources && this.options.blockResources.length > 0) {
+      await this.page.route("**/*", async (route) => {
+        const request = route.request();
+        const resourceType = request.resourceType();
+
+        // Block if the resource type is in the block list
+        if (this.options.blockResources!.includes(resourceType as any)) {
+          await route.abort();
+        } else {
+          await route.continue();
+        }
+      });
     }
   }
 
