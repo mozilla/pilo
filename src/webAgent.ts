@@ -8,7 +8,7 @@ import {
   buildPageSnapshotPrompt,
 } from "./prompts.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
-import { planSchema, actionSchema, Plan, Action } from "./schemas.js";
+import { planSchema, actionSchema } from "./schemas.js";
 
 export class WebAgent {
   private plan: string = "";
@@ -162,13 +162,26 @@ export class WebAgent {
     while (!finalAnswer) {
       // Get the page snapshot directly from the browser
       const pageSnapshot = await this.browser.getText();
+      const title = await this.browser.getTitle();
+      const truncatedTitle =
+        title.length > 50 ? title.slice(0, 47) + "..." : title;
+
+      console.log(
+        chalk.gray(
+          "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )
+      );
+      console.log(
+        chalk.blue.bold("📍 Current Page:"),
+        chalk.blue(truncatedTitle)
+      );
 
       if (this.DEBUG) {
         console.log(chalk.cyan.bold("\n🤔 Messages:"));
         console.log(chalk.gray(JSON.stringify(this.messages, null, 2)));
       }
 
-      console.log(chalk.cyan.bold("\n🤔 Thinking..."));
+      console.log(chalk.cyan.bold("🤔 Thinking..."));
 
       // Call LLM with the page snapshot
       const result = await this.getNextActions(pageSnapshot);
