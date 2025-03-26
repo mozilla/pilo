@@ -35,14 +35,8 @@ const DEBUG = false;
     const browser = new PlaywrightBrowser({
       headless: false,
       device: "Desktop Firefox",
-      bypassCSP: true,
       blockAds: true,
-      blockResources: [
-        "image", // Block images
-        "font", // Block fonts
-        "media", // Block audio and video content
-        "manifest", // Block web app manifests
-      ],
+      blockResources: ["image", "font", "media", "manifest"],
     });
 
     // Create WebAgent with the browser
