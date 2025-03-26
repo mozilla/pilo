@@ -6,6 +6,8 @@ import {
   Page,
 } from "playwright";
 import { AriaBrowser } from "./ariaBrowser.js";
+import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
+import fetch from "cross-fetch";
 
 /**
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
@@ -20,6 +22,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       headless?: boolean;
       device?: string;
       bypassCSP?: boolean;
+      adBlocking?: boolean;
     } = {}
   ) {}
 
@@ -42,6 +45,12 @@ export class PlaywrightBrowser implements AriaBrowser {
     });
 
     this.page = await this.context.newPage();
+
+    // Enable ad blocking if requested
+    if (this.options.adBlocking) {
+      const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
+      blocker.enableBlockingInPage(this.page);
+    }
   }
 
   async shutdown(): Promise<void> {

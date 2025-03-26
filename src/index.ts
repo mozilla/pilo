@@ -36,6 +36,7 @@ const DEBUG = false;
       headless: false,
       device: "Desktop Firefox",
       bypassCSP: true,
+      adBlocking: true,
     });
 
     // Create WebAgent with the browser

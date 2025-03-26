@@ -24,7 +24,7 @@ export const actionSchema = z.object({
   observation: z
     .string()
     .describe(
-      "Brief assessment of previous step's outcome. Note important information you might need to complete the task."
+      "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task."
     ),
   thought: z
     .string()
