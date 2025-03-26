@@ -20,7 +20,7 @@ export class WebAgent {
   private readonly FILTERED_PREFIXES = ["/url:"];
   private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
     [/^listitem/g, "li"],
-    [/\[ref=/g, "["],
+    [/(?<=\[)ref=/g, ""],
     [/^link/g, "a"],
     [/^text: (.*?)$/g, '"$1"'],
     [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'],
@@ -63,6 +63,12 @@ export class WebAgent {
     // Compress the snapshot before using it
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
 
+    // Get current page title and URL
+    const [title, url] = await Promise.all([
+      this.browser.getTitle(),
+      this.browser.getUrl(),
+    ]);
+
     if (this.DEBUG) {
       const originalSize = pageSnapshot.length;
       const compressedSize = compressedSnapshot.length;
@@ -81,16 +87,20 @@ export class WebAgent {
     this.messages.forEach((msg: any) => {
       if (
         msg.role === "user" &&
-        msg.content.includes("Current page snapshot")
+        msg.content.includes("snapshot") &&
+        msg.content.includes("```")
       ) {
-        msg.content = "[Previous snapshot removed]";
+        msg.content = msg.content.replace(
+          /```[\s\S]*$/g,
+          "```[snapshot clipped for length]```"
+        );
       }
     });
 
     // Add the new snapshot message with compressed snapshot
     this.messages.push({
       role: "user",
-      content: buildPageSnapshotPrompt(compressedSnapshot),
+      content: buildPageSnapshotPrompt(title, url, compressedSnapshot),
     });
 
     const response = await generateObject({
@@ -323,7 +333,7 @@ export class WebAgent {
       })
       .filter(Boolean);
 
-    // Then deduplicate repeated text by checking previous line
+    // Then deduplicate repeated text strings by checking previous line
     let lastQuotedText = "";
     const deduped = transformed.map((line) => {
       const match = line.match(/^([^"]*)"([^"]+)"(.*)$/);

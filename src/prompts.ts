@@ -1,11 +1,16 @@
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.
+You have deep knowledge of the web and use only the highest quality sources.
+You focus on the task at hand and complete one step at a time.
+You adapt to situations and find creative ways to complete tasks without getting stuck.
 `.trim();
 
 export const buildPlanPrompt = (task: string) =>
   `
 ${youArePrompt}
-Create a plan for this web navigation task. Focus on high-quality sources and provide a clear explanation, step-by-step plan, and starting URL.
+Create a plan for this web navigation task.
+Provide a clear explanation, step-by-step plan, and starting URL.
+Focus on general steps and goals rather than specific page features or UI elements.
 
 Date: ${getCurrentFormattedDate()}
 Task: ${task}
@@ -13,16 +18,17 @@ Task: ${task}
 
 export const actionLoopPrompt = `
 ${youArePrompt}
-For each step, assess the current state and decide on the next action to take. Consider the outcome of previous actions and explain your reasoning.
+For each step, assess the current state and decide on the next action to take.
+Consider the outcome of previous actions and explain your reasoning.
 
 Actions:
-- "select": Choose from dropdown (ref=element reference, value=option)
-- "fill": Enter text (ref=element reference, value=text)
+- "select": Select option from dropdown (ref=element reference, value=option)
+- "fill": Enter text into field (ref=element reference, value=text)
 - "click": Click element (ref=element reference)
-- "hover": Move mouse over element (ref=element reference)
-- "check": Check a checkbox (ref=element reference)
-- "uncheck": Uncheck a checkbox (ref=element reference)
-- "wait": Pause execution (value=seconds)
+- "hover": Hover over element (ref=element reference)
+- "check": Check checkbox (ref=element reference)
+- "uncheck": Uncheck checkbox (ref=element reference)
+- "wait": Wait for specified time (value=seconds)
 - "done": Complete task (value=final result)
 - "goto": Navigate to URL (value=URL)
 - "back": Go to previous page
@@ -41,27 +47,29 @@ export const buildTaskAndPlanPrompt = (
   plan: string
 ) =>
   `
-## Original Task
-${task}
-
-## Explanation
-${explanation}
-
-## Plan
-${plan}
-
-## Context
-Today's Date: ${getCurrentFormattedDate()}
+Task: ${task}
+Explanation: ${explanation}
+Plan: ${plan}
+Date: ${getCurrentFormattedDate()}
 `.trim();
 
-export const buildPageSnapshotPrompt = (pageSnapshot: string) =>
+export const buildPageSnapshotPrompt = (
+  title: string,
+  url: string,
+  snapshot: string
+) =>
   `
-## Current page snapshot
-Example interaction with a link element: link "Click me" [ref=s1e33] → ref: "s1e33"
+This is a text snapshot of the current page in the browser.
+
+Title: ${title}
+URL: ${url}
 
 \`\`\`
-${pageSnapshot}
+${snapshot}
 \`\`\`
+
+Assess the current state and choose your next action.
+If an action has failed twice, try something else or move on.
 `.trim();
 
 function getCurrentFormattedDate() {

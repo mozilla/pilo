@@ -4,7 +4,9 @@ import { z } from "zod";
 export const planSchema = z.object({
   explanation: z
     .string()
-    .describe("Restate the task concisely but include all relevant details"),
+    .describe(
+      "Clearly and precisely restate the task exactly as given, without adding any analysis or expansion"
+    ),
   plan: z
     .string()
     .describe(
@@ -27,7 +29,7 @@ export const actionSchema = z.object({
   thought: z
     .string()
     .describe(
-      "Reasoning for your next action. If an action fails, retry once then try an alternative"
+      "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach."
     ),
   action: z
     .object({
