@@ -232,6 +232,11 @@ export class WebAgent {
             await this.browser.goBack();
             break;
 
+          case "forward":
+            console.log(chalk.blue.bold(`▶️ Going forward to the next page`));
+            await this.browser.goForward();
+            break;
+
           default:
             if (!result.action.ref) {
               throw new Error("Missing ref for action");
@@ -254,6 +259,7 @@ export class WebAgent {
             "uncheck",
             "goto",
             "back",
+            "forward",
           ].includes(result.action.action)
         ) {
           console.log(

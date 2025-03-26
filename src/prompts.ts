@@ -32,6 +32,7 @@ Actions:
 - "done": Complete task (value=final result)
 - "goto": Navigate to URL (value=URL)
 - "back": Go to previous page
+- "forward": Go to next page
 
 Rules:
 1. Use refs from page snapshot (e.g., [ref=s1e33])

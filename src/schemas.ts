@@ -45,6 +45,7 @@ export const actionSchema = z.object({
           "done", // Complete task
           "goto", // Navigate to URL
           "back", // Go to previous page
+          "forward", // Go to next page
         ])
         .describe("The type of action to perform"),
       ref: z
