@@ -12,8 +12,12 @@ Create a plan for this web navigation task.
 Provide a clear explanation, step-by-step plan, and starting URL.
 Focus on general steps and goals rather than specific page features or UI elements.
 
-Date: ${getCurrentFormattedDate()}
+Today's Date: ${getCurrentFormattedDate()}
 Task: ${task}
+
+Best Practices:
+- When explaining the task, make sure to expand all dates to include the year.
+- For booking tasks, all dates must be in the future.
 `.trim();
 
 export const actionLoopPrompt = `
@@ -55,7 +59,7 @@ export const buildTaskAndPlanPrompt = (
 Task: ${task}
 Explanation: ${explanation}
 Plan: ${plan}
-Date: ${getCurrentFormattedDate()}
+Today's Date: ${getCurrentFormattedDate()}
 `.trim();
 
 export const buildPageSnapshotPrompt = (
