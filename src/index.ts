@@ -36,11 +36,14 @@ const DEBUG = false;
       headless: false,
       device: "Desktop Firefox",
       blockAds: true,
-      blockResources: ["image", "font", "media", "manifest"],
+      // blockResources: ["image", "font", "media", "manifest"],
+      blockResources: ["media", "manifest"],
     });
 
     // Create WebAgent with the browser
-    const webAgent = new WebAgent(browser, DEBUG);
+    const webAgent = new WebAgent(browser, {
+      debug: DEBUG,
+    });
 
     // Execute the task
     await webAgent.execute(task);

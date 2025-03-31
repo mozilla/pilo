@@ -1,6 +1,5 @@
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
-import chalk from "chalk";
 import {
   actionLoopPrompt,
   buildPlanPrompt,
@@ -9,12 +8,28 @@ import {
 } from "./prompts.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
 import { planSchema, actionSchema } from "./schemas.js";
+import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
+import { Logger, ConsoleLogger } from "./loggers.js";
+
+/**
+ * Options for configuring the WebAgent
+ */
+export interface WebAgentOptions {
+  /** Custom logger to use (defaults to ConsoleLogger) */
+  logger?: Logger;
+
+  /** Enable debug mode with additional logging */
+  debug?: boolean;
+
+  /** Model to use for LLM requests (defaults to "gpt-4o") */
+  model?: string;
+}
 
 export class WebAgent {
   private plan: string = "";
   private url: string = "";
   private messages: any[] = [];
-  private llm = openai("gpt-4o");
+  private llm;
   private DEBUG = false;
   private taskExplanation: string = "";
   private readonly FILTERED_PREFIXES = ["/url:"];
@@ -25,9 +40,21 @@ export class WebAgent {
     [/^text: (.*?)$/g, '"$1"'],
     [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'],
   ];
+  private eventEmitter: WebAgentEventEmitter;
+  private logger: Logger;
 
-  constructor(private browser: AriaBrowser, debug: boolean = false) {
-    this.DEBUG = debug;
+  /**
+   * Create a new WebAgent
+   *
+   * @param browser Browser instance to use for automation
+   * @param options Options for configuring the agent
+   */
+  constructor(private browser: AriaBrowser, options: WebAgentOptions = {}) {
+    this.DEBUG = options.debug || false;
+    this.llm = openai(options.model || "gpt-4o");
+    this.eventEmitter = new WebAgentEventEmitter();
+    this.logger = options.logger || new ConsoleLogger();
+    this.logger.initialize(this.eventEmitter);
   }
 
   async createPlan(task: string) {
@@ -76,11 +103,15 @@ export class WebAgent {
         (1 - compressedSize / originalSize) * 100
       );
 
-      console.log(
-        chalk.gray("\n📝 Compression:"),
-        chalk.green(`${compressionPercent}%`),
-        chalk.gray(`(${originalSize} → ${compressedSize} chars)`)
-      );
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.DEBUG_COMPRESSION,
+        data: {
+          timestamp: Date.now(),
+          originalSize,
+          compressedSize,
+          compressionPercent,
+        },
+      });
     }
 
     // Replace all previous snapshot messages with placeholders
@@ -103,6 +134,25 @@ export class WebAgent {
       content: buildPageSnapshotPrompt(title, url, compressedSnapshot),
     });
 
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.PAGE_NAVIGATION,
+      data: {
+        timestamp: Date.now(),
+        title,
+        url,
+      },
+    });
+
+    if (this.DEBUG) {
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.DEBUG_MESSAGES,
+        data: {
+          timestamp: Date.now(),
+          messages: this.messages,
+        },
+      });
+    }
+
     const response = await generateObject({
       model: this.llm,
       schema: actionSchema,
@@ -115,19 +165,28 @@ export class WebAgent {
 
   // Helper function to wait for a specified number of seconds
   async wait(seconds: number) {
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.WAITING,
+      data: {
+        timestamp: Date.now(),
+        seconds,
+      },
+    });
+
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   }
 
-  logTaskInfo(task: string) {
-    console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(task));
-    console.log(chalk.yellow.bold("\n💡 Explanation:"));
-    console.log(chalk.whiteBright(this.taskExplanation));
-    console.log(chalk.magenta.bold("\n📋 Plan:"));
-    console.log(chalk.whiteBright(this.plan));
-    console.log(
-      chalk.blue.bold("🌐 Starting URL: "),
-      chalk.blue.underline(this.url)
-    );
+  emitTaskStartEvent(task: string) {
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.TASK_START,
+      data: {
+        timestamp: Date.now(),
+        task,
+        explanation: this.taskExplanation,
+        plan: this.plan,
+        url: this.url,
+      },
+    });
   }
 
   // Reset the state for a new task
@@ -139,8 +198,7 @@ export class WebAgent {
 
   async execute(task: string) {
     if (!task) {
-      console.error(chalk.red.bold("❌ No task provided."));
-      return null;
+      throw new Error("No task provided.");
     }
 
     // Reset state for new task
@@ -149,7 +207,8 @@ export class WebAgent {
     // Run plan creation and browser launch concurrently
     await Promise.all([this.createPlan(task), this.browser.start()]);
 
-    this.logTaskInfo(task);
+    // Emit task start event
+    this.emitTaskStartEvent(task);
 
     // Go to the starting URL
     await this.browser.goto(this.url);
@@ -162,78 +221,63 @@ export class WebAgent {
     while (!finalAnswer) {
       // Get the page snapshot directly from the browser
       const pageSnapshot = await this.browser.getText();
-      const title = await this.browser.getTitle();
-      const truncatedTitle =
-        title.length > 50 ? title.slice(0, 47) + "..." : title;
-
-      console.log(
-        chalk.gray(
-          "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        )
-      );
-      console.log(
-        chalk.blue.bold("📍 Current Page:"),
-        chalk.blue(truncatedTitle)
-      );
-
-      if (this.DEBUG) {
-        console.log(chalk.cyan.bold("\n🤔 Messages:"));
-        console.log(chalk.gray(JSON.stringify(this.messages, null, 2)));
-      }
-
-      console.log(chalk.cyan.bold("🤔 Thinking..."));
 
       // Call LLM with the page snapshot
       const result = await this.getNextActions(pageSnapshot);
 
-      console.log(chalk.yellow.bold("🔭 Observation:"));
-      console.log(chalk.whiteBright("   " + result.observation));
+      // Emit observation and thought events
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.OBSERVATION,
+        data: {
+          timestamp: Date.now(),
+          observation: result.observation,
+        },
+      });
 
-      console.log(chalk.yellow.bold("\n💭 Thought:"));
-      console.log(chalk.whiteBright("   " + result.thought));
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.THOUGHT,
+        data: {
+          timestamp: Date.now(),
+          thought: result.thought,
+        },
+      });
 
-      console.log(chalk.yellow.bold("\n🎯 Actions:"));
-      console.log(
-        chalk.whiteBright(`   1. ${result.action.action.toUpperCase()}`),
-        result.action.ref ? chalk.cyan(`ref: ${result.action.ref}`) : "",
-        result.action.value
-          ? chalk.green(`value: "${result.action.value}"`)
-          : ""
-      );
+      // Emit action execution event
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.ACTION_EXECUTION,
+        data: {
+          timestamp: Date.now(),
+          action: result.action.action,
+          ref: result.action.ref || undefined,
+          value: result.action.value || undefined,
+        },
+      });
 
       // Check for the final answer
       if (result.action.action === "done") {
-        finalAnswer = result.action.value;
+        finalAnswer = result.action.value || null;
+
+        // Emit task complete event
+        this.eventEmitter.emitEvent({
+          type: WebAgentEventType.TASK_COMPLETE,
+          data: {
+            timestamp: Date.now(),
+            finalAnswer,
+          },
+        });
+
         break;
       }
-
-      // Execute the action
-      console.log(
-        chalk.cyan.bold("\n▶️ Executing action:"),
-        chalk.whiteBright(result.action.action.toUpperCase()),
-        result.action.ref ? chalk.cyan(`ref: ${result.action.ref}`) : "",
-        result.action.value
-          ? chalk.green(`value: "${result.action.value}"`)
-          : ""
-      );
 
       try {
         switch (result.action.action) {
           case "wait":
             const seconds = parseInt(result.action.value || "1", 10);
-            console.log(
-              chalk.yellow.bold(
-                `⏳ Waiting for ${seconds} second${seconds !== 1 ? "s" : ""}...`
-              )
-            );
             await this.wait(seconds);
             break;
 
           case "goto":
             if (result.action.value) {
-              console.log(
-                chalk.blue.bold(`🌐 Navigating to: ${result.action.value}`)
-              );
               await this.browser.goto(result.action.value);
             } else {
               throw new Error("Missing URL for goto action");
@@ -241,12 +285,10 @@ export class WebAgent {
             break;
 
           case "back":
-            console.log(chalk.blue.bold(`◀️ Going back to the previous page`));
             await this.browser.goBack();
             break;
 
           case "forward":
-            console.log(chalk.blue.bold(`▶️ Going forward to the next page`));
             await this.browser.goForward();
             break;
 
@@ -275,22 +317,29 @@ export class WebAgent {
             "forward",
           ].includes(result.action.action)
         ) {
-          console.log(
-            chalk.gray("   🌐 Waiting for network activity to settle...")
-          );
           try {
+            // Emit network waiting event
+            this.eventEmitter.emitEvent({
+              type: WebAgentEventType.NETWORK_WAITING,
+              data: {
+                timestamp: Date.now(),
+                action: result.action.action,
+              },
+            });
+
             // Wait for both network idle and DOM to be stable
             await this.browser.waitForLoadState("networkidle", {
-              timeout: 2000,
-            });
-            await this.browser.waitForLoadState("domcontentloaded", {
-              timeout: 2000,
+              timeout: 750,
             });
           } catch (e) {
-            // If timeout occurs, just continue
-            console.log(
-              chalk.gray("   ⚠️  Network wait timed out, continuing...")
-            );
+            // If timeout occurs, emit timeout event
+            this.eventEmitter.emitEvent({
+              type: WebAgentEventType.NETWORK_TIMEOUT,
+              data: {
+                timestamp: Date.now(),
+                action: result.action.action,
+              },
+            });
           }
         }
 
@@ -299,13 +348,26 @@ export class WebAgent {
           role: "assistant",
           content: JSON.stringify(result),
         });
+
+        // Emit action result event (success)
+        this.eventEmitter.emitEvent({
+          type: WebAgentEventType.ACTION_RESULT,
+          data: {
+            timestamp: Date.now(),
+            success: true,
+          },
+        });
       } catch (error) {
-        console.error(
-          chalk.red.bold(`❌ Failed to execute action: `),
-          chalk.whiteBright(
-            error instanceof Error ? error.message : String(error)
-          )
-        );
+        // Emit action result event (failure)
+        this.eventEmitter.emitEvent({
+          type: WebAgentEventType.ACTION_RESULT,
+          data: {
+            timestamp: Date.now(),
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+
         // Add the failure to the messages for context
         this.messages.push({
           role: "assistant",
@@ -316,17 +378,14 @@ export class WebAgent {
       }
     }
 
-    if (finalAnswer) {
-      console.log(
-        chalk.green.bold("\n✨ Final Answer:"),
-        chalk.whiteBright(finalAnswer)
-      );
-    }
-
     return finalAnswer;
   }
 
   async close() {
+    // Dispose the logger
+    this.logger.dispose();
+
+    // Close the browser
     await this.browser.shutdown();
   }
 
