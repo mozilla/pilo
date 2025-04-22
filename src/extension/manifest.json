@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Spark",
+  "version": "1.0.0",
+  "description": "AI-powered web automation tool.",
+  "permissions": ["scripting", "activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "sidebar_action": {
+    "default_panel": "sidebar.html",
+    "default_title": "Spark Sidebar"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

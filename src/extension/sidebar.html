@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Sidebar</title>
+    <style>
+        body {
+            width: 250px; /* Adjust width as needed */
+            padding: 10px;
+            font-family: sans-serif;
+        }
+        input[type="text"] {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 8px;
+            cursor: pointer;
+        }
+        #spark-response {
+            margin-bottom: 10px;
+        }
+    </style>
+    <script src="agent.bundle.js"></script>
+    <script src="sidebar.js" defer></script>
+</head>
+<body>
+    <div id="spark-response"></div>
+    <form id="query-form">
+        <input type="text" id="query" placeholder="Enter your query here...">
+        <button id="submit" type="submit">Submit</button>
+    </form>
+</body>
+</html>

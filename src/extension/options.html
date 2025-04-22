@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Options</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; }
+        label { display: block; margin-top: 15px; }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 6px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+        button { margin-top: 20px; padding: 8px 16px; }
+    </style>
+    <script src="options.js" defer></script>
+</head>
+<body>
+    <h2>Spark Settings</h2>
+    <form id="options-form">
+        <label for="api-endpoint">API Endpoint</label>
+        <input type="text" id="api-endpoint" placeholder="https://api.openai.com/v1">
+        <label for="model">Model</label>
+        <input type="text" id="model" placeholder="gpt-4.1-nano">
+        <label for="api-key">API Key</label>
+        <input type="password" id="api-key" placeholder="Enter your API key">
+        <button type="submit">Save</button>
+        <span id="status" style="margin-left:10px;"></span>
+    </form>
+</body>
+</html>
