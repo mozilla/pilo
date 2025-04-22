@@ -13904,6 +13904,102 @@ If the task was not completed successfully, provide a brief, direct instruction 
       console.log(source_default.gray("   \u26A0\uFE0F  Network wait timed out, continuing..."));
     };
   };
+  var SidebarLogger = class {
+    emitter = null;
+    logElement;
+    constructor(elementId = "spark-log") {
+      this.logElement = typeof document !== "undefined" ? document.getElementById(elementId) : null;
+    }
+    append(msg) {
+      if (this.logElement) {
+        const div = document.createElement("div");
+        div.innerHTML = msg;
+        this.logElement.appendChild(div);
+        this.logElement.scrollTop = this.logElement.scrollHeight;
+      }
+    }
+    initialize(emitter) {
+      this.emitter = emitter;
+      emitter.onEvent("task:start" /* TASK_START */, this.handleTaskStart);
+      emitter.onEvent("task:complete" /* TASK_COMPLETE */, this.handleTaskComplete);
+      emitter.onEvent("page:navigation" /* PAGE_NAVIGATION */, this.handlePageNavigation);
+      emitter.onEvent("agent:observation" /* OBSERVATION */, this.handleObservation);
+      emitter.onEvent("agent:thought" /* THOUGHT */, this.handleThought);
+      emitter.onEvent("action:execution" /* ACTION_EXECUTION */, this.handleActionExecution);
+      emitter.onEvent("action:result" /* ACTION_RESULT */, this.handleActionResult);
+      emitter.onEvent("debug:compression" /* DEBUG_COMPRESSION */, this.handleCompressionDebug);
+      emitter.onEvent("debug:messages" /* DEBUG_MESSAGES */, this.handleMessagesDebug);
+      emitter.onEvent("system:waiting" /* WAITING */, this.handleWaiting);
+      emitter.onEvent("system:network_waiting" /* NETWORK_WAITING */, this.handleNetworkWaiting);
+      emitter.onEvent("system:network_timeout" /* NETWORK_TIMEOUT */, this.handleNetworkTimeout);
+    }
+    dispose() {
+      if (this.emitter) {
+        this.emitter.offEvent("task:start" /* TASK_START */, this.handleTaskStart);
+        this.emitter.offEvent("task:complete" /* TASK_COMPLETE */, this.handleTaskComplete);
+        this.emitter.offEvent("page:navigation" /* PAGE_NAVIGATION */, this.handlePageNavigation);
+        this.emitter.offEvent("agent:observation" /* OBSERVATION */, this.handleObservation);
+        this.emitter.offEvent("agent:thought" /* THOUGHT */, this.handleThought);
+        this.emitter.offEvent("action:execution" /* ACTION_EXECUTION */, this.handleActionExecution);
+        this.emitter.offEvent("action:result" /* ACTION_RESULT */, this.handleActionResult);
+        this.emitter.offEvent("debug:compression" /* DEBUG_COMPRESSION */, this.handleCompressionDebug);
+        this.emitter.offEvent("debug:messages" /* DEBUG_MESSAGES */, this.handleMessagesDebug);
+        this.emitter.offEvent("system:waiting" /* WAITING */, this.handleWaiting);
+        this.emitter.offEvent("system:network_waiting" /* NETWORK_WAITING */, this.handleNetworkWaiting);
+        this.emitter.offEvent("system:network_timeout" /* NETWORK_TIMEOUT */, this.handleNetworkTimeout);
+        this.emitter = null;
+      }
+    }
+    handleTaskStart = (data) => {
+      this.append(`<b>\u{1F3AF} Task:</b> <span>${data.task}</span>`);
+      this.append(`<b>\u{1F4A1} Explanation:</b> <span>${data.explanation}</span>`);
+      this.append(`<b>\u{1F4CB} Plan:</b> <span>${data.plan}</span>`);
+      this.append(`<b>\u{1F310} Starting URL:</b> <span style='color:#0074d9;'>${data.url}</span>`);
+    };
+    handleTaskComplete = (data) => {
+      if (data.finalAnswer) {
+        this.append(`<b style='color:green;'>\u2728 Final Answer:</b> <span>${data.finalAnswer}</span>`);
+      }
+    };
+    handlePageNavigation = (data) => {
+      this.append(`<div style='color:#aaa;margin:8px 0 2px 0;'>\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</div>`);
+      const truncatedTitle = data.title.length > 50 ? data.title.slice(0, 47) + "..." : data.title;
+      this.append(`<b>\u{1F4CD} Current Page:</b> <span>${truncatedTitle}</span>`);
+    };
+    handleObservation = (data) => {
+      this.append(`<b>\u{1F52D} Observation:</b> <span>${data.observation}</span>`);
+    };
+    handleThought = (data) => {
+      this.append(`<b>\u{1F4AD} Thought:</b> <span>${data.thought}</span>`);
+    };
+    handleActionExecution = (data) => {
+      let details = `<b>\u{1F3AF} Action:</b> <span>${data.action.toUpperCase()}</span>`;
+      if (data.ref) details += ` <span style='color:#0074d9;'>ref: ${data.ref}</span>`;
+      if (data.value) details += ` <span style='color:green;'>value: "${data.value}"</span>`;
+      this.append(details);
+      this.append(`<b>\u25B6\uFE0F Executing:</b> <span>${data.action.toUpperCase()}</span>`);
+    };
+    handleActionResult = (data) => {
+      if (!data.success) {
+        this.append(`<span style='color:red;'><b>\u274C Failed to execute action:</b> ${data.error || "Unknown error"}</span>`);
+      }
+    };
+    handleCompressionDebug = (data) => {
+      this.append(`<span style='color:#888;'>\u{1F4DD} Compression: <b>${data.compressionPercent}%</b> (${data.originalSize} \u2192 ${data.compressedSize} chars)</span>`);
+    };
+    handleMessagesDebug = (data) => {
+      this.append(`<b>\u{1F914} Messages:</b> <pre style='white-space:pre-wrap;max-height:100px;overflow:auto;background:#f8f8f8;border:1px solid #eee;padding:4px;'>${JSON.stringify(data.messages, null, 2)}</pre>`);
+    };
+    handleWaiting = (data) => {
+      this.append(`<span style='color:#b8860b;'>\u23F3 Waiting for ${data.seconds} second${data.seconds !== 1 ? "s" : ""}...</span>`);
+    };
+    handleNetworkWaiting = (data) => {
+      this.append(`<span style='color:#888;'>\u{1F310} Waiting for network activity to settle...</span>`);
+    };
+    handleNetworkTimeout = (data) => {
+      this.append(`<span style='color:#888;'>\u26A0\uFE0F  Network wait timed out, continuing...</span>`);
+    };
+  };
 
   // src/webAgent.ts
   var WebAgent = class {
@@ -14461,10 +14557,11 @@ If the task was not completed successfully, provide a brief, direct instruction 
   };
 
   // src/extension/agentEntry.ts
-  async function runWebAgentTask(task, apiKey, apiEndpoint, model) {
+  async function runWebAgentTask(task, apiKey, apiEndpoint, model, logger) {
     const browser = new ExtensionBrowser();
     const agent = new WebAgent(browser, {
       debug: true,
+      logger,
       provider: createOpenAI({
         apiKey,
         baseURL: apiEndpoint
@@ -14474,5 +14571,5 @@ If the task was not completed successfully, provide a brief, direct instruction 
     await agent.close();
     return result;
   }
-  window.AgentAPI = { runWebAgentTask };
+  window.AgentAPI = { runWebAgentTask, SidebarLogger };
 })();
