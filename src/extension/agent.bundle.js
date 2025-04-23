@@ -14003,8 +14003,8 @@ If the task was not completed successfully, provide a brief, direct instruction 
 
   // src/webAgent.ts
   var WebAgent = class {
-    constructor(browser, options = {}) {
-      this.browser = browser;
+    constructor(browser2, options = {}) {
+      this.browser = browser2;
       this.DEBUG = options.debug || false;
       this.provider = options.provider || openai("gpt-4.1");
       this.eventEmitter = new WebAgentEventEmitter();
@@ -14523,43 +14523,75 @@ If the task was not completed successfully, provide a brief, direct instruction 
       console.log("[ExtensionBrowser] shutdown()");
     }
     async goto(url) {
-      console.log(`[ExtensionBrowser] goto(${url})`);
-      throw new Error(`stopped after attempted goto(${url})`);
+      await browser.tabs.update((await this.getTab()).id, { url });
     }
     async goBack() {
-      console.log("[ExtensionBrowser] goBack()");
+      await browser.scripting.executeScript({
+        target: { tabId: (await this.getTab()).id },
+        func: () => history.back()
+      });
     }
     async goForward() {
-      console.log("[ExtensionBrowser] goForward()");
+      await browser.scripting.executeScript({
+        target: { tabId: (await this.getTab()).id },
+        func: () => history.forward()
+      });
     }
     async getUrl() {
-      console.log("[ExtensionBrowser] getUrl()");
-      return "https://example.com";
+      return (await this.getTab()).url;
     }
     async getTitle() {
-      console.log("[ExtensionBrowser] getTitle()");
-      return "Example Page Title";
+      return (await this.getTab()).title;
     }
     async getText() {
-      console.log("[ExtensionBrowser] getText()");
-      return "[Mocked page text snapshot]";
+      const [{ result }] = await browser.scripting.executeScript({
+        target: { tabId: (await this.getTab()).id },
+        func: () => document.body.innerText
+      });
+      return result;
     }
     async getScreenshot() {
       console.log("[ExtensionBrowser] getScreenshot()");
       return Buffer.from("");
     }
     async performAction(ref, action, value) {
-      console.log(`[ExtensionBrowser] performAction(ref=${ref}, action=${action}, value=${value})`);
+      if (action == "click" && await browser.scripting.executeScript({
+        target: { tabId: (await this.getTab()).id },
+        func: () => {
+          const element = document.querySelector(
+            "a:is([data-cta-text*='Release Notes'],[data-link-text*='Release Notes'])"
+          );
+          if (element) {
+            element.click();
+            return true;
+          }
+          return false;
+        }
+      })) {
+        return;
+      }
+      throw new Error(`[ExtensionBrowser] performAction(ref=${ref}, action=${action}, value=${value})`);
     }
     async waitForLoadState(state, options) {
       console.log(`[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`);
+      await new Promise((resolve) => setTimeout(resolve, options?.timeout ?? 1e3));
+    }
+    /**
+     * Helper to get the current active tab in the current window, or throw if not found
+     */
+    async getTab() {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tabs.length || !tabs[0].id) {
+        throw new Error("No active tab found");
+      }
+      return tabs[0];
     }
   };
 
   // src/extension/agentEntry.ts
   async function runWebAgentTask(task, apiKey, apiEndpoint, model, logger) {
-    const browser = new ExtensionBrowser();
-    const agent = new WebAgent(browser, {
+    const browser2 = new ExtensionBrowser();
+    const agent = new WebAgent(browser2, {
       debug: true,
       logger,
       provider: createOpenAI({
