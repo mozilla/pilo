@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateObject, LanguageModel } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
   actionLoopPrompt,
@@ -21,15 +21,15 @@ export interface WebAgentOptions {
   /** Enable debug mode with additional logging */
   debug?: boolean;
 
-  /** Model to use for LLM requests (defaults to "gpt-4o") */
-  model?: string;
+  /** AI Provider to use for LLM requests (defaults to openai("gpt-4o")) */
+  provider?: LanguageModel;
 }
 
 export class WebAgent {
   private plan: string = "";
   private url: string = "";
   private messages: any[] = [];
-  private llm;
+  private provider: LanguageModel;
   private DEBUG = false;
   private taskExplanation: string = "";
   private readonly FILTERED_PREFIXES = ["/url:"];
@@ -51,7 +51,7 @@ export class WebAgent {
    */
   constructor(private browser: AriaBrowser, options: WebAgentOptions = {}) {
     this.DEBUG = options.debug || false;
-    this.llm = openai(options.model || "gpt-4o");
+    this.provider = options.provider || openai("gpt-4o");
     this.eventEmitter = new WebAgentEventEmitter();
     this.logger = options.logger || new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
@@ -59,7 +59,7 @@ export class WebAgent {
 
   async createPlan(task: string) {
     const response = await generateObject({
-      model: this.llm,
+      model: this.provider,
       schema: planSchema,
       prompt: buildPlanPrompt(task),
       temperature: 0,
@@ -154,7 +154,7 @@ export class WebAgent {
     }
 
     const response = await generateObject({
-      model: this.llm,
+      model: this.provider,
       schema: actionSchema,
       messages: this.messages,
       temperature: 0,
