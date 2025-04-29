@@ -18,6 +18,16 @@ Task: ${task}
 Best Practices:
 - When explaining the task, make sure to expand all dates to include the year.
 - For booking tasks, all dates must be in the future.
+- Avoid assumptions about specific UI layouts that may change.
+
+Respond with a JSON object matching this structure:
+\`\`\`json
+{
+  "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
+  "plan": "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line.",
+  "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"
+}
+\`\`\`
 `.trim();
 
 export const actionLoopPrompt = `
@@ -47,7 +57,21 @@ Rules:
 
 Best Practices:
 - Use click instead of goto when possible
+- For forms, click the submit button after filling all fields
+- If an element isn't found, try looking for alternative elements
 
+Respond with a JSON object matching this structure:
+\`\`\`json
+{
+  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task.",
+  "thought": "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach.",
+  "action": {
+    "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
+    "ref": "Aria reference (e.g., 's1e33') from the page snapshot. Not needed for done/wait/goto/back/forward.",
+    "value": "Required for fill/select/goto, seconds for wait, result for done."
+  }
+}
+\`\`\`
 `.trim();
 
 export const buildTaskAndPlanPrompt = (
@@ -78,6 +102,8 @@ ${snapshot}
 \`\`\`
 
 Assess the current state and choose your next action.
+Focus on the most relevant elements that help complete your task.
+If content appears dynamic or paginated, consider waiting or exploring navigation options.
 If an action has failed twice, try something else or move on.
 `.trim();
 
