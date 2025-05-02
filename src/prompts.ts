@@ -133,6 +133,24 @@ Remember:
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
 `.trim();
 
+export const buildTaskValidationPrompt = (
+  task: string,
+  finalAnswer: string
+): string =>
+  `
+Review the task completion and determine if it was successful.
+
+Task: ${task}
+Final Answer: ${finalAnswer}
+
+Consider:
+1. Does the answer directly address the task?
+2. Is the answer complete and specific enough?
+3. Does it provide the requested information or perform the requested action?
+
+If the task was not completed successfully, provide a brief, direct instruction on what needs to be done to complete it.
+`.trim();
+
 function getCurrentFormattedDate() {
   const date = new Date();
   return date.toLocaleDateString("en-US", {

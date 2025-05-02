@@ -6,11 +6,19 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   validationFeedbackPrompt,
+  buildTaskValidationPrompt,
 } from "./prompts.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
-import { planSchema, actionSchema, Action } from "./schemas.js";
+import {
+  planSchema,
+  actionSchema,
+  Action,
+  taskValidationSchema,
+  TaskValidationResult,
+} from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
+import { z } from "zod";
 
 /**
  * Options for configuring the WebAgent
@@ -354,6 +362,31 @@ export class WebAgent {
     this.messages = [];
   }
 
+  private async validateTaskCompletion(
+    task: string,
+    finalAnswer: string
+  ): Promise<TaskValidationResult> {
+    const response = await generateObject({
+      model: this.provider,
+      schema: taskValidationSchema,
+      prompt: buildTaskValidationPrompt(task, finalAnswer),
+      temperature: 0,
+    });
+
+    // Emit validation event
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.TASK_VALIDATION,
+      data: {
+        timestamp: Date.now(),
+        isValid: response.object.isValid,
+        feedback: response.object.feedback,
+        finalAnswer,
+      },
+    });
+
+    return response.object;
+  }
+
   async execute(task: string) {
     if (!task) {
       throw new Error("No task provided.");
@@ -374,9 +407,11 @@ export class WebAgent {
     // Setup messages
     this.setupMessages(task);
     let finalAnswer = null;
+    let validationAttempts = 0;
+    let lastValidationFeedback = "";
 
     // Start the loop
-    while (!finalAnswer) {
+    while (!finalAnswer && validationAttempts < 3) {
       // Get the page snapshot directly from the browser
       const pageSnapshot = await this.browser.getText();
 
@@ -413,18 +448,52 @@ export class WebAgent {
 
       // Check for the final answer
       if (result.action.action === "done") {
-        finalAnswer = result.action.value || null;
+        finalAnswer = result.action.value;
 
-        // Emit task complete event
-        this.eventEmitter.emitEvent({
-          type: WebAgentEventType.TASK_COMPLETE,
-          data: {
-            timestamp: Date.now(),
-            finalAnswer,
-          },
-        });
+        if (!finalAnswer) {
+          throw new Error("Missing final answer value in done action");
+        }
 
-        break;
+        // Validate the task completion
+        const { isValid, feedback } = await this.validateTaskCompletion(
+          task,
+          finalAnswer
+        );
+
+        if (isValid) {
+          // Emit task complete event
+          this.eventEmitter.emitEvent({
+            type: WebAgentEventType.TASK_COMPLETE,
+            data: {
+              timestamp: Date.now(),
+              finalAnswer,
+            },
+          });
+          break;
+        } else {
+          validationAttempts++;
+          lastValidationFeedback = feedback || "Unknown validation error";
+
+          if (validationAttempts < 3) {
+            // Reset finalAnswer so the loop continues
+            finalAnswer = null;
+
+            // Add validation feedback to messages
+            this.messages.push({
+              role: "assistant",
+              content: JSON.stringify(result),
+            });
+            this.messages.push({
+              role: "user",
+              content: `Task not completed successfully. ${feedback} Please continue working on the task.`,
+            });
+            continue;
+          }
+
+          throw new Error(
+            `Failed to complete task after ${validationAttempts} attempts. Last feedback: ${lastValidationFeedback}`
+          );
+        }
       }
 
       try {

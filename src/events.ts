@@ -27,6 +27,7 @@ export enum WebAgentEventType {
   WAITING = "system:waiting",
   NETWORK_WAITING = "system:network_waiting",
   NETWORK_TIMEOUT = "system:network_timeout",
+  TASK_VALIDATION = "task:validation",
 }
 
 /**
@@ -130,6 +131,15 @@ export interface NetworkTimeoutEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for task validation
+ */
+export interface TaskValidationEventData extends WebAgentEventData {
+  isValid: boolean;
+  feedback?: string;
+  finalAnswer: string;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -147,7 +157,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.DEBUG_MESSAGES; data: MessagesDebugEventData }
   | { type: WebAgentEventType.WAITING; data: WaitingEventData }
   | { type: WebAgentEventType.NETWORK_WAITING; data: NetworkWaitingEventData }
-  | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData };
+  | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
+  | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData };
 
 /**
  * Event emitter for WebAgent events

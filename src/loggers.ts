@@ -13,6 +13,7 @@ import type {
   TaskStartEventData,
   ThoughtEventData,
   WaitingEventData,
+  TaskValidationEventData,
 } from "./events.js";
 
 /**
@@ -43,6 +44,10 @@ export class ConsoleLogger implements Logger {
     // Task events
     emitter.onEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
     emitter.onEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
+    emitter.onEvent(
+      WebAgentEventType.TASK_VALIDATION,
+      this.handleTaskValidation
+    );
 
     // Page events
     emitter.onEvent(
@@ -88,6 +93,10 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(
         WebAgentEventType.TASK_COMPLETE,
         this.handleTaskComplete
+      );
+      this.emitter.offEvent(
+        WebAgentEventType.TASK_VALIDATION,
+        this.handleTaskValidation
       );
 
       // Page events
@@ -157,6 +166,26 @@ export class ConsoleLogger implements Logger {
         chalk.green.bold("\n✨ Final Answer:"),
         chalk.whiteBright(data.finalAnswer)
       );
+    }
+  };
+
+  private handleTaskValidation = (data: TaskValidationEventData): void => {
+    if (data.isValid) {
+      console.log(
+        chalk.green.bold("\n✅ Task Validation:"),
+        chalk.green("Answer is valid")
+      );
+    } else {
+      console.log(
+        chalk.yellow.bold("\n⚠️ Task Validation:"),
+        chalk.yellow("Answer needs improvement")
+      );
+      if (data.feedback) {
+        console.log(
+          chalk.yellow("   Feedback:"),
+          chalk.whiteBright(data.feedback)
+        );
+      }
     }
   };
 
