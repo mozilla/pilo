@@ -9,6 +9,7 @@ export const planSchema = z.object({
 
 // Schema for the action loop responses
 export const actionSchema = z.object({
+  currentStep: z.string(),
   observation: z.string(),
   thought: z.string(),
   action: z.object({

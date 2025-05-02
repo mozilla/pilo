@@ -4,6 +4,7 @@ import type {
   ActionExecutionEventData,
   ActionResultEventData,
   CompressionDebugEventData,
+  CurrentStepEventData,
   MessagesDebugEventData,
   NetworkTimeoutEventData,
   NetworkWaitingEventData,
@@ -56,6 +57,7 @@ export class ConsoleLogger implements Logger {
     );
 
     // Agent reasoning events
+    emitter.onEvent(WebAgentEventType.CURRENT_STEP, this.handleCurrentStep);
     emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
     emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
 
@@ -106,6 +108,10 @@ export class ConsoleLogger implements Logger {
       );
 
       // Agent reasoning events
+      this.emitter.offEvent(
+        WebAgentEventType.CURRENT_STEP,
+        this.handleCurrentStep
+      );
       this.emitter.offEvent(
         WebAgentEventType.OBSERVATION,
         this.handleObservation
@@ -203,6 +209,11 @@ export class ConsoleLogger implements Logger {
       chalk.blue.bold("📍 Current Page:"),
       chalk.blue(truncatedTitle)
     );
+  };
+
+  private handleCurrentStep = (data: CurrentStepEventData): void => {
+    console.log(chalk.magenta.bold("🔄 Current Step:"));
+    console.log(chalk.whiteBright("   " + data.currentStep));
   };
 
   private handleObservation = (data: ObservationEventData): void => {

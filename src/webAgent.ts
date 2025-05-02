@@ -128,6 +128,9 @@ export class WebAgent {
     const correctedResponse = { ...response };
 
     // Validate top-level fields
+    if (!response.currentStep?.trim()) {
+      errors.push('Missing or invalid "currentStep" field');
+    }
     if (!response.observation?.trim()) {
       errors.push('Missing or invalid "observation" field');
     }
@@ -419,6 +422,14 @@ export class WebAgent {
       const result = await this.getNextActions(pageSnapshot);
 
       // Emit observation and thought events
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.CURRENT_STEP,
+        data: {
+          timestamp: Date.now(),
+          currentStep: result.currentStep,
+        },
+      });
+
       this.eventEmitter.emitEvent({
         type: WebAgentEventType.OBSERVATION,
         data: {

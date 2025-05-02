@@ -12,6 +12,7 @@ export enum WebAgentEventType {
   PAGE_NAVIGATION = "page:navigation",
 
   // Agent reasoning events
+  CURRENT_STEP = "agent:current_step",
   OBSERVATION = "agent:observation",
   THOUGHT = "agent:thought",
 
@@ -60,6 +61,13 @@ export interface TaskCompleteEventData extends WebAgentEventData {
 export interface PageNavigationEventData extends WebAgentEventData {
   title: string;
   url: string;
+}
+
+/**
+ * Event data for current step tracking
+ */
+export interface CurrentStepEventData extends WebAgentEventData {
+  currentStep: string;
 }
 
 /**
@@ -146,6 +154,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_START; data: TaskStartEventData }
   | { type: WebAgentEventType.TASK_COMPLETE; data: TaskCompleteEventData }
   | { type: WebAgentEventType.PAGE_NAVIGATION; data: PageNavigationEventData }
+  | { type: WebAgentEventType.CURRENT_STEP; data: CurrentStepEventData }
   | { type: WebAgentEventType.OBSERVATION; data: ObservationEventData }
   | { type: WebAgentEventType.THOUGHT; data: ThoughtEventData }
   | { type: WebAgentEventType.ACTION_EXECUTION; data: ActionExecutionEventData }

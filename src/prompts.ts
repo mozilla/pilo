@@ -64,7 +64,8 @@ Best Practices:
 Respond with a JSON object matching this structure:
 \`\`\`json
 {
-  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task.",
+  "currentStep": "Status (Starting/Working on/Completing) Step X: [exact step text from plan] - where X is the step number",
+  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task. Include a 'so that' statement connecting this step to your overall plan objective.",
   "thought": "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach.",
   "action": {
     "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
@@ -116,7 +117,8 @@ Your previous response did not match the required format. Here are the validatio
 Please correct your response to match this exact format:
 \`\`\`json
 {
-  "observation": "Brief assessment of previous step's outcome",
+  "currentStep": "Status (Starting/Working on/Completing) Step X: [exact step text from plan]",
+  "observation": "Brief assessment of previous step's outcome with a 'so that' statement connecting to your plan",
   "thought": "Reasoning for your next action",
   "action": {
     "action": "One of: select, fill, click, hover, check, uncheck, wait, done, goto, back, forward",
