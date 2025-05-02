@@ -24,7 +24,7 @@ Respond with a JSON object matching this structure:
 \`\`\`json
 {
   "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
-  "plan": "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line.",
+  "plan": "Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features.",
   "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"
 }
 \`\`\`
@@ -43,7 +43,7 @@ Actions:
 - "check": Check checkbox (ref=element reference)
 - "uncheck": Uncheck checkbox (ref=element reference)
 - "wait": Wait for specified time (value=seconds)
-- "goto": Navigate to URL (value=URL)
+- "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
 - "back": Go to previous page
 - "forward": Go to next page
 - "done": Task is complete (value=final result)
@@ -54,9 +54,10 @@ Rules:
 3. After each action, you'll receive an updated page snapshot
 4. For "done", include the final result in value
 5. Use "wait" for page loads, animations, or dynamic content
+6. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
 
 Best Practices:
-- Use click instead of goto when possible
+- Use click instead of goto when possible, especially for navigation elements on the page.
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
 

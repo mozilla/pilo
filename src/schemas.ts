@@ -20,10 +20,10 @@ export const actionSchema = z.object({
       "check", // Check a checkbox
       "uncheck", // Uncheck a checkbox
       "wait", // Pause execution
-      "done", // Complete task
       "goto", // Navigate to URL
       "back", // Go to previous page
       "forward", // Go to next page
+      "done", // Complete task
     ]),
     ref: z.string().optional(),
     value: z.string().optional(),
