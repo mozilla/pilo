@@ -43,10 +43,10 @@ Actions:
 - "check": Check checkbox (ref=element reference)
 - "uncheck": Uncheck checkbox (ref=element reference)
 - "wait": Wait for specified time (value=seconds)
-- "done": Complete task (value=final result)
 - "goto": Navigate to URL (value=URL)
 - "back": Go to previous page
 - "forward": Go to next page
+- "done": Task is complete (value=final result)
 
 Rules:
 1. Use refs from page snapshot (e.g., [ref=s1e33])
@@ -105,6 +105,32 @@ Assess the current state and choose your next action.
 Focus on the most relevant elements that help complete your task.
 If content appears dynamic or paginated, consider waiting or exploring navigation options.
 If an action has failed twice, try something else or move on.
+`.trim();
+
+export const validationFeedbackPrompt = `
+Your previous response did not match the required format. Here are the validation errors:
+
+{validationErrors}
+
+Please correct your response to match this exact format:
+\`\`\`json
+{
+  "observation": "Brief assessment of previous step's outcome",
+  "thought": "Reasoning for your next action",
+  "action": {
+    "action": "One of: select, fill, click, hover, check, uncheck, wait, done, goto, back, forward",
+    "ref": "Aria reference (e.g., 's1e33') - required for all actions except done/wait/goto/back/forward",
+    "value": "Required for fill/select/goto, seconds for wait, result for done"
+  }
+}
+\`\`\`
+
+Remember:
+- For "select", "fill", "click", "hover", "check", "uncheck" actions, you MUST provide a "ref"
+- For "fill", "select", "goto" actions, you MUST provide a "value"
+- For "wait" action, you MUST provide a "value" with the number of seconds
+- For "done" action, you MUST provide a "value" with the final result
+- For "back" and "forward" actions, you must NOT provide a "ref" or "value"
 `.trim();
 
 function getCurrentFormattedDate() {
