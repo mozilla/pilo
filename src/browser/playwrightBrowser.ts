@@ -5,7 +5,7 @@ import {
   BrowserContext,
   Page,
 } from "playwright";
-import { AriaBrowser } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 
@@ -114,7 +114,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   async waitForLoadState(
-    state: "networkidle" | "domcontentloaded" | "load",
+    state: LoadState,
     options?: { timeout?: number }
   ): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
@@ -123,43 +123,66 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async performAction(
     ref: string,
-    action: string,
+    action: PageAction,
     value?: string
   ): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
 
-    const element = this.page.locator(`aria-ref=${ref}`);
-
     try {
-      switch (action.toLowerCase()) {
-        case "click":
-          await element.click();
+      switch (action) {
+        // Element interactions
+        case PageAction.Click:
+          await this.page.locator(`aria-ref=${ref}`).click();
           break;
 
-        case "hover":
-          await element.hover();
+        case PageAction.Hover:
+          await this.page.locator(`aria-ref=${ref}`).hover();
           break;
 
-        case "fill":
+        case PageAction.Fill:
           if (!value) throw new Error("Value required for fill action");
-          await element.fill(value);
+          await this.page.locator(`aria-ref=${ref}`).fill(value);
           break;
 
-        case "focus":
-          await element.focus();
+        case PageAction.Focus:
+          await this.page.locator(`aria-ref=${ref}`).focus();
           break;
 
-        case "check":
-          await element.check();
+        case PageAction.Check:
+          await this.page.locator(`aria-ref=${ref}`).check();
           break;
 
-        case "uncheck":
-          await element.uncheck();
+        case PageAction.Uncheck:
+          await this.page.locator(`aria-ref=${ref}`).uncheck();
           break;
 
-        case "select":
+        case PageAction.Select:
           if (!value) throw new Error("Value required for select action");
-          await element.selectOption(value);
+          await this.page.locator(`aria-ref=${ref}`).selectOption(value);
+          break;
+
+        // Navigation and workflow
+        case PageAction.Wait:
+          if (!value) throw new Error("Value required for wait action");
+          await this.page.waitForTimeout(parseInt(value, 10) * 1000);
+          break;
+
+        case PageAction.Goto:
+          if (!value) throw new Error("URL required for goto action");
+          await this.goto(value);
+          break;
+
+        case PageAction.Back:
+          await this.goBack();
+          break;
+
+        case PageAction.Forward:
+          await this.goForward();
+          break;
+
+        case PageAction.Done:
+          // This is a no-op in the browser implementation
+          // It's handled at a higher level in the automation flow
           break;
 
         default:

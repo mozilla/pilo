@@ -8,7 +8,7 @@ import {
   validationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
-import { AriaBrowser } from "./browser/ariaBrowser.js";
+import { AriaBrowser, LoadState } from "./browser/ariaBrowser.js";
 import {
   planSchema,
   actionSchema,
@@ -566,7 +566,7 @@ export class WebAgent {
             });
 
             // Wait for both network idle and DOM to be stable
-            await this.browser.waitForLoadState("networkidle", {
+            await this.browser.waitForLoadState(LoadState.NetworkIdle, {
               timeout: 750,
             });
           } catch (e) {

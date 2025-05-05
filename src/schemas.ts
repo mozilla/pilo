@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PageAction } from "./browser/ariaBrowser.js";
 
 // Schema for the initial plan creation
 export const planSchema = z.object({
@@ -13,19 +14,7 @@ export const actionSchema = z.object({
   observation: z.string(),
   thought: z.string(),
   action: z.object({
-    action: z.enum([
-      "select", // Choose from dropdown
-      "fill", // Enter text
-      "click", // Click element
-      "hover", // Move mouse over element
-      "check", // Check a checkbox
-      "uncheck", // Uncheck a checkbox
-      "wait", // Pause execution
-      "goto", // Navigate to URL
-      "back", // Go to previous page
-      "forward", // Go to next page
-      "done", // Complete task
-    ]),
+    action: z.nativeEnum(PageAction),
     ref: z.string().optional(),
     value: z.string().optional(),
   }),
