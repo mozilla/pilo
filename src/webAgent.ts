@@ -137,6 +137,9 @@ export class WebAgent {
     if (!response.thought?.trim()) {
       errors.push('Missing or invalid "thought" field');
     }
+    if (!response.extractedData?.trim()) {
+      errors.push('Missing or invalid "extractedData" field');
+    }
     if (!response.action || typeof response.action !== "object") {
       errors.push('Missing or invalid "action" field');
       return { isValid: false, errors };
@@ -435,6 +438,14 @@ export class WebAgent {
         data: {
           timestamp: Date.now(),
           observation: result.observation,
+        },
+      });
+
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.EXTRACTED_DATA,
+        data: {
+          timestamp: Date.now(),
+          extractedData: result.extractedData || "",
         },
       });
 

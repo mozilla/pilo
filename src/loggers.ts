@@ -5,6 +5,7 @@ import type {
   ActionResultEventData,
   CompressionDebugEventData,
   CurrentStepEventData,
+  ExtractedDataEventData,
   MessagesDebugEventData,
   NetworkTimeoutEventData,
   NetworkWaitingEventData,
@@ -60,6 +61,7 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.CURRENT_STEP, this.handleCurrentStep);
     emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
     emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
+    emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
 
     // Action events
     emitter.onEvent(
@@ -117,6 +119,10 @@ export class ConsoleLogger implements Logger {
         this.handleObservation
       );
       this.emitter.offEvent(WebAgentEventType.THOUGHT, this.handleThought);
+      this.emitter.offEvent(
+        WebAgentEventType.EXTRACTED_DATA,
+        this.handleExtractedData
+      );
 
       // Action events
       this.emitter.offEvent(
@@ -224,6 +230,11 @@ export class ConsoleLogger implements Logger {
   private handleThought = (data: ThoughtEventData): void => {
     console.log(chalk.yellow.bold("\n💭 Thought:"));
     console.log(chalk.whiteBright("   " + data.thought));
+  };
+
+  private handleExtractedData = (data: ExtractedDataEventData): void => {
+    console.log(chalk.green.bold("\n📋 Extracted Data:"));
+    console.log(chalk.whiteBright("   " + data.extractedData));
   };
 
   private handleActionExecution = (data: ActionExecutionEventData): void => {

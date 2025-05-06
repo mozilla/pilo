@@ -30,6 +30,18 @@ Respond with a JSON object matching this structure:
 \`\`\`
 `.trim();
 
+const actionLoopResponseFormat = `{
+  "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
+  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note the type of data you should extract from the page to complete the task.",
+  "extractedData": "Only extract important data from the page that is needed to complete the task. This shouldn't include any element refs. Use markdown to structure this data clearly.",
+  "thought": "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach.",
+  "action": {
+    "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
+    "ref": "reference to the element on the page (e.g., 's#e##'). Not needed for done/wait/goto/back/forward.",
+    "value": "Required for fill/select/goto, seconds for wait, result for done."
+  }
+}`;
+
 export const actionLoopPrompt = `
 ${youArePrompt}
 For each step, assess the current state and decide on the next action to take.
@@ -57,22 +69,13 @@ Rules:
 6. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
 
 Best Practices:
-- Use click instead of goto when possible, especially for navigation elements on the page.
+- Use click instead of goto whenever possible, especially for navigation elements on the page.
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
 
 Respond with a JSON object matching this structure:
 \`\`\`json
-{
-  "currentStep": "Status (Starting/Working on/Completing) Step X: [exact step text from plan] - where X is the step number",
-  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task. Include a 'so that' statement connecting this step to your overall plan objective.",
-  "thought": "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach.",
-  "action": {
-    "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
-    "ref": "Aria reference (e.g., 's1e33') from the page snapshot. Not needed for done/wait/goto/back/forward.",
-    "value": "Required for fill/select/goto, seconds for wait, result for done."
-  }
-}
+${actionLoopResponseFormat}
 \`\`\`
 `.trim();
 
@@ -116,16 +119,7 @@ Your previous response did not match the required format. Here are the validatio
 
 Please correct your response to match this exact format:
 \`\`\`json
-{
-  "currentStep": "Status (Starting/Working on/Completing) Step X: [exact step text from plan]",
-  "observation": "Brief assessment of previous step's outcome with a 'so that' statement connecting to your plan",
-  "thought": "Reasoning for your next action",
-  "action": {
-    "action": "One of: select, fill, click, hover, check, uncheck, wait, done, goto, back, forward",
-    "ref": "Aria reference (e.g., 's1e33') - required for all actions except done/wait/goto/back/forward",
-    "value": "Required for fill/select/goto, seconds for wait, result for done"
-  }
-}
+${actionLoopResponseFormat}
 \`\`\`
 
 Remember:

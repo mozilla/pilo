@@ -15,6 +15,7 @@ export enum WebAgentEventType {
   CURRENT_STEP = "agent:current_step",
   OBSERVATION = "agent:observation",
   THOUGHT = "agent:thought",
+  EXTRACTED_DATA = "agent:extracted_data",
 
   // Action events
   ACTION_EXECUTION = "action:execution",
@@ -82,6 +83,13 @@ export interface ObservationEventData extends WebAgentEventData {
  */
 export interface ThoughtEventData extends WebAgentEventData {
   thought: string;
+}
+
+/**
+ * Event data for extracted data
+ */
+export interface ExtractedDataEventData extends WebAgentEventData {
+  extractedData: string;
 }
 
 /**
@@ -157,6 +165,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.CURRENT_STEP; data: CurrentStepEventData }
   | { type: WebAgentEventType.OBSERVATION; data: ObservationEventData }
   | { type: WebAgentEventType.THOUGHT; data: ThoughtEventData }
+  | { type: WebAgentEventType.EXTRACTED_DATA; data: ExtractedDataEventData }
   | { type: WebAgentEventType.ACTION_EXECUTION; data: ActionExecutionEventData }
   | { type: WebAgentEventType.ACTION_RESULT; data: ActionResultEventData }
   | {

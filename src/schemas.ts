@@ -12,6 +12,7 @@ export const planSchema = z.object({
 export const actionSchema = z.object({
   currentStep: z.string(),
   observation: z.string(),
+  extractedData: z.string().optional(),
   thought: z.string(),
   action: z.object({
     action: z.nativeEnum(PageAction),
