@@ -51,6 +51,7 @@ export class WebAgent {
   ];
   private eventEmitter: WebAgentEventEmitter;
   private logger: Logger;
+  private currentPage: { url: string; title: string } = { url: "", title: "" };
 
   // Regex patterns for aria ref validation
   private readonly ARIA_REF_REGEX = /^s\d+e\d+$/;
@@ -216,9 +217,35 @@ export class WebAgent {
     };
   }
 
+  /**
+   * Captures the current page state but doesn't emit navigation events
+   * Only used when taking snapshots for AI processing
+   */
+  private capturePageState(newTitle: string, newUrl: string): void {
+    // Always silently update our tracking state
+    this.currentPage = { url: newUrl, title: newTitle };
+  }
+
+  /**
+   * Records a true navigation event (explicitly called only when we know navigation has occurred)
+   * This emits the navigation event for logging/display purposes
+   */
+  private recordNavigationEvent(title: string, url: string): void {
+    console.debug(`📄 Navigation occurred to: ${url}`);
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.PAGE_NAVIGATION,
+      data: { timestamp: Date.now(), title, url },
+    });
+
+    // Update our tracking state
+    this.currentPage = { url, title };
+  }
+
   async getNextActions(pageSnapshot: string, retryCount = 0): Promise<Action> {
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
-    const [title, url] = await Promise.all([
+
+    // Get current page info
+    const [pageTitle, pageUrl] = await Promise.all([
       this.browser.getTitle(),
       this.browser.getUrl(),
     ]);
@@ -227,8 +254,12 @@ export class WebAgent {
       this.logCompressionStats(pageSnapshot, compressedSnapshot);
     }
 
-    this.updateMessagesWithSnapshot(title, url, compressedSnapshot);
-    this.emitNavigationEvent(title, url);
+    // Silently update our page state without emitting navigation events
+    // (This is just taking a snapshot, not navigating)
+    this.capturePageState(pageTitle, pageUrl);
+
+    // Update AI messages with new snapshot
+    this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
 
     if (this.DEBUG) {
       this.emitDebugMessages();
@@ -284,8 +315,8 @@ export class WebAgent {
   }
 
   private updateMessagesWithSnapshot(
-    title: string,
-    url: string,
+    pageTitle: string,
+    pageUrl: string,
     snapshot: string
   ) {
     this.messages.forEach((msg: any) => {
@@ -303,14 +334,7 @@ export class WebAgent {
 
     this.messages.push({
       role: "user",
-      content: buildPageSnapshotPrompt(title, url, snapshot),
-    });
-  }
-
-  private emitNavigationEvent(title: string, url: string) {
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.PAGE_NAVIGATION,
-      data: { timestamp: Date.now(), title, url },
+      content: buildPageSnapshotPrompt(pageTitle, pageUrl, snapshot),
     });
   }
 
@@ -366,6 +390,7 @@ export class WebAgent {
     this.plan = "";
     this.url = "";
     this.messages = [];
+    this.currentPage = { url: "", title: "" };
   }
 
   private async validateTaskCompletion(
@@ -409,6 +434,15 @@ export class WebAgent {
 
     // Go to the starting URL
     await this.browser.goto(this.url);
+
+    // Get page info after navigation
+    const [pageTitle, pageUrl] = await Promise.all([
+      this.browser.getTitle(),
+      this.browser.getUrl(),
+    ]);
+
+    // Record initial navigation event
+    this.recordNavigationEvent(pageTitle, pageUrl);
 
     // Setup messages
     this.setupMessages(task);
@@ -528,6 +562,13 @@ export class WebAgent {
           case "goto":
             if (result.action.value) {
               await this.browser.goto(result.action.value);
+
+              // After navigation, record the navigation event
+              const [navTitle, navUrl] = await Promise.all([
+                this.browser.getTitle(),
+                this.browser.getUrl(),
+              ]);
+              this.recordNavigationEvent(navTitle, navUrl);
             } else {
               throw new Error("Missing URL for goto action");
             }
@@ -535,61 +576,54 @@ export class WebAgent {
 
           case "back":
             await this.browser.goBack();
+
+            // After navigation, record the navigation event
+            const [backTitle, backUrl] = await Promise.all([
+              this.browser.getTitle(),
+              this.browser.getUrl(),
+            ]);
+            this.recordNavigationEvent(backTitle, backUrl);
             break;
 
           case "forward":
             await this.browser.goForward();
+
+            // After navigation, record the navigation event
+            const [fwdTitle, fwdUrl] = await Promise.all([
+              this.browser.getTitle(),
+              this.browser.getUrl(),
+            ]);
+            this.recordNavigationEvent(fwdTitle, fwdUrl);
             break;
 
           default:
             if (!result.action.ref) {
               throw new Error("Missing ref for action");
             }
+
+            // Perform the action (which might cause navigation)
             await this.browser.performAction(
               result.action.ref,
               result.action.action,
               result.action.value
             );
-        }
 
-        // For interactive actions, wait for the page to settle
-        if (
-          [
-            "click",
-            "select",
-            "fill",
-            "hover",
-            "check",
-            "uncheck",
-            "goto",
-            "back",
-            "forward",
-          ].includes(result.action.action)
-        ) {
-          try {
-            // Emit network waiting event
-            this.eventEmitter.emitEvent({
-              type: WebAgentEventType.NETWORK_WAITING,
-              data: {
-                timestamp: Date.now(),
-                action: result.action.action,
-              },
-            });
+            // For actions that potentially cause navigation (click, select),
+            // check if navigation occurred by comparing current URL/title with previous
+            if (["click", "select"].includes(result.action.action)) {
+              const [actionTitle, actionUrl] = await Promise.all([
+                this.browser.getTitle(),
+                this.browser.getUrl(),
+              ]);
 
-            // Wait for both network idle and DOM to be stable
-            await this.browser.waitForLoadState(LoadState.NetworkIdle, {
-              timeout: 750,
-            });
-          } catch (e) {
-            // If timeout occurs, emit timeout event
-            this.eventEmitter.emitEvent({
-              type: WebAgentEventType.NETWORK_TIMEOUT,
-              data: {
-                timestamp: Date.now(),
-                action: result.action.action,
-              },
-            });
-          }
+              // Only record navigation if URL or title changed
+              if (
+                actionUrl !== this.currentPage.url ||
+                actionTitle !== this.currentPage.title
+              ) {
+                this.recordNavigationEvent(actionTitle, actionUrl);
+              }
+            }
         }
 
         // Add the successful result to messages for context
