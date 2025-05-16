@@ -48,7 +48,11 @@ export class ExtensionBrowser implements AriaBrowser {
   async getText(): Promise<string> {
     const [{ result }] = await browser.scripting.executeScript({
       target: { tabId: (await this.getTab()).id },
-      func: () => document.body.innerText,
+      func: () => {
+        // Use the globally available functions from content script
+        const snapshot = (window as any).generateAriaTree(document.body, { forAI: true, refPrefix: 's1' });
+        return (window as any).renderAriaTree(snapshot, { mode: 'raw', forAI: true });
+      }
     });
     return result;
   }
@@ -61,27 +65,48 @@ export class ExtensionBrowser implements AriaBrowser {
   }
 
   async performAction(ref: string, action: string, value?: string): Promise<void> {
-    // TODO: Use content script to perform actions on the page
-    if (
-        action == "click" &&
-        (await browser.scripting.executeScript({
-          target: { tabId: (await this.getTab()).id },
-          func: () => {
-            const element = document.querySelector(
-              "a:is([data-cta-text*='Release Notes'],[data-link-text*='Release Notes'])"
-            );
-            if (element) {
+    const [{ result }] = await browser.scripting.executeScript({
+      target: { tabId: (await this.getTab()).id },
+      func: (ref: string, action: string, value?: string) => {
+        // Use the globally available functions from content script
+        const snapshot = (window as any).generateAriaTree(document.body, { forAI: true, refPrefix: 's1' });
+        const element = snapshot.elements.get(ref);
+
+        if (!element) {
+          throw new Error(`Element with ref ${ref} not found`);
+        }
+
+        switch (action) {
+          case 'click':
+            if (element instanceof HTMLElement) {
               element.click();
               return true;
             }
-            return false;
-          }
-        }))
-      ) {
-      return;
-    }
+            break;
+          case 'type':
+            if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+              element.value = value || '';
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
+            break;
+          case 'select':
+            if (element instanceof HTMLSelectElement) {
+              element.value = value || '';
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
+            break;
+        }
+        throw new Error(`Action ${action} not supported for element type ${element.constructor.name}`);
+      },
+      args: [ref, action, value]
+    });
 
-    throw new Error(`[ExtensionBrowser] performAction(ref=${ref}, action=${action}, value=${value})`);
+    if (!result) {
+      throw new Error(`Failed to perform action ${action} on element ${ref}`);
+    }
   }
 
   async waitForLoadState(

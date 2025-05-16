@@ -14546,7 +14546,10 @@ If the task was not completed successfully, provide a brief, direct instruction 
     async getText() {
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: (await this.getTab()).id },
-        func: () => document.body.innerText
+        func: () => {
+          const snapshot = window.generateAriaTree(document.body, { forAI: true, refPrefix: "s1" });
+          return window.renderAriaTree(snapshot, { mode: "raw", forAI: true });
+        }
       });
       return result;
     }
@@ -14555,22 +14558,44 @@ If the task was not completed successfully, provide a brief, direct instruction 
       return Buffer.from("");
     }
     async performAction(ref, action, value) {
-      if (action == "click" && await browser.scripting.executeScript({
+      const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: (await this.getTab()).id },
-        func: () => {
-          const element = document.querySelector(
-            "a:is([data-cta-text*='Release Notes'],[data-link-text*='Release Notes'])"
-          );
-          if (element) {
-            element.click();
-            return true;
+        func: (ref2, action2, value2) => {
+          const snapshot = window.generateAriaTree(document.body, { forAI: true, refPrefix: "s1" });
+          const element = snapshot.elements.get(ref2);
+          if (!element) {
+            throw new Error(`Element with ref ${ref2} not found`);
           }
-          return false;
-        }
-      })) {
-        return;
+          switch (action2) {
+            case "click":
+              if (element instanceof HTMLElement) {
+                element.click();
+                return true;
+              }
+              break;
+            case "type":
+              if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+                element.value = value2 || "";
+                element.dispatchEvent(new Event("input", { bubbles: true }));
+                element.dispatchEvent(new Event("change", { bubbles: true }));
+                return true;
+              }
+              break;
+            case "select":
+              if (element instanceof HTMLSelectElement) {
+                element.value = value2 || "";
+                element.dispatchEvent(new Event("change", { bubbles: true }));
+                return true;
+              }
+              break;
+          }
+          throw new Error(`Action ${action2} not supported for element type ${element.constructor.name}`);
+        },
+        args: [ref, action, value]
+      });
+      if (!result) {
+        throw new Error(`Failed to perform action ${action} on element ${ref}`);
       }
-      throw new Error(`[ExtensionBrowser] performAction(ref=${ref}, action=${action}, value=${value})`);
     }
     async waitForLoadState(state, options) {
       console.log(`[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`);
