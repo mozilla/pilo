@@ -9,6 +9,10 @@
   var __commonJS = (cb, mod) => function __require() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
+  var __export = (target, all) => {
+    for (var name17 in all)
+      __defProp(target, name17, { get: all[name17], enumerable: true });
+  };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
       for (let key of __getOwnPropNames(from))
@@ -26,9 +30,9 @@
     mod
   ));
 
-  // node_modules/.pnpm/secure-json-parse@2.7.0/node_modules/secure-json-parse/index.js
+  // node_modules/secure-json-parse/index.js
   var require_secure_json_parse = __commonJS({
-    "node_modules/.pnpm/secure-json-parse@2.7.0/node_modules/secure-json-parse/index.js"(exports, module) {
+    "node_modules/secure-json-parse/index.js"(exports, module) {
       "use strict";
       var hasBuffer = typeof Buffer !== "undefined";
       var suspectProtoRx = /"(?:_|\\u005[Ff])(?:_|\\u005[Ff])(?:p|\\u0070)(?:r|\\u0072)(?:o|\\u006[Ff])(?:t|\\u0074)(?:o|\\u006[Ff])(?:_|\\u005[Ff])(?:_|\\u005[Ff])"\s*:/;
@@ -130,9 +134,9 @@
     }
   });
 
-  // node_modules/.pnpm/eventemitter3@5.0.1/node_modules/eventemitter3/index.js
+  // node_modules/eventemitter3/index.js
   var require_eventemitter3 = __commonJS({
-    "node_modules/.pnpm/eventemitter3@5.0.1/node_modules/eventemitter3/index.js"(exports, module) {
+    "node_modules/eventemitter3/index.js"(exports, module) {
       "use strict";
       var has = Object.prototype.hasOwnProperty;
       var prefix = "~";
@@ -292,7 +296,7 @@
     }
   });
 
-  // node_modules/.pnpm/@ai-sdk+provider@1.1.0/node_modules/@ai-sdk/provider/dist/index.mjs
+  // node_modules/@ai-sdk/provider/dist/index.mjs
   var marker = "vercel.ai.error";
   var symbol = Symbol.for(marker);
   var _a;
@@ -597,7 +601,7 @@ Error message: ${getErrorMessage(cause)}`,
     );
   }
 
-  // node_modules/.pnpm/nanoid@3.3.11/node_modules/nanoid/non-secure/index.js
+  // node_modules/nanoid/non-secure/index.js
   var customAlphabet = (alphabet, defaultSize = 21) => {
     return (size = defaultSize) => {
       let id = "";
@@ -609,130 +613,8 @@ Error message: ${getErrorMessage(cause)}`,
     };
   };
 
-  // node_modules/.pnpm/@ai-sdk+provider-utils@2.2.0_zod@3.24.2/node_modules/@ai-sdk/provider-utils/dist/index.mjs
+  // node_modules/@ai-sdk/provider-utils/dist/index.mjs
   var import_secure_json_parse = __toESM(require_secure_json_parse(), 1);
-
-  // node_modules/.pnpm/eventsource-parser@3.0.0/node_modules/eventsource-parser/dist/index.js
-  var __defProp2 = Object.defineProperty;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp2(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key != "symbol" ? key + "" : key, value);
-  var ParseError = class extends Error {
-    constructor(message, options) {
-      super(message), __publicField(this, "type"), __publicField(this, "field"), __publicField(this, "value"), __publicField(this, "line"), this.name = "ParseError", this.type = options.type, this.field = options.field, this.value = options.value, this.line = options.line;
-    }
-  };
-  function noop(_arg) {
-  }
-  function createParser(callbacks) {
-    const { onEvent = noop, onError = noop, onRetry = noop, onComment } = callbacks;
-    let incompleteLine = "", isFirstChunk = true, id, data = "", eventType = "";
-    function feed(newChunk) {
-      const chunk = isFirstChunk ? newChunk.replace(/^\xEF\xBB\xBF/, "") : newChunk, [complete, incomplete] = splitLines(`${incompleteLine}${chunk}`);
-      for (const line of complete)
-        parseLine(line);
-      incompleteLine = incomplete, isFirstChunk = false;
-    }
-    function parseLine(line) {
-      if (line === "") {
-        dispatchEvent();
-        return;
-      }
-      if (line.startsWith(":")) {
-        onComment && onComment(line.slice(line.startsWith(": ") ? 2 : 1));
-        return;
-      }
-      const fieldSeparatorIndex = line.indexOf(":");
-      if (fieldSeparatorIndex !== -1) {
-        const field = line.slice(0, fieldSeparatorIndex), offset = line[fieldSeparatorIndex + 1] === " " ? 2 : 1, value = line.slice(fieldSeparatorIndex + offset);
-        processField(field, value, line);
-        return;
-      }
-      processField(line, "", line);
-    }
-    function processField(field, value, line) {
-      switch (field) {
-        case "event":
-          eventType = value;
-          break;
-        case "data":
-          data = `${data}${value}
-`;
-          break;
-        case "id":
-          id = value.includes("\0") ? void 0 : value;
-          break;
-        case "retry":
-          /^\d+$/.test(value) ? onRetry(parseInt(value, 10)) : onError(
-            new ParseError(`Invalid \`retry\` value: "${value}"`, {
-              type: "invalid-retry",
-              value,
-              line
-            })
-          );
-          break;
-        default:
-          onError(
-            new ParseError(
-              `Unknown field "${field.length > 20 ? `${field.slice(0, 20)}\u2026` : field}"`,
-              { type: "unknown-field", field, value, line }
-            )
-          );
-          break;
-      }
-    }
-    function dispatchEvent() {
-      data.length > 0 && onEvent({
-        id,
-        event: eventType || void 0,
-        // If the data buffer's last character is a U+000A LINE FEED (LF) character,
-        // then remove the last character from the data buffer.
-        data: data.endsWith(`
-`) ? data.slice(0, -1) : data
-      }), id = void 0, data = "", eventType = "";
-    }
-    function reset(options = {}) {
-      incompleteLine && options.consume && parseLine(incompleteLine), id = void 0, data = "", eventType = "", incompleteLine = "";
-    }
-    return { feed, reset };
-  }
-  function splitLines(chunk) {
-    const lines = [];
-    let incompleteLine = "";
-    const totalLength = chunk.length;
-    for (let i = 0; i < totalLength; i++) {
-      const char = chunk[i];
-      char === "\r" && chunk[i + 1] === `
-` ? (lines.push(incompleteLine), incompleteLine = "", i++) : char === "\r" || char === `
-` ? (lines.push(incompleteLine), incompleteLine = "") : incompleteLine += char;
-    }
-    return [lines, incompleteLine];
-  }
-
-  // node_modules/.pnpm/eventsource-parser@3.0.0/node_modules/eventsource-parser/dist/stream.js
-  var EventSourceParserStream = class extends TransformStream {
-    constructor({ onError, onRetry, onComment } = {}) {
-      let parser;
-      super({
-        start(controller) {
-          parser = createParser({
-            onEvent: (event) => {
-              controller.enqueue(event);
-            },
-            onError(error) {
-              onError === "terminate" ? controller.error(error) : typeof onError == "function" && onError(error);
-            },
-            onRetry,
-            onComment
-          });
-        },
-        transform(chunk) {
-          parser.feed(chunk);
-        }
-      });
-    }
-  };
-
-  // node_modules/.pnpm/@ai-sdk+provider-utils@2.2.0_zod@3.24.2/node_modules/@ai-sdk/provider-utils/dist/index.mjs
   function combineHeaders(...headers) {
     return headers.reduce(
       (combinedHeaders, currentHeaders) => ({
@@ -771,6 +653,96 @@ Error message: ${getErrorMessage(cause)}`,
   }
   async function delay(delayInMs) {
     return delayInMs == null ? Promise.resolve() : new Promise((resolve2) => setTimeout(resolve2, delayInMs));
+  }
+  function createEventSourceParserStream() {
+    let buffer = "";
+    let event = void 0;
+    let data = [];
+    let lastEventId = void 0;
+    let retry = void 0;
+    function parseLine(line, controller) {
+      if (line === "") {
+        dispatchEvent(controller);
+        return;
+      }
+      if (line.startsWith(":")) {
+        return;
+      }
+      const colonIndex = line.indexOf(":");
+      if (colonIndex === -1) {
+        handleField(line, "");
+        return;
+      }
+      const field = line.slice(0, colonIndex);
+      const valueStart = colonIndex + 1;
+      const value = valueStart < line.length && line[valueStart] === " " ? line.slice(valueStart + 1) : line.slice(valueStart);
+      handleField(field, value);
+    }
+    function dispatchEvent(controller) {
+      if (data.length > 0) {
+        controller.enqueue({
+          event,
+          data: data.join("\n"),
+          id: lastEventId,
+          retry
+        });
+        data = [];
+        event = void 0;
+        retry = void 0;
+      }
+    }
+    function handleField(field, value) {
+      switch (field) {
+        case "event":
+          event = value;
+          break;
+        case "data":
+          data.push(value);
+          break;
+        case "id":
+          lastEventId = value;
+          break;
+        case "retry":
+          const parsedRetry = parseInt(value, 10);
+          if (!isNaN(parsedRetry)) {
+            retry = parsedRetry;
+          }
+          break;
+      }
+    }
+    return new TransformStream({
+      transform(chunk, controller) {
+        const { lines, incompleteLine } = splitLines(buffer, chunk);
+        buffer = incompleteLine;
+        for (let i = 0; i < lines.length; i++) {
+          parseLine(lines[i], controller);
+        }
+      },
+      flush(controller) {
+        parseLine(buffer, controller);
+        dispatchEvent(controller);
+      }
+    });
+  }
+  function splitLines(buffer, chunk) {
+    const lines = [];
+    let currentLine = buffer;
+    for (let i = 0; i < chunk.length; ) {
+      const char = chunk[i++];
+      if (char === "\n") {
+        lines.push(currentLine);
+        currentLine = "";
+      } else if (char === "\r") {
+        lines.push(currentLine);
+        currentLine = "";
+        if (chunk[i] === "\n") {
+          i++;
+        }
+      } else {
+        currentLine += char;
+      }
+    }
+    return { lines, incompleteLine: currentLine };
   }
   function extractResponseHeaders(response) {
     const headers = {};
@@ -943,6 +915,27 @@ Error message: ${getErrorMessage(cause)}`,
       return false;
     }
   }
+  function parseProviderOptions({
+    provider,
+    providerOptions,
+    schema
+  }) {
+    if ((providerOptions == null ? void 0 : providerOptions[provider]) == null) {
+      return void 0;
+    }
+    const parsedProviderOptions = safeValidateTypes({
+      value: providerOptions[provider],
+      schema
+    });
+    if (!parsedProviderOptions.success) {
+      throw new InvalidArgumentError({
+        argument: "providerOptions",
+        message: `invalid ${provider} provider options`,
+        cause: parsedProviderOptions.error
+      });
+    }
+    return parsedProviderOptions.value;
+  }
   var getOriginalFetch2 = () => globalThis.fetch;
   var postJsonToApi = async ({
     url,
@@ -961,6 +954,26 @@ Error message: ${getErrorMessage(cause)}`,
     body: {
       content: JSON.stringify(body),
       values: body
+    },
+    failedResponseHandler,
+    successfulResponseHandler,
+    abortSignal,
+    fetch: fetch2
+  });
+  var postFormDataToApi = async ({
+    url,
+    headers,
+    formData,
+    failedResponseHandler,
+    successfulResponseHandler,
+    abortSignal,
+    fetch: fetch2
+  }) => postToApi({
+    url,
+    headers,
+    body: {
+      content: formData,
+      values: Object.fromEntries(formData.entries())
     },
     failedResponseHandler,
     successfulResponseHandler,
@@ -1109,7 +1122,7 @@ Error message: ${getErrorMessage(cause)}`,
     }
     return {
       responseHeaders,
-      value: response.body.pipeThrough(new TextDecoderStream()).pipeThrough(new EventSourceParserStream()).pipeThrough(
+      value: response.body.pipeThrough(new TextDecoderStream()).pipeThrough(createEventSourceParserStream()).pipeThrough(
         new TransformStream({
           transform({ data }, controller) {
             if (data === "[DONE]") {
@@ -1150,6 +1163,36 @@ Error message: ${getErrorMessage(cause)}`,
       rawValue: parsedResult.rawValue
     };
   };
+  var createBinaryResponseHandler = () => async ({ response, url, requestBodyValues }) => {
+    const responseHeaders = extractResponseHeaders(response);
+    if (!response.body) {
+      throw new APICallError({
+        message: "Response body is empty",
+        url,
+        requestBodyValues,
+        statusCode: response.status,
+        responseHeaders,
+        responseBody: void 0
+      });
+    }
+    try {
+      const buffer = await response.arrayBuffer();
+      return {
+        responseHeaders,
+        value: new Uint8Array(buffer)
+      };
+    } catch (error) {
+      throw new APICallError({
+        message: "Failed to read response as array buffer",
+        url,
+        requestBodyValues,
+        statusCode: response.status,
+        responseHeaders,
+        responseBody: void 0,
+        cause: error
+      });
+    }
+  };
   var { btoa, atob: atob2 } = globalThis;
   function convertBase64ToUint8Array(base64String) {
     const base64Url = base64String.replace(/-/g, "+").replace(/_/g, "/");
@@ -1167,10 +1210,123 @@ Error message: ${getErrorMessage(cause)}`,
     return url == null ? void 0 : url.replace(/\/$/, "");
   }
 
-  // node_modules/.pnpm/zod@3.24.2/node_modules/zod/lib/index.mjs
+  // node_modules/zod/dist/esm/v3/external.js
+  var external_exports = {};
+  __export(external_exports, {
+    BRAND: () => BRAND,
+    DIRTY: () => DIRTY,
+    EMPTY_PATH: () => EMPTY_PATH,
+    INVALID: () => INVALID,
+    NEVER: () => NEVER,
+    OK: () => OK,
+    ParseStatus: () => ParseStatus,
+    Schema: () => ZodType,
+    ZodAny: () => ZodAny,
+    ZodArray: () => ZodArray,
+    ZodBigInt: () => ZodBigInt,
+    ZodBoolean: () => ZodBoolean,
+    ZodBranded: () => ZodBranded,
+    ZodCatch: () => ZodCatch,
+    ZodDate: () => ZodDate,
+    ZodDefault: () => ZodDefault,
+    ZodDiscriminatedUnion: () => ZodDiscriminatedUnion,
+    ZodEffects: () => ZodEffects,
+    ZodEnum: () => ZodEnum,
+    ZodError: () => ZodError,
+    ZodFirstPartyTypeKind: () => ZodFirstPartyTypeKind,
+    ZodFunction: () => ZodFunction,
+    ZodIntersection: () => ZodIntersection,
+    ZodIssueCode: () => ZodIssueCode,
+    ZodLazy: () => ZodLazy,
+    ZodLiteral: () => ZodLiteral,
+    ZodMap: () => ZodMap,
+    ZodNaN: () => ZodNaN,
+    ZodNativeEnum: () => ZodNativeEnum,
+    ZodNever: () => ZodNever,
+    ZodNull: () => ZodNull,
+    ZodNullable: () => ZodNullable,
+    ZodNumber: () => ZodNumber,
+    ZodObject: () => ZodObject,
+    ZodOptional: () => ZodOptional,
+    ZodParsedType: () => ZodParsedType,
+    ZodPipeline: () => ZodPipeline,
+    ZodPromise: () => ZodPromise,
+    ZodReadonly: () => ZodReadonly,
+    ZodRecord: () => ZodRecord,
+    ZodSchema: () => ZodType,
+    ZodSet: () => ZodSet,
+    ZodString: () => ZodString,
+    ZodSymbol: () => ZodSymbol,
+    ZodTransformer: () => ZodEffects,
+    ZodTuple: () => ZodTuple,
+    ZodType: () => ZodType,
+    ZodUndefined: () => ZodUndefined,
+    ZodUnion: () => ZodUnion,
+    ZodUnknown: () => ZodUnknown,
+    ZodVoid: () => ZodVoid,
+    addIssueToContext: () => addIssueToContext,
+    any: () => anyType,
+    array: () => arrayType,
+    bigint: () => bigIntType,
+    boolean: () => booleanType,
+    coerce: () => coerce,
+    custom: () => custom,
+    date: () => dateType,
+    datetimeRegex: () => datetimeRegex,
+    defaultErrorMap: () => en_default,
+    discriminatedUnion: () => discriminatedUnionType,
+    effect: () => effectsType,
+    enum: () => enumType,
+    function: () => functionType,
+    getErrorMap: () => getErrorMap,
+    getParsedType: () => getParsedType,
+    instanceof: () => instanceOfType,
+    intersection: () => intersectionType,
+    isAborted: () => isAborted,
+    isAsync: () => isAsync,
+    isDirty: () => isDirty,
+    isValid: () => isValid,
+    late: () => late,
+    lazy: () => lazyType,
+    literal: () => literalType,
+    makeIssue: () => makeIssue,
+    map: () => mapType,
+    nan: () => nanType,
+    nativeEnum: () => nativeEnumType,
+    never: () => neverType,
+    null: () => nullType,
+    nullable: () => nullableType,
+    number: () => numberType,
+    object: () => objectType,
+    objectUtil: () => objectUtil,
+    oboolean: () => oboolean,
+    onumber: () => onumber,
+    optional: () => optionalType,
+    ostring: () => ostring,
+    pipeline: () => pipelineType,
+    preprocess: () => preprocessType,
+    promise: () => promiseType,
+    quotelessJson: () => quotelessJson,
+    record: () => recordType,
+    set: () => setType,
+    setErrorMap: () => setErrorMap,
+    strictObject: () => strictObjectType,
+    string: () => stringType,
+    symbol: () => symbolType,
+    transformer: () => effectsType,
+    tuple: () => tupleType,
+    undefined: () => undefinedType,
+    union: () => unionType,
+    unknown: () => unknownType,
+    util: () => util,
+    void: () => voidType
+  });
+
+  // node_modules/zod/dist/esm/v3/helpers/util.js
   var util;
   (function(util2) {
-    util2.assertEqual = (val) => val;
+    util2.assertEqual = (_) => {
+    };
     function assertIs(_arg) {
     }
     util2.assertIs = assertIs;
@@ -1214,7 +1370,7 @@ Error message: ${getErrorMessage(cause)}`,
       }
       return void 0;
     };
-    util2.isInteger = typeof Number.isInteger === "function" ? (val) => Number.isInteger(val) : (val) => typeof val === "number" && isFinite(val) && Math.floor(val) === val;
+    util2.isInteger = typeof Number.isInteger === "function" ? (val) => Number.isInteger(val) : (val) => typeof val === "number" && Number.isFinite(val) && Math.floor(val) === val;
     function joinValues(array, separator = " | ") {
       return array.map((val) => typeof val === "string" ? `'${val}'` : val).join(separator);
     }
@@ -1266,7 +1422,7 @@ Error message: ${getErrorMessage(cause)}`,
       case "string":
         return ZodParsedType.string;
       case "number":
-        return isNaN(data) ? ZodParsedType.nan : ZodParsedType.number;
+        return Number.isNaN(data) ? ZodParsedType.nan : ZodParsedType.number;
       case "boolean":
         return ZodParsedType.boolean;
       case "function":
@@ -1299,6 +1455,8 @@ Error message: ${getErrorMessage(cause)}`,
         return ZodParsedType.unknown;
     }
   };
+
+  // node_modules/zod/dist/esm/v3/ZodError.js
   var ZodIssueCode = util.arrayToEnum([
     "invalid_type",
     "invalid_literal",
@@ -1414,6 +1572,8 @@ Error message: ${getErrorMessage(cause)}`,
     const error = new ZodError(issues);
     return error;
   };
+
+  // node_modules/zod/dist/esm/v3/locales/en.js
   var errorMap = (issue, _ctx) => {
     let message;
     switch (issue.code) {
@@ -1512,13 +1672,18 @@ Error message: ${getErrorMessage(cause)}`,
     }
     return { message };
   };
-  var overrideErrorMap = errorMap;
+  var en_default = errorMap;
+
+  // node_modules/zod/dist/esm/v3/errors.js
+  var overrideErrorMap = en_default;
   function setErrorMap(map) {
     overrideErrorMap = map;
   }
   function getErrorMap() {
     return overrideErrorMap;
   }
+
+  // node_modules/zod/dist/esm/v3/helpers/parseUtil.js
   var makeIssue = (params) => {
     const { data, path, errorMaps, issueData } = params;
     const fullPath = [...path, ...issueData.path || []];
@@ -1558,7 +1723,7 @@ Error message: ${getErrorMessage(cause)}`,
         // then schema-bound map if available
         overrideMap,
         // then global override map
-        overrideMap === errorMap ? void 0 : errorMap
+        overrideMap === en_default ? void 0 : en_default
         // then global default map
       ].filter((x) => !!x)
     });
@@ -1627,24 +1792,15 @@ Error message: ${getErrorMessage(cause)}`,
   var isDirty = (x) => x.status === "dirty";
   var isValid = (x) => x.status === "valid";
   var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
-  function __classPrivateFieldGet(receiver, state, kind, f) {
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
-    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
-  }
-  function __classPrivateFieldSet(receiver, state, value, kind, f) {
-    if (kind === "m") throw new TypeError("Private method is not writable");
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
-    return kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value), value;
-  }
+
+  // node_modules/zod/dist/esm/v3/helpers/errorUtil.js
   var errorUtil;
   (function(errorUtil2) {
     errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
-    errorUtil2.toString = (message) => typeof message === "string" ? message : message === null || message === void 0 ? void 0 : message.message;
+    errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
   })(errorUtil || (errorUtil = {}));
-  var _ZodEnum_cache;
-  var _ZodNativeEnum_cache;
+
+  // node_modules/zod/dist/esm/v3/types.js
   var ParseInputLazyPath = class {
     constructor(parent, value, path, key) {
       this._cachedPath = [];
@@ -1655,7 +1811,7 @@ Error message: ${getErrorMessage(cause)}`,
     }
     get path() {
       if (!this._cachedPath.length) {
-        if (this._key instanceof Array) {
+        if (Array.isArray(this._key)) {
           this._cachedPath.push(...this._path, ...this._key);
         } else {
           this._cachedPath.push(...this._path, this._key);
@@ -1693,17 +1849,16 @@ Error message: ${getErrorMessage(cause)}`,
     if (errorMap2)
       return { errorMap: errorMap2, description };
     const customMap = (iss, ctx) => {
-      var _a17, _b;
       const { message } = params;
       if (iss.code === "invalid_enum_value") {
-        return { message: message !== null && message !== void 0 ? message : ctx.defaultError };
+        return { message: message ?? ctx.defaultError };
       }
       if (typeof ctx.data === "undefined") {
-        return { message: (_a17 = message !== null && message !== void 0 ? message : required_error) !== null && _a17 !== void 0 ? _a17 : ctx.defaultError };
+        return { message: message ?? required_error ?? ctx.defaultError };
       }
       if (iss.code !== "invalid_type")
         return { message: ctx.defaultError };
-      return { message: (_b = message !== null && message !== void 0 ? message : invalid_type_error) !== null && _b !== void 0 ? _b : ctx.defaultError };
+      return { message: message ?? invalid_type_error ?? ctx.defaultError };
     };
     return { errorMap: customMap, description };
   }
@@ -1755,14 +1910,13 @@ Error message: ${getErrorMessage(cause)}`,
       throw result.error;
     }
     safeParse(data, params) {
-      var _a17;
       const ctx = {
         common: {
           issues: [],
-          async: (_a17 = params === null || params === void 0 ? void 0 : params.async) !== null && _a17 !== void 0 ? _a17 : false,
-          contextualErrorMap: params === null || params === void 0 ? void 0 : params.errorMap
+          async: params?.async ?? false,
+          contextualErrorMap: params?.errorMap
         },
-        path: (params === null || params === void 0 ? void 0 : params.path) || [],
+        path: params?.path || [],
         schemaErrorMap: this._def.errorMap,
         parent: null,
         data,
@@ -1772,7 +1926,6 @@ Error message: ${getErrorMessage(cause)}`,
       return handleResult(ctx, result);
     }
     "~validate"(data) {
-      var _a17, _b;
       const ctx = {
         common: {
           issues: [],
@@ -1793,7 +1946,7 @@ Error message: ${getErrorMessage(cause)}`,
             issues: ctx.common.issues
           };
         } catch (err) {
-          if ((_b = (_a17 = err === null || err === void 0 ? void 0 : err.message) === null || _a17 === void 0 ? void 0 : _a17.toLowerCase()) === null || _b === void 0 ? void 0 : _b.includes("encountered")) {
+          if (err?.message?.toLowerCase()?.includes("encountered")) {
             this["~standard"].async = true;
           }
           ctx.common = {
@@ -1818,10 +1971,10 @@ Error message: ${getErrorMessage(cause)}`,
       const ctx = {
         common: {
           issues: [],
-          contextualErrorMap: params === null || params === void 0 ? void 0 : params.errorMap,
+          contextualErrorMap: params?.errorMap,
           async: true
         },
-        path: (params === null || params === void 0 ? void 0 : params.path) || [],
+        path: params?.path || [],
         schemaErrorMap: this._def.errorMap,
         parent: null,
         data,
@@ -2011,13 +2164,14 @@ Error message: ${getErrorMessage(cause)}`,
   var dateRegexSource = `((\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\\d|3[01])|(0[469]|11)-(0[1-9]|[12]\\d|30)|(02)-(0[1-9]|1\\d|2[0-8])))`;
   var dateRegex = new RegExp(`^${dateRegexSource}$`);
   function timeRegexSource(args) {
-    let regex = `([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d`;
+    let secondsRegexSource = `[0-5]\\d`;
     if (args.precision) {
-      regex = `${regex}\\.\\d{${args.precision}}`;
+      secondsRegexSource = `${secondsRegexSource}\\.\\d{${args.precision}}`;
     } else if (args.precision == null) {
-      regex = `${regex}(\\.\\d+)?`;
+      secondsRegexSource = `${secondsRegexSource}(\\.\\d+)?`;
     }
-    return regex;
+    const secondsQuantifier = args.precision ? "+" : "?";
+    return `([01]\\d|2[0-3]):[0-5]\\d(:${secondsRegexSource})${secondsQuantifier}`;
   }
   function timeRegex(args) {
     return new RegExp(`^${timeRegexSource(args)}$`);
@@ -2049,12 +2203,14 @@ Error message: ${getErrorMessage(cause)}`,
       const decoded = JSON.parse(atob(base64));
       if (typeof decoded !== "object" || decoded === null)
         return false;
-      if (!decoded.typ || !decoded.alg)
+      if ("typ" in decoded && decoded?.typ !== "JWT")
+        return false;
+      if (!decoded.alg)
         return false;
       if (alg && decoded.alg !== alg)
         return false;
       return true;
-    } catch (_a17) {
+    } catch {
       return false;
     }
   }
@@ -2213,7 +2369,7 @@ Error message: ${getErrorMessage(cause)}`,
         } else if (check.kind === "url") {
           try {
             new URL(input.data);
-          } catch (_a17) {
+          } catch {
             ctx = this._getOrReturnCtx(input, ctx);
             addIssueToContext(ctx, {
               validation: "url",
@@ -2425,7 +2581,6 @@ Error message: ${getErrorMessage(cause)}`,
       return this._addCheck({ kind: "cidr", ...errorUtil.errToObj(options) });
     }
     datetime(options) {
-      var _a17, _b;
       if (typeof options === "string") {
         return this._addCheck({
           kind: "datetime",
@@ -2437,10 +2592,10 @@ Error message: ${getErrorMessage(cause)}`,
       }
       return this._addCheck({
         kind: "datetime",
-        precision: typeof (options === null || options === void 0 ? void 0 : options.precision) === "undefined" ? null : options === null || options === void 0 ? void 0 : options.precision,
-        offset: (_a17 = options === null || options === void 0 ? void 0 : options.offset) !== null && _a17 !== void 0 ? _a17 : false,
-        local: (_b = options === null || options === void 0 ? void 0 : options.local) !== null && _b !== void 0 ? _b : false,
-        ...errorUtil.errToObj(options === null || options === void 0 ? void 0 : options.message)
+        precision: typeof options?.precision === "undefined" ? null : options?.precision,
+        offset: options?.offset ?? false,
+        local: options?.local ?? false,
+        ...errorUtil.errToObj(options?.message)
       });
     }
     date(message) {
@@ -2456,8 +2611,8 @@ Error message: ${getErrorMessage(cause)}`,
       }
       return this._addCheck({
         kind: "time",
-        precision: typeof (options === null || options === void 0 ? void 0 : options.precision) === "undefined" ? null : options === null || options === void 0 ? void 0 : options.precision,
-        ...errorUtil.errToObj(options === null || options === void 0 ? void 0 : options.message)
+        precision: typeof options?.precision === "undefined" ? null : options?.precision,
+        ...errorUtil.errToObj(options?.message)
       });
     }
     duration(message) {
@@ -2474,8 +2629,8 @@ Error message: ${getErrorMessage(cause)}`,
       return this._addCheck({
         kind: "includes",
         value,
-        position: options === null || options === void 0 ? void 0 : options.position,
-        ...errorUtil.errToObj(options === null || options === void 0 ? void 0 : options.message)
+        position: options?.position,
+        ...errorUtil.errToObj(options?.message)
       });
     }
     startsWith(value, message) {
@@ -2607,11 +2762,10 @@ Error message: ${getErrorMessage(cause)}`,
     }
   };
   ZodString.create = (params) => {
-    var _a17;
     return new ZodString({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodString,
-      coerce: (_a17 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a17 !== void 0 ? _a17 : false,
+      coerce: params?.coerce ?? false,
       ...processCreateParams(params)
     });
   };
@@ -2619,9 +2773,9 @@ Error message: ${getErrorMessage(cause)}`,
     const valDecCount = (val.toString().split(".")[1] || "").length;
     const stepDecCount = (step.toString().split(".")[1] || "").length;
     const decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount;
-    const valInt = parseInt(val.toFixed(decCount).replace(".", ""));
-    const stepInt = parseInt(step.toFixed(decCount).replace(".", ""));
-    return valInt % stepInt / Math.pow(10, decCount);
+    const valInt = Number.parseInt(val.toFixed(decCount).replace(".", ""));
+    const stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
+    return valInt % stepInt / 10 ** decCount;
   }
   var ZodNumber = class _ZodNumber extends ZodType {
     constructor() {
@@ -2831,7 +2985,8 @@ Error message: ${getErrorMessage(cause)}`,
       return !!this._def.checks.find((ch) => ch.kind === "int" || ch.kind === "multipleOf" && util.isInteger(ch.value));
     }
     get isFinite() {
-      let max = null, min = null;
+      let max = null;
+      let min = null;
       for (const ch of this._def.checks) {
         if (ch.kind === "finite" || ch.kind === "int" || ch.kind === "multipleOf") {
           return true;
@@ -2850,7 +3005,7 @@ Error message: ${getErrorMessage(cause)}`,
     return new ZodNumber({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodNumber,
-      coerce: (params === null || params === void 0 ? void 0 : params.coerce) || false,
+      coerce: params?.coerce || false,
       ...processCreateParams(params)
     });
   };
@@ -2864,7 +3019,7 @@ Error message: ${getErrorMessage(cause)}`,
       if (this._def.coerce) {
         try {
           input.data = BigInt(input.data);
-        } catch (_a17) {
+        } catch {
           return this._getInvalidInput(input);
         }
       }
@@ -3019,11 +3174,10 @@ Error message: ${getErrorMessage(cause)}`,
     }
   };
   ZodBigInt.create = (params) => {
-    var _a17;
     return new ZodBigInt({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodBigInt,
-      coerce: (_a17 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a17 !== void 0 ? _a17 : false,
+      coerce: params?.coerce ?? false,
       ...processCreateParams(params)
     });
   };
@@ -3048,7 +3202,7 @@ Error message: ${getErrorMessage(cause)}`,
   ZodBoolean.create = (params) => {
     return new ZodBoolean({
       typeName: ZodFirstPartyTypeKind.ZodBoolean,
-      coerce: (params === null || params === void 0 ? void 0 : params.coerce) || false,
+      coerce: params?.coerce || false,
       ...processCreateParams(params)
     });
   };
@@ -3067,7 +3221,7 @@ Error message: ${getErrorMessage(cause)}`,
         });
         return INVALID;
       }
-      if (isNaN(input.data.getTime())) {
+      if (Number.isNaN(input.data.getTime())) {
         const ctx2 = this._getOrReturnCtx(input);
         addIssueToContext(ctx2, {
           code: ZodIssueCode.invalid_date
@@ -3156,7 +3310,7 @@ Error message: ${getErrorMessage(cause)}`,
   ZodDate.create = (params) => {
     return new ZodDate({
       checks: [],
-      coerce: (params === null || params === void 0 ? void 0 : params.coerce) || false,
+      coerce: params?.coerce || false,
       typeName: ZodFirstPartyTypeKind.ZodDate,
       ...processCreateParams(params)
     });
@@ -3431,7 +3585,8 @@ Error message: ${getErrorMessage(cause)}`,
         return this._cached;
       const shape = this._def.shape();
       const keys = util.objectKeys(shape);
-      return this._cached = { shape, keys };
+      this._cached = { shape, keys };
+      return this._cached;
     }
     _parse(input) {
       const parsedType = this._getType(input);
@@ -3481,8 +3636,8 @@ Error message: ${getErrorMessage(cause)}`,
             });
             status.dirty();
           }
-        } else if (unknownKeys === "strip") ;
-        else {
+        } else if (unknownKeys === "strip") {
+        } else {
           throw new Error(`Internal ZodObject error: invalid unknownKeys value.`);
         }
       } else {
@@ -3529,11 +3684,10 @@ Error message: ${getErrorMessage(cause)}`,
         unknownKeys: "strict",
         ...message !== void 0 ? {
           errorMap: (issue, ctx) => {
-            var _a17, _b, _c, _d;
-            const defaultError = (_c = (_b = (_a17 = this._def).errorMap) === null || _b === void 0 ? void 0 : _b.call(_a17, issue, ctx).message) !== null && _c !== void 0 ? _c : ctx.defaultError;
+            const defaultError = this._def.errorMap?.(issue, ctx).message ?? ctx.defaultError;
             if (issue.code === "unrecognized_keys")
               return {
-                message: (_d = errorUtil.errToObj(message).message) !== null && _d !== void 0 ? _d : defaultError
+                message: errorUtil.errToObj(message).message ?? defaultError
               };
             return {
               message: defaultError
@@ -3664,11 +3818,11 @@ Error message: ${getErrorMessage(cause)}`,
     }
     pick(mask) {
       const shape = {};
-      util.objectKeys(mask).forEach((key) => {
+      for (const key of util.objectKeys(mask)) {
         if (mask[key] && this.shape[key]) {
           shape[key] = this.shape[key];
         }
-      });
+      }
       return new _ZodObject({
         ...this._def,
         shape: () => shape
@@ -3676,11 +3830,11 @@ Error message: ${getErrorMessage(cause)}`,
     }
     omit(mask) {
       const shape = {};
-      util.objectKeys(this.shape).forEach((key) => {
+      for (const key of util.objectKeys(this.shape)) {
         if (!mask[key]) {
           shape[key] = this.shape[key];
         }
-      });
+      }
       return new _ZodObject({
         ...this._def,
         shape: () => shape
@@ -3694,14 +3848,14 @@ Error message: ${getErrorMessage(cause)}`,
     }
     partial(mask) {
       const newShape = {};
-      util.objectKeys(this.shape).forEach((key) => {
+      for (const key of util.objectKeys(this.shape)) {
         const fieldSchema = this.shape[key];
         if (mask && !mask[key]) {
           newShape[key] = fieldSchema;
         } else {
           newShape[key] = fieldSchema.optional();
         }
-      });
+      }
       return new _ZodObject({
         ...this._def,
         shape: () => newShape
@@ -3709,7 +3863,7 @@ Error message: ${getErrorMessage(cause)}`,
     }
     required(mask) {
       const newShape = {};
-      util.objectKeys(this.shape).forEach((key) => {
+      for (const key of util.objectKeys(this.shape)) {
         if (mask && !mask[key]) {
           newShape[key] = this.shape[key];
         } else {
@@ -3720,7 +3874,7 @@ Error message: ${getErrorMessage(cause)}`,
           }
           newShape[key] = newField;
         }
-      });
+      }
       return new _ZodObject({
         ...this._def,
         shape: () => newShape
@@ -4336,12 +4490,7 @@ Error message: ${getErrorMessage(cause)}`,
         return makeIssue({
           data: args,
           path: ctx.path,
-          errorMaps: [
-            ctx.common.contextualErrorMap,
-            ctx.schemaErrorMap,
-            getErrorMap(),
-            errorMap
-          ].filter((x) => !!x),
+          errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default].filter((x) => !!x),
           issueData: {
             code: ZodIssueCode.invalid_arguments,
             argumentsError: error
@@ -4352,12 +4501,7 @@ Error message: ${getErrorMessage(cause)}`,
         return makeIssue({
           data: returns,
           path: ctx.path,
-          errorMaps: [
-            ctx.common.contextualErrorMap,
-            ctx.schemaErrorMap,
-            getErrorMap(),
-            errorMap
-          ].filter((x) => !!x),
+          errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default].filter((x) => !!x),
           issueData: {
             code: ZodIssueCode.invalid_return_type,
             returnTypeError: error
@@ -4481,10 +4625,6 @@ Error message: ${getErrorMessage(cause)}`,
     });
   }
   var ZodEnum = class _ZodEnum extends ZodType {
-    constructor() {
-      super(...arguments);
-      _ZodEnum_cache.set(this, void 0);
-    }
     _parse(input) {
       if (typeof input.data !== "string") {
         const ctx = this._getOrReturnCtx(input);
@@ -4496,10 +4636,10 @@ Error message: ${getErrorMessage(cause)}`,
         });
         return INVALID;
       }
-      if (!__classPrivateFieldGet(this, _ZodEnum_cache, "f")) {
-        __classPrivateFieldSet(this, _ZodEnum_cache, new Set(this._def.values), "f");
+      if (!this._cache) {
+        this._cache = new Set(this._def.values);
       }
-      if (!__classPrivateFieldGet(this, _ZodEnum_cache, "f").has(input.data)) {
+      if (!this._cache.has(input.data)) {
         const ctx = this._getOrReturnCtx(input);
         const expectedValues = this._def.values;
         addIssueToContext(ctx, {
@@ -4548,13 +4688,8 @@ Error message: ${getErrorMessage(cause)}`,
       });
     }
   };
-  _ZodEnum_cache = /* @__PURE__ */ new WeakMap();
   ZodEnum.create = createZodEnum;
   var ZodNativeEnum = class extends ZodType {
-    constructor() {
-      super(...arguments);
-      _ZodNativeEnum_cache.set(this, void 0);
-    }
     _parse(input) {
       const nativeEnumValues = util.getValidEnumValues(this._def.values);
       const ctx = this._getOrReturnCtx(input);
@@ -4567,10 +4702,10 @@ Error message: ${getErrorMessage(cause)}`,
         });
         return INVALID;
       }
-      if (!__classPrivateFieldGet(this, _ZodNativeEnum_cache, "f")) {
-        __classPrivateFieldSet(this, _ZodNativeEnum_cache, new Set(util.getValidEnumValues(this._def.values)), "f");
+      if (!this._cache) {
+        this._cache = new Set(util.getValidEnumValues(this._def.values));
       }
-      if (!__classPrivateFieldGet(this, _ZodNativeEnum_cache, "f").has(input.data)) {
+      if (!this._cache.has(input.data)) {
         const expectedValues = util.objectValues(nativeEnumValues);
         addIssueToContext(ctx, {
           received: ctx.data,
@@ -4585,7 +4720,6 @@ Error message: ${getErrorMessage(cause)}`,
       return this._def.values;
     }
   };
-  _ZodNativeEnum_cache = /* @__PURE__ */ new WeakMap();
   ZodNativeEnum.create = (values, params) => {
     return new ZodNativeEnum({
       values,
@@ -4726,7 +4860,7 @@ Error message: ${getErrorMessage(cause)}`,
             parent: ctx
           });
           if (!isValid(base))
-            return base;
+            return INVALID;
           const result = effect.transform(base.value, checkCtx);
           if (result instanceof Promise) {
             throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
@@ -4735,8 +4869,11 @@ Error message: ${getErrorMessage(cause)}`,
         } else {
           return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
             if (!isValid(base))
-              return base;
-            return Promise.resolve(effect.transform(base.value, checkCtx)).then((result) => ({ status: status.value, value: result }));
+              return INVALID;
+            return Promise.resolve(effect.transform(base.value, checkCtx)).then((result) => ({
+              status: status.value,
+              value: result
+            }));
           });
         }
       }
@@ -4996,21 +5133,19 @@ Error message: ${getErrorMessage(cause)}`,
   function custom(check, _params = {}, fatal) {
     if (check)
       return ZodAny.create().superRefine((data, ctx) => {
-        var _a17, _b;
         const r = check(data);
         if (r instanceof Promise) {
           return r.then((r2) => {
-            var _a18, _b2;
             if (!r2) {
               const params = cleanParams(_params, data);
-              const _fatal = (_b2 = (_a18 = params.fatal) !== null && _a18 !== void 0 ? _a18 : fatal) !== null && _b2 !== void 0 ? _b2 : true;
+              const _fatal = params.fatal ?? fatal ?? true;
               ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
             }
           });
         }
         if (!r) {
           const params = cleanParams(_params, data);
-          const _fatal = (_b = (_a17 = params.fatal) !== null && _a17 !== void 0 ? _a17 : fatal) !== null && _b !== void 0 ? _b : true;
+          const _fatal = params.fatal ?? fatal ?? true;
           ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
         }
         return;
@@ -5110,124 +5245,8 @@ Error message: ${getErrorMessage(cause)}`,
     date: (arg) => ZodDate.create({ ...arg, coerce: true })
   };
   var NEVER = INVALID;
-  var z = /* @__PURE__ */ Object.freeze({
-    __proto__: null,
-    defaultErrorMap: errorMap,
-    setErrorMap,
-    getErrorMap,
-    makeIssue,
-    EMPTY_PATH,
-    addIssueToContext,
-    ParseStatus,
-    INVALID,
-    DIRTY,
-    OK,
-    isAborted,
-    isDirty,
-    isValid,
-    isAsync,
-    get util() {
-      return util;
-    },
-    get objectUtil() {
-      return objectUtil;
-    },
-    ZodParsedType,
-    getParsedType,
-    ZodType,
-    datetimeRegex,
-    ZodString,
-    ZodNumber,
-    ZodBigInt,
-    ZodBoolean,
-    ZodDate,
-    ZodSymbol,
-    ZodUndefined,
-    ZodNull,
-    ZodAny,
-    ZodUnknown,
-    ZodNever,
-    ZodVoid,
-    ZodArray,
-    ZodObject,
-    ZodUnion,
-    ZodDiscriminatedUnion,
-    ZodIntersection,
-    ZodTuple,
-    ZodRecord,
-    ZodMap,
-    ZodSet,
-    ZodFunction,
-    ZodLazy,
-    ZodLiteral,
-    ZodEnum,
-    ZodNativeEnum,
-    ZodPromise,
-    ZodEffects,
-    ZodTransformer: ZodEffects,
-    ZodOptional,
-    ZodNullable,
-    ZodDefault,
-    ZodCatch,
-    ZodNaN,
-    BRAND,
-    ZodBranded,
-    ZodPipeline,
-    ZodReadonly,
-    custom,
-    Schema: ZodType,
-    ZodSchema: ZodType,
-    late,
-    get ZodFirstPartyTypeKind() {
-      return ZodFirstPartyTypeKind;
-    },
-    coerce,
-    any: anyType,
-    array: arrayType,
-    bigint: bigIntType,
-    boolean: booleanType,
-    date: dateType,
-    discriminatedUnion: discriminatedUnionType,
-    effect: effectsType,
-    "enum": enumType,
-    "function": functionType,
-    "instanceof": instanceOfType,
-    intersection: intersectionType,
-    lazy: lazyType,
-    literal: literalType,
-    map: mapType,
-    nan: nanType,
-    nativeEnum: nativeEnumType,
-    never: neverType,
-    "null": nullType,
-    nullable: nullableType,
-    number: numberType,
-    object: objectType,
-    oboolean,
-    onumber,
-    optional: optionalType,
-    ostring,
-    pipeline: pipelineType,
-    preprocess: preprocessType,
-    promise: promiseType,
-    record: recordType,
-    set: setType,
-    strictObject: strictObjectType,
-    string: stringType,
-    symbol: symbolType,
-    transformer: effectsType,
-    tuple: tupleType,
-    "undefined": undefinedType,
-    union: unionType,
-    unknown: unknownType,
-    "void": voidType,
-    NEVER,
-    ZodIssueCode,
-    quotelessJson,
-    ZodError
-  });
 
-  // node_modules/.pnpm/@ai-sdk+openai@1.3.0_zod@3.24.2/node_modules/@ai-sdk/openai/dist/index.mjs
+  // node_modules/@ai-sdk/openai/dist/index.mjs
   function convertToOpenAIChatMessages({
     prompt,
     useLegacyFunctionCalling = false,
@@ -5421,15 +5440,15 @@ Error message: ${getErrorMessage(cause)}`,
         return "unknown";
     }
   }
-  var openaiErrorDataSchema = z.object({
-    error: z.object({
-      message: z.string(),
+  var openaiErrorDataSchema = external_exports.object({
+    error: external_exports.object({
+      message: external_exports.string(),
       // The additional information below is handled loosely to support
       // OpenAI-compatible providers that have slightly different error
       // responses:
-      type: z.string().nullish(),
-      param: z.any().nullish(),
-      code: z.union([z.string(), z.number()]).nullish()
+      type: external_exports.string().nullish(),
+      param: external_exports.any().nullish(),
+      code: external_exports.union([external_exports.string(), external_exports.number()]).nullish()
     })
   });
   var openaiFailedResponseHandler = createJsonErrorResponseHandler({
@@ -5712,6 +5731,15 @@ Error message: ${getErrorMessage(cause)}`,
             baseArgs.max_completion_tokens = baseArgs.max_tokens;
           }
           baseArgs.max_tokens = void 0;
+        }
+      } else if (this.modelId.startsWith("gpt-4o-search-preview") || this.modelId.startsWith("gpt-4o-mini-search-preview")) {
+        if (baseArgs.temperature != null) {
+          baseArgs.temperature = void 0;
+          warnings.push({
+            type: "unsupported-setting",
+            setting: "temperature",
+            details: "temperature is not supported for the search preview models and has been removed."
+          });
         }
       }
       switch (type) {
@@ -6116,104 +6144,104 @@ Error message: ${getErrorMessage(cause)}`,
       };
     }
   };
-  var openaiTokenUsageSchema = z.object({
-    prompt_tokens: z.number().nullish(),
-    completion_tokens: z.number().nullish(),
-    prompt_tokens_details: z.object({
-      cached_tokens: z.number().nullish()
+  var openaiTokenUsageSchema = external_exports.object({
+    prompt_tokens: external_exports.number().nullish(),
+    completion_tokens: external_exports.number().nullish(),
+    prompt_tokens_details: external_exports.object({
+      cached_tokens: external_exports.number().nullish()
     }).nullish(),
-    completion_tokens_details: z.object({
-      reasoning_tokens: z.number().nullish(),
-      accepted_prediction_tokens: z.number().nullish(),
-      rejected_prediction_tokens: z.number().nullish()
+    completion_tokens_details: external_exports.object({
+      reasoning_tokens: external_exports.number().nullish(),
+      accepted_prediction_tokens: external_exports.number().nullish(),
+      rejected_prediction_tokens: external_exports.number().nullish()
     }).nullish()
   }).nullish();
-  var openaiChatResponseSchema = z.object({
-    id: z.string().nullish(),
-    created: z.number().nullish(),
-    model: z.string().nullish(),
-    choices: z.array(
-      z.object({
-        message: z.object({
-          role: z.literal("assistant").nullish(),
-          content: z.string().nullish(),
-          function_call: z.object({
-            arguments: z.string(),
-            name: z.string()
+  var openaiChatResponseSchema = external_exports.object({
+    id: external_exports.string().nullish(),
+    created: external_exports.number().nullish(),
+    model: external_exports.string().nullish(),
+    choices: external_exports.array(
+      external_exports.object({
+        message: external_exports.object({
+          role: external_exports.literal("assistant").nullish(),
+          content: external_exports.string().nullish(),
+          function_call: external_exports.object({
+            arguments: external_exports.string(),
+            name: external_exports.string()
           }).nullish(),
-          tool_calls: z.array(
-            z.object({
-              id: z.string().nullish(),
-              type: z.literal("function"),
-              function: z.object({
-                name: z.string(),
-                arguments: z.string()
+          tool_calls: external_exports.array(
+            external_exports.object({
+              id: external_exports.string().nullish(),
+              type: external_exports.literal("function"),
+              function: external_exports.object({
+                name: external_exports.string(),
+                arguments: external_exports.string()
               })
             })
           ).nullish()
         }),
-        index: z.number(),
-        logprobs: z.object({
-          content: z.array(
-            z.object({
-              token: z.string(),
-              logprob: z.number(),
-              top_logprobs: z.array(
-                z.object({
-                  token: z.string(),
-                  logprob: z.number()
+        index: external_exports.number(),
+        logprobs: external_exports.object({
+          content: external_exports.array(
+            external_exports.object({
+              token: external_exports.string(),
+              logprob: external_exports.number(),
+              top_logprobs: external_exports.array(
+                external_exports.object({
+                  token: external_exports.string(),
+                  logprob: external_exports.number()
                 })
               )
             })
           ).nullable()
         }).nullish(),
-        finish_reason: z.string().nullish()
+        finish_reason: external_exports.string().nullish()
       })
     ),
     usage: openaiTokenUsageSchema
   });
-  var openaiChatChunkSchema = z.union([
-    z.object({
-      id: z.string().nullish(),
-      created: z.number().nullish(),
-      model: z.string().nullish(),
-      choices: z.array(
-        z.object({
-          delta: z.object({
-            role: z.enum(["assistant"]).nullish(),
-            content: z.string().nullish(),
-            function_call: z.object({
-              name: z.string().optional(),
-              arguments: z.string().optional()
+  var openaiChatChunkSchema = external_exports.union([
+    external_exports.object({
+      id: external_exports.string().nullish(),
+      created: external_exports.number().nullish(),
+      model: external_exports.string().nullish(),
+      choices: external_exports.array(
+        external_exports.object({
+          delta: external_exports.object({
+            role: external_exports.enum(["assistant"]).nullish(),
+            content: external_exports.string().nullish(),
+            function_call: external_exports.object({
+              name: external_exports.string().optional(),
+              arguments: external_exports.string().optional()
             }).nullish(),
-            tool_calls: z.array(
-              z.object({
-                index: z.number(),
-                id: z.string().nullish(),
-                type: z.literal("function").optional(),
-                function: z.object({
-                  name: z.string().nullish(),
-                  arguments: z.string().nullish()
+            tool_calls: external_exports.array(
+              external_exports.object({
+                index: external_exports.number(),
+                id: external_exports.string().nullish(),
+                type: external_exports.literal("function").nullish(),
+                function: external_exports.object({
+                  name: external_exports.string().nullish(),
+                  arguments: external_exports.string().nullish()
                 })
               })
             ).nullish()
           }).nullish(),
-          logprobs: z.object({
-            content: z.array(
-              z.object({
-                token: z.string(),
-                logprob: z.number(),
-                top_logprobs: z.array(
-                  z.object({
-                    token: z.string(),
-                    logprob: z.number()
+          logprobs: external_exports.object({
+            content: external_exports.array(
+              external_exports.object({
+                token: external_exports.string(),
+                logprob: external_exports.number(),
+                top_logprobs: external_exports.array(
+                  external_exports.object({
+                    token: external_exports.string(),
+                    logprob: external_exports.number()
                   })
                 )
               })
             ).nullable()
           }).nullish(),
-          finish_reason: z.string().nullable().optional(),
-          index: z.number()
+          finish_reason: external_exports.string().nullish(),
+          index: external_exports.number()
         })
       ),
       usage: openaiTokenUsageSchema
@@ -6221,7 +6249,7 @@ Error message: ${getErrorMessage(cause)}`,
     openaiErrorDataSchema
   ]);
   function isReasoningModel(modelId) {
-    return modelId === "o1" || modelId.startsWith("o1-") || modelId === "o3" || modelId.startsWith("o3-");
+    return modelId.startsWith("o");
   }
   function isAudioModel(modelId) {
     return modelId.startsWith("gpt-4o-audio-preview");
@@ -6246,10 +6274,22 @@ Error message: ${getErrorMessage(cause)}`,
     "o1-preview-2024-09-12": {
       systemMessageMode: "remove"
     },
+    o3: {
+      systemMessageMode: "developer"
+    },
+    "o3-2025-04-16": {
+      systemMessageMode: "developer"
+    },
     "o3-mini": {
       systemMessageMode: "developer"
     },
     "o3-mini-2025-01-31": {
+      systemMessageMode: "developer"
+    },
+    "o4-mini": {
+      systemMessageMode: "developer"
+    },
+    "o4-mini-2025-04-16": {
       systemMessageMode: "developer"
     }
   };
@@ -6570,46 +6610,46 @@ ${user}:`]
       };
     }
   };
-  var openaiCompletionResponseSchema = z.object({
-    id: z.string().nullish(),
-    created: z.number().nullish(),
-    model: z.string().nullish(),
-    choices: z.array(
-      z.object({
-        text: z.string(),
-        finish_reason: z.string(),
-        logprobs: z.object({
-          tokens: z.array(z.string()),
-          token_logprobs: z.array(z.number()),
-          top_logprobs: z.array(z.record(z.string(), z.number())).nullable()
+  var openaiCompletionResponseSchema = external_exports.object({
+    id: external_exports.string().nullish(),
+    created: external_exports.number().nullish(),
+    model: external_exports.string().nullish(),
+    choices: external_exports.array(
+      external_exports.object({
+        text: external_exports.string(),
+        finish_reason: external_exports.string(),
+        logprobs: external_exports.object({
+          tokens: external_exports.array(external_exports.string()),
+          token_logprobs: external_exports.array(external_exports.number()),
+          top_logprobs: external_exports.array(external_exports.record(external_exports.string(), external_exports.number())).nullable()
         }).nullish()
       })
     ),
-    usage: z.object({
-      prompt_tokens: z.number(),
-      completion_tokens: z.number()
+    usage: external_exports.object({
+      prompt_tokens: external_exports.number(),
+      completion_tokens: external_exports.number()
     })
   });
-  var openaiCompletionChunkSchema = z.union([
-    z.object({
-      id: z.string().nullish(),
-      created: z.number().nullish(),
-      model: z.string().nullish(),
-      choices: z.array(
-        z.object({
-          text: z.string(),
-          finish_reason: z.string().nullish(),
-          index: z.number(),
-          logprobs: z.object({
-            tokens: z.array(z.string()),
-            token_logprobs: z.array(z.number()),
-            top_logprobs: z.array(z.record(z.string(), z.number())).nullable()
+  var openaiCompletionChunkSchema = external_exports.union([
+    external_exports.object({
+      id: external_exports.string().nullish(),
+      created: external_exports.number().nullish(),
+      model: external_exports.string().nullish(),
+      choices: external_exports.array(
+        external_exports.object({
+          text: external_exports.string(),
+          finish_reason: external_exports.string().nullish(),
+          index: external_exports.number(),
+          logprobs: external_exports.object({
+            tokens: external_exports.array(external_exports.string()),
+            token_logprobs: external_exports.array(external_exports.number()),
+            top_logprobs: external_exports.array(external_exports.record(external_exports.string(), external_exports.number())).nullable()
           }).nullish()
         })
       ),
-      usage: z.object({
-        prompt_tokens: z.number(),
-        completion_tokens: z.number()
+      usage: external_exports.object({
+        prompt_tokens: external_exports.number(),
+        completion_tokens: external_exports.number()
       }).nullish()
     }),
     openaiErrorDataSchema
@@ -6672,14 +6712,16 @@ ${user}:`]
       };
     }
   };
-  var openaiTextEmbeddingResponseSchema = z.object({
-    data: z.array(z.object({ embedding: z.array(z.number()) })),
-    usage: z.object({ prompt_tokens: z.number() }).nullish()
+  var openaiTextEmbeddingResponseSchema = external_exports.object({
+    data: external_exports.array(external_exports.object({ embedding: external_exports.array(external_exports.number()) })),
+    usage: external_exports.object({ prompt_tokens: external_exports.number() }).nullish()
   });
   var modelMaxImagesPerCall = {
     "dall-e-3": 1,
-    "dall-e-2": 10
+    "dall-e-2": 10,
+    "gpt-image-1": 10
   };
+  var hasDefaultResponseFormat = /* @__PURE__ */ new Set(["gpt-image-1"]);
   var OpenAIImageModel = class {
     constructor(modelId, settings, config) {
       this.modelId = modelId;
@@ -6729,7 +6771,7 @@ ${user}:`]
           n,
           size,
           ...(_d = providerOptions.openai) != null ? _d : {},
-          response_format: "b64_json"
+          ...!hasDefaultResponseFormat.has(this.modelId) ? { response_format: "b64_json" } : {}
         },
         failedResponseHandler: openaiFailedResponseHandler,
         successfulResponseHandler: createJsonResponseHandler(
@@ -6749,8 +6791,173 @@ ${user}:`]
       };
     }
   };
-  var openaiImageResponseSchema = z.object({
-    data: z.array(z.object({ b64_json: z.string() }))
+  var openaiImageResponseSchema = external_exports.object({
+    data: external_exports.array(external_exports.object({ b64_json: external_exports.string() }))
+  });
+  var openAIProviderOptionsSchema = external_exports.object({
+    include: external_exports.array(external_exports.string()).nullish(),
+    language: external_exports.string().nullish(),
+    prompt: external_exports.string().nullish(),
+    temperature: external_exports.number().min(0).max(1).nullish().default(0),
+    timestampGranularities: external_exports.array(external_exports.enum(["word", "segment"])).nullish().default(["segment"])
+  });
+  var languageMap = {
+    afrikaans: "af",
+    arabic: "ar",
+    armenian: "hy",
+    azerbaijani: "az",
+    belarusian: "be",
+    bosnian: "bs",
+    bulgarian: "bg",
+    catalan: "ca",
+    chinese: "zh",
+    croatian: "hr",
+    czech: "cs",
+    danish: "da",
+    dutch: "nl",
+    english: "en",
+    estonian: "et",
+    finnish: "fi",
+    french: "fr",
+    galician: "gl",
+    german: "de",
+    greek: "el",
+    hebrew: "he",
+    hindi: "hi",
+    hungarian: "hu",
+    icelandic: "is",
+    indonesian: "id",
+    italian: "it",
+    japanese: "ja",
+    kannada: "kn",
+    kazakh: "kk",
+    korean: "ko",
+    latvian: "lv",
+    lithuanian: "lt",
+    macedonian: "mk",
+    malay: "ms",
+    marathi: "mr",
+    maori: "mi",
+    nepali: "ne",
+    norwegian: "no",
+    persian: "fa",
+    polish: "pl",
+    portuguese: "pt",
+    romanian: "ro",
+    russian: "ru",
+    serbian: "sr",
+    slovak: "sk",
+    slovenian: "sl",
+    spanish: "es",
+    swahili: "sw",
+    swedish: "sv",
+    tagalog: "tl",
+    tamil: "ta",
+    thai: "th",
+    turkish: "tr",
+    ukrainian: "uk",
+    urdu: "ur",
+    vietnamese: "vi",
+    welsh: "cy"
+  };
+  var OpenAITranscriptionModel = class {
+    constructor(modelId, config) {
+      this.modelId = modelId;
+      this.config = config;
+      this.specificationVersion = "v1";
+    }
+    get provider() {
+      return this.config.provider;
+    }
+    getArgs({
+      audio,
+      mediaType,
+      providerOptions
+    }) {
+      var _a17, _b, _c, _d, _e;
+      const warnings = [];
+      const openAIOptions = parseProviderOptions({
+        provider: "openai",
+        providerOptions,
+        schema: openAIProviderOptionsSchema
+      });
+      const formData = new FormData();
+      const blob = audio instanceof Uint8Array ? new Blob([audio]) : new Blob([convertBase64ToUint8Array(audio)]);
+      formData.append("model", this.modelId);
+      formData.append("file", new File([blob], "audio", { type: mediaType }));
+      if (openAIOptions) {
+        const transcriptionModelOptions = {
+          include: (_a17 = openAIOptions.include) != null ? _a17 : void 0,
+          language: (_b = openAIOptions.language) != null ? _b : void 0,
+          prompt: (_c = openAIOptions.prompt) != null ? _c : void 0,
+          temperature: (_d = openAIOptions.temperature) != null ? _d : void 0,
+          timestamp_granularities: (_e = openAIOptions.timestampGranularities) != null ? _e : void 0
+        };
+        for (const key in transcriptionModelOptions) {
+          const value = transcriptionModelOptions[key];
+          if (value !== void 0) {
+            formData.append(key, String(value));
+          }
+        }
+      }
+      return {
+        formData,
+        warnings
+      };
+    }
+    async doGenerate(options) {
+      var _a17, _b, _c, _d, _e, _f;
+      const currentDate = (_c = (_b = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+      const { formData, warnings } = this.getArgs(options);
+      const {
+        value: response,
+        responseHeaders,
+        rawValue: rawResponse
+      } = await postFormDataToApi({
+        url: this.config.url({
+          path: "/audio/transcriptions",
+          modelId: this.modelId
+        }),
+        headers: combineHeaders(this.config.headers(), options.headers),
+        formData,
+        failedResponseHandler: openaiFailedResponseHandler,
+        successfulResponseHandler: createJsonResponseHandler(
+          openaiTranscriptionResponseSchema
+        ),
+        abortSignal: options.abortSignal,
+        fetch: this.config.fetch
+      });
+      const language = response.language != null && response.language in languageMap ? languageMap[response.language] : void 0;
+      return {
+        text: response.text,
+        segments: (_e = (_d = response.words) == null ? void 0 : _d.map((word) => ({
+          text: word.word,
+          startSecond: word.start,
+          endSecond: word.end
+        }))) != null ? _e : [],
+        language,
+        durationInSeconds: (_f = response.duration) != null ? _f : void 0,
+        warnings,
+        response: {
+          timestamp: currentDate,
+          modelId: this.modelId,
+          headers: responseHeaders,
+          body: rawResponse
+        }
+      };
+    }
+  };
+  var openaiTranscriptionResponseSchema = external_exports.object({
+    text: external_exports.string(),
+    language: external_exports.string().nullish(),
+    duration: external_exports.number().nullish(),
+    words: external_exports.array(
+      external_exports.object({
+        word: external_exports.string(),
+        start: external_exports.number(),
+        end: external_exports.number()
+      })
+    ).nullish()
   });
   function convertToOpenAIResponsesMessages({
     prompt,
@@ -6937,7 +7144,16 @@ ${user}:`]
       case "none":
       case "required":
         return { tools: openaiTools2, tool_choice: type, toolWarnings };
-      case "tool":
+      case "tool": {
+        if (toolChoice.toolName === "web_search_preview") {
+          return {
+            tools: openaiTools2,
+            tool_choice: {
+              type: "web_search_preview"
+            },
+            toolWarnings
+          };
+        }
         return {
           tools: openaiTools2,
           tool_choice: {
@@ -6946,6 +7162,7 @@ ${user}:`]
           },
           toolWarnings
         };
+      }
       default: {
         const _exhaustiveCheck = type;
         throw new UnsupportedFunctionalityError({
@@ -6958,6 +7175,7 @@ ${user}:`]
     constructor(modelId, config) {
       this.specificationVersion = "v1";
       this.defaultObjectGenerationMode = "json";
+      this.supportsStructuredOutputs = true;
       this.modelId = modelId;
       this.config = config;
     }
@@ -6978,7 +7196,7 @@ ${user}:`]
       providerMetadata,
       responseFormat
     }) {
-      var _a17, _b, _c, _d;
+      var _a17, _b, _c;
       const warnings = [];
       const modelConfig = getResponsesModelConfig(this.modelId);
       const type = mode.type;
@@ -7017,19 +7235,12 @@ ${user}:`]
         systemMessageMode: modelConfig.systemMessageMode
       });
       warnings.push(...messageWarnings);
-      const parsedProviderOptions = providerMetadata != null ? safeValidateTypes({
-        value: providerMetadata,
-        schema: providerOptionsSchema
-      }) : { success: true, value: void 0 };
-      if (!parsedProviderOptions.success) {
-        throw new InvalidArgumentError({
-          argument: "providerOptions",
-          message: "invalid provider options",
-          cause: parsedProviderOptions.error
-        });
-      }
-      const openaiOptions = (_a17 = parsedProviderOptions.value) == null ? void 0 : _a17.openai;
-      const isStrict = (_b = openaiOptions == null ? void 0 : openaiOptions.strictSchemas) != null ? _b : true;
+      const openaiOptions = parseProviderOptions({
+        provider: "openai",
+        providerOptions: providerMetadata,
+        schema: openaiResponsesProviderOptionsSchema
+      });
+      const isStrict = (_a17 = openaiOptions == null ? void 0 : openaiOptions.strictSchemas) != null ? _a17 : true;
       const baseArgs = {
         model: this.modelId,
         input: messages,
@@ -7041,7 +7252,7 @@ ${user}:`]
             format: responseFormat.schema != null ? {
               type: "json_schema",
               strict: isStrict,
-              name: (_c = responseFormat.name) != null ? _c : "response",
+              name: (_b = responseFormat.name) != null ? _b : "response",
               description: responseFormat.description,
               schema: responseFormat.schema
             } : { type: "json_object" }
@@ -7053,9 +7264,17 @@ ${user}:`]
         previous_response_id: openaiOptions == null ? void 0 : openaiOptions.previousResponseId,
         store: openaiOptions == null ? void 0 : openaiOptions.store,
         user: openaiOptions == null ? void 0 : openaiOptions.user,
+        instructions: openaiOptions == null ? void 0 : openaiOptions.instructions,
         // model-specific settings:
-        ...modelConfig.isReasoningModel && (openaiOptions == null ? void 0 : openaiOptions.reasoningEffort) != null && {
-          reasoning: { effort: openaiOptions == null ? void 0 : openaiOptions.reasoningEffort }
+        ...modelConfig.isReasoningModel && ((openaiOptions == null ? void 0 : openaiOptions.reasoningEffort) != null || (openaiOptions == null ? void 0 : openaiOptions.reasoningSummary) != null) && {
+          reasoning: {
+            ...(openaiOptions == null ? void 0 : openaiOptions.reasoningEffort) != null && {
+              effort: openaiOptions.reasoningEffort
+            },
+            ...(openaiOptions == null ? void 0 : openaiOptions.reasoningSummary) != null && {
+              summary: openaiOptions.reasoningSummary
+            }
+          }
         },
         ...modelConfig.requiredAutoTruncation && {
           truncation: "auto"
@@ -7103,7 +7322,7 @@ ${user}:`]
                 format: mode.schema != null ? {
                   type: "json_schema",
                   strict: isStrict,
-                  name: (_d = mode.name) != null ? _d : "response",
+                  name: (_c = mode.name) != null ? _c : "response",
                   description: mode.description,
                   schema: mode.schema
                 } : { type: "json_object" }
@@ -7137,7 +7356,7 @@ ${user}:`]
       }
     }
     async doGenerate(options) {
-      var _a17, _b, _c, _d, _e;
+      var _a17, _b, _c, _d, _e, _f, _g;
       const { args: body, warnings } = this.getArgs(options);
       const {
         responseHeaders,
@@ -7152,49 +7371,55 @@ ${user}:`]
         body,
         failedResponseHandler: openaiFailedResponseHandler,
         successfulResponseHandler: createJsonResponseHandler(
-          z.object({
-            id: z.string(),
-            created_at: z.number(),
-            model: z.string(),
-            output: z.array(
-              z.discriminatedUnion("type", [
-                z.object({
-                  type: z.literal("message"),
-                  role: z.literal("assistant"),
-                  content: z.array(
-                    z.object({
-                      type: z.literal("output_text"),
-                      text: z.string(),
-                      annotations: z.array(
-                        z.object({
-                          type: z.literal("url_citation"),
-                          start_index: z.number(),
-                          end_index: z.number(),
-                          url: z.string(),
-                          title: z.string()
+          external_exports.object({
+            id: external_exports.string(),
+            created_at: external_exports.number(),
+            model: external_exports.string(),
+            output: external_exports.array(
+              external_exports.discriminatedUnion("type", [
+                external_exports.object({
+                  type: external_exports.literal("message"),
+                  role: external_exports.literal("assistant"),
+                  content: external_exports.array(
+                    external_exports.object({
+                      type: external_exports.literal("output_text"),
+                      text: external_exports.string(),
+                      annotations: external_exports.array(
+                        external_exports.object({
+                          type: external_exports.literal("url_citation"),
+                          start_index: external_exports.number(),
+                          end_index: external_exports.number(),
+                          url: external_exports.string(),
+                          title: external_exports.string()
                         })
                       )
                     })
                   )
                 }),
-                z.object({
-                  type: z.literal("function_call"),
-                  call_id: z.string(),
-                  name: z.string(),
-                  arguments: z.string()
+                external_exports.object({
+                  type: external_exports.literal("function_call"),
+                  call_id: external_exports.string(),
+                  name: external_exports.string(),
+                  arguments: external_exports.string()
                 }),
-                z.object({
-                  type: z.literal("web_search_call")
+                external_exports.object({
+                  type: external_exports.literal("web_search_call")
                 }),
-                z.object({
-                  type: z.literal("computer_call")
+                external_exports.object({
+                  type: external_exports.literal("computer_call")
                 }),
-                z.object({
-                  type: z.literal("reasoning")
+                external_exports.object({
+                  type: external_exports.literal("reasoning"),
+                  summary: external_exports.array(
+                    external_exports.object({
+                      type: external_exports.literal("summary_text"),
+                      text: external_exports.string()
+                    })
+                  )
                 })
               ])
             ),
-            incomplete_details: z.object({ reason: z.string() }).nullable(),
+            incomplete_details: external_exports.object({ reason: external_exports.string() }).nullable(),
             usage: usageSchema
           })
         ),
@@ -7208,6 +7433,7 @@ ${user}:`]
         toolName: output.name,
         args: output.arguments
       }));
+      const reasoningSummary = (_b = (_a17 = response.output.find((item) => item.type === "reasoning")) == null ? void 0 : _a17.summary) != null ? _b : null;
       return {
         text: outputTextElements.map((content) => content.text).join("\n"),
         sources: outputTextElements.flatMap(
@@ -7222,10 +7448,14 @@ ${user}:`]
           })
         ),
         finishReason: mapOpenAIResponseFinishReason({
-          finishReason: (_a17 = response.incomplete_details) == null ? void 0 : _a17.reason,
+          finishReason: (_c = response.incomplete_details) == null ? void 0 : _c.reason,
           hasToolCalls: toolCalls.length > 0
         }),
         toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
+        reasoning: reasoningSummary ? reasoningSummary.map((summary) => ({
+          type: "text",
+          text: summary.text
+        })) : void 0,
         usage: {
           promptTokens: response.usage.input_tokens,
           completionTokens: response.usage.output_tokens
@@ -7249,8 +7479,8 @@ ${user}:`]
         providerMetadata: {
           openai: {
             responseId: response.id,
-            cachedPromptTokens: (_c = (_b = response.usage.input_tokens_details) == null ? void 0 : _b.cached_tokens) != null ? _c : null,
-            reasoningTokens: (_e = (_d = response.usage.output_tokens_details) == null ? void 0 : _d.reasoning_tokens) != null ? _e : null
+            cachedPromptTokens: (_e = (_d = response.usage.input_tokens_details) == null ? void 0 : _d.cached_tokens) != null ? _e : null,
+            reasoningTokens: (_g = (_f = response.usage.output_tokens_details) == null ? void 0 : _f.reasoning_tokens) != null ? _g : null
           }
         },
         warnings
@@ -7333,6 +7563,11 @@ ${user}:`]
                   type: "text-delta",
                   textDelta: value.delta
                 });
+              } else if (isResponseReasoningSummaryTextDeltaChunk(value)) {
+                controller.enqueue({
+                  type: "reasoning",
+                  textDelta: value.delta
+                });
               } else if (isResponseOutputItemDoneChunk(value) && value.item.type === "function_call") {
                 ongoingToolCalls[value.output_index] = void 0;
                 hasToolCalls = true;
@@ -7392,79 +7627,86 @@ ${user}:`]
       };
     }
   };
-  var usageSchema = z.object({
-    input_tokens: z.number(),
-    input_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-    output_tokens: z.number(),
-    output_tokens_details: z.object({ reasoning_tokens: z.number().nullish() }).nullish()
+  var usageSchema = external_exports.object({
+    input_tokens: external_exports.number(),
+    input_tokens_details: external_exports.object({ cached_tokens: external_exports.number().nullish() }).nullish(),
+    output_tokens: external_exports.number(),
+    output_tokens_details: external_exports.object({ reasoning_tokens: external_exports.number().nullish() }).nullish()
   });
-  var textDeltaChunkSchema = z.object({
-    type: z.literal("response.output_text.delta"),
-    delta: z.string()
+  var textDeltaChunkSchema = external_exports.object({
+    type: external_exports.literal("response.output_text.delta"),
+    delta: external_exports.string()
   });
-  var responseFinishedChunkSchema = z.object({
-    type: z.enum(["response.completed", "response.incomplete"]),
-    response: z.object({
-      incomplete_details: z.object({ reason: z.string() }).nullish(),
+  var responseFinishedChunkSchema = external_exports.object({
+    type: external_exports.enum(["response.completed", "response.incomplete"]),
+    response: external_exports.object({
+      incomplete_details: external_exports.object({ reason: external_exports.string() }).nullish(),
       usage: usageSchema
     })
   });
-  var responseCreatedChunkSchema = z.object({
-    type: z.literal("response.created"),
-    response: z.object({
-      id: z.string(),
-      created_at: z.number(),
-      model: z.string()
+  var responseCreatedChunkSchema = external_exports.object({
+    type: external_exports.literal("response.created"),
+    response: external_exports.object({
+      id: external_exports.string(),
+      created_at: external_exports.number(),
+      model: external_exports.string()
     })
   });
-  var responseOutputItemDoneSchema = z.object({
-    type: z.literal("response.output_item.done"),
-    output_index: z.number(),
-    item: z.discriminatedUnion("type", [
-      z.object({
-        type: z.literal("message")
+  var responseOutputItemDoneSchema = external_exports.object({
+    type: external_exports.literal("response.output_item.done"),
+    output_index: external_exports.number(),
+    item: external_exports.discriminatedUnion("type", [
+      external_exports.object({
+        type: external_exports.literal("message")
       }),
-      z.object({
-        type: z.literal("function_call"),
-        id: z.string(),
-        call_id: z.string(),
-        name: z.string(),
-        arguments: z.string(),
-        status: z.literal("completed")
+      external_exports.object({
+        type: external_exports.literal("function_call"),
+        id: external_exports.string(),
+        call_id: external_exports.string(),
+        name: external_exports.string(),
+        arguments: external_exports.string(),
+        status: external_exports.literal("completed")
       })
     ])
   });
-  var responseFunctionCallArgumentsDeltaSchema = z.object({
-    type: z.literal("response.function_call_arguments.delta"),
-    item_id: z.string(),
-    output_index: z.number(),
-    delta: z.string()
+  var responseFunctionCallArgumentsDeltaSchema = external_exports.object({
+    type: external_exports.literal("response.function_call_arguments.delta"),
+    item_id: external_exports.string(),
+    output_index: external_exports.number(),
+    delta: external_exports.string()
   });
-  var responseOutputItemAddedSchema = z.object({
-    type: z.literal("response.output_item.added"),
-    output_index: z.number(),
-    item: z.discriminatedUnion("type", [
-      z.object({
-        type: z.literal("message")
+  var responseOutputItemAddedSchema = external_exports.object({
+    type: external_exports.literal("response.output_item.added"),
+    output_index: external_exports.number(),
+    item: external_exports.discriminatedUnion("type", [
+      external_exports.object({
+        type: external_exports.literal("message")
       }),
-      z.object({
-        type: z.literal("function_call"),
-        id: z.string(),
-        call_id: z.string(),
-        name: z.string(),
-        arguments: z.string()
+      external_exports.object({
+        type: external_exports.literal("function_call"),
+        id: external_exports.string(),
+        call_id: external_exports.string(),
+        name: external_exports.string(),
+        arguments: external_exports.string()
       })
     ])
   });
-  var responseAnnotationAddedSchema = z.object({
-    type: z.literal("response.output_text.annotation.added"),
-    annotation: z.object({
-      type: z.literal("url_citation"),
-      url: z.string(),
-      title: z.string()
+  var responseAnnotationAddedSchema = external_exports.object({
+    type: external_exports.literal("response.output_text.annotation.added"),
+    annotation: external_exports.object({
+      type: external_exports.literal("url_citation"),
+      url: external_exports.string(),
+      title: external_exports.string()
     })
   });
-  var openaiResponsesChunkSchema = z.union([
+  var responseReasoningSummaryTextDeltaSchema = external_exports.object({
+    type: external_exports.literal("response.reasoning_summary_text.delta"),
+    item_id: external_exports.string(),
+    output_index: external_exports.number(),
+    summary_index: external_exports.number(),
+    delta: external_exports.string()
+  });
+  var openaiResponsesChunkSchema = external_exports.union([
     textDeltaChunkSchema,
     responseFinishedChunkSchema,
     responseCreatedChunkSchema,
@@ -7472,7 +7714,8 @@ ${user}:`]
     responseFunctionCallArgumentsDeltaSchema,
     responseOutputItemAddedSchema,
     responseAnnotationAddedSchema,
-    z.object({ type: z.string() }).passthrough()
+    responseReasoningSummaryTextDeltaSchema,
+    external_exports.object({ type: external_exports.string() }).passthrough()
     // fallback for unknown chunks
   ]);
   function isTextDeltaChunk(chunk) {
@@ -7496,17 +7739,9 @@ ${user}:`]
   function isResponseAnnotationAddedChunk(chunk) {
     return chunk.type === "response.output_text.annotation.added";
   }
-  var providerOptionsSchema = z.object({
-    openai: z.object({
-      metadata: z.any().nullish(),
-      parallelToolCalls: z.boolean().nullish(),
-      previousResponseId: z.string().nullish(),
-      store: z.boolean().nullish(),
-      user: z.string().nullish(),
-      reasoningEffort: z.string().nullish(),
-      strictSchemas: z.boolean().nullish()
-    }).nullish()
-  });
+  function isResponseReasoningSummaryTextDeltaChunk(chunk) {
+    return chunk.type === "response.reasoning_summary_text.delta";
+  }
   function getResponsesModelConfig(modelId) {
     if (modelId.startsWith("o")) {
       if (modelId.startsWith("o1-mini") || modelId.startsWith("o1-preview")) {
@@ -7528,7 +7763,18 @@ ${user}:`]
       requiredAutoTruncation: false
     };
   }
-  var WebSearchPreviewParameters = z.object({});
+  var openaiResponsesProviderOptionsSchema = external_exports.object({
+    metadata: external_exports.any().nullish(),
+    parallelToolCalls: external_exports.boolean().nullish(),
+    previousResponseId: external_exports.string().nullish(),
+    store: external_exports.boolean().nullish(),
+    user: external_exports.string().nullish(),
+    reasoningEffort: external_exports.string().nullish(),
+    strictSchemas: external_exports.boolean().nullish(),
+    instructions: external_exports.string().nullish(),
+    reasoningSummary: external_exports.string().nullish()
+  });
+  var WebSearchPreviewParameters = external_exports.object({});
   function webSearchPreviewTool({
     searchContextSize,
     userLocation
@@ -7545,6 +7791,101 @@ ${user}:`]
   }
   var openaiTools = {
     webSearchPreview: webSearchPreviewTool
+  };
+  var OpenAIProviderOptionsSchema = external_exports.object({
+    instructions: external_exports.string().nullish(),
+    speed: external_exports.number().min(0.25).max(4).default(1).nullish()
+  });
+  var OpenAISpeechModel = class {
+    constructor(modelId, config) {
+      this.modelId = modelId;
+      this.config = config;
+      this.specificationVersion = "v1";
+    }
+    get provider() {
+      return this.config.provider;
+    }
+    getArgs({
+      text: text2,
+      voice = "alloy",
+      outputFormat = "mp3",
+      speed,
+      instructions,
+      providerOptions
+    }) {
+      const warnings = [];
+      const openAIOptions = parseProviderOptions({
+        provider: "openai",
+        providerOptions,
+        schema: OpenAIProviderOptionsSchema
+      });
+      const requestBody = {
+        model: this.modelId,
+        input: text2,
+        voice,
+        response_format: "mp3",
+        speed,
+        instructions
+      };
+      if (outputFormat) {
+        if (["mp3", "opus", "aac", "flac", "wav", "pcm"].includes(outputFormat)) {
+          requestBody.response_format = outputFormat;
+        } else {
+          warnings.push({
+            type: "unsupported-setting",
+            setting: "outputFormat",
+            details: `Unsupported output format: ${outputFormat}. Using mp3 instead.`
+          });
+        }
+      }
+      if (openAIOptions) {
+        const speechModelOptions = {};
+        for (const key in speechModelOptions) {
+          const value = speechModelOptions[key];
+          if (value !== void 0) {
+            requestBody[key] = value;
+          }
+        }
+      }
+      return {
+        requestBody,
+        warnings
+      };
+    }
+    async doGenerate(options) {
+      var _a17, _b, _c;
+      const currentDate = (_c = (_b = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+      const { requestBody, warnings } = this.getArgs(options);
+      const {
+        value: audio,
+        responseHeaders,
+        rawValue: rawResponse
+      } = await postJsonToApi({
+        url: this.config.url({
+          path: "/audio/speech",
+          modelId: this.modelId
+        }),
+        headers: combineHeaders(this.config.headers(), options.headers),
+        body: requestBody,
+        failedResponseHandler: openaiFailedResponseHandler,
+        successfulResponseHandler: createBinaryResponseHandler(),
+        abortSignal: options.abortSignal,
+        fetch: this.config.fetch
+      });
+      return {
+        audio,
+        warnings,
+        request: {
+          body: JSON.stringify(requestBody)
+        },
+        response: {
+          timestamp: currentDate,
+          modelId: this.modelId,
+          headers: responseHeaders,
+          body: rawResponse
+        }
+      };
+    }
   };
   function createOpenAI(options = {}) {
     var _a17, _b, _c;
@@ -7587,6 +7928,18 @@ ${user}:`]
       headers: getHeaders,
       fetch: options.fetch
     });
+    const createTranscriptionModel = (modelId) => new OpenAITranscriptionModel(modelId, {
+      provider: `${providerName}.transcription`,
+      url: ({ path }) => `${baseURL}${path}`,
+      headers: getHeaders,
+      fetch: options.fetch
+    });
+    const createSpeechModel = (modelId) => new OpenAISpeechModel(modelId, {
+      provider: `${providerName}.speech`,
+      url: ({ path }) => `${baseURL}${path}`,
+      headers: getHeaders,
+      fetch: options.fetch
+    });
     const createLanguageModel = (modelId, settings) => {
       if (new.target) {
         throw new Error(
@@ -7621,6 +7974,10 @@ ${user}:`]
     provider.textEmbeddingModel = createEmbeddingModel;
     provider.image = createImageModel;
     provider.imageModel = createImageModel;
+    provider.transcription = createTranscriptionModel;
+    provider.transcriptionModel = createTranscriptionModel;
+    provider.speech = createSpeechModel;
+    provider.speechModel = createSpeechModel;
     provider.tools = openaiTools;
     return provider;
   }
@@ -7629,7 +7986,7 @@ ${user}:`]
     // strict for OpenAI API
   });
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/Options.js
+  // node_modules/zod-to-json-schema/dist/esm/Options.js
   var ignoreOverride = Symbol("Let zodToJsonSchema decide on which parser to use");
   var defaultOptions = {
     name: void 0,
@@ -7662,7 +8019,7 @@ ${user}:`]
     ...options
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/Refs.js
+  // node_modules/zod-to-json-schema/dist/esm/Refs.js
   var getRefs = (options) => {
     const _options = getDefaultOptions(options);
     const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -7682,7 +8039,7 @@ ${user}:`]
     };
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+  // node_modules/zod-to-json-schema/dist/esm/errorMessages.js
   function addErrorMessage(res, key, errorMessage, refs) {
     if (!refs?.errorMessages)
       return;
@@ -7698,12 +8055,12 @@ ${user}:`]
     addErrorMessage(res, key, errorMessage, refs);
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/any.js
   function parseAnyDef() {
     return {};
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/array.js
   function parseArrayDef(def, refs) {
     const res = {
       type: "array"
@@ -7727,7 +8084,7 @@ ${user}:`]
     return res;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
   function parseBigintDef(def, refs) {
     const res = {
       type: "integer",
@@ -7773,24 +8130,24 @@ ${user}:`]
     return res;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
   function parseBooleanDef() {
     return {
       type: "boolean"
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
   function parseBrandedDef(_def, refs) {
     return parseDef(_def.type._def, refs);
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
   var parseCatchDef = (def, refs) => {
     return parseDef(def.innerType._def, refs);
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/date.js
   function parseDateDef(def, refs, overrideDateStrategy) {
     const strategy = overrideDateStrategy ?? refs.dateStrategy;
     if (Array.isArray(strategy)) {
@@ -7849,7 +8206,7 @@ ${user}:`]
     return res;
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/default.js
   function parseDefaultDef(_def, refs) {
     return {
       ...parseDef(_def.innerType._def, refs),
@@ -7857,12 +8214,12 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
   function parseEffectsDef(_def, refs) {
     return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : {};
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
   function parseEnumDef(def) {
     return {
       type: "string",
@@ -7870,7 +8227,7 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
   var isJsonSchema7AllOfType = (type) => {
     if ("type" in type && type.type === "string")
       return false;
@@ -7912,7 +8269,7 @@ ${user}:`]
     } : void 0;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
   function parseLiteralDef(def, refs) {
     const parsedType = typeof def.value;
     if (parsedType !== "bigint" && parsedType !== "number" && parsedType !== "boolean" && parsedType !== "string") {
@@ -7932,7 +8289,7 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/string.js
   var emojiRegex2 = void 0;
   var zodPatterns = {
     /**
@@ -8257,7 +8614,7 @@ ${user}:`]
     return pattern;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/record.js
   function parseRecordDef(def, refs) {
     if (refs.target === "openAi") {
       console.warn("Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.");
@@ -8309,7 +8666,7 @@ ${user}:`]
     return schema;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/map.js
   function parseMapDef(def, refs) {
     if (refs.mapStrategy === "record") {
       return parseRecordDef(def, refs);
@@ -8334,7 +8691,7 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
   function parseNativeEnumDef(def) {
     const object2 = def.values;
     const actualKeys = Object.keys(def.values).filter((key) => {
@@ -8348,14 +8705,14 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/never.js
   function parseNeverDef() {
     return {
       not: {}
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/null.js
   function parseNullDef(refs) {
     return refs.target === "openApi3" ? {
       enum: ["null"],
@@ -8365,7 +8722,7 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/union.js
   var primitiveMappings = {
     ZodString: "string",
     ZodNumber: "number",
@@ -8433,7 +8790,7 @@ ${user}:`]
     return anyOf.length ? { anyOf } : void 0;
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
   function parseNullableDef(def, refs) {
     if (["ZodString", "ZodNumber", "ZodBigInt", "ZodBoolean", "ZodNull"].includes(def.innerType._def.typeName) && (!def.innerType._def.checks || !def.innerType._def.checks.length)) {
       if (refs.target === "openApi3") {
@@ -8465,7 +8822,7 @@ ${user}:`]
     return base && { anyOf: [base, { type: "null" }] };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/number.js
   function parseNumberDef(def, refs) {
     const res = {
       type: "number"
@@ -8514,7 +8871,7 @@ ${user}:`]
     return res;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/object.js
   function parseObjectDef(def, refs) {
     const forceOptionalIntoNullable = refs.target === "openAi";
     const result = {
@@ -8584,7 +8941,7 @@ ${user}:`]
     }
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
   var parseOptionalDef = (def, refs) => {
     if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
       return parseDef(def.innerType._def, refs);
@@ -8603,7 +8960,7 @@ ${user}:`]
     } : {};
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
   var parsePipelineDef = (def, refs) => {
     if (refs.pipeStrategy === "input") {
       return parseDef(def.in._def, refs);
@@ -8623,12 +8980,12 @@ ${user}:`]
     };
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
   function parsePromiseDef(def, refs) {
     return parseDef(def.type._def, refs);
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/set.js
   function parseSetDef(def, refs) {
     const items = parseDef(def.valueType._def, {
       ...refs,
@@ -8648,7 +9005,7 @@ ${user}:`]
     return schema;
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
   function parseTupleDef(def, refs) {
     if (def.rest) {
       return {
@@ -8676,24 +9033,24 @@ ${user}:`]
     }
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
   function parseUndefinedDef() {
     return {
       not: {}
     };
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
   function parseUnknownDef() {
     return {};
   }
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+  // node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
   var parseReadonlyDef = (def, refs) => {
     return parseDef(def.innerType._def, refs);
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/selectParser.js
+  // node_modules/zod-to-json-schema/dist/esm/selectParser.js
   var selectParser = (def, typeName, refs) => {
     switch (typeName) {
       case ZodFirstPartyTypeKind.ZodString:
@@ -8769,7 +9126,7 @@ ${user}:`]
     }
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/parseDef.js
+  // node_modules/zod-to-json-schema/dist/esm/parseDef.js
   function parseDef(def, refs, forceResolution = false) {
     const seenItem = refs.seen.get(def);
     if (refs.override) {
@@ -8833,7 +9190,7 @@ ${user}:`]
     return jsonSchema2;
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+  // node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
   var zodToJsonSchema = (schema, options) => {
     const refs = getRefs(options);
     const definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name18, schema2]) => ({
@@ -8877,10 +9234,10 @@ ${user}:`]
     return combined;
   };
 
-  // node_modules/.pnpm/zod-to-json-schema@3.24.5_zod@3.24.2/node_modules/zod-to-json-schema/dist/esm/index.js
+  // node_modules/zod-to-json-schema/dist/esm/index.js
   var esm_default = zodToJsonSchema;
 
-  // node_modules/.pnpm/@ai-sdk+ui-utils@1.2.0_zod@3.24.2/node_modules/@ai-sdk/ui-utils/dist/index.mjs
+  // node_modules/@ai-sdk/ui-utils/dist/index.mjs
   var textStreamPart = {
     code: "0",
     name: "text",
@@ -9606,13 +9963,13 @@ ${user}:`]
     return isSchema(schema) ? schema : zodSchema(schema);
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/platform/browser/globalThis.js
+  // node_modules/@opentelemetry/api/build/esm/platform/browser/globalThis.js
   var _globalThis = typeof globalThis === "object" ? globalThis : typeof self === "object" ? self : typeof window === "object" ? window : typeof global === "object" ? global : {};
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/version.js
+  // node_modules/@opentelemetry/api/build/esm/version.js
   var VERSION = "1.9.0";
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/internal/semver.js
+  // node_modules/@opentelemetry/api/build/esm/internal/semver.js
   var re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
   function _makeCompatibilityCheck(ownVersion) {
     var acceptedVersions = /* @__PURE__ */ new Set([ownVersion]);
@@ -9679,7 +10036,7 @@ ${user}:`]
   }
   var isCompatible = _makeCompatibilityCheck(VERSION);
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
+  // node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
   var major = VERSION.split(".")[0];
   var GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for("opentelemetry.js.api." + major);
   var _global = _globalThis;
@@ -9721,7 +10078,7 @@ ${user}:`]
     }
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
+  // node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
   var __read = function(o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
     if (!m) return o;
@@ -9801,7 +10158,7 @@ ${user}:`]
     return logger[funcName].apply(logger, __spreadArray([], __read(args), false));
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/types.js
+  // node_modules/@opentelemetry/api/build/esm/diag/types.js
   var DiagLogLevel;
   (function(DiagLogLevel2) {
     DiagLogLevel2[DiagLogLevel2["NONE"] = 0] = "NONE";
@@ -9813,7 +10170,7 @@ ${user}:`]
     DiagLogLevel2[DiagLogLevel2["ALL"] = 9999] = "ALL";
   })(DiagLogLevel || (DiagLogLevel = {}));
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
+  // node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
   function createLogLevelDiagLogger(maxLevel, logger) {
     if (maxLevel < DiagLogLevel.NONE) {
       maxLevel = DiagLogLevel.NONE;
@@ -9838,7 +10195,7 @@ ${user}:`]
     };
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/api/diag.js
+  // node_modules/@opentelemetry/api/build/esm/api/diag.js
   var __read2 = function(o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
     if (!m) return o;
@@ -9930,7 +10287,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/context/context.js
+  // node_modules/@opentelemetry/api/build/esm/context/context.js
   function createContextKey(description) {
     return Symbol.for(description);
   }
@@ -9959,7 +10316,7 @@ ${user}:`]
   );
   var ROOT_CONTEXT = new BaseContext();
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js
+  // node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js
   var __read3 = function(o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
     if (!m) return o;
@@ -10014,7 +10371,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/api/context.js
+  // node_modules/@opentelemetry/api/build/esm/api/context.js
   var __read4 = function(o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
     if (!m) return o;
@@ -10082,14 +10439,14 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/trace_flags.js
+  // node_modules/@opentelemetry/api/build/esm/trace/trace_flags.js
   var TraceFlags;
   (function(TraceFlags2) {
     TraceFlags2[TraceFlags2["NONE"] = 0] = "NONE";
     TraceFlags2[TraceFlags2["SAMPLED"] = 1] = "SAMPLED";
   })(TraceFlags || (TraceFlags = {}));
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/invalid-span-constants.js
+  // node_modules/@opentelemetry/api/build/esm/trace/invalid-span-constants.js
   var INVALID_SPANID = "0000000000000000";
   var INVALID_TRACEID = "00000000000000000000000000000000";
   var INVALID_SPAN_CONTEXT = {
@@ -10098,7 +10455,7 @@ ${user}:`]
     traceFlags: TraceFlags.NONE
   };
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/NonRecordingSpan.js
+  // node_modules/@opentelemetry/api/build/esm/trace/NonRecordingSpan.js
   var NonRecordingSpan = (
     /** @class */
     function() {
@@ -10143,7 +10500,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/context-utils.js
+  // node_modules/@opentelemetry/api/build/esm/trace/context-utils.js
   var SPAN_KEY = createContextKey("OpenTelemetry Context Key SPAN");
   function getSpan(context) {
     return context.getValue(SPAN_KEY) || void 0;
@@ -10165,7 +10522,7 @@ ${user}:`]
     return (_a17 = getSpan(context)) === null || _a17 === void 0 ? void 0 : _a17.spanContext();
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/spancontext-utils.js
+  // node_modules/@opentelemetry/api/build/esm/trace/spancontext-utils.js
   var VALID_TRACEID_REGEX = /^([0-9a-f]{32})$/i;
   var VALID_SPANID_REGEX = /^[0-9a-f]{16}$/i;
   function isValidTraceId(traceId) {
@@ -10181,7 +10538,7 @@ ${user}:`]
     return new NonRecordingSpan(spanContext);
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/NoopTracer.js
+  // node_modules/@opentelemetry/api/build/esm/trace/NoopTracer.js
   var contextApi = ContextAPI.getInstance();
   var NoopTracer = (
     /** @class */
@@ -10231,7 +10588,7 @@ ${user}:`]
     return typeof spanContext === "object" && typeof spanContext["spanId"] === "string" && typeof spanContext["traceId"] === "string" && typeof spanContext["traceFlags"] === "number";
   }
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/ProxyTracer.js
+  // node_modules/@opentelemetry/api/build/esm/trace/ProxyTracer.js
   var NOOP_TRACER = new NoopTracer();
   var ProxyTracer = (
     /** @class */
@@ -10264,7 +10621,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/NoopTracerProvider.js
+  // node_modules/@opentelemetry/api/build/esm/trace/NoopTracerProvider.js
   var NoopTracerProvider = (
     /** @class */
     function() {
@@ -10277,7 +10634,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/ProxyTracerProvider.js
+  // node_modules/@opentelemetry/api/build/esm/trace/ProxyTracerProvider.js
   var NOOP_TRACER_PROVIDER = new NoopTracerProvider();
   var ProxyTracerProvider = (
     /** @class */
@@ -10303,7 +10660,7 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace/status.js
+  // node_modules/@opentelemetry/api/build/esm/trace/status.js
   var SpanStatusCode;
   (function(SpanStatusCode2) {
     SpanStatusCode2[SpanStatusCode2["UNSET"] = 0] = "UNSET";
@@ -10311,7 +10668,7 @@ ${user}:`]
     SpanStatusCode2[SpanStatusCode2["ERROR"] = 2] = "ERROR";
   })(SpanStatusCode || (SpanStatusCode = {}));
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/api/trace.js
+  // node_modules/@opentelemetry/api/build/esm/api/trace.js
   var API_NAME3 = "trace";
   var TraceAPI = (
     /** @class */
@@ -10354,14 +10711,14 @@ ${user}:`]
     }()
   );
 
-  // node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/trace-api.js
+  // node_modules/@opentelemetry/api/build/esm/trace-api.js
   var trace = TraceAPI.getInstance();
 
-  // node_modules/.pnpm/ai@4.2.0_react@19.0.0_zod@3.24.2/node_modules/ai/dist/index.mjs
-  var __defProp3 = Object.defineProperty;
-  var __export = (target, all) => {
+  // node_modules/ai/dist/index.mjs
+  var __defProp2 = Object.defineProperty;
+  var __export2 = (target, all) => {
     for (var name17 in all)
-      __defProp3(target, name17, { get: all[name17], enumerable: true });
+      __defProp2(target, name17, { get: all[name17], enumerable: true });
   };
   function prepareResponseHeaders(headers, {
     contentType,
@@ -10678,7 +11035,7 @@ ${user}:`]
   var symbol32 = Symbol.for(marker32);
   var _a32;
   _a32 = symbol32;
-  var mimeTypeSignatures = [
+  var imageMimeTypeSignatures = [
     {
       mimeType: "image/gif",
       bytesPrefix: [71, 73, 70],
@@ -10751,9 +11108,26 @@ ${user}:`]
       base64Prefix: "AAAAIGZ0eXBoZWlj"
     }
   ];
-  function detectImageMimeType(image) {
-    for (const signature of mimeTypeSignatures) {
-      if (typeof image === "string" ? image.startsWith(signature.base64Prefix) : image.length >= signature.bytesPrefix.length && signature.bytesPrefix.every((byte, index) => image[index] === byte)) {
+  var stripID3 = (data) => {
+    const bytes = typeof data === "string" ? convertBase64ToUint8Array(data) : data;
+    const id3Size = (bytes[6] & 127) << 21 | (bytes[7] & 127) << 14 | (bytes[8] & 127) << 7 | bytes[9] & 127;
+    return bytes.slice(id3Size + 10);
+  };
+  function stripID3TagsIfPresent(data) {
+    const hasId3 = typeof data === "string" && data.startsWith("SUQz") || typeof data !== "string" && data.length > 10 && data[0] === 73 && // 'I'
+    data[1] === 68 && // 'D'
+    data[2] === 51;
+    return hasId3 ? stripID3(data) : data;
+  }
+  function detectMimeType({
+    data,
+    signatures
+  }) {
+    const processedData = stripID3TagsIfPresent(data);
+    for (const signature of signatures) {
+      if (typeof processedData === "string" ? processedData.startsWith(signature.base64Prefix) : processedData.length >= signature.bytesPrefix.length && signature.bytesPrefix.every(
+        (byte, index) => processedData[index] === byte
+      )) {
         return signature.mimeType;
       }
     }
@@ -10769,13 +11143,15 @@ ${user}:`]
       cause,
       text: text2,
       response,
-      usage
+      usage,
+      finishReason
     }) {
       super({ name: name42, message, cause });
       this[_a42] = true;
       this.text = text2;
       this.response = response;
       this.usage = usage;
+      this.finishReason = finishReason;
     }
     static isInstance(error) {
       return AISDKError.hasMarker(error, marker42);
@@ -10805,14 +11181,11 @@ ${user}:`]
     }
   };
   _a52 = symbol52;
-  async function download({
-    url,
-    fetchImplementation = fetch
-  }) {
+  async function download({ url }) {
     var _a17;
     const urlText = url.toString();
     try {
-      const response = await fetchImplementation(urlText);
+      const response = await fetch(urlText);
       if (!response.ok) {
         throw new DownloadError({
           url: urlText,
@@ -10850,11 +11223,11 @@ ${user}:`]
     }
   };
   _a62 = symbol62;
-  var dataContentSchema = z.union([
-    z.string(),
-    z.instanceof(Uint8Array),
-    z.instanceof(ArrayBuffer),
-    z.custom(
+  var dataContentSchema = external_exports.union([
+    external_exports.string(),
+    external_exports.instanceof(Uint8Array),
+    external_exports.instanceof(ArrayBuffer),
+    external_exports.custom(
       // Buffer might not be available in some environments such as CloudFlare:
       (value) => {
         var _a17, _b;
@@ -11138,7 +11511,10 @@ ${user}:`]
     switch (type) {
       case "image": {
         if (normalizedData instanceof Uint8Array) {
-          mimeType = (_b = detectImageMimeType(normalizedData)) != null ? _b : mimeType;
+          mimeType = (_b = detectMimeType({
+            data: normalizedData,
+            signatures: imageMimeTypeSignatures
+          })) != null ? _b : mimeType;
         }
         return {
           type: "image",
@@ -11363,13 +11739,24 @@ ${user}:`]
           break;
         }
         case "user": {
-          coreMessages.push({
-            role: "user",
-            content: experimental_attachments ? [
-              { type: "text", text: content },
-              ...attachmentsToParts(experimental_attachments)
-            ] : content
-          });
+          if (message.parts == null) {
+            coreMessages.push({
+              role: "user",
+              content: experimental_attachments ? [
+                { type: "text", text: content },
+                ...attachmentsToParts(experimental_attachments)
+              ] : content
+            });
+          } else {
+            const textParts = message.parts.filter((part) => part.type === "text").map((part) => ({
+              type: "text",
+              text: part.text
+            }));
+            coreMessages.push({
+              role: "user",
+              content: experimental_attachments ? [...textParts, ...attachmentsToParts(experimental_attachments)] : textParts
+            });
+          }
           break;
         }
         case "assistant": {
@@ -11566,136 +11953,102 @@ ${user}:`]
     }
     return coreMessages;
   }
-  function detectPromptType(prompt) {
-    if (!Array.isArray(prompt)) {
-      return "other";
-    }
-    if (prompt.length === 0) {
-      return "messages";
-    }
-    const characteristics = prompt.map(detectSingleMessageCharacteristics);
-    if (characteristics.some((c) => c === "has-ui-specific-parts")) {
-      return "ui-messages";
-    } else if (characteristics.every(
-      (c) => c === "has-core-specific-parts" || c === "message"
-    )) {
-      return "messages";
-    } else {
-      return "other";
-    }
-  }
-  function detectSingleMessageCharacteristics(message) {
-    if (typeof message === "object" && message !== null && (message.role === "function" || // UI-only role
-    message.role === "data" || // UI-only role
-    "toolInvocations" in message || // UI-specific field
-    "parts" in message || // UI-specific field
-    "experimental_attachments" in message)) {
-      return "has-ui-specific-parts";
-    } else if (typeof message === "object" && message !== null && "content" in message && (Array.isArray(message.content) || // Core messages can have array content
-    "experimental_providerMetadata" in message || "providerOptions" in message)) {
-      return "has-core-specific-parts";
-    } else if (typeof message === "object" && message !== null && "role" in message && "content" in message && typeof message.content === "string" && ["system", "user", "assistant", "tool"].includes(message.role)) {
-      return "message";
-    } else {
-      return "other";
-    }
-  }
-  var jsonValueSchema = z.lazy(
-    () => z.union([
-      z.null(),
-      z.string(),
-      z.number(),
-      z.boolean(),
-      z.record(z.string(), jsonValueSchema),
-      z.array(jsonValueSchema)
+  var jsonValueSchema = external_exports.lazy(
+    () => external_exports.union([
+      external_exports.null(),
+      external_exports.string(),
+      external_exports.number(),
+      external_exports.boolean(),
+      external_exports.record(external_exports.string(), jsonValueSchema),
+      external_exports.array(jsonValueSchema)
     ])
   );
-  var providerMetadataSchema = z.record(
-    z.string(),
-    z.record(z.string(), jsonValueSchema)
+  var providerMetadataSchema = external_exports.record(
+    external_exports.string(),
+    external_exports.record(external_exports.string(), jsonValueSchema)
   );
-  var toolResultContentSchema = z.array(
-    z.union([
-      z.object({ type: z.literal("text"), text: z.string() }),
-      z.object({
-        type: z.literal("image"),
-        data: z.string(),
-        mimeType: z.string().optional()
+  var toolResultContentSchema = external_exports.array(
+    external_exports.union([
+      external_exports.object({ type: external_exports.literal("text"), text: external_exports.string() }),
+      external_exports.object({
+        type: external_exports.literal("image"),
+        data: external_exports.string(),
+        mimeType: external_exports.string().optional()
       })
     ])
   );
-  var textPartSchema = z.object({
-    type: z.literal("text"),
-    text: z.string(),
+  var textPartSchema = external_exports.object({
+    type: external_exports.literal("text"),
+    text: external_exports.string(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var imagePartSchema = z.object({
-    type: z.literal("image"),
-    image: z.union([dataContentSchema, z.instanceof(URL)]),
-    mimeType: z.string().optional(),
+  var imagePartSchema = external_exports.object({
+    type: external_exports.literal("image"),
+    image: external_exports.union([dataContentSchema, external_exports.instanceof(URL)]),
+    mimeType: external_exports.string().optional(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var filePartSchema = z.object({
-    type: z.literal("file"),
-    data: z.union([dataContentSchema, z.instanceof(URL)]),
-    filename: z.string().optional(),
-    mimeType: z.string(),
+  var filePartSchema = external_exports.object({
+    type: external_exports.literal("file"),
+    data: external_exports.union([dataContentSchema, external_exports.instanceof(URL)]),
+    filename: external_exports.string().optional(),
+    mimeType: external_exports.string(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var reasoningPartSchema = z.object({
-    type: z.literal("reasoning"),
-    text: z.string(),
+  var reasoningPartSchema = external_exports.object({
+    type: external_exports.literal("reasoning"),
+    text: external_exports.string(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var redactedReasoningPartSchema = z.object({
-    type: z.literal("redacted-reasoning"),
-    data: z.string(),
+  var redactedReasoningPartSchema = external_exports.object({
+    type: external_exports.literal("redacted-reasoning"),
+    data: external_exports.string(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var toolCallPartSchema = z.object({
-    type: z.literal("tool-call"),
-    toolCallId: z.string(),
-    toolName: z.string(),
-    args: z.unknown(),
+  var toolCallPartSchema = external_exports.object({
+    type: external_exports.literal("tool-call"),
+    toolCallId: external_exports.string(),
+    toolName: external_exports.string(),
+    args: external_exports.unknown(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var toolResultPartSchema = z.object({
-    type: z.literal("tool-result"),
-    toolCallId: z.string(),
-    toolName: z.string(),
-    result: z.unknown(),
+  var toolResultPartSchema = external_exports.object({
+    type: external_exports.literal("tool-result"),
+    toolCallId: external_exports.string(),
+    toolName: external_exports.string(),
+    result: external_exports.unknown(),
     content: toolResultContentSchema.optional(),
-    isError: z.boolean().optional(),
+    isError: external_exports.boolean().optional(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var coreSystemMessageSchema = z.object({
-    role: z.literal("system"),
-    content: z.string(),
+  var coreSystemMessageSchema = external_exports.object({
+    role: external_exports.literal("system"),
+    content: external_exports.string(),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var coreUserMessageSchema = z.object({
-    role: z.literal("user"),
-    content: z.union([
-      z.string(),
-      z.array(z.union([textPartSchema, imagePartSchema, filePartSchema]))
+  var coreUserMessageSchema = external_exports.object({
+    role: external_exports.literal("user"),
+    content: external_exports.union([
+      external_exports.string(),
+      external_exports.array(external_exports.union([textPartSchema, imagePartSchema, filePartSchema]))
     ]),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var coreAssistantMessageSchema = z.object({
-    role: z.literal("assistant"),
-    content: z.union([
-      z.string(),
-      z.array(
-        z.union([
+  var coreAssistantMessageSchema = external_exports.object({
+    role: external_exports.literal("assistant"),
+    content: external_exports.union([
+      external_exports.string(),
+      external_exports.array(
+        external_exports.union([
           textPartSchema,
           filePartSchema,
           reasoningPartSchema,
@@ -11707,13 +12060,13 @@ ${user}:`]
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var coreToolMessageSchema = z.object({
-    role: z.literal("tool"),
-    content: z.array(toolResultPartSchema),
+  var coreToolMessageSchema = external_exports.object({
+    role: external_exports.literal("tool"),
+    content: external_exports.array(toolResultPartSchema),
     providerOptions: providerMetadataSchema.optional(),
     experimental_providerMetadata: providerMetadataSchema.optional()
   });
-  var coreMessageSchema = z.union([
+  var coreMessageSchema = external_exports.union([
     coreSystemMessageSchema,
     coreUserMessageSchema,
     coreAssistantMessageSchema,
@@ -11761,23 +12114,26 @@ ${user}:`]
     }
     if (prompt.messages != null) {
       const promptType = detectPromptType(prompt.messages);
-      if (promptType === "other") {
-        throw new InvalidPromptError({
-          prompt,
-          message: "messages must be an array of CoreMessage or UIMessage"
-        });
-      }
       const messages = promptType === "ui-messages" ? convertToCoreMessages(prompt.messages, {
         tools
       }) : prompt.messages;
+      if (messages.length === 0) {
+        throw new InvalidPromptError({
+          prompt,
+          message: "messages must not be empty"
+        });
+      }
       const validationResult = safeValidateTypes({
         value: messages,
-        schema: z.array(coreMessageSchema)
+        schema: external_exports.array(coreMessageSchema)
       });
       if (!validationResult.success) {
         throw new InvalidPromptError({
           prompt,
-          message: "messages must be an array of CoreMessage or UIMessage",
+          message: [
+            "message must be a CoreMessage or a UI message",
+            `Validation error: ${validationResult.error.message}`
+          ].join("\n"),
           cause: validationResult.error
         });
       }
@@ -11788,6 +12144,56 @@ ${user}:`]
       };
     }
     throw new Error("unreachable");
+  }
+  function detectPromptType(prompt) {
+    if (!Array.isArray(prompt)) {
+      throw new InvalidPromptError({
+        prompt,
+        message: [
+          "messages must be an array of CoreMessage or UIMessage",
+          `Received non-array value: ${JSON.stringify(prompt)}`
+        ].join("\n"),
+        cause: prompt
+      });
+    }
+    if (prompt.length === 0) {
+      return "messages";
+    }
+    const characteristics = prompt.map(detectSingleMessageCharacteristics);
+    if (characteristics.some((c) => c === "has-ui-specific-parts")) {
+      return "ui-messages";
+    }
+    const nonMessageIndex = characteristics.findIndex(
+      (c) => c !== "has-core-specific-parts" && c !== "message"
+    );
+    if (nonMessageIndex === -1) {
+      return "messages";
+    }
+    throw new InvalidPromptError({
+      prompt,
+      message: [
+        "messages must be an array of CoreMessage or UIMessage",
+        `Received message of type: "${characteristics[nonMessageIndex]}" at index ${nonMessageIndex}`,
+        `messages[${nonMessageIndex}]: ${JSON.stringify(prompt[nonMessageIndex])}`
+      ].join("\n"),
+      cause: prompt
+    });
+  }
+  function detectSingleMessageCharacteristics(message) {
+    if (typeof message === "object" && message !== null && (message.role === "function" || // UI-only role
+    message.role === "data" || // UI-only role
+    "toolInvocations" in message || // UI-specific field
+    "parts" in message || // UI-specific field
+    "experimental_attachments" in message)) {
+      return "has-ui-specific-parts";
+    } else if (typeof message === "object" && message !== null && "content" in message && (Array.isArray(message.content) || // Core messages can have array content
+    "experimental_providerMetadata" in message || "providerOptions" in message)) {
+      return "has-core-specific-parts";
+    } else if (typeof message === "object" && message !== null && "role" in message && "content" in message && typeof message.content === "string" && ["system", "user", "assistant", "tool"].includes(message.role)) {
+      return "message";
+    } else {
+      return "other";
+    }
   }
   function calculateLanguageModelUsage({
     promptTokens,
@@ -11843,7 +12249,8 @@ ${user}:`]
           message: "No object generated: response did not match schema.",
           text: context.text,
           response: context.response,
-          usage: context.usage
+          usage: context.usage,
+          finishReason: context.finishReason
         })
       } : { success: true, value };
     },
@@ -12176,6 +12583,24 @@ ${user}:`]
       }
     }
   }
+  function stringifyForTelemetry(prompt) {
+    const processedPrompt = prompt.map((message) => {
+      return {
+        ...message,
+        content: typeof message.content === "string" ? message.content : message.content.map(processPart)
+      };
+    });
+    return JSON.stringify(processedPrompt);
+  }
+  function processPart(part) {
+    if (part.type === "image") {
+      return {
+        ...part,
+        image: part.image instanceof Uint8Array ? convertDataContentToBase64String(part.image) : part.image
+      };
+    }
+    return part;
+  }
   var originalGenerateId = createIdGenerator({ prefix: "aiobj", size: 24 });
   async function generateObject({
     model,
@@ -12336,7 +12761,8 @@ ${user}:`]
                     throw new NoObjectGeneratedError({
                       message: "No object generated: the model did not return a response.",
                       response: responseData,
-                      usage: calculateLanguageModelUsage(result2.usage)
+                      usage: calculateLanguageModelUsage(result2.usage),
+                      finishReason: result2.finishReason
                     });
                   }
                   span2.setAttributes(
@@ -12401,7 +12827,7 @@ ${user}:`]
                       input: () => inputFormat
                     },
                     "ai.prompt.messages": {
-                      input: () => JSON.stringify(promptMessages)
+                      input: () => stringifyForTelemetry(promptMessages)
                     },
                     "ai.settings.mode": mode,
                     // standardized gen-ai llm span attributes:
@@ -12445,7 +12871,8 @@ ${user}:`]
                     throw new NoObjectGeneratedError({
                       message: "No object generated: the tool was not called.",
                       response: responseData,
-                      usage: calculateLanguageModelUsage(result2.usage)
+                      usage: calculateLanguageModelUsage(result2.usage),
+                      finishReason: result2.finishReason
                     });
                   }
                   span2.setAttributes(
@@ -12501,7 +12928,8 @@ ${user}:`]
               cause: parseResult.error,
               text: result2,
               response,
-              usage: calculateLanguageModelUsage(usage)
+              usage: calculateLanguageModelUsage(usage),
+              finishReason
             });
           }
           const validationResult = outputStrategy.validateFinalResult(
@@ -12518,7 +12946,8 @@ ${user}:`]
               cause: validationResult.error,
               text: result2,
               response,
-              usage: calculateLanguageModelUsage(usage)
+              usage: calculateLanguageModelUsage(usage),
+              finishReason
             });
           }
           return validationResult.value;
@@ -12627,7 +13056,7 @@ ${user}:`]
     size: 24
   });
   var output_exports = {};
-  __export(output_exports, {
+  __export2(output_exports, {
     object: () => object,
     text: () => text
   });
@@ -12696,7 +13125,8 @@ ${user}:`]
             cause: parseResult.error,
             text: text2,
             response: context.response,
-            usage: context.usage
+            usage: context.usage,
+            finishReason: context.finishReason
           });
         }
         const validationResult = safeValidateTypes({
@@ -12709,7 +13139,8 @@ ${user}:`]
             cause: validationResult.error,
             text: text2,
             response: context.response,
-            usage: context.usage
+            usage: context.usage,
+            finishReason: context.finishReason
           });
         }
         return validationResult.value;
@@ -12815,132 +13246,132 @@ ${user}:`]
   var symbol16 = Symbol.for(marker16);
   var _a16;
   _a16 = symbol16;
-  var ClientOrServerImplementationSchema = z.object({
-    name: z.string(),
-    version: z.string()
+  var ClientOrServerImplementationSchema = external_exports.object({
+    name: external_exports.string(),
+    version: external_exports.string()
   }).passthrough();
-  var BaseParamsSchema = z.object({
-    _meta: z.optional(z.object({}).passthrough())
+  var BaseParamsSchema = external_exports.object({
+    _meta: external_exports.optional(external_exports.object({}).passthrough())
   }).passthrough();
   var ResultSchema = BaseParamsSchema;
-  var RequestSchema = z.object({
-    method: z.string(),
-    params: z.optional(BaseParamsSchema)
+  var RequestSchema = external_exports.object({
+    method: external_exports.string(),
+    params: external_exports.optional(BaseParamsSchema)
   });
-  var ServerCapabilitiesSchema = z.object({
-    experimental: z.optional(z.object({}).passthrough()),
-    logging: z.optional(z.object({}).passthrough()),
-    prompts: z.optional(
-      z.object({
-        listChanged: z.optional(z.boolean())
+  var ServerCapabilitiesSchema = external_exports.object({
+    experimental: external_exports.optional(external_exports.object({}).passthrough()),
+    logging: external_exports.optional(external_exports.object({}).passthrough()),
+    prompts: external_exports.optional(
+      external_exports.object({
+        listChanged: external_exports.optional(external_exports.boolean())
       }).passthrough()
     ),
-    resources: z.optional(
-      z.object({
-        subscribe: z.optional(z.boolean()),
-        listChanged: z.optional(z.boolean())
+    resources: external_exports.optional(
+      external_exports.object({
+        subscribe: external_exports.optional(external_exports.boolean()),
+        listChanged: external_exports.optional(external_exports.boolean())
       }).passthrough()
     ),
-    tools: z.optional(
-      z.object({
-        listChanged: z.optional(z.boolean())
+    tools: external_exports.optional(
+      external_exports.object({
+        listChanged: external_exports.optional(external_exports.boolean())
       }).passthrough()
     )
   }).passthrough();
   var InitializeResultSchema = ResultSchema.extend({
-    protocolVersion: z.string(),
+    protocolVersion: external_exports.string(),
     capabilities: ServerCapabilitiesSchema,
     serverInfo: ClientOrServerImplementationSchema,
-    instructions: z.optional(z.string())
+    instructions: external_exports.optional(external_exports.string())
   });
   var PaginatedResultSchema = ResultSchema.extend({
-    nextCursor: z.optional(z.string())
+    nextCursor: external_exports.optional(external_exports.string())
   });
-  var ToolSchema = z.object({
-    name: z.string(),
-    description: z.optional(z.string()),
-    inputSchema: z.object({
-      type: z.literal("object"),
-      properties: z.optional(z.object({}).passthrough())
+  var ToolSchema = external_exports.object({
+    name: external_exports.string(),
+    description: external_exports.optional(external_exports.string()),
+    inputSchema: external_exports.object({
+      type: external_exports.literal("object"),
+      properties: external_exports.optional(external_exports.object({}).passthrough())
     }).passthrough()
   }).passthrough();
   var ListToolsResultSchema = PaginatedResultSchema.extend({
-    tools: z.array(ToolSchema)
+    tools: external_exports.array(ToolSchema)
   });
-  var TextContentSchema = z.object({
-    type: z.literal("text"),
-    text: z.string()
+  var TextContentSchema = external_exports.object({
+    type: external_exports.literal("text"),
+    text: external_exports.string()
   }).passthrough();
-  var ImageContentSchema = z.object({
-    type: z.literal("image"),
-    data: z.string().base64(),
-    mimeType: z.string()
+  var ImageContentSchema = external_exports.object({
+    type: external_exports.literal("image"),
+    data: external_exports.string().base64(),
+    mimeType: external_exports.string()
   }).passthrough();
-  var ResourceContentsSchema = z.object({
+  var ResourceContentsSchema = external_exports.object({
     /**
      * The URI of this resource.
      */
-    uri: z.string(),
+    uri: external_exports.string(),
     /**
      * The MIME type of this resource, if known.
      */
-    mimeType: z.optional(z.string())
+    mimeType: external_exports.optional(external_exports.string())
   }).passthrough();
   var TextResourceContentsSchema = ResourceContentsSchema.extend({
-    text: z.string()
+    text: external_exports.string()
   });
   var BlobResourceContentsSchema = ResourceContentsSchema.extend({
-    blob: z.string().base64()
+    blob: external_exports.string().base64()
   });
-  var EmbeddedResourceSchema = z.object({
-    type: z.literal("resource"),
-    resource: z.union([TextResourceContentsSchema, BlobResourceContentsSchema])
+  var EmbeddedResourceSchema = external_exports.object({
+    type: external_exports.literal("resource"),
+    resource: external_exports.union([TextResourceContentsSchema, BlobResourceContentsSchema])
   }).passthrough();
   var CallToolResultSchema = ResultSchema.extend({
-    content: z.array(
-      z.union([TextContentSchema, ImageContentSchema, EmbeddedResourceSchema])
+    content: external_exports.array(
+      external_exports.union([TextContentSchema, ImageContentSchema, EmbeddedResourceSchema])
     ),
-    isError: z.boolean().default(false).optional()
+    isError: external_exports.boolean().default(false).optional()
   }).or(
     ResultSchema.extend({
-      toolResult: z.unknown()
+      toolResult: external_exports.unknown()
     })
   );
   var JSONRPC_VERSION = "2.0";
-  var JSONRPCRequestSchema = z.object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: z.union([z.string(), z.number().int()])
+  var JSONRPCRequestSchema = external_exports.object({
+    jsonrpc: external_exports.literal(JSONRPC_VERSION),
+    id: external_exports.union([external_exports.string(), external_exports.number().int()])
   }).merge(RequestSchema).strict();
-  var JSONRPCResponseSchema = z.object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: z.union([z.string(), z.number().int()]),
+  var JSONRPCResponseSchema = external_exports.object({
+    jsonrpc: external_exports.literal(JSONRPC_VERSION),
+    id: external_exports.union([external_exports.string(), external_exports.number().int()]),
     result: ResultSchema
   }).strict();
-  var JSONRPCErrorSchema = z.object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: z.union([z.string(), z.number().int()]),
-    error: z.object({
-      code: z.number().int(),
-      message: z.string(),
-      data: z.optional(z.unknown())
+  var JSONRPCErrorSchema = external_exports.object({
+    jsonrpc: external_exports.literal(JSONRPC_VERSION),
+    id: external_exports.union([external_exports.string(), external_exports.number().int()]),
+    error: external_exports.object({
+      code: external_exports.number().int(),
+      message: external_exports.string(),
+      data: external_exports.optional(external_exports.unknown())
     })
   }).strict();
-  var JSONRPCNotificationSchema = z.object({
-    jsonrpc: z.literal(JSONRPC_VERSION)
+  var JSONRPCNotificationSchema = external_exports.object({
+    jsonrpc: external_exports.literal(JSONRPC_VERSION)
   }).merge(
-    z.object({
-      method: z.string(),
-      params: z.optional(BaseParamsSchema)
+    external_exports.object({
+      method: external_exports.string(),
+      params: external_exports.optional(BaseParamsSchema)
     })
   ).strict();
-  var JSONRPCMessageSchema = z.union([
+  var JSONRPCMessageSchema = external_exports.union([
     JSONRPCRequestSchema,
     JSONRPCNotificationSchema,
     JSONRPCResponseSchema,
     JSONRPCErrorSchema
   ]);
   var langchain_adapter_exports = {};
-  __export(langchain_adapter_exports, {
+  __export2(langchain_adapter_exports, {
     mergeIntoDataStream: () => mergeIntoDataStream,
     toDataStream: () => toDataStream,
     toDataStreamResponse: () => toDataStreamResponse
@@ -13040,7 +13471,7 @@ ${user}:`]
     }
   }
   var llamaindex_adapter_exports = {};
-  __export(llamaindex_adapter_exports, {
+  __export2(llamaindex_adapter_exports, {
     mergeIntoDataStream: () => mergeIntoDataStream2,
     toDataStream: () => toDataStream2,
     toDataStreamResponse: () => toDataStreamResponse2
@@ -13253,32 +13684,32 @@ If the task was not completed successfully, provide a brief, direct instruction 
   })(PageAction || {});
 
   // src/schemas.ts
-  var planSchema = z.object({
-    explanation: z.string(),
-    plan: z.string(),
-    url: z.string()
+  var planSchema = external_exports.object({
+    explanation: external_exports.string(),
+    plan: external_exports.string(),
+    url: external_exports.string()
   });
-  var actionSchema = z.object({
-    currentStep: z.string(),
-    observation: z.string(),
-    extractedData: z.string().optional(),
-    thought: z.string(),
-    action: z.object({
-      action: z.nativeEnum(PageAction),
-      ref: z.string().optional(),
-      value: z.string().optional()
+  var actionSchema = external_exports.object({
+    currentStep: external_exports.string(),
+    observation: external_exports.string(),
+    extractedData: external_exports.string().optional(),
+    thought: external_exports.string(),
+    action: external_exports.object({
+      action: external_exports.nativeEnum(PageAction),
+      ref: external_exports.string().optional(),
+      value: external_exports.string().optional()
     })
   });
-  var taskValidationSchema = z.object({
-    isValid: z.boolean(),
-    feedback: z.string().optional()
+  var taskValidationSchema = external_exports.object({
+    isValid: external_exports.boolean(),
+    feedback: external_exports.string().optional()
   });
 
-  // node_modules/.pnpm/eventemitter3@5.0.1/node_modules/eventemitter3/index.mjs
-  var import_index2 = __toESM(require_eventemitter3(), 1);
+  // node_modules/eventemitter3/index.mjs
+  var import_index = __toESM(require_eventemitter3(), 1);
 
   // src/events.ts
-  var WebAgentEventEmitter = class extends import_index2.default {
+  var WebAgentEventEmitter = class extends import_index.default {
     /**
      * Emit a WebAgent event
      */
@@ -13305,7 +13736,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
     }
   };
 
-  // node_modules/.pnpm/chalk@5.4.1/node_modules/chalk/source/vendor/ansi-styles/index.js
+  // node_modules/chalk/source/vendor/ansi-styles/index.js
   var ANSI_BACKGROUND_OFFSET = 10;
   var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
   var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
@@ -13491,7 +13922,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
   var ansiStyles = assembleStyles();
   var ansi_styles_default = ansiStyles;
 
-  // node_modules/.pnpm/chalk@5.4.1/node_modules/chalk/source/vendor/supports-color/browser.js
+  // node_modules/chalk/source/vendor/supports-color/browser.js
   var level = (() => {
     if (!("navigator" in globalThis)) {
       return 0;
@@ -13519,7 +13950,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
   };
   var browser_default = supportsColor;
 
-  // node_modules/.pnpm/chalk@5.4.1/node_modules/chalk/source/utilities.js
+  // node_modules/chalk/source/utilities.js
   function stringReplaceAll(string, substring, replacer) {
     let index = string.indexOf(substring);
     if (index === -1) {
@@ -13549,7 +13980,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
     return returnValue;
   }
 
-  // node_modules/.pnpm/chalk@5.4.1/node_modules/chalk/source/index.js
+  // node_modules/chalk/source/index.js
   var { stdout: stdoutColor, stderr: stderrColor } = browser_default;
   var GENERATOR = Symbol("GENERATOR");
   var STYLER = Symbol("STYLER");
@@ -14307,11 +14738,16 @@ If the task was not completed successfully, provide a brief, direct instruction 
       });
       return response.object;
     }
+    isStopped = false;
+    stop() {
+      this.isStopped = true;
+    }
     async execute(task) {
       if (!task) {
         throw new Error("No task provided.");
       }
       this.resetState();
+      this.isStopped = false;
       await Promise.all([this.createPlan(task), this.browser.start()]);
       this.emitTaskStartEvent(task);
       await this.browser.goto(this.url);
@@ -14324,9 +14760,11 @@ If the task was not completed successfully, provide a brief, direct instruction 
       let finalAnswer = null;
       let validationAttempts = 0;
       let lastValidationFeedback = "";
-      while (!finalAnswer && validationAttempts < 3) {
+      while (!finalAnswer && validationAttempts < 3 && !this.isStopped) {
         const pageSnapshot = await this.browser.getText();
+        if (this.isStopped) break;
         const result = await this.getNextActions(pageSnapshot);
+        if (this.isStopped) break;
         this.eventEmitter.emitEvent({
           type: "agent:current_step" /* CURRENT_STEP */,
           data: {
@@ -14484,6 +14922,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
       return finalAnswer;
     }
     async close() {
+      this.stop();
       this.logger.dispose();
       await this.browser.shutdown();
     }
@@ -14547,8 +14986,14 @@ If the task was not completed successfully, provide a brief, direct instruction 
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: (await this.getTab()).id },
         func: () => {
-          const snapshot = window.generateAriaTree(document.body, { forAI: true, refPrefix: "s1" });
-          return window.renderAriaTree(snapshot, { mode: "raw", forAI: true });
+          const snapshot = window.generateAriaTree(document.body, {
+            forAI: true,
+            refPrefix: "s1"
+          });
+          return window.renderAriaTree(snapshot, {
+            mode: "raw",
+            forAI: true
+          });
         }
       });
       return result;
@@ -14561,14 +15006,25 @@ If the task was not completed successfully, provide a brief, direct instruction 
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: (await this.getTab()).id },
         func: (ref2, action2, value2) => {
-          const snapshot = window.generateAriaTree(document.body, { forAI: true, refPrefix: "s1" });
+          const snapshot = window.generateAriaTree(document.body, {
+            forAI: true,
+            refPrefix: "s1"
+          });
           const element = snapshot.elements.get(ref2);
           if (!element) {
             throw new Error(`Element with ref ${ref2} not found`);
           }
           switch (action2) {
+            case "fill":
+              if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+                element.value = value2 || "";
+                element.dispatchEvent(new Event("input", { bubbles: true }));
+                element.dispatchEvent(new Event("change", { bubbles: true }));
+                return true;
+              }
             case "click":
               if (element instanceof HTMLElement) {
+                console.log(`[ExtensionBrowser] Element`, element);
                 element.click();
                 return true;
               }
@@ -14589,7 +15045,9 @@ If the task was not completed successfully, provide a brief, direct instruction 
               }
               break;
           }
-          throw new Error(`Action ${action2} not supported for element type ${element.constructor.name}`);
+          throw new Error(
+            `Action ${action2} not supported for element type ${element.constructor.name}`
+          );
         },
         args: [ref, action, value]
       });
@@ -14598,14 +15056,21 @@ If the task was not completed successfully, provide a brief, direct instruction 
       }
     }
     async waitForLoadState(state, options) {
-      console.log(`[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`);
-      await new Promise((resolve) => setTimeout(resolve, options?.timeout ?? 1e3));
+      console.log(
+        `[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`
+      );
+      await new Promise(
+        (resolve) => setTimeout(resolve, options?.timeout ?? 1e3)
+      );
     }
     /**
      * Helper to get the current active tab in the current window, or throw if not found
      */
     async getTab() {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true
+      });
       if (!tabs.length || !tabs[0].id) {
         throw new Error("No active tab found");
       }
@@ -14614,7 +15079,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
   };
 
   // src/extension/agentEntry.ts
-  async function runWebAgentTask(task, apiKey, apiEndpoint, model, logger) {
+  async function initWebAgent(apiKey, apiEndpoint, model, logger) {
     const browser2 = new ExtensionBrowser();
     const agent = new WebAgent(browser2, {
       debug: true,
@@ -14624,9 +15089,7 @@ If the task was not completed successfully, provide a brief, direct instruction 
         baseURL: apiEndpoint
       })(model)
     });
-    const result = await agent.execute(task);
-    await agent.close();
-    return result;
+    return agent;
   }
-  window.AgentAPI = { runWebAgentTask, SidebarLogger };
+  window.AgentAPI = { initWebAgent, SidebarLogger };
 })();

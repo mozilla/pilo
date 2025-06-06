@@ -418,6 +418,12 @@ export class WebAgent {
     return response.object;
   }
 
+  private isStopped = false;
+
+  stop() {
+    this.isStopped = true;
+  }
+
   async execute(task: string) {
     if (!task) {
       throw new Error("No task provided.");
@@ -425,6 +431,7 @@ export class WebAgent {
 
     // Reset state for new task
     this.resetState();
+    this.isStopped = false;
 
     // Run plan creation and browser launch concurrently
     await Promise.all([this.createPlan(task), this.browser.start()]);
@@ -451,12 +458,14 @@ export class WebAgent {
     let lastValidationFeedback = "";
 
     // Start the loop
-    while (!finalAnswer && validationAttempts < 3) {
+    while (!finalAnswer && validationAttempts < 3 && !this.isStopped) {
       // Get the page snapshot directly from the browser
       const pageSnapshot = await this.browser.getText();
+      if (this.isStopped) break;
 
       // Call LLM with the page snapshot
       const result = await this.getNextActions(pageSnapshot);
+       if (this.isStopped) break;
 
       // Emit observation and thought events
       this.eventEmitter.emitEvent({
@@ -665,6 +674,7 @@ export class WebAgent {
   }
 
   async close() {
+     this.stop();
     // Dispose the logger
     this.logger.dispose();
 

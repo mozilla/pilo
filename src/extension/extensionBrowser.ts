@@ -2,7 +2,7 @@
 // eslint-disable-next-line no-var
 declare var browser: any;
 
-import { AriaBrowser } from "../browser/ariaBrowser.js";
+import { AriaBrowser, PageAction } from '../browser/ariaBrowser.js';
 
 /**
  * ExtensionBrowser - Mock implementation of AriaBrowser for web extension context
@@ -11,12 +11,12 @@ import { AriaBrowser } from "../browser/ariaBrowser.js";
 export class ExtensionBrowser implements AriaBrowser {
   async start(): Promise<void> {
     // No-op for extension
-    console.log("[ExtensionBrowser] start()");
+    console.log('[ExtensionBrowser] start()');
   }
 
   async shutdown(): Promise<void> {
     // No-op for extension
-    console.log("[ExtensionBrowser] shutdown()");
+    console.log('[ExtensionBrowser] shutdown()');
   }
 
   async goto(url: string): Promise<void> {
@@ -50,26 +50,39 @@ export class ExtensionBrowser implements AriaBrowser {
       target: { tabId: (await this.getTab()).id },
       func: () => {
         // Use the globally available functions from content script
-        const snapshot = (window as any).generateAriaTree(document.body, { forAI: true, refPrefix: 's1' });
-        return (window as any).renderAriaTree(snapshot, { mode: 'raw', forAI: true });
-      }
+        const snapshot = (window as any).generateAriaTree(document.body, {
+          forAI: true,
+          refPrefix: 's1',
+        });
+        return (window as any).renderAriaTree(snapshot, {
+          mode: 'raw',
+          forAI: true,
+        });
+      },
     });
     return result;
   }
 
   async getScreenshot(): Promise<Buffer> {
     // TODO: Use browser.tabs.captureVisibleTab
-    console.log("[ExtensionBrowser] getScreenshot()");
+    console.log('[ExtensionBrowser] getScreenshot()');
     // Return an empty buffer for now
-    return Buffer.from("");
+    return Buffer.from('');
   }
 
-  async performAction(ref: string, action: string, value?: string): Promise<void> {
+  async performAction(
+    ref: string,
+    action: PageAction,
+    value?: string
+  ): Promise<void> {
     const [{ result }] = await browser.scripting.executeScript({
       target: { tabId: (await this.getTab()).id },
       func: (ref: string, action: string, value?: string) => {
         // Use the globally available functions from content script
-        const snapshot = (window as any).generateAriaTree(document.body, { forAI: true, refPrefix: 's1' });
+        const snapshot = (window as any).generateAriaTree(document.body, {
+          forAI: true,
+          refPrefix: 's1',
+        });
         const element = snapshot.elements.get(ref);
 
         if (!element) {
@@ -77,14 +90,28 @@ export class ExtensionBrowser implements AriaBrowser {
         }
 
         switch (action) {
+          case 'fill':
+            if (
+              element instanceof HTMLInputElement ||
+              element instanceof HTMLTextAreaElement
+            ) {
+              element.value = value || '';
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
           case 'click':
             if (element instanceof HTMLElement) {
+              console.log(`[ExtensionBrowser] Element`, element);
               element.click();
               return true;
             }
             break;
           case 'type':
-            if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+            if (
+              element instanceof HTMLInputElement ||
+              element instanceof HTMLTextAreaElement
+            ) {
               element.value = value || '';
               element.dispatchEvent(new Event('input', { bubbles: true }));
               element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -99,9 +126,11 @@ export class ExtensionBrowser implements AriaBrowser {
             }
             break;
         }
-        throw new Error(`Action ${action} not supported for element type ${element.constructor.name}`);
+        throw new Error(
+          `Action ${action} not supported for element type ${element.constructor.name}`
+        );
       },
-      args: [ref, action, value]
+      args: [ref, action, value],
     });
 
     if (!result) {
@@ -110,20 +139,27 @@ export class ExtensionBrowser implements AriaBrowser {
   }
 
   async waitForLoadState(
-    state: "networkidle" | "domcontentloaded" | "load",
+    state: 'networkidle' | 'domcontentloaded' | 'load',
     options?: { timeout?: number }
   ): Promise<void> {
-    console.log(`[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`);
-    await new Promise(resolve => setTimeout(resolve, options?.timeout ?? 1000));
+    console.log(
+      `[ExtensionBrowser] waitForLoadState(${state}, timeout=${options?.timeout})`
+    );
+    await new Promise((resolve) =>
+      setTimeout(resolve, options?.timeout ?? 1000)
+    );
   }
 
   /**
    * Helper to get the current active tab in the current window, or throw if not found
    */
   private async getTab(): Promise<any> {
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
     if (!tabs.length || !tabs[0].id) {
-      throw new Error("No active tab found");
+      throw new Error('No active tab found');
     }
     return tabs[0];
   }

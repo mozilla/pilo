@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "install-cli": "npm run build && chmod +x dist/index.js && npm install -g .",
-    "build:extension": "esbuild src/extension/agentEntry.ts --bundle --format=iife --platform=browser --outfile=src/extension/agent.bundle.js && esbuild src/extension/content.ts --bundle --format=iife --platform=browser --outfile=src/extension/content.bundle.js --alias:@isomorphic=./src/vendor/@isomorphic"
+    "build:extension": "esbuild src/extension/agentEntry.ts --bundle --format=iife --platform=browser --outfile=src/extension/distro/agent.bundle.js && esbuild src/extension/content.ts --bundle --format=iife --platform=browser --outfile=src/extension/distro/content.bundle.js --alias:@isomorphic=./src/vendor/@isomorphic"
   },
   "keywords": [],
   "author": "",
