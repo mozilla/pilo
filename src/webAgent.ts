@@ -3,14 +3,16 @@ import { openai } from "@ai-sdk/openai";
 import {
   actionLoopPrompt,
   buildPlanPrompt,
+  buildPlanAndUrlPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  validationFeedbackPrompt,
+  buildValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
 import { AriaBrowser, LoadState } from "./browser/ariaBrowser.js";
 import {
   planSchema,
+  planAndUrlSchema,
   actionSchema,
   Action,
   taskValidationSchema,
@@ -18,7 +20,6 @@ import {
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
-import { z } from "zod";
 
 /**
  * Options for configuring the WebAgent
@@ -65,11 +66,11 @@ export class WebAgent {
     this.logger.initialize(this.eventEmitter);
   }
 
-  async createPlan(task: string) {
+  async createPlanAndUrl(task: string) {
     const response = await generateObject({
       model: this.provider,
-      schema: planSchema,
-      prompt: buildPlanPrompt(task),
+      schema: planAndUrlSchema,
+      prompt: buildPlanAndUrlPrompt(task),
       temperature: 0,
     });
 
@@ -78,6 +79,20 @@ export class WebAgent {
     this.url = response.object.url;
 
     return { plan: this.plan, url: this.url };
+  }
+
+  async createPlan(task: string, startingUrl?: string) {
+    const response = await generateObject({
+      model: this.provider,
+      schema: planSchema,
+      prompt: buildPlanPrompt(task, startingUrl),
+      temperature: 0,
+    });
+
+    this.taskExplanation = response.object.explanation;
+    this.plan = response.object.plan;
+
+    return { plan: this.plan };
   }
 
   setupMessages(task: string) {
@@ -352,10 +367,7 @@ export class WebAgent {
     });
     this.messages.push({
       role: "user",
-      content: validationFeedbackPrompt.replace(
-        "{validationErrors}",
-        errors.join("\n")
-      ),
+      content: buildValidationFeedbackPrompt(errors.join("\n")),
     });
   }
 
@@ -418,7 +430,7 @@ export class WebAgent {
     return response.object;
   }
 
-  async execute(task: string) {
+  async execute(task: string, startingUrl?: string) {
     if (!task) {
       throw new Error("No task provided.");
     }
@@ -426,8 +438,15 @@ export class WebAgent {
     // Reset state for new task
     this.resetState();
 
-    // Run plan creation and browser launch concurrently
-    await Promise.all([this.createPlan(task), this.browser.start()]);
+    // If a starting URL is provided, use it directly
+    if (startingUrl) {
+      this.url = startingUrl;
+      // Run browser launch and plan creation concurrently
+      await Promise.all([this.createPlan(task, startingUrl), this.browser.start()]);
+    } else {
+      // Run plan creation and browser launch concurrently
+      await Promise.all([this.createPlanAndUrl(task), this.browser.start()]);
+    }
 
     // Emit task start event
     this.emitTaskStartEvent(task);

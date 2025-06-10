@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { PageAction } from "./browser/ariaBrowser.js";
 
-// Schema for the initial plan creation
+// Schema for plan creation (without URL)
 export const planSchema = z.object({
+  explanation: z.string(),
+  plan: z.string(),
+});
+
+// Schema for plan creation with URL
+export const planAndUrlSchema = z.object({
   explanation: z.string(),
   plan: z.string(),
   url: z.string(),
@@ -23,6 +29,7 @@ export const actionSchema = z.object({
 
 // Export the types
 export type Plan = z.infer<typeof planSchema>;
+export type PlanAndUrl = z.infer<typeof planAndUrlSchema>;
 export type Action = z.infer<typeof actionSchema>;
 
 // Schema for task validation results

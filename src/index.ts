@@ -8,18 +8,22 @@ import { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 // Load environment variables from .env file
 config();
 
-// Get the task from the args
+// Get the task and optional URL from the args
 const task = process.argv[2];
+const startingUrl = process.argv[3];
 
 if (!task) {
   console.error(chalk.red.bold("❌ Error: Missing task argument"));
   console.log("");
   console.log(chalk.white.bold("Usage:"));
-  console.log(`  ${chalk.cyan("spark")} ${chalk.green("<task>")}`);
+  console.log(`  ${chalk.cyan("spark")} ${chalk.green("<task>")} ${chalk.yellow("[url]")}`);
   console.log("");
-  console.log(chalk.white.bold("Example:"));
+  console.log(chalk.white.bold("Examples:"));
   console.log(
     `  ${chalk.cyan("spark")} ${chalk.green('"search for flights to Paris"')}`
+  );
+  console.log(
+    `  ${chalk.cyan("spark")} ${chalk.green('"find the latest news"')} ${chalk.yellow("https://news.ycombinator.com")}`
   );
   console.log("");
   process.exit(1);
@@ -46,7 +50,7 @@ const DEBUG = false;
     });
 
     // Execute the task
-    await webAgent.execute(task);
+    await webAgent.execute(task, startingUrl);
 
     // Close the browser when done
     await webAgent.close();
