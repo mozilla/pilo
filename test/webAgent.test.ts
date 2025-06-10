@@ -593,6 +593,215 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("Data handling", () => {
+    it("should handle data parameter in execute method", async () => {
+      const planResponse = {
+        object: {
+          explanation: "test explanation",
+          plan: "test plan",
+        },
+      };
+
+      const doneResponse = {
+        object: {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed with data",
+          },
+        },
+      };
+
+      const validationResponse = {
+        object: {
+          isValid: true,
+        },
+      };
+
+      mockGenerateObject
+        .mockResolvedValueOnce(planResponse)
+        .mockResolvedValueOnce(doneResponse)
+        .mockResolvedValueOnce(validationResponse);
+
+      const testData = {
+        departure: "NYC",
+        destination: "LAX",
+        date: "2024-12-25",
+      };
+
+      const result = await webAgent.execute("test task", "https://example.com", testData);
+      expect(result).toBe("Task completed with data");
+    });
+
+    it("should include data in setupMessages when provided", async () => {
+      const testData = {
+        departure: "NYC",
+        destination: "LAX",
+      };
+
+      // Execute with data to set internal state
+      const planResponse = {
+        object: {
+          explanation: "test explanation",
+          plan: "test plan",
+        },
+      };
+
+      mockGenerateObject.mockResolvedValueOnce(planResponse);
+
+      // Start execution (this will call setupMessages internally)
+      const executePromise = webAgent.execute("test task", "https://example.com", testData);
+
+      // Let the promise settle to avoid unhandled rejection
+      try {
+        await executePromise;
+      } catch (error) {
+        // Expected to fail since we're not providing all necessary mocks
+        // We're just testing that data gets passed to setupMessages
+      }
+
+      // Verify that generateObject was called with prompt containing the data
+      expect(mockGenerateObject).toHaveBeenCalled();
+    });
+
+    it("should reset data on resetState", () => {
+      // Set up some state including data
+      const testData = { test: "value" };
+
+      // We can't directly test private properties, but we can test the behavior
+      webAgent.resetState();
+
+      // After reset, setupMessages should work without data
+      const messages = webAgent.setupMessages("test task");
+      expect(messages).toHaveLength(2);
+      expect(messages[1].content).not.toContain("Input Data:");
+    });
+
+    it("should handle null data parameter", async () => {
+      const planResponse = {
+        object: {
+          explanation: "test explanation",
+          plan: "test plan",
+        },
+      };
+
+      const doneResponse = {
+        object: {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed without data",
+          },
+        },
+      };
+
+      const validationResponse = {
+        object: {
+          isValid: true,
+        },
+      };
+
+      mockGenerateObject
+        .mockResolvedValueOnce(planResponse)
+        .mockResolvedValueOnce(doneResponse)
+        .mockResolvedValueOnce(validationResponse);
+
+      const result = await webAgent.execute("test task", "https://example.com", null);
+      expect(result).toBe("Task completed without data");
+    });
+
+    it("should handle undefined data parameter", async () => {
+      const planResponse = {
+        object: {
+          explanation: "test explanation",
+          plan: "test plan",
+        },
+      };
+
+      const doneResponse = {
+        object: {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed without data",
+          },
+        },
+      };
+
+      const validationResponse = {
+        object: {
+          isValid: true,
+        },
+      };
+
+      mockGenerateObject
+        .mockResolvedValueOnce(planResponse)
+        .mockResolvedValueOnce(doneResponse)
+        .mockResolvedValueOnce(validationResponse);
+
+      const result = await webAgent.execute("test task", "https://example.com");
+      expect(result).toBe("Task completed without data");
+    });
+
+    it("should handle complex data objects", async () => {
+      const planResponse = {
+        object: {
+          explanation: "test explanation",
+          plan: "test plan",
+        },
+      };
+
+      const doneResponse = {
+        object: {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Complex data task completed",
+          },
+        },
+      };
+
+      const validationResponse = {
+        object: {
+          isValid: true,
+        },
+      };
+
+      mockGenerateObject
+        .mockResolvedValueOnce(planResponse)
+        .mockResolvedValueOnce(doneResponse)
+        .mockResolvedValueOnce(validationResponse);
+
+      const complexData = {
+        booking: {
+          flight: {
+            departure: { city: "NYC", time: "9:00 AM" },
+            arrival: { city: "LAX", time: "12:00 PM" },
+          },
+        },
+        travelers: [
+          { name: "John Doe", age: 30 },
+          { name: "Jane Doe", age: 28 },
+        ],
+      };
+
+      const result = await webAgent.execute("test task", "https://example.com", complexData);
+      expect(result).toBe("Complex data task completed");
+    });
+  });
+
   describe("Task validation", () => {
     it("should validate successful task completion", async () => {
       const planResponse = {

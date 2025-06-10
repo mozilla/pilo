@@ -40,7 +40,21 @@ cp .env.example .env
 pnpm run spark "what is the current temperature in London?"
 ```
 
+## Usage
+
+Spark accepts up to three arguments:
+
+```bash
+pnpm run spark "<task>" [url] [data]
+```
+
+- **task**: Natural language description of what you want to do (required)
+- **url**: Starting URL to begin the task from (optional)
+- **data**: JSON object with contextual data for the task (optional)
+
 ## Examples
+
+### Basic Usage
 
 ```bash
 # Get current weather
@@ -52,6 +66,45 @@ pnpm run spark "what is the current price of AAPL stock"
 # Get latest news
 pnpm run spark "what is the top headline on Reuters"
 ```
+
+### With Starting URL
+
+```bash
+# Start from a specific website
+pnpm run spark "find the latest news" "https://news.ycombinator.com"
+
+# Check weather on a specific weather site
+pnpm run spark "get weather for San Francisco" "https://weather.com"
+
+# Book a flight from NYC to LAX on December 25th for 2 passengers
+pnpm run spark "book a flight from NYC to LAX on December 25th for 2 passengers" "https://airline.com"
+```
+
+### With Contextual Data
+
+You can provide details either in the task description OR in the data object. Using the data object helps keep the task description clean and provides structured information the AI can easily reference.
+
+```bash
+# Same task as above, but with structured data instead of in the prompt
+pnpm run spark "book a flight" "https://airline.com" '{"departure":"NYC","destination":"LAX","date":"2024-12-25","passengers":2}'
+
+# Fill out a form with provided information
+pnpm run spark "submit contact form" "https://example.com/contact" '{"name":"John Doe","email":"john@example.com","message":"Hello world"}'
+
+# Compare: details in prompt vs. data object
+pnpm run spark "find hotels in Paris from Dec 20-22 for 2 guests" "https://booking.com"
+# vs.
+pnpm run spark "find hotels" "https://booking.com" '{"location":"Paris","checkIn":"2024-12-20","checkOut":"2024-12-22","guests":2}'
+```
+
+**When to use data objects:**
+
+- Complex information with multiple fields
+- Structured data like dates, IDs, or specifications
+- When you want to keep the task description simple and focused
+- For reusable templates where only the data changes
+
+The data object is passed as JSON and becomes available to the AI throughout the entire task execution, allowing it to reference the information when filling forms, making selections, or completing complex workflows.
 
 ## Development
 

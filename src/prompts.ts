@@ -109,15 +109,27 @@ Task: {{task}}
 Explanation: {{explanation}}
 Plan: {{plan}}
 Today's Date: {{currentDate}}
+{{#if data}}
+Input Data:
+\`\`\`json
+{{data}}
+\`\`\`
+{{/if}}
 `.trim(),
 );
 
-export const buildTaskAndPlanPrompt = (task: string, explanation: string, plan: string) =>
+export const buildTaskAndPlanPrompt = (
+  task: string,
+  explanation: string,
+  plan: string,
+  data?: any,
+) =>
   taskAndPlanTemplate({
     task,
     explanation,
     plan,
     currentDate: getCurrentFormattedDate(),
+    data: data ? JSON.stringify(data, null, 2) : null,
   });
 
 const pageSnapshotTemplate = buildPromptTemplate(

@@ -42,6 +42,7 @@ export class WebAgent {
   private provider: LanguageModel;
   private DEBUG = false;
   private taskExplanation: string = "";
+  private data: any = null;
   private readonly FILTERED_PREFIXES = ["/url:"];
   private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
     [/^listitem/g, "li"],
@@ -106,7 +107,7 @@ export class WebAgent {
       },
       {
         role: "user",
-        content: buildTaskAndPlanPrompt(task, this.taskExplanation, this.plan),
+        content: buildTaskAndPlanPrompt(task, this.taskExplanation, this.plan, this.data),
       },
     ];
     return this.messages;
@@ -377,6 +378,7 @@ export class WebAgent {
     this.plan = "";
     this.url = "";
     this.messages = [];
+    this.data = null;
     this.currentPage = { url: "", title: "" };
   }
 
@@ -405,13 +407,18 @@ export class WebAgent {
     return response.object;
   }
 
-  async execute(task: string, startingUrl?: string) {
+  async execute(task: string, startingUrl?: string, data?: any) {
     if (!task) {
       throw new Error("No task provided.");
     }
 
     // Reset state for new task
     this.resetState();
+
+    // Store the data if provided
+    if (data) {
+      this.data = data;
+    }
 
     // If a starting URL is provided, use it directly
     if (startingUrl) {
