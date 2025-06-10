@@ -58,7 +58,10 @@ export class WebAgent {
   private readonly ARIA_REF_REGEX = /^s\d+e\d+$/;
   private readonly ARIA_REF_EXTRACT_REGEX = /\b(s\d+e\d+)\b/;
 
-  constructor(private browser: AriaBrowser, options: WebAgentOptions = {}) {
+  constructor(
+    private browser: AriaBrowser,
+    options: WebAgentOptions = {},
+  ) {
     this.DEBUG = options.debug || false;
     this.provider = options.provider || openai("gpt-4.1");
     this.eventEmitter = new WebAgentEventEmitter();
@@ -176,33 +179,22 @@ export class WebAgent {
       case "check":
       case "uncheck":
         if (!action.ref) {
-          errors.push(
-            `Missing required "ref" field for ${action.action} action`
-          );
+          errors.push(`Missing required "ref" field for ${action.action} action`);
         } else {
-          const { isValid, error, correctedRef } = this.validateAriaRef(
-            action.ref
-          );
+          const { isValid, error, correctedRef } = this.validateAriaRef(action.ref);
           if (!isValid && error) {
             errors.push(error);
           } else if (correctedRef) {
             correctedResponse.action.ref = correctedRef;
           }
         }
-        if (
-          (action.action === "fill" || action.action === "select") &&
-          !action.value?.trim()
-        ) {
-          errors.push(
-            `Missing required "value" field for ${action.action} action`
-          );
+        if ((action.action === "fill" || action.action === "select") && !action.value?.trim()) {
+          errors.push(`Missing required "value" field for ${action.action} action`);
         }
         break;
       case "wait":
         if (!action.value || isNaN(Number(action.value))) {
-          errors.push(
-            'Missing or invalid "value" field for wait action (must be a number)'
-          );
+          errors.push('Missing or invalid "value" field for wait action (must be a number)');
         }
         break;
       case "done":
@@ -218,9 +210,7 @@ export class WebAgent {
       case "back":
       case "forward":
         if (action.ref || action.value) {
-          errors.push(
-            `${action.action} action should not have ref or value fields`
-          );
+          errors.push(`${action.action} action should not have ref or value fields`);
         }
         break;
     }
@@ -287,16 +277,14 @@ export class WebAgent {
       temperature: 0,
     });
 
-    const { isValid, errors, correctedResponse } = this.validateActionResponse(
-      response.object
-    );
+    const { isValid, errors, correctedResponse } = this.validateActionResponse(response.object);
 
     if (!isValid) {
       if (retryCount >= 2) {
         throw new Error(
           `Failed to get valid response after ${
             retryCount + 1
-          } attempts. Errors: ${errors.join(", ")}`
+          } attempts. Errors: ${errors.join(", ")}`,
         );
       }
 
@@ -314,9 +302,7 @@ export class WebAgent {
   private logCompressionStats(original: string, compressed: string) {
     const originalSize = original.length;
     const compressedSize = compressed.length;
-    const compressionPercent = Math.round(
-      (1 - compressedSize / originalSize) * 100
-    );
+    const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
 
     this.eventEmitter.emitEvent({
       type: WebAgentEventType.DEBUG_COMPRESSION,
@@ -329,21 +315,10 @@ export class WebAgent {
     });
   }
 
-  private updateMessagesWithSnapshot(
-    pageTitle: string,
-    pageUrl: string,
-    snapshot: string
-  ) {
+  private updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
     this.messages.forEach((msg: any) => {
-      if (
-        msg.role === "user" &&
-        msg.content.includes("snapshot") &&
-        msg.content.includes("```")
-      ) {
-        msg.content = msg.content.replace(
-          /```[\s\S]*$/g,
-          "```[snapshot clipped for length]```"
-        );
+      if (msg.role === "user" && msg.content.includes("snapshot") && msg.content.includes("```")) {
+        msg.content = msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```");
       }
     });
 
@@ -407,7 +382,7 @@ export class WebAgent {
 
   private async validateTaskCompletion(
     task: string,
-    finalAnswer: string
+    finalAnswer: string,
   ): Promise<TaskValidationResult> {
     const response = await generateObject({
       model: this.provider,
@@ -530,10 +505,7 @@ export class WebAgent {
         }
 
         // Validate the task completion
-        const { isValid, feedback } = await this.validateTaskCompletion(
-          task,
-          finalAnswer
-        );
+        const { isValid, feedback } = await this.validateTaskCompletion(task, finalAnswer);
 
         if (isValid) {
           // Emit task complete event
@@ -566,7 +538,7 @@ export class WebAgent {
           }
 
           throw new Error(
-            `Failed to complete task after ${validationAttempts} attempts. Last feedback: ${lastValidationFeedback}`
+            `Failed to complete task after ${validationAttempts} attempts. Last feedback: ${lastValidationFeedback}`,
           );
         }
       }
@@ -624,7 +596,7 @@ export class WebAgent {
             await this.browser.performAction(
               result.action.ref,
               result.action.action,
-              result.action.value
+              result.action.value,
             );
 
             // For actions that potentially cause navigation (click, select),
@@ -636,10 +608,7 @@ export class WebAgent {
               ]);
 
               // Only record navigation if URL or title changed
-              if (
-                actionUrl !== this.currentPage.url ||
-                actionTitle !== this.currentPage.title
-              ) {
+              if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
                 this.recordNavigationEvent(actionTitle, actionUrl);
               }
             }
@@ -700,15 +669,11 @@ export class WebAgent {
       .split("\n")
       .map((line) => line.trim())
       .map((line) => line.replace(/^- /, ""))
-      .filter(
-        (line) =>
-          !this.FILTERED_PREFIXES.some((start) => line.startsWith(start))
-      )
+      .filter((line) => !this.FILTERED_PREFIXES.some((start) => line.startsWith(start)))
       .map((line) => {
         return this.ARIA_TRANSFORMATIONS.reduce(
-          (processed, [pattern, replacement]) =>
-            processed.replace(pattern, replacement),
-          line
+          (processed, [pattern, replacement]) => processed.replace(pattern, replacement),
+          line,
         );
       })
       .filter(Boolean);

@@ -19,11 +19,9 @@ if (!task) {
   console.log(`  ${chalk.cyan("spark")} ${chalk.green("<task>")} ${chalk.yellow("[url]")}`);
   console.log("");
   console.log(chalk.white.bold("Examples:"));
+  console.log(`  ${chalk.cyan("spark")} ${chalk.green('"search for flights to Paris"')}`);
   console.log(
-    `  ${chalk.cyan("spark")} ${chalk.green('"search for flights to Paris"')}`
-  );
-  console.log(
-    `  ${chalk.cyan("spark")} ${chalk.green('"find the latest news"')} ${chalk.yellow("https://news.ycombinator.com")}`
+    `  ${chalk.cyan("spark")} ${chalk.green('"find the latest news"')} ${chalk.yellow("https://news.ycombinator.com")}`,
   );
   console.log("");
   process.exit(1);

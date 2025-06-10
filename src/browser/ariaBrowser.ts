@@ -73,8 +73,5 @@ export interface AriaBrowser {
    * @param state The load state to wait for
    * @param options Additional options like timeout
    */
-  waitForLoadState(
-    state: LoadState,
-    options?: { timeout?: number }
-  ): Promise<void>;
+  waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
 }
