@@ -642,7 +642,7 @@ describe("WebAgent", () => {
         destination: "LAX",
       };
 
-      // Execute with data to set internal state
+      // Mock all required responses for a complete execution
       const planResponse = {
         object: {
           explanation: "test explanation",
@@ -650,21 +650,34 @@ describe("WebAgent", () => {
         },
       };
 
-      mockGenerateObject.mockResolvedValueOnce(planResponse);
+      const doneResponse = {
+        object: {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed with data included",
+          },
+        },
+      };
 
-      // Start execution (this will call setupMessages internally)
-      const executePromise = webAgent.execute("test task", "https://example.com", testData);
+      const validationResponse = {
+        object: {
+          isValid: true,
+        },
+      };
 
-      // Let the promise settle to avoid unhandled rejection
-      try {
-        await executePromise;
-      } catch (error) {
-        // Expected to fail since we're not providing all necessary mocks
-        // We're just testing that data gets passed to setupMessages
-      }
+      mockGenerateObject
+        .mockResolvedValueOnce(planResponse)
+        .mockResolvedValueOnce(doneResponse)
+        .mockResolvedValueOnce(validationResponse);
 
-      // Verify that generateObject was called with prompt containing the data
-      expect(mockGenerateObject).toHaveBeenCalled();
+      const result = await webAgent.execute("test task", "https://example.com", testData);
+
+      expect(result).toBe("Task completed with data included");
+      expect(mockGenerateObject).toHaveBeenCalledTimes(3);
     });
 
     it("should reset data on resetState", () => {
