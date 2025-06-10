@@ -26,10 +26,8 @@ export class PlaywrightBrowser implements AriaBrowser {
       device?: string;
       bypassCSP?: boolean;
       blockAds?: boolean;
-      blockResources?: Array<
-        "image" | "stylesheet" | "font" | "media" | "manifest"
-      >;
-    } = {}
+      blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
+    } = {},
   ) {}
 
   async start(): Promise<void> {
@@ -99,7 +97,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.error(
         `❌ Navigation failed to: ${url} - ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       throw error; // Re-throw to allow caller to handle
     }
@@ -117,9 +115,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       await this.ensureOptimizedPageLoad();
     } catch (error) {
       console.error(
-        `❌ Back navigation failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `❌ Back navigation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error; // Re-throw to allow caller to handle
     }
@@ -137,9 +133,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       await this.ensureOptimizedPageLoad();
     } catch (error) {
       console.error(
-        `❌ Forward navigation failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `❌ Forward navigation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error; // Re-throw to allow caller to handle
     }
@@ -155,9 +149,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.debug("✅ DOM content loaded successfully");
     } catch (error) {
       console.error(
-        `❌ DOM content load failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `❌ DOM content load failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Still continue since we might be able to interact with what's loaded
     }
@@ -173,7 +165,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.debug(
         `⚠️ Page load timed out after ${this.ACTION_TIMEOUT_MS}ms: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
     }
   }
@@ -198,16 +190,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     return await this.page.screenshot();
   }
 
-  async waitForLoadState(
-    state: LoadState,
-    options?: { timeout?: number }
-  ): Promise<void> {
+  async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     try {
       console.debug(
         `🔄 Waiting for load state: ${state}${
           options?.timeout ? ` with timeout ${options.timeout}ms` : ""
-        }`
+        }`,
       );
       await this.page.waitForLoadState(state, options);
       console.debug(`✅ Load state "${state}" reached successfully`);
@@ -215,17 +204,13 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.error(
         `❌ Failed to reach load state "${state}": ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       throw error; // Re-throw to allow caller to handle
     }
   }
 
-  async performAction(
-    ref: string,
-    action: PageAction,
-    value?: string
-  ): Promise<void> {
+  async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
 
     try {
@@ -233,7 +218,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.debug(
         `🔄 Performing ${action} action on element with ref=${ref}${
           value ? ` with value="${value}"` : ""
-        }`
+        }`,
       );
 
       // Create a locator for the element
@@ -256,9 +241,7 @@ export class PlaywrightBrowser implements AriaBrowser {
         case PageAction.Fill:
           if (!value) throw new Error("Value required for fill action");
           await locator.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(
-            `✅ Fill successful on ref=${ref} with value="${value}"`
-          );
+          console.debug(`✅ Fill successful on ref=${ref} with value="${value}"`);
           break;
 
         case PageAction.Focus:
@@ -281,9 +264,7 @@ export class PlaywrightBrowser implements AriaBrowser {
           await locator.selectOption(value, {
             timeout: this.ACTION_TIMEOUT_MS,
           });
-          console.debug(
-            `✅ Select successful on ref=${ref} with value="${value}"`
-          );
+          console.debug(`✅ Select successful on ref=${ref} with value="${value}"`);
           // Forms might trigger page reloads on select
           await this.ensureOptimizedPageLoad();
           break;
@@ -326,12 +307,10 @@ export class PlaywrightBrowser implements AriaBrowser {
       console.error(
         `❌ Failed to perform ${action} action on ref=${ref}${
           value ? ` with value="${value}"` : ""
-        }: ${error instanceof Error ? error.message : String(error)}`
+        }: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw new Error(
-        `Failed to perform action: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

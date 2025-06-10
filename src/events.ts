@@ -194,7 +194,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   onEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.on(eventType, listener);
   }
@@ -204,7 +204,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   onceEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.once(eventType, listener);
   }
@@ -214,7 +214,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   offEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.off(eventType, listener);
   }

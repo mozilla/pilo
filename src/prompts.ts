@@ -7,7 +7,8 @@ You adapt to situations and find creative ways to complete tasks without getting
 
 import { buildPromptTemplate } from "./templateUtils.js";
 
-const planPromptTemplate = buildPromptTemplate(`
+const planPromptTemplate = buildPromptTemplate(
+  `
 {{youArePrompt}}
 Create a plan for this web navigation task.
 Provide a clear explanation{{#if includeUrl}}, step-by-step plan, and starting URL{{else}} and step-by-step plan{{/if}}.
@@ -33,23 +34,24 @@ Respond with a JSON object matching this structure:
   "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"{{/if}}
 }
 \`\`\`
-`.trim());
+`.trim(),
+);
 
-export const buildPlanAndUrlPrompt = (task: string) => 
+export const buildPlanAndUrlPrompt = (task: string) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
-    includeUrl: true
+    includeUrl: true,
   });
 
-export const buildPlanPrompt = (task: string, startingUrl?: string) => 
+export const buildPlanPrompt = (task: string, startingUrl?: string) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: false,
-    startingUrl
+    startingUrl,
   });
 
 const actionLoopResponseFormat = `{
@@ -101,25 +103,25 @@ ${actionLoopResponseFormat}
 \`\`\`
 `.trim();
 
-const taskAndPlanTemplate = buildPromptTemplate(`
+const taskAndPlanTemplate = buildPromptTemplate(
+  `
 Task: {{task}}
 Explanation: {{explanation}}
 Plan: {{plan}}
 Today's Date: {{currentDate}}
-`.trim());
+`.trim(),
+);
 
-export const buildTaskAndPlanPrompt = (
-  task: string,
-  explanation: string,
-  plan: string
-) => taskAndPlanTemplate({
-  task,
-  explanation,
-  plan,
-  currentDate: getCurrentFormattedDate()
-});
+export const buildTaskAndPlanPrompt = (task: string, explanation: string, plan: string) =>
+  taskAndPlanTemplate({
+    task,
+    explanation,
+    plan,
+    currentDate: getCurrentFormattedDate(),
+  });
 
-const pageSnapshotTemplate = buildPromptTemplate(`
+const pageSnapshotTemplate = buildPromptTemplate(
+  `
 This is a text snapshot of the current page in the browser.
 
 Title: {{title}}
@@ -133,19 +135,18 @@ Assess the current state and choose your next action.
 Focus on the most relevant elements that help complete your task.
 If content appears dynamic or paginated, consider waiting or exploring navigation options.
 If an action has failed twice, try something else or move on.
-`.trim());
+`.trim(),
+);
 
-export const buildPageSnapshotPrompt = (
-  title: string,
-  url: string,
-  snapshot: string
-) => pageSnapshotTemplate({
-  title,
-  url,
-  snapshot
-});
+export const buildPageSnapshotPrompt = (title: string, url: string, snapshot: string) =>
+  pageSnapshotTemplate({
+    title,
+    url,
+    snapshot,
+  });
 
-const validationFeedbackTemplate = buildPromptTemplate(`
+const validationFeedbackTemplate = buildPromptTemplate(
+  `
 Your previous response did not match the required format. Here are the validation errors:
 
 {{validationErrors}}
@@ -161,15 +162,17 @@ Remember:
 - For "wait" action, you MUST provide a "value" with the number of seconds
 - For "done" action, you MUST provide a "value" with the final result
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
-`.trim());
+`.trim(),
+);
 
-export const buildValidationFeedbackPrompt = (validationErrors: string) => 
+export const buildValidationFeedbackPrompt = (validationErrors: string) =>
   validationFeedbackTemplate({
     validationErrors,
-    actionLoopResponseFormat
+    actionLoopResponseFormat,
   });
 
-const taskValidationTemplate = buildPromptTemplate(`
+const taskValidationTemplate = buildPromptTemplate(
+  `
 Review the task completion and determine if it was successful.
 
 Task: {{task}}
@@ -181,15 +184,14 @@ Consider:
 3. Does it provide the requested information or perform the requested action?
 
 If the task was not completed successfully, provide a brief, direct instruction on what needs to be done to complete it.
-`.trim());
+`.trim(),
+);
 
-export const buildTaskValidationPrompt = (
-  task: string,
-  finalAnswer: string
-): string => taskValidationTemplate({
-  task,
-  finalAnswer
-});
+export const buildTaskValidationPrompt = (task: string, finalAnswer: string): string =>
+  taskValidationTemplate({
+    task,
+    finalAnswer,
+  });
 
 function getCurrentFormattedDate() {
   const date = new Date();
