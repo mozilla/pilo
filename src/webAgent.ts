@@ -80,7 +80,7 @@ export class WebAgent {
     const response = await generateObject({
       model: this.provider,
       schema: planAndUrlSchema,
-      prompt: buildPlanAndUrlPrompt(task),
+      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
       temperature: 0,
     });
 
@@ -95,7 +95,7 @@ export class WebAgent {
     const response = await generateObject({
       model: this.provider,
       schema: planSchema,
-      prompt: buildPlanPrompt(task, startingUrl),
+      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
       temperature: 0,
     });
 

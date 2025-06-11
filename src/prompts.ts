@@ -17,14 +17,14 @@ Focus on general steps and goals rather than specific page features or UI elemen
 Today's Date: {{currentDate}}
 Task: {{task}}
 {{#if startingUrl}}Starting URL: {{startingUrl}}{{/if}}
+{{#if guardrails}}Guardrails: {{guardrails}}{{/if}}
 
 Best Practices:
 - When explaining the task, make sure to expand all dates to include the year.
 - For booking tasks, all dates must be in the future.
 - Avoid assumptions about specific UI layouts that may change.
-{{#if startingUrl}}
-- Use the provided starting URL as your starting point for the task.
-{{/if}}
+{{#if startingUrl}}- Use the provided starting URL as your starting point for the task.{{/if}}
+{{#if guardrails}}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{{/if}}
 
 Respond with a JSON object matching this structure:
 \`\`\`json
@@ -37,21 +37,23 @@ Respond with a JSON object matching this structure:
 `.trim(),
 );
 
-export const buildPlanAndUrlPrompt = (task: string) =>
+export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: true,
+    guardrails,
   });
 
-export const buildPlanPrompt = (task: string, startingUrl?: string) =>
+export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?: string | null) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: false,
     startingUrl,
+    guardrails,
   });
 
 const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
@@ -124,7 +126,7 @@ Input Data:
 {{/if}}
 {{#if guardrails}}
 
-🚨 MANDATORY GUARDRAILS 🚨
+**MANDATORY GUARDRAILS**
 {{guardrails}}
 
 These guardrails are ABSOLUTE REQUIREMENTS that you MUST follow at all times. Any action that violates these guardrails is STRICTLY FORBIDDEN.

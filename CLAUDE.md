@@ -11,7 +11,7 @@ Development commands:
 - `pnpm run typecheck` - Run TypeScript type checking without emitting files
 - `pnpm test` - Run tests with Vitest
 - `pnpm run test:watch` - Run tests in watch mode
-- `pnpm run format` - Format code with Prettier 
+- `pnpm run format` - Format code with Prettier
 - `pnpm run format:check` - Check code formatting without modifying files
 
 Setup commands:
@@ -71,6 +71,7 @@ Spark is an AI-powered web automation tool that combines natural language unders
 Guardrails provide a way to limit what the WebAgent can do during task execution. When provided, the agent will consider these constraints in its thought process before taking any action.
 
 Examples:
+
 - `"Do not make any purchases or bookings"`
 - `"Only search and browse, do not submit any forms"`
 - `"Avoid clicking on external links outside the current domain"`
