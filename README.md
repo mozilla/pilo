@@ -42,15 +42,16 @@ pnpm run spark "what is the current temperature in London?"
 
 ## Usage
 
-Spark accepts up to three arguments:
+Spark accepts up to four arguments:
 
 ```bash
-pnpm run spark "<task>" [url] [data]
+pnpm run spark "<task>" [url] [data] [guardrails]
 ```
 
 - **task**: Natural language description of what you want to do (required)
 - **url**: Starting URL to begin the task from (optional)
 - **data**: JSON object with contextual data for the task (optional)
+- **guardrails**: String with limitations or constraints for the agent (optional)
 
 ## Examples
 
@@ -105,6 +106,28 @@ pnpm run spark "find hotels" "https://booking.com" '{"location":"Paris","checkIn
 - For reusable templates where only the data changes
 
 The data object is passed as JSON and becomes available to the AI throughout the entire task execution, allowing it to reference the information when filling forms, making selections, or completing complex workflows.
+
+### With Guardrails
+
+You can provide guardrails to limit what the agent can do:
+
+```bash
+# Search without making any purchases
+pnpm run spark "find flights to Tokyo" "https://airline.com" "" "Do not make any bookings or purchases"
+
+# Browse only, no form submissions
+pnpm run spark "check product availability" "https://store.com" '{"product":"laptop"}' "Only browse and search, do not submit any forms"
+
+# Stay within current domain
+pnpm run spark "find company contact info" "https://company.com" "" "Do not navigate to external websites"
+```
+
+**When to use guardrails:**
+
+- Prevent unintended actions like purchases or bookings
+- Limit navigation scope to specific domains
+- Restrict form submissions or data entry
+- Ensure the agent only performs safe, read-only operations
 
 ## Development
 

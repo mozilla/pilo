@@ -17,14 +17,14 @@ Focus on general steps and goals rather than specific page features or UI elemen
 Today's Date: {{currentDate}}
 Task: {{task}}
 {{#if startingUrl}}Starting URL: {{startingUrl}}{{/if}}
+{{#if guardrails}}Guardrails: {{guardrails}}{{/if}}
 
 Best Practices:
 - When explaining the task, make sure to expand all dates to include the year.
 - For booking tasks, all dates must be in the future.
 - Avoid assumptions about specific UI layouts that may change.
-{{#if startingUrl}}
-- Use the provided starting URL as your starting point for the task.
-{{/if}}
+{{#if startingUrl}}- Use the provided starting URL as your starting point for the task.{{/if}}
+{{#if guardrails}}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{{/if}}
 
 Respond with a JSON object matching this structure:
 \`\`\`json
@@ -37,39 +37,43 @@ Respond with a JSON object matching this structure:
 `.trim(),
 );
 
-export const buildPlanAndUrlPrompt = (task: string) =>
+export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: true,
+    guardrails,
   });
 
-export const buildPlanPrompt = (task: string, startingUrl?: string) =>
+export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?: string | null) =>
   planPromptTemplate({
     youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: false,
     startingUrl,
+    guardrails,
   });
 
-const actionLoopResponseFormat = `{
+const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
   "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note the type of data you should extract from the page to complete the task.",
   "extractedData": "Only extract important data from the page that is needed to complete the task. This shouldn't include any element refs. Use markdown to structure this data clearly.",
-  "thought": "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach.",
+  "thought": "Reasoning for your next action.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
   "action": {
     "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
     "ref": "reference to the element on the page (e.g., 's#e##'). Not needed for done/wait/goto/back/forward.",
     "value": "Required for fill/select/goto, seconds for wait, result for done."
   }
-}`;
+}`);
 
-export const actionLoopPrompt = `
+const buildActionLoopPrompt = (hasGuardrails: boolean) =>
+  `
 ${youArePrompt}
 For each step, assess the current state and decide on the next action to take.
 Consider the outcome of previous actions and explain your reasoning.
+${hasGuardrails ? "\n🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN." : ""}
 
 Actions:
 - "select": Select option from dropdown (ref=element reference, value=option)
@@ -91,17 +95,22 @@ Rules:
 4. For "done", include the final result in value
 5. Use "wait" for page loads, animations, or dynamic content
 6. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
+${hasGuardrails ? "7. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION" : ""}
 
 Best Practices:
 - Use click instead of goto whenever possible, especially for navigation elements on the page.
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
+${hasGuardrails ? "- Before taking any action, verify it does not violate the guardrails" : ""}
 
 Respond with a JSON object matching this structure:
 \`\`\`json
-${actionLoopResponseFormat}
+${actionLoopResponseFormatTemplate({ hasGuardrails })}
 \`\`\`
 `.trim();
+
+export const actionLoopPrompt = buildActionLoopPrompt(false);
+export { buildActionLoopPrompt };
 
 const taskAndPlanTemplate = buildPromptTemplate(
   `
@@ -115,6 +124,13 @@ Input Data:
 {{data}}
 \`\`\`
 {{/if}}
+{{#if guardrails}}
+
+**MANDATORY GUARDRAILS**
+{{guardrails}}
+
+These guardrails are ABSOLUTE REQUIREMENTS that you MUST follow at all times. Any action that violates these guardrails is STRICTLY FORBIDDEN.
+{{/if}}
 `.trim(),
 );
 
@@ -123,6 +139,7 @@ export const buildTaskAndPlanPrompt = (
   explanation: string,
   plan: string,
   data?: any,
+  guardrails?: string | null,
 ) =>
   taskAndPlanTemplate({
     task,
@@ -130,6 +147,7 @@ export const buildTaskAndPlanPrompt = (
     plan,
     currentDate: getCurrentFormattedDate(),
     data: data ? JSON.stringify(data, null, 2) : null,
+    guardrails,
   });
 
 const pageSnapshotTemplate = buildPromptTemplate(
@@ -174,13 +192,20 @@ Remember:
 - For "wait" action, you MUST provide a "value" with the number of seconds
 - For "done" action, you MUST provide a "value" with the final result
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
+{{#if hasGuardrails}}
+- ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+{{/if}}
 `.trim(),
 );
 
-export const buildValidationFeedbackPrompt = (validationErrors: string) =>
+export const buildValidationFeedbackPrompt = (
+  validationErrors: string,
+  hasGuardrails: boolean = false,
+) =>
   validationFeedbackTemplate({
     validationErrors,
-    actionLoopResponseFormat,
+    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
+    hasGuardrails,
   });
 
 const taskValidationTemplate = buildPromptTemplate(

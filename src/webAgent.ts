@@ -2,6 +2,7 @@ import { generateObject, LanguageModel } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
   actionLoopPrompt,
+  buildActionLoopPrompt,
   buildPlanPrompt,
   buildPlanAndUrlPrompt,
   buildTaskAndPlanPrompt,
@@ -33,6 +34,9 @@ export interface WebAgentOptions {
 
   /** AI Provider to use for LLM requests (defaults to openai("gpt-4.1-nano")) */
   provider?: LanguageModel;
+
+  /** Optional guardrails to limit what the agent can do */
+  guardrails?: string;
 }
 
 export class WebAgent {
@@ -43,6 +47,7 @@ export class WebAgent {
   private DEBUG = false;
   private taskExplanation: string = "";
   private data: any = null;
+  private guardrails: string | null = null;
   private readonly FILTERED_PREFIXES = ["/url:"];
   private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
     [/^listitem/g, "li"],
@@ -68,13 +73,14 @@ export class WebAgent {
     this.eventEmitter = new WebAgentEventEmitter();
     this.logger = options.logger || new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
+    this.guardrails = options.guardrails || null;
   }
 
   async createPlanAndUrl(task: string) {
     const response = await generateObject({
       model: this.provider,
       schema: planAndUrlSchema,
-      prompt: buildPlanAndUrlPrompt(task),
+      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
       temperature: 0,
     });
 
@@ -89,7 +95,7 @@ export class WebAgent {
     const response = await generateObject({
       model: this.provider,
       schema: planSchema,
-      prompt: buildPlanPrompt(task, startingUrl),
+      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
       temperature: 0,
     });
 
@@ -100,14 +106,21 @@ export class WebAgent {
   }
 
   setupMessages(task: string) {
+    const hasGuardrails = !!this.guardrails;
     this.messages = [
       {
         role: "system",
-        content: actionLoopPrompt,
+        content: buildActionLoopPrompt(hasGuardrails),
       },
       {
         role: "user",
-        content: buildTaskAndPlanPrompt(task, this.taskExplanation, this.plan, this.data),
+        content: buildTaskAndPlanPrompt(
+          task,
+          this.taskExplanation,
+          this.plan,
+          this.data,
+          this.guardrails,
+        ),
       },
     ];
     return this.messages;
@@ -337,13 +350,14 @@ export class WebAgent {
   }
 
   private addValidationFeedback(errors: string[], response: any) {
+    const hasGuardrails = !!this.guardrails;
     this.messages.push({
       role: "assistant",
       content: JSON.stringify(response),
     });
     this.messages.push({
       role: "user",
-      content: buildValidationFeedbackPrompt(errors.join("\n")),
+      content: buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails),
     });
   }
 
