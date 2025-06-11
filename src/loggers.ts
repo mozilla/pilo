@@ -16,6 +16,7 @@ import type {
   ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
+  ThinkingEventData,
 } from "./events.js";
 
 /**
@@ -41,6 +42,10 @@ export class ConsoleLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
 
   initialize(emitter: WebAgentEventEmitter): void {
+    if (this.emitter) {
+      // Dispose existing listeners before reinitializing
+      this.dispose();
+    }
     this.emitter = emitter;
 
     // Task events
@@ -56,6 +61,7 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
     emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
     emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
+    emitter.onEvent(WebAgentEventType.THINKING, this.handleThinking);
 
     // Action events
     emitter.onEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
@@ -87,6 +93,7 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
       this.emitter.offEvent(WebAgentEventType.THOUGHT, this.handleThought);
       this.emitter.offEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
+      this.emitter.offEvent(WebAgentEventType.THINKING, this.handleThinking);
 
       // Action events
       this.emitter.offEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
@@ -228,5 +235,11 @@ export class ConsoleLogger implements Logger {
 
   private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
     console.log(chalk.gray("   ⚠️  Network wait timed out, continuing..."));
+  };
+
+  private handleThinking = (data: ThinkingEventData): void => {
+    if (data.status === "start") {
+      console.log(chalk.cyan.bold(`\n🤔 ${data.operation}...`));
+    }
   };
 }

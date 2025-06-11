@@ -18,7 +18,7 @@ import {
   taskValidationSchema,
   TaskValidationResult,
 } from "./schemas.js";
-import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
+import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
 
 // Task completion quality constants
@@ -287,7 +287,6 @@ export class WebAgent {
    * Only used when taking snapshots for AI processing
    */
   private capturePageState(newTitle: string, newUrl: string): void {
-    // Always silently update our tracking state
     this.currentPage = { url: newUrl, title: newTitle };
   }
 
@@ -296,13 +295,7 @@ export class WebAgent {
    * This emits the navigation event for logging/display purposes
    */
   private recordNavigationEvent(title: string, url: string): void {
-    console.debug(`📄 Navigation occurred to: ${url}`);
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.PAGE_NAVIGATION,
-      data: { timestamp: Date.now(), title, url },
-    });
-
-    // Update our tracking state
+    this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
     this.currentPage = { url, title };
   }
 
@@ -316,7 +309,14 @@ export class WebAgent {
     ]);
 
     if (this.DEBUG) {
-      this.logCompressionStats(pageSnapshot, compressedSnapshot);
+      const originalSize = pageSnapshot.length;
+      const compressedSize = compressedSnapshot.length;
+      const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
+      this.emit(WebAgentEventType.DEBUG_COMPRESSION, {
+        originalSize,
+        compressedSize,
+        compressionPercent,
+      });
     }
 
     // Silently update our page state without emitting navigation events
@@ -327,15 +327,17 @@ export class WebAgent {
     this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
 
     if (this.DEBUG) {
-      this.emitDebugMessages();
+      this.emit(WebAgentEventType.DEBUG_MESSAGES, { messages: this.messages });
     }
 
+    this.emit(WebAgentEventType.THINKING, { status: "start", operation: "Planning next action" });
     const response = await generateObject({
       model: this.provider,
       schema: actionSchema,
       messages: this.messages,
       temperature: 0,
     });
+    this.emit(WebAgentEventType.THINKING, { status: "end", operation: "Planning next action" });
 
     const { isValid, errors, correctedResponse } = this.validateActionResponse(response.object);
 
@@ -359,20 +361,20 @@ export class WebAgent {
     return response.object;
   }
 
-  private logCompressionStats(original: string, compressed: string) {
-    const originalSize = original.length;
-    const compressedSize = compressed.length;
-    const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.DEBUG_COMPRESSION,
-      data: {
-        timestamp: Date.now(),
-        originalSize,
-        compressedSize,
-        compressionPercent,
-      },
-    });
+  /**
+   * Centralized event emission with automatic timestamp injection
+   * Provides type safety and consistent event structure
+   */
+  private emit(type: WebAgentEventType, data: Omit<any, "timestamp">) {
+    try {
+      this.eventEmitter.emitEvent({
+        type,
+        data: { timestamp: Date.now(), ...data },
+      } as WebAgentEvent);
+    } catch (error) {
+      // Prevent logging errors from crashing the agent
+      console.error("Failed to emit event:", error);
+    }
   }
 
   private clipSnapshotsFromMessages(messages: any[]): any[] {
@@ -397,13 +399,6 @@ export class WebAgent {
     });
   }
 
-  private emitDebugMessages() {
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.DEBUG_MESSAGES,
-      data: { timestamp: Date.now(), messages: this.messages },
-    });
-  }
-
   private addValidationFeedback(errors: string[], response: any) {
     const hasGuardrails = !!this.guardrails;
     this.messages.push({
@@ -416,47 +411,18 @@ export class WebAgent {
     });
   }
 
+  /**
+   * Emits all step-related events for the current AI reasoning cycle
+   */
   private emitStepEvents(result: any) {
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.CURRENT_STEP,
-      data: {
-        timestamp: Date.now(),
-        currentStep: result.currentStep,
-      },
-    });
-
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.OBSERVATION,
-      data: {
-        timestamp: Date.now(),
-        observation: result.observation,
-      },
-    });
-
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.EXTRACTED_DATA,
-      data: {
-        timestamp: Date.now(),
-        extractedData: result.extractedData || "",
-      },
-    });
-
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.THOUGHT,
-      data: {
-        timestamp: Date.now(),
-        thought: result.thought,
-      },
-    });
-
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.ACTION_EXECUTION,
-      data: {
-        timestamp: Date.now(),
-        action: result.action.action,
-        ref: result.action.ref || undefined,
-        value: result.action.value || undefined,
-      },
+    this.emit(WebAgentEventType.CURRENT_STEP, { currentStep: result.currentStep });
+    this.emit(WebAgentEventType.OBSERVATION, { observation: result.observation });
+    this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData || "" });
+    this.emit(WebAgentEventType.THOUGHT, { thought: result.thought });
+    this.emit(WebAgentEventType.ACTION_EXECUTION, {
+      action: result.action.action,
+      ref: result.action.ref || undefined,
+      value: result.action.value || undefined,
     });
   }
 
@@ -539,14 +505,9 @@ export class WebAgent {
       }
       return true;
     } catch (error) {
-      // Emit action result event (failure)
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
-        data: {
-          timestamp: Date.now(),
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
+      this.emit(WebAgentEventType.ACTION_RESULT, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
@@ -559,13 +520,7 @@ export class WebAgent {
         content: JSON.stringify(result),
       });
 
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
-        data: {
-          timestamp: Date.now(),
-          success: true,
-        },
-      });
+      this.emit(WebAgentEventType.ACTION_RESULT, { success: true });
     } else {
       this.messages.push({
         role: "assistant",
@@ -576,27 +531,20 @@ export class WebAgent {
 
   // Helper function to wait for a specified number of seconds
   async wait(seconds: number) {
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.WAITING,
-      data: {
-        timestamp: Date.now(),
-        seconds,
-      },
-    });
+    this.emit(WebAgentEventType.WAITING, { seconds });
 
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   }
 
-  emitTaskStartEvent(task: string) {
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.TASK_START,
-      data: {
-        timestamp: Date.now(),
-        task,
-        explanation: this.taskExplanation,
-        plan: this.plan,
-        url: this.url,
-      },
+  /**
+   * Emits the task start event with all initial task information
+   */
+  private emitTaskStartEvent(task: string) {
+    this.emit(WebAgentEventType.TASK_START, {
+      task,
+      explanation: this.taskExplanation,
+      plan: this.plan,
+      url: this.url,
     });
   }
 
@@ -622,23 +570,26 @@ export class WebAgent {
   ): Promise<TaskValidationResult> {
     const conversationHistory = this.formatConversationHistory();
 
+    this.emit(WebAgentEventType.THINKING, {
+      status: "start",
+      operation: "Validating task completion",
+    });
     const response = await generateObject({
       model: this.provider,
       schema: taskValidationSchema,
       prompt: buildTaskValidationPrompt(task, finalAnswer, conversationHistory),
       temperature: 0,
     });
+    this.emit(WebAgentEventType.THINKING, {
+      status: "end",
+      operation: "Validating task completion",
+    });
 
-    // Emit validation event
-    this.eventEmitter.emitEvent({
-      type: WebAgentEventType.TASK_VALIDATION,
-      data: {
-        timestamp: Date.now(),
-        observation: response.object.observation,
-        completionQuality: response.object.completionQuality,
-        feedback: response.object.feedback,
-        finalAnswer,
-      },
+    this.emit(WebAgentEventType.TASK_VALIDATION, {
+      observation: response.object.observation,
+      completionQuality: response.object.completionQuality,
+      feedback: response.object.feedback,
+      finalAnswer,
     });
 
     return response.object;
@@ -715,11 +666,7 @@ export class WebAgent {
         validationAttempts++;
 
         if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-          // Success! Task completed
-          this.eventEmitter.emitEvent({
-            type: WebAgentEventType.TASK_COMPLETE,
-            data: { timestamp: Date.now(), finalAnswer },
-          });
+          this.emit(WebAgentEventType.TASK_COMPLETE, { finalAnswer });
           break; // Exit: task completed successfully
         } else {
           // Validation failed

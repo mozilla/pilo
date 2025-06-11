@@ -17,6 +17,7 @@ import type {
   WaitingEventData,
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
+  ThinkingEventData,
 } from "../src/events.js";
 
 // Mock console methods
@@ -487,6 +488,42 @@ describe("ConsoleLogger", () => {
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("timed out");
+    });
+  });
+
+  describe("Thinking events", () => {
+    it("should handle THINKING start events", () => {
+      const eventData: ThinkingEventData = {
+        timestamp: Date.now(),
+        status: "start",
+        operation: "Planning next action",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.THINKING,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Planning next action");
+      expect(allOutput).toContain("🤔");
+    });
+
+    it("should not log THINKING end events", () => {
+      const eventData: ThinkingEventData = {
+        timestamp: Date.now(),
+        status: "end",
+        operation: "Planning next action",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.THINKING,
+        data: eventData,
+      });
+
+      // End events should not trigger console output
+      expect(mockConsole.log).not.toHaveBeenCalled();
     });
   });
 

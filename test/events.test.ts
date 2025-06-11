@@ -120,6 +120,7 @@ describe("WebAgentEventEmitter", () => {
         "agent:observation",
         "agent:thought",
         "agent:extracted_data",
+        "agent:thinking",
         "action:execution",
         "action:result",
         "debug:compression",
