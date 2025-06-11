@@ -125,6 +125,7 @@ describe("WebAgentEventEmitter", () => {
         "action:result",
         "debug:compression",
         "debug:messages",
+        "validation:error",
         "system:waiting",
         "system:network_waiting",
         "system:network_timeout",

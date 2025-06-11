@@ -26,6 +26,9 @@ export enum WebAgentEventType {
   DEBUG_COMPRESSION = "debug:compression",
   DEBUG_MESSAGES = "debug:messages",
 
+  // Validation events
+  VALIDATION_ERROR = "validation:error",
+
   // Waiting events
   WAITING = "system:waiting",
   NETWORK_WAITING = "system:network_waiting",
@@ -166,6 +169,15 @@ export interface TaskValidationEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for validation errors during action response processing
+ */
+export interface ValidationErrorEventData extends WebAgentEventData {
+  errors: string[];
+  retryCount: number;
+  rawResponse: any;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -187,7 +199,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.WAITING; data: WaitingEventData }
   | { type: WebAgentEventType.NETWORK_WAITING; data: NetworkWaitingEventData }
   | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
-  | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData };
+  | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData }
+  | { type: WebAgentEventType.VALIDATION_ERROR; data: ValidationErrorEventData };
 
 /**
  * Event emitter for WebAgent events

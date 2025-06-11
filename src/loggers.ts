@@ -17,6 +17,7 @@ import type {
   WaitingEventData,
   TaskValidationEventData,
   ThinkingEventData,
+  ValidationErrorEventData,
 } from "./events.js";
 
 /**
@@ -75,6 +76,9 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.WAITING, this.handleWaiting);
     emitter.onEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+
+    // Validation events
+    emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
   }
 
   dispose(): void {
@@ -107,6 +111,9 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.WAITING, this.handleWaiting);
       this.emitter.offEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+
+      // Validation events
+      this.emitter.offEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
 
       // Reset emitter reference
       this.emitter = null;
@@ -240,6 +247,18 @@ export class ConsoleLogger implements Logger {
   private handleThinking = (data: ThinkingEventData): void => {
     if (data.status === "start") {
       console.log(chalk.cyan.bold(`\n🤔 ${data.operation}...`));
+    }
+  };
+
+  private handleValidationError = (data: ValidationErrorEventData): void => {
+    console.error(
+      chalk.red.bold(`\n⚠️ Action validation failed (attempt ${data.retryCount + 1}):`),
+    );
+    data.errors.forEach((error, index) => {
+      console.error(chalk.red(`   ${index + 1}. ${error}`));
+    });
+    if (data.retryCount < 2) {
+      console.log(chalk.yellow("   🔄 Retrying with corrected feedback..."));
     }
   };
 }

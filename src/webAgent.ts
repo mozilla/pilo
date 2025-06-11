@@ -9,7 +9,7 @@ import {
   buildValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
-import { AriaBrowser, LoadState } from "./browser/ariaBrowser.js";
+import { AriaBrowser, LoadState, PageAction } from "./browser/ariaBrowser.js";
 import {
   planSchema,
   planAndUrlSchema,
@@ -169,29 +169,37 @@ export class WebAgent {
     return this.messages;
   }
 
+  /**
+   * Validates aria reference format and attempts to auto-correct common issues
+   */
   protected validateAriaRef(ref: string): {
     isValid: boolean;
     error?: string;
     correctedRef?: string;
   } {
-    if (!ref) {
-      return { isValid: false, error: "Aria ref is required" };
+    if (!ref?.trim()) {
+      return { isValid: false, error: "Aria ref cannot be empty" };
     }
 
-    // First check if it's already in the correct format
-    if (this.ARIA_REF_REGEX.test(ref)) {
+    const trimmedRef = ref.trim();
+
+    // Check if it's already in the correct format (s<number>e<number>)
+    if (this.ARIA_REF_REGEX.test(trimmedRef)) {
       return { isValid: true };
     }
 
-    // Try to extract a valid ref from the input
-    const match = ref.match(this.ARIA_REF_EXTRACT_REGEX);
+    // Try to extract a valid ref from the input (auto-correction)
+    const match = trimmedRef.match(this.ARIA_REF_EXTRACT_REGEX);
     if (match?.[1]) {
-      return { isValid: true, correctedRef: match[1] };
+      return {
+        isValid: true,
+        correctedRef: match[1],
+      };
     }
 
     return {
       isValid: false,
-      error: `Invalid aria ref format. Expected format: s<number>e<number> (e.g., s1e23). Got: ${ref}`,
+      error: `Invalid aria ref format "${trimmedRef}". Expected: s<number>e<number> (e.g., s1e23)`,
     };
   }
 
@@ -203,80 +211,122 @@ export class WebAgent {
     const errors: string[] = [];
     const correctedResponse = { ...response };
 
-    // Validate top-level fields
-    if (!response.currentStep?.trim()) {
-      errors.push('Missing or invalid "currentStep" field');
-    }
-    if (!response.observation?.trim()) {
-      errors.push('Missing or invalid "observation" field');
-    }
-    if (!response.thought?.trim()) {
-      errors.push('Missing or invalid "thought" field');
-    }
-    if (!response.extractedData?.trim()) {
-      errors.push('Missing or invalid "extractedData" field');
-    }
+    // Validate required top-level fields
+    this.validateRequiredStringField(response, "currentStep", errors);
+    this.validateRequiredStringField(response, "observation", errors);
+    this.validateRequiredStringField(response, "thought", errors);
+
+    // Validate action object exists
     if (!response.action || typeof response.action !== "object") {
-      errors.push('Missing or invalid "action" field');
+      errors.push('Missing or invalid "action" field - must be an object');
       return { isValid: false, errors };
     }
 
-    // Validate action object
-    const { action } = response;
-    if (!action.action?.trim()) {
-      errors.push('Missing or invalid "action.action" field');
-    }
-
-    // Validate action-specific requirements
-    switch (action.action) {
-      case "select":
-      case "fill":
-      case "click":
-      case "hover":
-      case "check":
-      case "uncheck":
-        if (!action.ref) {
-          errors.push(`Missing required "ref" field for ${action.action} action`);
-        } else {
-          const { isValid, error, correctedRef } = this.validateAriaRef(action.ref);
-          if (!isValid && error) {
-            errors.push(error);
-          } else if (correctedRef) {
-            correctedResponse.action.ref = correctedRef;
-          }
-        }
-        if ((action.action === "fill" || action.action === "select") && !action.value?.trim()) {
-          errors.push(`Missing required "value" field for ${action.action} action`);
-        }
-        break;
-      case "wait":
-        if (!action.value || isNaN(Number(action.value))) {
-          errors.push('Missing or invalid "value" field for wait action (must be a number)');
-        }
-        break;
-      case "done":
-        if (!action.value?.trim()) {
-          errors.push('Missing required "value" field for done action');
-        }
-        break;
-      case "goto":
-        if (!action.value?.trim()) {
-          errors.push('Missing required "value" field for goto action');
-        }
-        break;
-      case "back":
-      case "forward":
-        if (action.ref || action.value) {
-          errors.push(`${action.action} action should not have ref or value fields`);
-        }
-        break;
-    }
+    // Validate action object structure
+    const actionErrors = this.validateActionObject(response.action, correctedResponse);
+    errors.push(...actionErrors);
 
     return {
       isValid: errors.length === 0,
       errors,
       correctedResponse: errors.length === 0 ? correctedResponse : undefined,
     };
+  }
+
+  /**
+   * Validates that a required string field exists and is non-empty
+   */
+  private validateRequiredStringField(obj: any, fieldName: string, errors: string[]): void {
+    const value = obj?.[fieldName];
+    if (typeof value !== "string" || !value.trim()) {
+      errors.push(`Missing or empty required field "${fieldName}"`);
+    }
+  }
+
+  /**
+   * Validates the action object structure and requirements
+   */
+  private validateActionObject(action: any, correctedResponse: any): string[] {
+    const errors: string[] = [];
+
+    // Validate action type
+    if (!action.action?.trim()) {
+      errors.push('Missing or empty "action.action" field');
+      return errors; // Can't validate further without action type
+    }
+
+    const actionType = action.action;
+
+    // Check if action type is valid
+    const validActions = Object.values(PageAction);
+    if (!validActions.includes(actionType)) {
+      errors.push(`Invalid action type "${actionType}". Valid actions: ${validActions.join(", ")}`);
+      return errors;
+    }
+
+    // Define action requirements
+    const actionsRequiringRef = [
+      PageAction.Click,
+      PageAction.Hover,
+      PageAction.Fill,
+      PageAction.Focus,
+      PageAction.Check,
+      PageAction.Uncheck,
+      PageAction.Select,
+    ];
+    const actionsRequiringValue = [
+      PageAction.Fill,
+      PageAction.Select,
+      PageAction.Wait,
+      PageAction.Done,
+      PageAction.Goto,
+    ];
+    const actionsProhibitingRefAndValue = [PageAction.Back, PageAction.Forward];
+
+    // Validate ref requirement
+    if (actionsRequiringRef.includes(actionType)) {
+      if (!action.ref || typeof action.ref !== "string") {
+        errors.push(`Action "${actionType}" requires a "ref" field`);
+      } else {
+        const { isValid, error, correctedRef } = this.validateAriaRef(action.ref);
+        if (!isValid && error) {
+          errors.push(`Invalid ref for "${actionType}" action: ${error}`);
+        } else if (correctedRef) {
+          correctedResponse.action.ref = correctedRef;
+        }
+      }
+    }
+
+    // Validate value requirement
+    if (actionsRequiringValue.includes(actionType)) {
+      if (actionType === PageAction.Wait) {
+        // Special validation for wait action - must be a valid number (including 0)
+        if (
+          action.value === undefined ||
+          action.value === null ||
+          action.value === "" ||
+          isNaN(Number(action.value))
+        ) {
+          errors.push('Action "wait" requires a numeric "value" field (seconds to wait)');
+        }
+      } else {
+        // Regular string value validation
+        if (!action.value?.trim()) {
+          errors.push(`Action "${actionType}" requires a non-empty "value" field`);
+        }
+      }
+    }
+
+    // Validate that certain actions don't have ref or value
+    if (actionsProhibitingRefAndValue.includes(actionType)) {
+      const hasRef = action.ref !== undefined && action.ref !== null && action.ref !== "";
+      const hasValue = action.value !== undefined && action.value !== null && action.value !== "";
+      if (hasRef || hasValue) {
+        errors.push(`Action "${actionType}" should not have "ref" or "value" fields`);
+      }
+    }
+
+    return errors;
   }
 
   /**
@@ -349,6 +399,13 @@ export class WebAgent {
     const { isValid, errors, correctedResponse } = this.validateActionResponse(response);
 
     if (!isValid) {
+      // Emit validation error event for logging
+      this.emit(WebAgentEventType.VALIDATION_ERROR, {
+        errors,
+        retryCount,
+        rawResponse: response,
+      });
+
       if (retryCount >= 2) {
         throw new Error(
           `Failed to get valid response after ${

@@ -243,6 +243,340 @@ describe("WebAgent", () => {
   });
 
   describe("Action validation", () => {
+    describe("Enhanced validation logic", () => {
+      it("should validate wait action with zero value", async () => {
+        const validResponse = {
+          object: {
+            currentStep: "Waiting",
+            observation: "Pausing briefly",
+            thought: "Need to wait 0 seconds",
+            action: {
+              action: PageAction.Wait,
+              value: "0",
+            },
+          },
+        };
+
+        mockGenerateObject.mockResolvedValue(validResponse);
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.action.value).toBe("0");
+      });
+
+      it("should reject wait action with non-numeric value", async () => {
+        const invalidResponse = {
+          object: {
+            currentStep: "Waiting",
+            observation: "Pausing",
+            thought: "Need to wait",
+            action: {
+              action: PageAction.Wait,
+              value: "not a number",
+            },
+          },
+        };
+
+        const validResponse = {
+          object: {
+            currentStep: "Waiting",
+            observation: "Pausing",
+            thought: "Need to wait",
+            action: {
+              action: PageAction.Wait,
+              value: "5",
+            },
+          },
+        };
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.action.value).toBe("5");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should validate all actions requiring refs", async () => {
+        const actionsWithRefs = [
+          PageAction.Click,
+          PageAction.Hover,
+          PageAction.Fill,
+          PageAction.Focus,
+          PageAction.Check,
+          PageAction.Uncheck,
+          PageAction.Select,
+        ];
+
+        for (const action of actionsWithRefs) {
+          const invalidResponse = {
+            object: {
+              currentStep: "Working",
+              observation: "Found element",
+              thought: "Perform action",
+              action: {
+                action,
+                // Missing ref
+                ...(action === PageAction.Fill || action === PageAction.Select
+                  ? { value: "test" }
+                  : {}),
+              },
+            },
+          };
+
+          const validResponse = {
+            object: {
+              currentStep: "Working",
+              observation: "Found element",
+              thought: "Perform action",
+              action: {
+                action,
+                ref: "s1e23",
+                ...(action === PageAction.Fill || action === PageAction.Select
+                  ? { value: "test" }
+                  : {}),
+              },
+            },
+          };
+
+          mockGenerateObject
+            .mockResolvedValueOnce(invalidResponse)
+            .mockResolvedValueOnce(validResponse);
+
+          mockBrowser.setCurrentText("element [ref=s1e23]");
+
+          const result = await webAgent.generateNextAction("element [ref=s1e23]");
+          expect(result.action.ref).toBe("s1e23");
+
+          mockGenerateObject.mockClear();
+        }
+      });
+
+      it("should validate actions prohibiting ref and value", async () => {
+        const actionsProhibiting = [PageAction.Back, PageAction.Forward];
+
+        for (const action of actionsProhibiting) {
+          const invalidResponse = {
+            object: {
+              currentStep: "Navigating",
+              observation: "Going back",
+              thought: "Navigate",
+              action: {
+                action,
+                ref: "s1e23", // Should not have ref
+                value: "test", // Should not have value
+              },
+            },
+          };
+
+          const validResponse = {
+            object: {
+              currentStep: "Navigating",
+              observation: "Going back",
+              thought: "Navigate",
+              action: {
+                action,
+              },
+            },
+          };
+
+          mockGenerateObject
+            .mockResolvedValueOnce(invalidResponse)
+            .mockResolvedValueOnce(validResponse);
+
+          mockBrowser.setCurrentText("page content");
+
+          const result = await webAgent.generateNextAction("page content");
+          expect(result.action.ref).toBeUndefined();
+          expect(result.action.value).toBeUndefined();
+
+          mockGenerateObject.mockClear();
+        }
+      });
+
+      it("should validate string field types", async () => {
+        const invalidResponse = {
+          object: {
+            currentStep: 123, // Should be string
+            observation: null, // Should be string
+            thought: "", // Empty string
+            action: {
+              action: PageAction.Done,
+              value: "Complete",
+            },
+          },
+        };
+
+        const validResponse = {
+          object: {
+            currentStep: "Step 1",
+            observation: "Valid observation",
+            thought: "Valid thought",
+            action: {
+              action: PageAction.Done,
+              value: "Complete",
+            },
+          },
+        };
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.currentStep).toBe("Step 1");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should handle invalid action type", async () => {
+        const invalidResponse = {
+          object: {
+            currentStep: "Working",
+            observation: "Found element",
+            thought: "Perform action",
+            action: {
+              action: "invalid_action",
+              ref: "s1e23",
+            },
+          },
+        };
+
+        const validResponse = {
+          object: {
+            currentStep: "Working",
+            observation: "Found element",
+            thought: "Perform action",
+            action: {
+              action: PageAction.Click,
+              ref: "s1e23",
+            },
+          },
+        };
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.action).toBe(PageAction.Click);
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should emit validation error events", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, eventSpy);
+
+        const invalidResponse = {
+          object: {
+            currentStep: "",
+            observation: "Found element",
+            thought: "Click button",
+            action: {
+              action: PageAction.Click,
+              // Missing ref
+            },
+          },
+        };
+
+        const validResponse = {
+          object: {
+            currentStep: "Step 1",
+            observation: "Found element",
+            thought: "Click button",
+            action: {
+              action: PageAction.Click,
+              ref: "s1e23",
+            },
+          },
+        };
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        await webAgent.generateNextAction("button [ref=s1e23]");
+
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            errors: expect.arrayContaining([
+              expect.stringContaining('Missing or empty required field "currentStep"'),
+              expect.stringContaining('Action "click" requires a "ref" field'),
+            ]),
+            retryCount: 0,
+            rawResponse: invalidResponse.object,
+          }),
+        );
+      });
+    });
+
+    describe("Aria ref validation improvements", () => {
+      it("should handle whitespace in aria refs", async () => {
+        const mockResponse = {
+          object: {
+            currentStep: "Step 1",
+            observation: "Found element",
+            thought: "Click button",
+            action: {
+              action: PageAction.Click,
+              ref: "  s1e23  ", // Has whitespace
+            },
+          },
+        };
+
+        mockGenerateObject.mockResolvedValue(mockResponse);
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.ref).toBe("  s1e23  "); // Should pass as trimmed ref is valid
+      });
+
+      it("should handle empty string aria refs", async () => {
+        const invalidResponse = {
+          object: {
+            currentStep: "Step 1",
+            observation: "Found element",
+            thought: "Click button",
+            action: {
+              action: PageAction.Click,
+              ref: "", // Empty string
+            },
+          },
+        };
+
+        const validResponse = {
+          object: {
+            currentStep: "Step 1",
+            observation: "Found element",
+            thought: "Click button",
+            action: {
+              action: PageAction.Click,
+              ref: "s1e23",
+            },
+          },
+        };
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.ref).toBe("s1e23");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it("should validate correct aria refs", async () => {
       const mockResponse = {
         object: {
