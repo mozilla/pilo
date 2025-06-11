@@ -120,6 +120,8 @@ describe("WebAgent", () => {
       logger: mockLogger,
       debug: true,
       provider: mockProvider,
+      maxValidationAttempts: 1, // Reduce validation attempts for faster tests
+      maxIterations: 10, // Reduce max iterations for faster test failures
     });
   });
 
@@ -517,7 +519,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed successfully without errors",
+          completionQuality: "complete" as const,
+          feedback: "All actions executed correctly",
         },
       };
 
@@ -531,7 +535,8 @@ describe("WebAgent", () => {
 
       // This should not throw, even though the action fails
       const result = await webAgent.execute("test task", "https://example.com");
-      expect(result).toBe("Task completed with errors");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed with errors");
     });
   });
 
@@ -576,7 +581,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Navigation completed successfully",
+          completionQuality: "complete" as const,
+          feedback: "Page navigation was executed correctly",
         },
       };
 
@@ -617,7 +624,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed with data successfully",
+          completionQuality: "complete" as const,
+          feedback: "Data was processed correctly during task execution",
         },
       };
 
@@ -633,7 +642,8 @@ describe("WebAgent", () => {
       };
 
       const result = await webAgent.execute("test task", "https://example.com", testData);
-      expect(result).toBe("Task completed with data");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed with data");
     });
 
     it("should include data in setupMessages when provided", async () => {
@@ -665,7 +675,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed with data included successfully",
+          completionQuality: "complete" as const,
+          feedback: "Data was properly included in task execution",
         },
       };
 
@@ -676,7 +688,8 @@ describe("WebAgent", () => {
 
       const result = await webAgent.execute("test task", "https://example.com", testData);
 
-      expect(result).toBe("Task completed with data included");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed with data included");
       expect(mockGenerateObject).toHaveBeenCalledTimes(3);
     });
 
@@ -716,7 +729,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed without data successfully",
+          completionQuality: "complete" as const,
+          feedback: "Task executed correctly without data dependency",
         },
       };
 
@@ -726,7 +741,8 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(validationResponse);
 
       const result = await webAgent.execute("test task", "https://example.com", null);
-      expect(result).toBe("Task completed without data");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed without data");
     });
 
     it("should handle undefined data parameter", async () => {
@@ -752,7 +768,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed without data parameter successfully",
+          completionQuality: "complete" as const,
+          feedback: "Task handled undefined data correctly",
         },
       };
 
@@ -762,7 +780,8 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(validationResponse);
 
       const result = await webAgent.execute("test task", "https://example.com");
-      expect(result).toBe("Task completed without data");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed without data");
     });
 
     it("should handle complex data objects", async () => {
@@ -788,7 +807,9 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Complex data task completed successfully",
+          completionQuality: "complete" as const,
+          feedback: "Complex nested data structure was handled correctly",
         },
       };
 
@@ -811,7 +832,8 @@ describe("WebAgent", () => {
       };
 
       const result = await webAgent.execute("test task", "https://example.com", complexData);
-      expect(result).toBe("Complex data task completed");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Complex data task completed");
     });
   });
 
@@ -839,7 +861,8 @@ describe("WebAgent", () => {
 
       const validationResponse = {
         object: {
-          isValid: true,
+          observation: "Agent completed task successfully",
+          completionQuality: "complete",
           feedback: "Task completed correctly",
         },
       };
@@ -850,10 +873,19 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(validationResponse);
 
       const result = await webAgent.execute("test task", "https://example.com");
-      expect(result).toBe("Task completed successfully");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed successfully");
     });
 
     it("should retry on failed task validation", async () => {
+      // Create a separate WebAgent instance with higher maxValidationAttempts for this test
+      const retryWebAgent = new WebAgent(mockBrowser, {
+        logger: mockLogger,
+        debug: true,
+        provider: mockProvider,
+        maxValidationAttempts: 3,
+        maxIterations: 10,
+      });
       const planResponse = {
         object: {
           explanation: "test explanation",
@@ -889,14 +921,16 @@ describe("WebAgent", () => {
 
       const failedValidationResponse = {
         object: {
-          isValid: false,
+          observation: "Task not completed properly",
+          completionQuality: "partial",
           feedback: "Task not completed properly",
         },
       };
 
       const successValidationResponse = {
         object: {
-          isValid: true,
+          observation: "Task completed correctly",
+          completionQuality: "complete",
           feedback: "Task completed correctly",
         },
       };
@@ -908,11 +942,20 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(secondDoneResponse)
         .mockResolvedValueOnce(successValidationResponse);
 
-      const result = await webAgent.execute("test task", "https://example.com");
-      expect(result).toBe("Complete task result");
+      const result = await retryWebAgent.execute("test task", "https://example.com");
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Complete task result");
     });
 
     it("should fail after maximum validation attempts", async () => {
+      // Create a separate WebAgent instance with higher maxValidationAttempts for this test
+      const failWebAgent = new WebAgent(mockBrowser, {
+        logger: mockLogger,
+        debug: true,
+        provider: mockProvider,
+        maxValidationAttempts: 3,
+        maxIterations: 10,
+      });
       const planResponse = {
         object: {
           explanation: "test explanation",
@@ -935,7 +978,8 @@ describe("WebAgent", () => {
 
       const failedValidationResponse = {
         object: {
-          isValid: false,
+          observation: "Task not completed properly",
+          completionQuality: "failed",
           feedback: "Task not completed properly",
         },
       };
@@ -949,9 +993,90 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(doneResponse)
         .mockResolvedValueOnce(failedValidationResponse);
 
-      await expect(webAgent.execute("test task", "https://example.com")).rejects.toThrow(
-        "Failed to complete task after 3 attempts",
-      );
+      const result = await failWebAgent.execute("test task", "https://example.com");
+      expect(result.success).toBe(false);
+      expect(result.validationAttempts).toBe(3);
+      expect(result.finalAnswer).toBe("Incomplete task result");
+    });
+  });
+
+  describe("Snapshot clipping", () => {
+    it("should clip snapshots from messages", () => {
+      const messages = [
+        {
+          role: "system",
+          content: "You are a helpful assistant",
+        },
+        {
+          role: "user",
+          content: "Please complete this task",
+        },
+        {
+          role: "user",
+          content:
+            "Here is the current page snapshot:\n```\nbutton 'Submit' [click>123]\ninput 'email' [fill>input@example.com]\nThis is a very long page snapshot that should be clipped\n```",
+        },
+        {
+          role: "assistant",
+          content: JSON.stringify({ action: "click", ref: "s1e23" }),
+        },
+      ];
+
+      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+
+      expect(clippedMessages).toHaveLength(4);
+      expect(clippedMessages[0].content).toBe("You are a helpful assistant");
+      expect(clippedMessages[1].content).toBe("Please complete this task");
+      expect(clippedMessages[2].content).toContain("[snapshot clipped for length]");
+      expect(clippedMessages[2].content).not.toContain("This is a very long page snapshot");
+      expect(clippedMessages[3].content).toContain("s1e23");
+    });
+
+    it("should preserve non-snapshot messages unchanged", () => {
+      const messages = [
+        {
+          role: "user",
+          content: "Regular user message",
+        },
+        {
+          role: "assistant",
+          content: "Regular assistant response",
+        },
+        {
+          role: "user",
+          content: "Another message with code but no backticks",
+        },
+      ];
+
+      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+
+      expect(clippedMessages).toEqual(messages);
+    });
+
+    it("should only clip messages that contain both 'snapshot' and code blocks", () => {
+      const messages = [
+        {
+          role: "user",
+          content: "This has ```code``` but no page content",
+        },
+        {
+          role: "user",
+          content: "This mentions snapshot but has no code blocks",
+        },
+        {
+          role: "user",
+          content: "Page snapshot: ```\nlong content\n```",
+        },
+      ];
+
+      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+
+      // Should not clip - has ``` but no "snapshot"
+      expect(clippedMessages[0].content).toBe("This has ```code``` but no page content");
+      // Should not clip - has "snapshot" but no ```
+      expect(clippedMessages[1].content).toBe("This mentions snapshot but has no code blocks");
+      // Should clip - has both "snapshot" and ```
+      expect(clippedMessages[2].content).toBe("Page snapshot: ```[snapshot clipped for length]```");
     });
   });
 });

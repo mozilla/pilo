@@ -396,22 +396,22 @@ describe("prompts", () => {
     });
 
     it("should include validation criteria", () => {
-      const prompt = buildTaskValidationPrompt("test task", "test answer");
+      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("Does the answer directly address the task");
+      expect(prompt).toContain("Does the final answer directly address the task");
       expect(prompt).toContain("Is the answer complete and specific enough");
-      expect(prompt).toContain("provide the requested information");
+      expect(prompt).toContain("perform the requested action or provide the requested information");
     });
 
     it("should include feedback instruction", () => {
-      const prompt = buildTaskValidationPrompt("test task", "test answer");
+      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("If the task was not completed successfully");
-      expect(prompt).toContain("brief, direct instruction");
+      expect(prompt).toContain("If quality is not 'complete' or 'excellent'");
+      expect(prompt).toContain("specific, actionable guidance");
     });
 
     it("should handle empty inputs", () => {
-      const prompt = buildTaskValidationPrompt("", "");
+      const prompt = buildTaskValidationPrompt("", "", "");
 
       expect(prompt).toContain("Task: ");
       expect(prompt).toContain("Final Answer: ");
@@ -421,7 +421,7 @@ describe("prompts", () => {
       const task = 'Find "best price" for product & purchase';
       const finalAnswer = "Found item for $29.99 & completed checkout";
 
-      const prompt = buildTaskValidationPrompt(task, finalAnswer);
+      const prompt = buildTaskValidationPrompt(task, finalAnswer, "conversation history");
 
       expect(prompt).toContain('Find "best price" for product & purchase');
       expect(prompt).toContain("Found item for $29.99 & completed checkout");

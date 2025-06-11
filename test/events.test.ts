@@ -217,7 +217,8 @@ describe("WebAgentEventEmitter", () => {
           type: WebAgentEventType.TASK_VALIDATION,
           data: {
             timestamp: Date.now(),
-            isValid: true,
+            observation: "test observation",
+            completionQuality: "complete" as const,
             feedback: "test",
             finalAnswer: "test",
           },
@@ -325,7 +326,8 @@ describe("WebAgentEventEmitter", () => {
       // Test with feedback
       const withFeedback: TaskValidationEventData = {
         timestamp: Date.now(),
-        isValid: false,
+        observation: "Task incomplete, missing confirmation step",
+        completionQuality: "partial",
         feedback: "Task incomplete, missing confirmation step",
         finalAnswer: "Form submitted",
       };
@@ -341,7 +343,8 @@ describe("WebAgentEventEmitter", () => {
       // Test without feedback
       const withoutFeedback: TaskValidationEventData = {
         timestamp: Date.now(),
-        isValid: true,
+        observation: "Task completed successfully",
+        completionQuality: "complete",
         finalAnswer: "Task completed successfully",
       };
 

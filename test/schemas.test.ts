@@ -286,7 +286,8 @@ describe("schemas", () => {
   describe("taskValidationSchema", () => {
     it("should validate valid task validation result", () => {
       const validResult = {
-        isValid: true,
+        observation: "The agent followed a logical sequence and completed the task efficiently",
+        completionQuality: "excellent" as const,
         feedback: "Task completed successfully",
       };
 
@@ -299,19 +300,21 @@ describe("schemas", () => {
 
     it("should validate task validation without feedback", () => {
       const validResult = {
-        isValid: false,
+        observation: "The agent made some progress but did not complete the main objective",
+        completionQuality: "partial" as const,
       };
 
       const result = taskValidationSchema.safeParse(validResult);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.isValid).toBe(false);
+        expect(result.data.completionQuality).toBe("partial");
         expect(result.data.feedback).toBeUndefined();
       }
     });
 
-    it("should reject task validation with missing isValid", () => {
+    it("should reject task validation with missing completionQuality", () => {
       const invalidResult = {
+        observation: "Some observation",
         feedback: "Some feedback",
       };
 
@@ -319,9 +322,10 @@ describe("schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should reject task validation with non-boolean isValid", () => {
+    it("should reject task validation with invalid completionQuality", () => {
       const invalidResult = {
-        isValid: "true",
+        observation: "Some observation",
+        completionQuality: "invalid_quality",
         feedback: "Some feedback",
       };
 
@@ -331,12 +335,30 @@ describe("schemas", () => {
 
     it("should reject task validation with non-string feedback", () => {
       const invalidResult = {
-        isValid: true,
+        observation: "Some observation",
+        completionQuality: "complete",
         feedback: 123,
       };
 
       const result = taskValidationSchema.safeParse(invalidResult);
       expect(result.success).toBe(false);
+    });
+
+    it("should validate all completion quality levels", () => {
+      const qualities = ["failed", "partial", "complete", "excellent"] as const;
+
+      qualities.forEach((quality) => {
+        const validResult = {
+          observation: "Test observation",
+          completionQuality: quality,
+        };
+
+        const result = taskValidationSchema.safeParse(validResult);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.completionQuality).toBe(quality);
+        }
+      });
     });
   });
 
@@ -366,7 +388,8 @@ describe("schemas", () => {
       };
 
       const validation: TaskValidationResult = {
-        isValid: true,
+        observation: "test observation",
+        completionQuality: "complete",
         feedback: "test",
       };
 

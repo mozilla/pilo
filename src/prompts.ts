@@ -210,24 +210,47 @@ export const buildValidationFeedbackPrompt = (
 
 const taskValidationTemplate = buildPromptTemplate(
   `
-Review the task completion and determine if it was successful.
+Review the task completion and determine if it was successful by analyzing both the final answer and the conversation that led to it.
 
 Task: {{task}}
 Final Answer: {{finalAnswer}}
 
-Consider:
-1. Does the answer directly address the task?
-2. Is the answer complete and specific enough?
-3. Does it provide the requested information or perform the requested action?
+Conversation History:
+{{conversationHistory}}
 
-If the task was not completed successfully, provide a brief, direct instruction on what needs to be done to complete it.
+Analyze the task completion using these quality levels:
+- **failed**: Task not completed or completed incorrectly
+- **partial**: Some objectives met but task incomplete or has significant issues  
+- **complete**: Task fully completed as requested with acceptable approach
+- **excellent**: Task completed efficiently with optimal approach and high quality result
+
+Evaluation criteria:
+1. Does the final answer directly address the task?
+2. Is the answer complete and specific enough?
+3. Did the agent perform the requested action or provide the requested information?
+4. Was the approach reasonable and efficient?
+5. Are there any significant errors or omissions?
+
+Respond with a JSON object matching this structure:
+\`\`\`json
+{
+  "observation": "Analyze how the agent approached the task: sequence of actions taken, appropriateness of actions, reasoning quality, and whether the agent worked efficiently toward the goal or got sidetracked.",
+  "completionQuality": "failed|partial|complete|excellent",
+  "feedback": "If quality is not 'complete' or 'excellent', provide specific, actionable guidance on what needs to be improved. Focus on what the agent should do differently next time. If quality is 'complete' or 'excellent', this field is optional."
+}
+\`\`\`
 `.trim(),
 );
 
-export const buildTaskValidationPrompt = (task: string, finalAnswer: string): string =>
+export const buildTaskValidationPrompt = (
+  task: string,
+  finalAnswer: string,
+  conversationHistory: string,
+): string =>
   taskValidationTemplate({
     task,
     finalAnswer,
+    conversationHistory,
   });
 
 function getCurrentFormattedDate() {

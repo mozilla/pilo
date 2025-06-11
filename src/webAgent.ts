@@ -1,7 +1,6 @@
 import { generateObject, LanguageModel } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
-  actionLoopPrompt,
   buildActionLoopPrompt,
   buildPlanPrompt,
   buildPlanAndUrlPrompt,
@@ -22,6 +21,43 @@ import {
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
 
+// Task completion quality constants
+const COMPLETION_QUALITY = {
+  FAILED: "failed",
+  PARTIAL: "partial",
+  COMPLETE: "complete",
+  EXCELLENT: "excellent",
+} as const;
+
+// Success values are COMPLETE and EXCELLENT
+const SUCCESS_QUALITIES = [COMPLETION_QUALITY.COMPLETE, COMPLETION_QUALITY.EXCELLENT] as const;
+
+/**
+ * Result returned by WebAgent.execute()
+ */
+export interface TaskExecutionResult {
+  /** Whether the task completed successfully */
+  success: boolean;
+
+  /** The final answer provided by the agent */
+  finalAnswer: string;
+
+  /** The plan that was created for the task */
+  plan: string;
+
+  /** The explanation of how the task will be approached */
+  taskExplanation: string;
+
+  /** Validation result details (only present if validation was performed) */
+  validationResult?: TaskValidationResult;
+
+  /** Number of iterations taken during execution */
+  iterations: number;
+
+  /** Number of validation attempts made */
+  validationAttempts: number;
+}
+
 /**
  * Options for configuring the WebAgent
  */
@@ -37,6 +73,12 @@ export interface WebAgentOptions {
 
   /** Optional guardrails to limit what the agent can do */
   guardrails?: string;
+
+  /** Maximum validation attempts when task completion quality is insufficient (defaults to 3) */
+  maxValidationAttempts?: number;
+
+  /** Maximum total iterations to prevent infinite loops (defaults to 50) */
+  maxIterations?: number;
 }
 
 export class WebAgent {
@@ -48,6 +90,8 @@ export class WebAgent {
   private taskExplanation: string = "";
   private data: any = null;
   private guardrails: string | null = null;
+  private maxValidationAttempts: number;
+  private maxIterations: number;
   private readonly FILTERED_PREFIXES = ["/url:"];
   private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
     [/^listitem/g, "li"],
@@ -74,6 +118,8 @@ export class WebAgent {
     this.logger = options.logger || new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
     this.guardrails = options.guardrails || null;
+    this.maxValidationAttempts = options.maxValidationAttempts || 3;
+    this.maxIterations = options.maxIterations || 50;
   }
 
   async createPlanAndUrl(task: string) {
@@ -329,12 +375,21 @@ export class WebAgent {
     });
   }
 
-  private updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
-    this.messages.forEach((msg: any) => {
+  private clipSnapshotsFromMessages(messages: any[]): any[] {
+    return messages.map((msg) => {
       if (msg.role === "user" && msg.content.includes("snapshot") && msg.content.includes("```")) {
-        msg.content = msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```");
+        return {
+          ...msg,
+          content: msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
+        };
       }
+      return msg;
     });
+  }
+
+  private updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
+    // Clip old snapshots from existing messages
+    this.messages = this.clipSnapshotsFromMessages(this.messages);
 
     this.messages.push({
       role: "user",
@@ -359,6 +414,164 @@ export class WebAgent {
       role: "user",
       content: buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails),
     });
+  }
+
+  private emitStepEvents(result: any) {
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.CURRENT_STEP,
+      data: {
+        timestamp: Date.now(),
+        currentStep: result.currentStep,
+      },
+    });
+
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.OBSERVATION,
+      data: {
+        timestamp: Date.now(),
+        observation: result.observation,
+      },
+    });
+
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.EXTRACTED_DATA,
+      data: {
+        timestamp: Date.now(),
+        extractedData: result.extractedData || "",
+      },
+    });
+
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.THOUGHT,
+      data: {
+        timestamp: Date.now(),
+        thought: result.thought,
+      },
+    });
+
+    this.eventEmitter.emitEvent({
+      type: WebAgentEventType.ACTION_EXECUTION,
+      data: {
+        timestamp: Date.now(),
+        action: result.action.action,
+        ref: result.action.ref || undefined,
+        value: result.action.value || undefined,
+      },
+    });
+  }
+
+  private addTaskValidationFeedback(result: any, validationResult: TaskValidationResult) {
+    this.messages.push({
+      role: "assistant",
+      content: JSON.stringify(result),
+    });
+    this.messages.push({
+      role: "user",
+      content: `Task completion quality: ${validationResult.completionQuality}. ${validationResult.feedback} Please continue working on the task.`,
+    });
+  }
+
+  private async executeAction(result: any): Promise<boolean> {
+    try {
+      switch (result.action.action) {
+        case "wait":
+          const seconds = parseInt(result.action.value || "1", 10);
+          await this.wait(seconds);
+          break;
+
+        case "goto":
+          if (result.action.value) {
+            await this.browser.goto(result.action.value);
+            const [navTitle, navUrl] = await Promise.all([
+              this.browser.getTitle(),
+              this.browser.getUrl(),
+            ]);
+            this.recordNavigationEvent(navTitle, navUrl);
+          } else {
+            throw new Error("Missing URL for goto action");
+          }
+          break;
+
+        case "back":
+          await this.browser.goBack();
+          const [backTitle, backUrl] = await Promise.all([
+            this.browser.getTitle(),
+            this.browser.getUrl(),
+          ]);
+          this.recordNavigationEvent(backTitle, backUrl);
+          break;
+
+        case "forward":
+          await this.browser.goForward();
+          const [fwdTitle, fwdUrl] = await Promise.all([
+            this.browser.getTitle(),
+            this.browser.getUrl(),
+          ]);
+          this.recordNavigationEvent(fwdTitle, fwdUrl);
+          break;
+
+        case "done":
+          // "done" actions are handled in the main loop, not here
+          break;
+
+        default:
+          if (!result.action.ref) {
+            throw new Error("Missing ref for action");
+          }
+
+          await this.browser.performAction(
+            result.action.ref,
+            result.action.action,
+            result.action.value,
+          );
+
+          // Check if navigation occurred for actions that might navigate
+          if (["click", "select"].includes(result.action.action)) {
+            const [actionTitle, actionUrl] = await Promise.all([
+              this.browser.getTitle(),
+              this.browser.getUrl(),
+            ]);
+
+            if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
+              this.recordNavigationEvent(actionTitle, actionUrl);
+            }
+          }
+      }
+      return true;
+    } catch (error) {
+      // Emit action result event (failure)
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.ACTION_RESULT,
+        data: {
+          timestamp: Date.now(),
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      return false;
+    }
+  }
+
+  private addActionToHistory(result: any, actionSuccess: boolean) {
+    if (actionSuccess) {
+      this.messages.push({
+        role: "assistant",
+        content: JSON.stringify(result),
+      });
+
+      this.eventEmitter.emitEvent({
+        type: WebAgentEventType.ACTION_RESULT,
+        data: {
+          timestamp: Date.now(),
+          success: true,
+        },
+      });
+    } else {
+      this.messages.push({
+        role: "assistant",
+        content: `Failed to execute action: ${result.action.action}`,
+      });
+    }
   }
 
   // Helper function to wait for a specified number of seconds
@@ -396,14 +609,23 @@ export class WebAgent {
     this.currentPage = { url: "", title: "" };
   }
 
+  private formatConversationHistory(): string {
+    // Clip snapshots for validation - we don't need massive page content for validation
+    const clippedMessages = this.clipSnapshotsFromMessages(this.messages);
+
+    return clippedMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n");
+  }
+
   private async validateTaskCompletion(
     task: string,
     finalAnswer: string,
   ): Promise<TaskValidationResult> {
+    const conversationHistory = this.formatConversationHistory();
+
     const response = await generateObject({
       model: this.provider,
       schema: taskValidationSchema,
-      prompt: buildTaskValidationPrompt(task, finalAnswer),
+      prompt: buildTaskValidationPrompt(task, finalAnswer, conversationHistory),
       temperature: 0,
     });
 
@@ -412,7 +634,8 @@ export class WebAgent {
       type: WebAgentEventType.TASK_VALIDATION,
       data: {
         timestamp: Date.now(),
-        isValid: response.object.isValid,
+        observation: response.object.observation,
+        completionQuality: response.object.completionQuality,
         feedback: response.object.feedback,
         finalAnswer,
       },
@@ -421,7 +644,7 @@ export class WebAgent {
     return response.object;
   }
 
-  async execute(task: string, startingUrl?: string, data?: any) {
+  async execute(task: string, startingUrl?: string, data?: any): Promise<TaskExecutionResult> {
     if (!task) {
       throw new Error("No task provided.");
     }
@@ -463,214 +686,75 @@ export class WebAgent {
     this.setupMessages(task);
     let finalAnswer = null;
     let validationAttempts = 0;
-    let lastValidationFeedback = "";
+    let currentIteration = 0;
+    let lastValidationResult: TaskValidationResult | undefined;
 
-    // Start the loop
-    while (!finalAnswer && validationAttempts < 3) {
-      // Get the page snapshot directly from the browser
+    // Main execution loop - continues until one of these conditions:
+    // 1. Task successfully completed
+    // 2. Max validation attempts reached
+    // 3. Max iterations reached (prevents infinite loops)
+    while (true) {
+      // Check iteration limit
+      currentIteration++;
+      if (currentIteration > this.maxIterations) {
+        break; // Exit: hit iteration limit
+      }
+
+      // Get current page state and generate next action
       const pageSnapshot = await this.browser.getText();
-
-      // Call LLM with the page snapshot
       const result = await this.getNextActions(pageSnapshot);
 
-      // Emit observation and thought events
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.CURRENT_STEP,
-        data: {
-          timestamp: Date.now(),
-          currentStep: result.currentStep,
-        },
-      });
+      // Emit all the step events
+      this.emitStepEvents(result);
 
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.OBSERVATION,
-        data: {
-          timestamp: Date.now(),
-          observation: result.observation,
-        },
-      });
-
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.EXTRACTED_DATA,
-        data: {
-          timestamp: Date.now(),
-          extractedData: result.extractedData || "",
-        },
-      });
-
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.THOUGHT,
-        data: {
-          timestamp: Date.now(),
-          thought: result.thought,
-        },
-      });
-
-      // Emit action execution event
-      this.eventEmitter.emitEvent({
-        type: WebAgentEventType.ACTION_EXECUTION,
-        data: {
-          timestamp: Date.now(),
-          action: result.action.action,
-          ref: result.action.ref || undefined,
-          value: result.action.value || undefined,
-        },
-      });
-
-      // Check for the final answer
+      // Handle "done" action - check if task is complete
       if (result.action.action === "done") {
-        finalAnswer = result.action.value;
+        finalAnswer = result.action.value!; // validateActionResponse ensures this exists
+        const validationResult = await this.validateTaskCompletion(task, finalAnswer);
+        lastValidationResult = validationResult;
+        validationAttempts++;
 
-        if (!finalAnswer) {
-          throw new Error("Missing final answer value in done action");
-        }
-
-        // Validate the task completion
-        const { isValid, feedback } = await this.validateTaskCompletion(task, finalAnswer);
-
-        if (isValid) {
-          // Emit task complete event
+        if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
+          // Success! Task completed
           this.eventEmitter.emitEvent({
             type: WebAgentEventType.TASK_COMPLETE,
-            data: {
-              timestamp: Date.now(),
-              finalAnswer,
-            },
+            data: { timestamp: Date.now(), finalAnswer },
           });
-          break;
+          break; // Exit: task completed successfully
         } else {
-          validationAttempts++;
-          lastValidationFeedback = feedback || "Unknown validation error";
-
-          if (validationAttempts < 3) {
-            // Reset finalAnswer so the loop continues
-            finalAnswer = null;
-
-            // Add validation feedback to messages
-            this.messages.push({
-              role: "assistant",
-              content: JSON.stringify(result),
-            });
-            this.messages.push({
-              role: "user",
-              content: `Task not completed successfully. ${feedback} Please continue working on the task.`,
-            });
-            continue;
+          // Validation failed
+          if (validationAttempts >= this.maxValidationAttempts) {
+            break; // Exit: max validation attempts reached
           }
 
-          throw new Error(
-            `Failed to complete task after ${validationAttempts} attempts. Last feedback: ${lastValidationFeedback}`,
-          );
+          // Add feedback and try again
+          this.addTaskValidationFeedback(result, validationResult);
+          finalAnswer = null; // Reset for next attempt
+          continue; // Continue loop for retry
         }
       }
 
-      try {
-        switch (result.action.action) {
-          case "wait":
-            const seconds = parseInt(result.action.value || "1", 10);
-            await this.wait(seconds);
-            break;
+      // Execute the action (not "done")
+      const actionSuccess = await this.executeAction(result);
 
-          case "goto":
-            if (result.action.value) {
-              await this.browser.goto(result.action.value);
-
-              // After navigation, record the navigation event
-              const [navTitle, navUrl] = await Promise.all([
-                this.browser.getTitle(),
-                this.browser.getUrl(),
-              ]);
-              this.recordNavigationEvent(navTitle, navUrl);
-            } else {
-              throw new Error("Missing URL for goto action");
-            }
-            break;
-
-          case "back":
-            await this.browser.goBack();
-
-            // After navigation, record the navigation event
-            const [backTitle, backUrl] = await Promise.all([
-              this.browser.getTitle(),
-              this.browser.getUrl(),
-            ]);
-            this.recordNavigationEvent(backTitle, backUrl);
-            break;
-
-          case "forward":
-            await this.browser.goForward();
-
-            // After navigation, record the navigation event
-            const [fwdTitle, fwdUrl] = await Promise.all([
-              this.browser.getTitle(),
-              this.browser.getUrl(),
-            ]);
-            this.recordNavigationEvent(fwdTitle, fwdUrl);
-            break;
-
-          default:
-            if (!result.action.ref) {
-              throw new Error("Missing ref for action");
-            }
-
-            // Perform the action (which might cause navigation)
-            await this.browser.performAction(
-              result.action.ref,
-              result.action.action,
-              result.action.value,
-            );
-
-            // For actions that potentially cause navigation (click, select),
-            // check if navigation occurred by comparing current URL/title with previous
-            if (["click", "select"].includes(result.action.action)) {
-              const [actionTitle, actionUrl] = await Promise.all([
-                this.browser.getTitle(),
-                this.browser.getUrl(),
-              ]);
-
-              // Only record navigation if URL or title changed
-              if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
-                this.recordNavigationEvent(actionTitle, actionUrl);
-              }
-            }
-        }
-
-        // Add the successful result to messages for context
-        this.messages.push({
-          role: "assistant",
-          content: JSON.stringify(result),
-        });
-
-        // Emit action result event (success)
-        this.eventEmitter.emitEvent({
-          type: WebAgentEventType.ACTION_RESULT,
-          data: {
-            timestamp: Date.now(),
-            success: true,
-          },
-        });
-      } catch (error) {
-        // Emit action result event (failure)
-        this.eventEmitter.emitEvent({
-          type: WebAgentEventType.ACTION_RESULT,
-          data: {
-            timestamp: Date.now(),
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
-
-        // Add the failure to the messages for context
-        this.messages.push({
-          role: "assistant",
-          content: `Failed to execute action: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-      }
+      // Add result to conversation history
+      this.addActionToHistory(result, actionSuccess);
     }
 
-    return finalAnswer;
+    // Determine success: task completed and validation result shows success
+    const success = lastValidationResult
+      ? SUCCESS_QUALITIES.includes(lastValidationResult.completionQuality as any)
+      : false;
+
+    return {
+      success,
+      finalAnswer: finalAnswer || "Task did not complete",
+      plan: this.plan,
+      taskExplanation: this.taskExplanation,
+      validationResult: lastValidationResult,
+      iterations: currentIteration,
+      validationAttempts,
+    };
   }
 
   async close() {
