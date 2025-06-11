@@ -8,17 +8,18 @@ import { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 // Load environment variables from .env file
 config();
 
-// Get the task, optional URL, and optional data from the args
+// Get the task, optional URL, optional data, and optional guardrails from the args
 const task = process.argv[2];
 const startingUrl = process.argv[3];
 const dataArg = process.argv[4];
+const guardrailsArg = process.argv[5];
 
 if (!task) {
   console.error(chalk.red.bold("❌ Error: Missing task argument"));
   console.log("");
   console.log(chalk.white.bold("Usage:"));
   console.log(
-    `  ${chalk.cyan("spark")} ${chalk.green("<task>")} ${chalk.yellow("[url]")} ${chalk.magenta("[data]")}`,
+    `  ${chalk.cyan("spark")} ${chalk.green("<task>")} ${chalk.yellow("[url]")} ${chalk.magenta("[data]")} ${chalk.blue("[guardrails]")}`,
   );
   console.log("");
   console.log(chalk.white.bold("Examples:"));
@@ -28,6 +29,9 @@ if (!task) {
   );
   console.log(
     `  ${chalk.cyan("spark")} ${chalk.green('"book a flight"')} ${chalk.yellow("https://airline.com")} ${chalk.magenta('\'{"departure":"NYC","destination":"LAX","date":"2024-12-25"}\'')}`,
+  );
+  console.log(
+    `  ${chalk.cyan("spark")} ${chalk.green('"search for hotels"')} ${chalk.yellow("https://booking.com")} ${chalk.magenta('\'{"location":"Paris"}\'')} ${chalk.blue('"Do not book anything, only search"')}`,
   );
   console.log("");
   process.exit(1);
@@ -64,6 +68,7 @@ const DEBUG = false;
     // Create WebAgent with the browser
     const webAgent = new WebAgent(browser, {
       debug: DEBUG,
+      guardrails: guardrailsArg || undefined,
     });
 
     // Execute the task
