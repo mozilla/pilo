@@ -153,7 +153,7 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("createPlanAndUrl", () => {
+  describe("generatePlanWithUrl", () => {
     it("should create plan with URL", async () => {
       const mockResponse = {
         object: {
@@ -165,7 +165,7 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlanAndUrl("Book a flight to Paris");
+      const result = await webAgent.generatePlanWithUrl("Book a flight to Paris");
 
       expect(result.plan).toBe("1. Search flights\n2. Select dates\n3. Book ticket");
       expect(result.url).toBe("https://airline.com");
@@ -180,11 +180,11 @@ describe("WebAgent", () => {
     it("should handle LLM errors", async () => {
       mockGenerateObject.mockRejectedValue(new Error("LLM error"));
 
-      await expect(webAgent.createPlanAndUrl("test task")).rejects.toThrow("LLM error");
+      await expect(webAgent.generatePlanWithUrl("test task")).rejects.toThrow("LLM error");
     });
   });
 
-  describe("createPlan", () => {
+  describe("generatePlan", () => {
     it("should create plan without URL", async () => {
       const mockResponse = {
         object: {
@@ -195,7 +195,7 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlan("Fill contact form");
+      const result = await webAgent.generatePlan("Fill contact form");
 
       expect(result.plan).toBe("1. Navigate to form\n2. Fill fields\n3. Submit");
       expect(mockGenerateObject).toHaveBeenCalledWith({
@@ -216,7 +216,10 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlan("Fill contact form", "https://example.com/contact");
+      const result = await webAgent.generatePlan(
+        "Fill contact form",
+        "https://example.com/contact",
+      );
 
       expect(result.plan).toBe("1. Fill fields\n2. Submit");
       expect(mockGenerateObject).toHaveBeenCalledWith({
@@ -228,9 +231,9 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("setupMessages", () => {
+  describe("initializeConversation", () => {
     it("should setup initial messages", () => {
-      const messages = webAgent.setupMessages("Test task");
+      const messages = webAgent.initializeConversation("Test task");
 
       expect(messages).toHaveLength(2);
       expect(messages[0].role).toBe("system");
@@ -257,7 +260,7 @@ describe("WebAgent", () => {
       mockGenerateObject.mockResolvedValue(mockResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("button 'Click me' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("button 'Click me' [ref=s1e23]");
 
       expect(result.action.action).toBe(PageAction.Click);
       expect(result.action.ref).toBe("s1e23");
@@ -280,7 +283,7 @@ describe("WebAgent", () => {
       mockGenerateObject.mockResolvedValue(mockResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("button 'Click me' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("button 'Click me' [ref=s1e23]");
 
       expect(result.action.ref).toBe("s1e23");
     });
@@ -320,7 +323,7 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText("input 'Email' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("input 'Email' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("input 'Email' [ref=s1e23]");
 
       expect(result.action.value).toBe("test@example.com");
       expect(mockGenerateObject).toHaveBeenCalledTimes(2);
@@ -359,7 +362,7 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText("Success message displayed");
 
-      const result = await webAgent.getNextActions("Success message displayed");
+      const result = await webAgent.generateNextAction("Success message displayed");
 
       expect(result.action.value).toBe("Task completed successfully");
       expect(mockGenerateObject).toHaveBeenCalledTimes(2);
@@ -382,7 +385,7 @@ describe("WebAgent", () => {
       mockGenerateObject.mockResolvedValue(invalidResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      await expect(webAgent.getNextActions("button 'Click me' [ref=s1e23]")).rejects.toThrow(
+      await expect(webAgent.generateNextAction("button 'Click me' [ref=s1e23]")).rejects.toThrow(
         "Failed to get valid response after 3 attempts",
       );
 
@@ -408,14 +411,14 @@ describe("WebAgent", () => {
   describe("resetState", () => {
     it("should reset internal state", () => {
       // First create some state
-      webAgent.setupMessages("test task");
+      webAgent.initializeConversation("test task");
 
       // Reset state
       webAgent.resetState();
 
       // State should be cleared (we can't directly test private properties,
       // but we can test that setupMessages works correctly after reset)
-      const messages = webAgent.setupMessages("new task");
+      const messages = webAgent.initializeConversation("new task");
       expect(messages[1].content).toContain("new task");
     });
   });
@@ -478,7 +481,7 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText(longSnapshot);
 
-      await webAgent.getNextActions(longSnapshot);
+      await webAgent.generateNextAction(longSnapshot);
 
       // Check that compression occurred (private method, so we test indirectly)
       expect(mockGenerateObject).toHaveBeenCalled();
@@ -701,7 +704,7 @@ describe("WebAgent", () => {
       webAgent.resetState();
 
       // After reset, setupMessages should work without data
-      const messages = webAgent.setupMessages("test task");
+      const messages = webAgent.initializeConversation("test task");
       expect(messages).toHaveLength(2);
       expect(messages[1].content).not.toContain("Input Data:");
     });
@@ -1022,7 +1025,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       expect(clippedMessages).toHaveLength(4);
       expect(clippedMessages[0].content).toBe("You are a helpful assistant");
@@ -1048,7 +1051,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       expect(clippedMessages).toEqual(messages);
     });
@@ -1069,7 +1072,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       // Should not clip - has ``` but no "snapshot"
       expect(clippedMessages[0].content).toBe("This has ```code``` but no page content");
@@ -1077,6 +1080,96 @@ describe("WebAgent", () => {
       expect(clippedMessages[1].content).toBe("This mentions snapshot but has no code blocks");
       // Should clip - has both "snapshot" and ```
       expect(clippedMessages[2].content).toBe("Page snapshot: ```[snapshot clipped for length]```");
+    });
+  });
+
+  describe("Page state management", () => {
+    it("should update page state without side effects", () => {
+      // Initial state should be empty
+      expect(webAgent["currentPage"]).toEqual({ url: "", title: "" });
+
+      // Update page state
+      webAgent["updatePageState"]("Test Page", "https://test.com");
+
+      // Should update internal state
+      expect(webAgent["currentPage"]).toEqual({
+        url: "https://test.com",
+        title: "Test Page",
+      });
+    });
+
+    it("should refresh page state from browser", async () => {
+      mockBrowser.setCurrentTitle("Browser Page");
+      mockBrowser.setCurrentUrl("https://browser.com");
+
+      const result = await webAgent["refreshPageState"]();
+
+      expect(result).toEqual({
+        title: "Browser Page",
+        url: "https://browser.com",
+      });
+      expect(webAgent["currentPage"]).toEqual({
+        url: "https://browser.com",
+        title: "Browser Page",
+      });
+    });
+  });
+
+  describe("Thinking events wrapper", () => {
+    it("should emit thinking start and end events around task execution", async () => {
+      const eventSpy = vi.fn();
+      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+
+      const mockTask = vi.fn().mockResolvedValue("test result");
+
+      const result = await webAgent["withThinkingEvents"]("Test Operation", mockTask);
+
+      expect(result).toBe("test result");
+      expect(mockTask).toHaveBeenCalledOnce();
+      expect(eventSpy).toHaveBeenCalledTimes(2);
+
+      // Check start event
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          status: "start",
+          operation: "Test Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
+
+      // Check end event
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          status: "end",
+          operation: "Test Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
+    });
+
+    it("should emit end event even when task throws error", async () => {
+      const eventSpy = vi.fn();
+      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+
+      const mockTask = vi.fn().mockRejectedValue(new Error("Test error"));
+
+      await expect(webAgent["withThinkingEvents"]("Failed Operation", mockTask)).rejects.toThrow(
+        "Test error",
+      );
+
+      expect(eventSpy).toHaveBeenCalledTimes(2);
+
+      // Should still emit end event after error
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          status: "end",
+          operation: "Failed Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
     });
   });
 });

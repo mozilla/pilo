@@ -122,36 +122,33 @@ export class WebAgent {
     this.maxIterations = options.maxIterations || 50;
   }
 
-  async createPlanAndUrl(task: string) {
-    const response = await generateObject({
-      model: this.provider,
-      schema: planAndUrlSchema,
-      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
-      temperature: 0,
-    });
+  async generatePlanWithUrl(task: string) {
+    const response = await this.generateAIResponse<{
+      explanation: string;
+      plan: string;
+      url: string;
+    }>(planAndUrlSchema, buildPlanAndUrlPrompt(task, this.guardrails));
 
-    this.taskExplanation = response.object.explanation;
-    this.plan = response.object.plan;
-    this.url = response.object.url;
+    this.taskExplanation = response.explanation;
+    this.plan = response.plan;
+    this.url = response.url;
 
     return { plan: this.plan, url: this.url };
   }
 
-  async createPlan(task: string, startingUrl?: string) {
-    const response = await generateObject({
-      model: this.provider,
-      schema: planSchema,
-      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
-      temperature: 0,
-    });
+  async generatePlan(task: string, startingUrl?: string) {
+    const response = await this.generateAIResponse<{
+      explanation: string;
+      plan: string;
+    }>(planSchema, buildPlanPrompt(task, startingUrl, this.guardrails));
 
-    this.taskExplanation = response.object.explanation;
-    this.plan = response.object.plan;
+    this.taskExplanation = response.explanation;
+    this.plan = response.plan;
 
     return { plan: this.plan };
   }
 
-  setupMessages(task: string) {
+  initializeConversation(task: string) {
     const hasGuardrails = !!this.guardrails;
     this.messages = [
       {
@@ -172,7 +169,7 @@ export class WebAgent {
     return this.messages;
   }
 
-  private validateAriaRef(ref: string): {
+  protected validateAriaRef(ref: string): {
     isValid: boolean;
     error?: string;
     correctedRef?: string;
@@ -198,7 +195,7 @@ export class WebAgent {
     };
   }
 
-  private validateActionResponse(response: any): {
+  protected validateActionResponse(response: any): {
     isValid: boolean;
     errors: string[];
     correctedResponse?: any;
@@ -283,30 +280,49 @@ export class WebAgent {
   }
 
   /**
-   * Captures the current page state but doesn't emit navigation events
-   * Only used when taking snapshots for AI processing
+   * Updates internal page state only (no side effects)
    */
-  private capturePageState(newTitle: string, newUrl: string): void {
-    this.currentPage = { url: newUrl, title: newTitle };
-  }
-
-  /**
-   * Records a true navigation event (explicitly called only when we know navigation has occurred)
-   * This emits the navigation event for logging/display purposes
-   */
-  private recordNavigationEvent(title: string, url: string): void {
-    this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
+  private updatePageState(title: string, url: string): void {
     this.currentPage = { url, title };
   }
 
-  async getNextActions(pageSnapshot: string, retryCount = 0): Promise<Action> {
+  /**
+   * Emits navigation event for logging/display
+   */
+  private emitNavigationEvent(title: string, url: string): void {
+    this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
+  }
+
+  /**
+   * Records actual navigation (state + event)
+   */
+  private recordNavigation(title: string, url: string): void {
+    this.updatePageState(title, url);
+    this.emitNavigationEvent(title, url);
+  }
+
+  /**
+   * Fetches current page info and updates internal state
+   */
+  private async refreshPageState(): Promise<{ title: string; url: string }> {
+    const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
+    this.updatePageState(title, url);
+    return { title, url };
+  }
+
+  /**
+   * Fetches current page info and records navigation
+   */
+  private async refreshAndRecordNavigation(): Promise<void> {
+    const { title, url } = await this.refreshPageState();
+    this.emitNavigationEvent(title, url);
+  }
+
+  async generateNextAction(pageSnapshot: string, retryCount = 0): Promise<Action> {
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
 
-    // Get current page info
-    const [pageTitle, pageUrl] = await Promise.all([
-      this.browser.getTitle(),
-      this.browser.getUrl(),
-    ]);
+    // Get current page info and update state for AI context
+    const { title: pageTitle, url: pageUrl } = await this.refreshPageState();
 
     if (this.DEBUG) {
       const originalSize = pageSnapshot.length;
@@ -319,10 +335,6 @@ export class WebAgent {
       });
     }
 
-    // Silently update our page state without emitting navigation events
-    // (This is just taking a snapshot, not navigating)
-    this.capturePageState(pageTitle, pageUrl);
-
     // Update AI messages with new snapshot
     this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
 
@@ -330,16 +342,11 @@ export class WebAgent {
       this.emit(WebAgentEventType.DEBUG_MESSAGES, { messages: this.messages });
     }
 
-    this.emit(WebAgentEventType.THINKING, { status: "start", operation: "Planning next action" });
-    const response = await generateObject({
-      model: this.provider,
-      schema: actionSchema,
-      messages: this.messages,
-      temperature: 0,
-    });
-    this.emit(WebAgentEventType.THINKING, { status: "end", operation: "Planning next action" });
+    const response = await this.withThinkingEvents("Planning next action", () =>
+      this.generateAIResponse<Action>(actionSchema, undefined, this.messages),
+    );
 
-    const { isValid, errors, correctedResponse } = this.validateActionResponse(response.object);
+    const { isValid, errors, correctedResponse } = this.validateActionResponse(response);
 
     if (!isValid) {
       if (retryCount >= 2) {
@@ -354,18 +361,18 @@ export class WebAgent {
         return correctedResponse;
       }
 
-      this.addValidationFeedback(errors, response.object);
-      return this.getNextActions(pageSnapshot, retryCount + 1);
+      this.addValidationErrorFeedback(errors, response);
+      return this.generateNextAction(pageSnapshot, retryCount + 1);
     }
 
-    return response.object;
+    return response;
   }
 
   /**
    * Centralized event emission with automatic timestamp injection
    * Provides type safety and consistent event structure
    */
-  private emit(type: WebAgentEventType, data: Omit<any, "timestamp">) {
+  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp">) {
     try {
       this.eventEmitter.emitEvent({
         type,
@@ -377,7 +384,66 @@ export class WebAgent {
     }
   }
 
-  private clipSnapshotsFromMessages(messages: any[]): any[] {
+  /**
+   * Helper to emit thinking start/end events around AI operations
+   */
+  protected async withThinkingEvents<T>(operation: string, task: () => Promise<T>): Promise<T> {
+    this.emit(WebAgentEventType.THINKING, { status: "start", operation });
+    try {
+      const result = await task();
+      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      return result;
+    } catch (error) {
+      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      throw error;
+    }
+  }
+
+  /**
+   * Helper to add assistant response to conversation history
+   */
+  protected addAssistantMessage(response: any): void {
+    this.messages.push({
+      role: "assistant",
+      content: JSON.stringify(response),
+    });
+  }
+
+  /**
+   * Helper to add user message to conversation history
+   */
+  protected addUserMessage(content: string): void {
+    this.messages.push({
+      role: "user",
+      content,
+    });
+  }
+
+  /**
+   * Centralized AI generation with consistent configuration
+   */
+  protected async generateAIResponse<T>(
+    schema: any,
+    prompt?: string,
+    messages?: any[],
+  ): Promise<T> {
+    const config: any = {
+      model: this.provider,
+      schema,
+      temperature: 0,
+    };
+
+    if (prompt) {
+      config.prompt = prompt;
+    } else if (messages) {
+      config.messages = messages;
+    }
+
+    const response = await generateObject(config);
+    return response.object as T;
+  }
+
+  private truncateSnapshotsInMessages(messages: any[]): any[] {
     return messages.map((msg) => {
       if (msg.role === "user" && msg.content.includes("snapshot") && msg.content.includes("```")) {
         return {
@@ -391,7 +457,7 @@ export class WebAgent {
 
   private updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
     // Clip old snapshots from existing messages
-    this.messages = this.clipSnapshotsFromMessages(this.messages);
+    this.messages = this.truncateSnapshotsInMessages(this.messages);
 
     this.messages.push({
       role: "user",
@@ -399,22 +465,16 @@ export class WebAgent {
     });
   }
 
-  private addValidationFeedback(errors: string[], response: any) {
+  private addValidationErrorFeedback(errors: string[], response: any) {
     const hasGuardrails = !!this.guardrails;
-    this.messages.push({
-      role: "assistant",
-      content: JSON.stringify(response),
-    });
-    this.messages.push({
-      role: "user",
-      content: buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails),
-    });
+    this.addAssistantMessage(response);
+    this.addUserMessage(buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
   }
 
   /**
-   * Emits all step-related events for the current AI reasoning cycle
+   * Broadcasts all details of the current action for logging/display
    */
-  private emitStepEvents(result: any) {
+  protected broadcastActionDetails(result: any) {
     this.emit(WebAgentEventType.CURRENT_STEP, { currentStep: result.currentStep });
     this.emit(WebAgentEventType.OBSERVATION, { observation: result.observation });
     this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData || "" });
@@ -426,18 +486,14 @@ export class WebAgent {
     });
   }
 
-  private addTaskValidationFeedback(result: any, validationResult: TaskValidationResult) {
-    this.messages.push({
-      role: "assistant",
-      content: JSON.stringify(result),
-    });
-    this.messages.push({
-      role: "user",
-      content: `Task completion quality: ${validationResult.completionQuality}. ${validationResult.feedback} Please continue working on the task.`,
-    });
+  private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
+    this.addAssistantMessage(result);
+    this.addUserMessage(
+      `Task completion quality: ${validationResult.completionQuality}. ${validationResult.feedback} Please continue working on the task.`,
+    );
   }
 
-  private async executeAction(result: any): Promise<boolean> {
+  protected async executeAction(result: any): Promise<boolean> {
     try {
       switch (result.action.action) {
         case "wait":
@@ -448,11 +504,7 @@ export class WebAgent {
         case "goto":
           if (result.action.value) {
             await this.browser.goto(result.action.value);
-            const [navTitle, navUrl] = await Promise.all([
-              this.browser.getTitle(),
-              this.browser.getUrl(),
-            ]);
-            this.recordNavigationEvent(navTitle, navUrl);
+            await this.refreshAndRecordNavigation();
           } else {
             throw new Error("Missing URL for goto action");
           }
@@ -460,20 +512,12 @@ export class WebAgent {
 
         case "back":
           await this.browser.goBack();
-          const [backTitle, backUrl] = await Promise.all([
-            this.browser.getTitle(),
-            this.browser.getUrl(),
-          ]);
-          this.recordNavigationEvent(backTitle, backUrl);
+          await this.refreshAndRecordNavigation();
           break;
 
         case "forward":
           await this.browser.goForward();
-          const [fwdTitle, fwdUrl] = await Promise.all([
-            this.browser.getTitle(),
-            this.browser.getUrl(),
-          ]);
-          this.recordNavigationEvent(fwdTitle, fwdUrl);
+          await this.refreshAndRecordNavigation();
           break;
 
         case "done":
@@ -493,13 +537,10 @@ export class WebAgent {
 
           // Check if navigation occurred for actions that might navigate
           if (["click", "select"].includes(result.action.action)) {
-            const [actionTitle, actionUrl] = await Promise.all([
-              this.browser.getTitle(),
-              this.browser.getUrl(),
-            ]);
+            const { title: actionTitle, url: actionUrl } = await this.refreshPageState();
 
             if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
-              this.recordNavigationEvent(actionTitle, actionUrl);
+              this.emitNavigationEvent(actionTitle, actionUrl);
             }
           }
       }
@@ -513,19 +554,12 @@ export class WebAgent {
     }
   }
 
-  private addActionToHistory(result: any, actionSuccess: boolean) {
+  private recordActionResult(result: any, actionSuccess: boolean) {
     if (actionSuccess) {
-      this.messages.push({
-        role: "assistant",
-        content: JSON.stringify(result),
-      });
-
+      this.addAssistantMessage(result);
       this.emit(WebAgentEventType.ACTION_RESULT, { success: true });
     } else {
-      this.messages.push({
-        role: "assistant",
-        content: `Failed to execute action: ${result.action.action}`,
-      });
+      this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
     }
   }
 
@@ -559,40 +593,32 @@ export class WebAgent {
 
   private formatConversationHistory(): string {
     // Clip snapshots for validation - we don't need massive page content for validation
-    const clippedMessages = this.clipSnapshotsFromMessages(this.messages);
+    const clippedMessages = this.truncateSnapshotsInMessages(this.messages);
 
     return clippedMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n");
   }
 
-  private async validateTaskCompletion(
+  protected async validateTaskCompletion(
     task: string,
     finalAnswer: string,
   ): Promise<TaskValidationResult> {
     const conversationHistory = this.formatConversationHistory();
 
-    this.emit(WebAgentEventType.THINKING, {
-      status: "start",
-      operation: "Validating task completion",
-    });
-    const response = await generateObject({
-      model: this.provider,
-      schema: taskValidationSchema,
-      prompt: buildTaskValidationPrompt(task, finalAnswer, conversationHistory),
-      temperature: 0,
-    });
-    this.emit(WebAgentEventType.THINKING, {
-      status: "end",
-      operation: "Validating task completion",
-    });
+    const response = await this.withThinkingEvents("Validating task completion", () =>
+      this.generateAIResponse<TaskValidationResult>(
+        taskValidationSchema,
+        buildTaskValidationPrompt(task, finalAnswer, conversationHistory),
+      ),
+    );
 
     this.emit(WebAgentEventType.TASK_VALIDATION, {
-      observation: response.object.observation,
-      completionQuality: response.object.completionQuality,
-      feedback: response.object.feedback,
+      observation: response.observation,
+      completionQuality: response.completionQuality,
+      feedback: response.feedback,
       finalAnswer,
     });
 
-    return response.object;
+    return response;
   }
 
   async execute(task: string, startingUrl?: string, data?: any): Promise<TaskExecutionResult> {
@@ -612,10 +638,10 @@ export class WebAgent {
     if (startingUrl) {
       this.url = startingUrl;
       // Run browser launch and plan creation concurrently
-      await Promise.all([this.createPlan(task, startingUrl), this.browser.start()]);
+      await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
     } else {
       // Run plan creation and browser launch concurrently
-      await Promise.all([this.createPlanAndUrl(task), this.browser.start()]);
+      await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
     }
 
     // Emit task start event
@@ -624,17 +650,11 @@ export class WebAgent {
     // Go to the starting URL
     await this.browser.goto(this.url);
 
-    // Get page info after navigation
-    const [pageTitle, pageUrl] = await Promise.all([
-      this.browser.getTitle(),
-      this.browser.getUrl(),
-    ]);
-
     // Record initial navigation event
-    this.recordNavigationEvent(pageTitle, pageUrl);
+    await this.refreshAndRecordNavigation();
 
     // Setup messages
-    this.setupMessages(task);
+    this.initializeConversation(task);
     let finalAnswer = null;
     let validationAttempts = 0;
     let currentIteration = 0;
@@ -653,10 +673,10 @@ export class WebAgent {
 
       // Get current page state and generate next action
       const pageSnapshot = await this.browser.getText();
-      const result = await this.getNextActions(pageSnapshot);
+      const result = await this.generateNextAction(pageSnapshot);
 
       // Emit all the step events
-      this.emitStepEvents(result);
+      this.broadcastActionDetails(result);
 
       // Handle "done" action - check if task is complete
       if (result.action.action === "done") {
@@ -675,7 +695,7 @@ export class WebAgent {
           }
 
           // Add feedback and try again
-          this.addTaskValidationFeedback(result, validationResult);
+          this.addTaskRetryFeedback(result, validationResult);
           finalAnswer = null; // Reset for next attempt
           continue; // Continue loop for retry
         }
@@ -685,7 +705,7 @@ export class WebAgent {
       const actionSuccess = await this.executeAction(result);
 
       // Add result to conversation history
-      this.addActionToHistory(result, actionSuccess);
+      this.recordActionResult(result, actionSuccess);
     }
 
     // Determine success: task completed and validation result shows success
@@ -715,7 +735,7 @@ export class WebAgent {
   /**
    * Compresses the aria tree snapshot to reduce token usage while maintaining essential information
    */
-  private compressSnapshot(snapshot: string): string {
+  protected compressSnapshot(snapshot: string): string {
     // First apply all our normal transformations
     const transformed = snapshot
       .split("\n")
