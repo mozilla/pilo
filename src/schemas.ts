@@ -34,7 +34,8 @@ export type Action = z.infer<typeof actionSchema>;
 
 // Schema for task validation results
 export const taskValidationSchema = z.object({
-  isValid: z.boolean(),
+  observation: z.string(),
+  completionQuality: z.enum(["failed", "partial", "complete", "excellent"]),
   feedback: z.string().optional(),
 });
 

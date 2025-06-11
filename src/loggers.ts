@@ -122,16 +122,31 @@ export class ConsoleLogger implements Logger {
   };
 
   private handleTaskValidation = (data: TaskValidationEventData): void => {
-    if (data.isValid) {
-      console.log(chalk.green.bold("\n✅ Task Validation:"), chalk.green("Answer is valid"));
-    } else {
-      console.log(
-        chalk.yellow.bold("\n⚠️ Task Validation:"),
-        chalk.yellow("Answer needs improvement"),
-      );
-      if (data.feedback) {
-        console.log(chalk.yellow("   Feedback:"), chalk.whiteBright(data.feedback));
-      }
+    const qualityColors = {
+      excellent: chalk.green,
+      complete: chalk.green,
+      partial: chalk.yellow,
+      failed: chalk.red,
+    };
+
+    const qualityLabels = {
+      excellent: "✨ Excellent completion",
+      complete: "✅ Task completed",
+      partial: "⚠️ Partial completion",
+      failed: "❌ Task failed",
+    };
+
+    const color = qualityColors[data.completionQuality];
+    const label = qualityLabels[data.completionQuality];
+
+    console.log(chalk.bold("\n🔍 Task Validation:"), color(label));
+
+    if (data.observation) {
+      console.log(chalk.gray("   Analysis:"), chalk.whiteBright(data.observation));
+    }
+
+    if (data.feedback) {
+      console.log(chalk.gray("   Feedback:"), chalk.whiteBright(data.feedback));
     }
   };
 

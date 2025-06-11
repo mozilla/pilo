@@ -150,7 +150,8 @@ export interface NetworkTimeoutEventData extends WebAgentEventData {
  * Event data for task validation
  */
 export interface TaskValidationEventData extends WebAgentEventData {
-  isValid: boolean;
+  observation: string;
+  completionQuality: "failed" | "partial" | "complete" | "excellent";
   feedback?: string;
   finalAnswer: string;
 }

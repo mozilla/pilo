@@ -153,7 +153,8 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_VALIDATION events (valid)", () => {
       const eventData: TaskValidationEventData = {
         timestamp: Date.now(),
-        isValid: true,
+        observation: "Task completed successfully",
+        completionQuality: "complete",
         finalAnswer: "Task completed successfully",
       };
 
@@ -164,13 +165,14 @@ describe("ConsoleLogger", () => {
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("valid");
+      expect(allOutput).toContain("Task completed");
     });
 
     it("should handle TASK_VALIDATION events (invalid with feedback)", () => {
       const eventData: TaskValidationEventData = {
         timestamp: Date.now(),
-        isValid: false,
+        observation: "Task not completed properly",
+        completionQuality: "partial",
         feedback: "Missing confirmation step in the process",
         finalAnswer: "Form submitted",
       };
@@ -182,7 +184,7 @@ describe("ConsoleLogger", () => {
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("improvement");
+      expect(allOutput).toContain("Partial completion");
       expect(allOutput).toContain("Missing confirmation step");
     });
   });
