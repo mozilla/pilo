@@ -18,13 +18,16 @@ export const planAndUrlSchema = z.object({
 export const actionSchema = z.object({
   currentStep: z.string(),
   observation: z.string(),
+  observationStatusMessage: z.string(),
   extractedData: z.string().optional(),
+  extractedDataStatusMessage: z.string().optional(),
   thought: z.string(),
   action: z.object({
     action: z.nativeEnum(PageAction),
     ref: z.string().optional(),
     value: z.string().optional(),
   }),
+  actionStatusMessage: z.string(),
 });
 
 // Export the types

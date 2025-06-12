@@ -34,6 +34,9 @@ export enum WebAgentEventType {
   NETWORK_WAITING = "system:network_waiting",
   NETWORK_TIMEOUT = "system:network_timeout",
   TASK_VALIDATION = "task:validation",
+
+  // Status events
+  STATUS_MESSAGE = "status:message",
 }
 
 /**
@@ -178,6 +181,13 @@ export interface ValidationErrorEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for status messages
+ */
+export interface StatusMessageEventData extends WebAgentEventData {
+  message: string;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -200,7 +210,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.NETWORK_WAITING; data: NetworkWaitingEventData }
   | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
   | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData }
-  | { type: WebAgentEventType.VALIDATION_ERROR; data: ValidationErrorEventData };
+  | { type: WebAgentEventType.VALIDATION_ERROR; data: ValidationErrorEventData }
+  | { type: WebAgentEventType.STATUS_MESSAGE; data: StatusMessageEventData };
 
 /**
  * Event emitter for WebAgent events

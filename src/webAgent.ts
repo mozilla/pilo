@@ -316,7 +316,14 @@ export class WebAgent {
     // Validate required top-level fields
     this.validateRequiredStringField(response, "currentStep", errors);
     this.validateRequiredStringField(response, "observation", errors);
+    this.validateRequiredStringField(response, "observationStatusMessage", errors);
     this.validateRequiredStringField(response, "thought", errors);
+    this.validateRequiredStringField(response, "actionStatusMessage", errors);
+
+    // Validate conditional status message requirements
+    if (response.extractedData && response.extractedData.trim()) {
+      this.validateRequiredStringField(response, "extractedDataStatusMessage", errors);
+    }
 
     // Validate action object exists
     if (!response.action || typeof response.action !== "object") {
@@ -647,6 +654,7 @@ export class WebAgent {
     schema: any,
     prompt?: string,
     messages?: any[],
+    retryCount = 0,
   ): Promise<T> {
     const config: any = {
       model: this.provider,
@@ -660,8 +668,45 @@ export class WebAgent {
       config.messages = messages;
     }
 
-    const response = await generateObject(config);
-    return response.object as T;
+    try {
+      const response = await generateObject(config);
+      return response.object as T;
+    } catch (error) {
+      // Handle AI generation failures with retry logic
+      if (
+        error instanceof Error &&
+        (error.message.includes("response did not match schema") ||
+          error.message.includes("AI_NoObjectGeneratedError") ||
+          error.message.includes("No object generated"))
+      ) {
+        console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
+
+        // Log some debugging info on the first failure
+        if (retryCount === 0 && this.DEBUG) {
+          console.error("Debug info - Last few messages:");
+          const lastMessages = messages ? messages.slice(-2) : [];
+          console.error(JSON.stringify(lastMessages, null, 2));
+        }
+
+        if (retryCount < 2) {
+          console.log("🔄 Retrying AI generation...");
+          // Add a small delay before retry
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return this.generateAIResponse<T>(schema, prompt, messages, retryCount + 1);
+        } else {
+          const errorMessage =
+            `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
+            `1. The AI response not matching the expected schema format\n` +
+            `2. Network issues or AI service problems\n` +
+            `3. Complex page content that confused the AI\n` +
+            `Original error: ${error.message}`;
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   private truncateSnapshotsInMessages(messages: any[]): any[] {
@@ -697,14 +742,28 @@ export class WebAgent {
    */
   protected broadcastActionDetails(result: any) {
     this.emit(WebAgentEventType.CURRENT_STEP, { currentStep: result.currentStep });
+
     this.emit(WebAgentEventType.OBSERVATION, { observation: result.observation });
-    this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData || "" });
+    this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.observationStatusMessage });
+
+    // Only emit extractedData if it exists and has content
+    if (result.extractedData && result.extractedData.trim()) {
+      this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData });
+      if (result.extractedDataStatusMessage) {
+        this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.extractedDataStatusMessage });
+      }
+    }
+
     this.emit(WebAgentEventType.THOUGHT, { thought: result.thought });
+
     this.emit(WebAgentEventType.ACTION_EXECUTION, {
       action: result.action.action,
       ref: result.action.ref || undefined,
       value: result.action.value || undefined,
     });
+    if (result.actionStatusMessage) {
+      this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.actionStatusMessage });
+    }
   }
 
   private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {

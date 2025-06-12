@@ -11,6 +11,7 @@ import type {
   NetworkWaitingEventData,
   ObservationEventData,
   PageNavigationEventData,
+  StatusMessageEventData,
   TaskCompleteEventData,
   TaskStartEventData,
   ThoughtEventData,
@@ -79,6 +80,9 @@ export class ConsoleLogger implements Logger {
 
     // Validation events
     emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
+
+    // Status events
+    emitter.onEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
   }
 
   dispose(): void {
@@ -114,6 +118,9 @@ export class ConsoleLogger implements Logger {
 
       // Validation events
       this.emitter.offEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
+
+      // Status events
+      this.emitter.offEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
 
       // Reset emitter reference
       this.emitter = null;
@@ -260,5 +267,9 @@ export class ConsoleLogger implements Logger {
     if (data.retryCount < 2) {
       console.log(chalk.yellow("   🔄 Retrying with corrected feedback..."));
     }
+  };
+
+  private handleStatusMessage = (data: StatusMessageEventData): void => {
+    console.log(chalk.green.bold("📡 Status:"), chalk.whiteBright(data.message));
   };
 }
