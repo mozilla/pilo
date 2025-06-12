@@ -20,7 +20,7 @@ import {
   buildValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
-import { AriaBrowser, LoadState, PageAction } from "./browser/ariaBrowser.js";
+import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
   planSchema,
   planAndUrlSchema,
@@ -467,16 +467,6 @@ export class WebAgent {
    */
   private emitNavigationEvent(title: string, url: string): void {
     this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
-  }
-
-  /**
-   * Records actual navigation (state + event)
-   *
-   * Used for confirmed navigation events where we want both state update and logging.
-   */
-  private recordNavigation(title: string, url: string): void {
-    this.updatePageState(title, url);
-    this.emitNavigationEvent(title, url);
   }
 
   /**
