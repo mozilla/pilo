@@ -10,7 +10,6 @@
  */
 
 import { generateObject, LanguageModel } from "ai";
-import { openai } from "@ai-sdk/openai";
 import {
   buildActionLoopPrompt,
   buildPlanPrompt,
@@ -79,8 +78,8 @@ export interface WebAgentOptions {
   /** Enable debug mode with additional logging */
   debug?: boolean;
 
-  /** AI Provider to use for LLM requests (defaults to openai("gpt-4.1")) */
-  provider?: LanguageModel;
+  /** AI Provider to use for LLM requests (required) */
+  provider: LanguageModel;
 
   /** Optional guardrails to limit what the agent can do */
   guardrails?: string;
@@ -176,11 +175,11 @@ export class WebAgent {
    */
   constructor(
     private browser: AriaBrowser,
-    options: WebAgentOptions = {},
+    options: WebAgentOptions,
   ) {
     // Initialize configuration from options with sensible defaults
     this.DEBUG = options.debug || false;
-    this.provider = options.provider || openai("gpt-4.1");
+    this.provider = options.provider;
     this.guardrails = options.guardrails || null;
     this.maxValidationAttempts = options.maxValidationAttempts || 3;
     this.maxIterations = options.maxIterations || 50;

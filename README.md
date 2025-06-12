@@ -1,244 +1,288 @@
 # Spark 🔥
 
-A powerful AI-powered web automation library and CLI tool that helps you get answers and take actions in the browser. Spark uses advanced language models to understand web pages and perform complex tasks automatically.
+AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Spark will navigate websites, fill forms, and gather information automatically.
 
-Use Spark as a **library** in your Node.js applications or as a **CLI tool** for interactive automation.
+## Quick Start
 
-## Features
-
-- 🤖 **AI-Powered Navigation**: Automatically understands and navigates web pages using natural language
-- 🎯 **Smart Task Planning**: Breaks down complex tasks into actionable steps
-- 🔍 **Intelligent Element Detection**: Automatically finds and interacts with relevant page elements
-- 🌐 **Browser Automation**: Built on Playwright for reliable web automation
-- 📝 **Natural Language Interface**: Simply describe what you want to do in plain English
-- 🔄 **Interactive Feedback**: Real-time updates on what the agent is thinking and doing
-
-## Installation
-
-### Install from GitHub (Recommended)
+### Installation
 
 ```bash
-# Install as library
-npm install https://github.com/Mozilla-Ocho/spark.git
-
-# Or install globally for CLI usage
+# Install globally
 npm install -g https://github.com/Mozilla-Ocho/spark.git
+
+# Setup AI provider (choose OpenAI or OpenRouter)
+spark config --init
+
+# Run your first task
+spark run "what's the weather in Tokyo?"
 ```
-
-**What happens:** npm automatically builds the project after installation using the `prepare` script.
-
-### Install from Source (for development)
-
-```bash
-git clone https://github.com/Mozilla-Ocho/spark.git
-cd spark
-pnpm install
-pnpm run build
-```
-
-### Development Setup
-
-1. Clone and install:
-
-```bash
-git clone https://github.com/Mozilla-Ocho/spark.git
-cd spark
-pnpm install
-```
-
-2. Install Playwright browsers:
-
-```bash
-pnpm playwright install firefox
-```
-
-3. Set up your OpenAI API key:
-
-```bash
-cp .env.example .env
-# Edit .env and add your OpenAI API key
-```
-
-4. Run Spark:
-
-```bash
-pnpm run spark "what is the current temperature in London?"
-```
-
-## Usage
-
-### Programmatic Usage (Library)
-
-```javascript
-import { WebAgent, PlaywrightBrowser } from "spark";
-
-// Setup: Set OPENAI_API_KEY environment variable
-// Install browsers: npx playwright install firefox
-
-// Create a browser instance
-const browser = new PlaywrightBrowser({
-  headless: false,
-  blockAds: true,
-});
-
-// Create WebAgent
-const webAgent = new WebAgent(browser, {
-  debug: false,
-  guardrails: "Do not make any purchases",
-});
-
-// Execute a task
-try {
-  const result = await webAgent.execute("find flights to Tokyo", "https://airline.com", {
-    departure: "NYC",
-    passengers: 2,
-  });
-  console.log("Task completed:", result.success);
-} finally {
-  await webAgent.close();
-}
-```
-
-#### Library API Reference
-
-**WebAgent Constructor Options:**
-
-- `debug`: boolean - Enable debug logging and page snapshots
-- `guardrails`: string - Constraints to limit agent actions
-
-**PlaywrightBrowser Constructor Options:**
-
-- `headless`: boolean - Run browser in headless mode
-- `blockAds`: boolean - Block ads and trackers
-- `blockResources`: string[] - Block specific resource types
-- `device`: string - Device type for emulation
-
-**WebAgent.execute() Parameters:**
-
-- `task`: string - Natural language task description
-- `startingUrl`: string (optional) - Starting URL
-- `data`: object (optional) - Contextual data for the task
-
-**Returns:** `TaskExecutionResult` with success status and details
-
-### CLI Usage
-
-Spark accepts up to four arguments:
-
-```bash
-pnpm run spark "<task>" [url] [data] [guardrails]
-```
-
-- **task**: Natural language description of what you want to do (required)
-- **url**: Starting URL to begin the task from (optional)
-- **data**: JSON object with contextual data for the task (optional)
-- **guardrails**: String with limitations or constraints for the agent (optional)
-
-## Examples
 
 ### Basic Usage
 
 ```bash
-# Get current weather
-pnpm run spark "is it raining in Tokyo"
+# Simple web queries
+spark run "find the latest news on Reuters"
+spark run "what's the current price of AAPL stock?"
 
-# Check stock price
-pnpm run spark "what is the current price of AAPL stock"
+# With specific starting URL
+spark run "find flight deals to Paris" --url https://kayak.com
 
-# Get latest news
-pnpm run spark "what is the top headline on Reuters"
+# With structured data
+spark run "book a flight" --url https://airline.com --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+
+# With safety constraints
+spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
 ```
 
-### With Starting URL
+## Features
+
+- 🤖 **Natural Language Control**: Just describe what you want to do in plain English
+- 🎯 **Smart Navigation**: Automatically finds and interacts with the right page elements
+- 🔍 **Intelligent Planning**: Breaks down complex tasks into actionable steps
+- 🌐 **Multi-Browser Support**: Works with Firefox, Chrome, Safari, and Edge
+- 🛡️ **Safety First**: Built-in guardrails to prevent unintended actions
+- 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
+
+## Installation Options
+
+### Global Installation (Recommended)
 
 ```bash
-# Start from a specific website
-pnpm run spark "find the latest news" "https://news.ycombinator.com"
-
-# Check weather on a specific weather site
-pnpm run spark "get weather for San Francisco" "https://weather.com"
-
-# Book a flight from NYC to LAX on December 25th for 2 passengers
-pnpm run spark "book a flight from NYC to LAX on December 25th for 2 passengers" "https://airline.com"
+npm install -g https://github.com/Mozilla-Ocho/spark.git
+spark config --init  # Setup wizard
 ```
 
-### With Contextual Data
-
-You can provide details either in the task description OR in the data object. Using the data object helps keep the task description clean and provides structured information the AI can easily reference.
+### Library Installation
 
 ```bash
-# Same task as above, but with structured data instead of in the prompt
-pnpm run spark "book a flight" "https://airline.com" '{"departure":"NYC","destination":"LAX","date":"2024-12-25","passengers":2}'
-
-# Fill out a form with provided information
-pnpm run spark "submit contact form" "https://example.com/contact" '{"name":"John Doe","email":"john@example.com","message":"Hello world"}'
-
-# Compare: details in prompt vs. data object
-pnpm run spark "find hotels in Paris from Dec 20-22 for 2 guests" "https://booking.com"
-# vs.
-pnpm run spark "find hotels" "https://booking.com" '{"location":"Paris","checkIn":"2024-12-20","checkOut":"2024-12-22","guests":2}'
+npm install https://github.com/Mozilla-Ocho/spark.git
 ```
 
-**When to use data objects:**
-
-- Complex information with multiple fields
-- Structured data like dates, IDs, or specifications
-- When you want to keep the task description simple and focused
-- For reusable templates where only the data changes
-
-The data object is passed as JSON and becomes available to the AI throughout the entire task execution, allowing it to reference the information when filling forms, making selections, or completing complex workflows.
-
-### With Guardrails
-
-You can provide guardrails to limit what the agent can do:
+### Development Setup
 
 ```bash
-# Search without making any purchases
-pnpm run spark "find flights to Tokyo" "https://airline.com" "" "Do not make any bookings or purchases"
-
-# Browse only, no form submissions
-pnpm run spark "check product availability" "https://store.com" '{"product":"laptop"}' "Only browse and search, do not submit any forms"
-
-# Stay within current domain
-pnpm run spark "find company contact info" "https://company.com" "" "Do not navigate to external websites"
+git clone https://github.com/Mozilla-Ocho/spark.git
+cd spark
+pnpm install
+pnpm playwright install firefox
+pnpm spark config --init
+pnpm spark run "test task"
 ```
 
-**When to use guardrails:**
+## Usage
 
-- Prevent unintended actions like purchases or bookings
-- Limit navigation scope to specific domains
-- Restrict form submissions or data entry
-- Ensure the agent only performs safe, read-only operations
+### Command Line
 
-## Development
-
-Built with TypeScript, Playwright, and OpenAI's GPT-4.1.
+**Basic syntax:**
 
 ```bash
-# Run tests
-pnpm test
-pnpm run test:watch  # for development
-
-# Build
-pnpm run build
+spark run "<task description>" [options]
 ```
 
-### Creating Releases
+**Common options:**
 
-Releases are automated via GitHub Actions using git flow:
+- `--url <url>` - Starting website URL
+- `--data '<json>'` - Structured data for the task
+- `--guardrails "<text>"` - Safety constraints
+- `--browser <name>` - Browser choice (firefox, chrome, safari, edge)
+- `--headless` - Run without visible browser window
+- `--debug` - Show detailed logs and page snapshots
 
-1. `git flow release start 1.0.1`
-2. Update the version in `package.json` to match
-3. `git flow release finish 1.0.1`
-4. When the release merges to `main`, GitHub Actions automatically builds and creates a release
+**Configuration:**
 
-Tags are created automatically based on the package.json version.
+```bash
+spark config --init     # Setup wizard
+spark config --show     # View current settings
+spark config --reset    # Clear all settings
+```
+
+### Programmatic Usage
+
+```javascript
+import { WebAgent, PlaywrightBrowser } from "spark";
+import { openai } from "@ai-sdk/openai";
+
+const browser = new PlaywrightBrowser({ headless: false });
+const provider = openai("gpt-4.1");
+
+const agent = new WebAgent(browser, {
+  provider,
+  guardrails: "Do not make purchases",
+});
+
+try {
+  const result = await agent.execute("find flights to Tokyo", "https://airline.com");
+  console.log("Success:", result.success);
+} finally {
+  await agent.close();
+}
+```
+
+## Examples
+
+### Simple Tasks
+
+```bash
+spark run "is it raining in London?"
+spark run "what's trending on Hacker News?"
+spark run "find the contact email for example.com"
+```
+
+### With URLs
+
+```bash
+spark run "find flight deals" --url https://kayak.com
+spark run "check if items are in stock" --url https://store.com
+```
+
+### With Structured Data
+
+```bash
+# Hotel search
+spark run "find hotels" --url https://booking.com --data '{
+  "location": "Paris",
+  "checkIn": "2024-12-20",
+  "checkOut": "2024-12-22",
+  "guests": 2
+}'
+
+# Form filling
+spark run "submit contact form" --url https://company.com/contact --data '{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "message": "Hello world"
+}'
+```
+
+### With Safety Guardrails
+
+```bash
+# Browse-only mode
+spark run "research product prices" --guardrails "only browse, don't buy anything"
+
+# Domain restrictions
+spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
+
+# Form restrictions
+spark run "check shipping costs" --guardrails "don't submit any payment forms"
+```
+
+### Advanced Options
+
+```bash
+# Mobile testing
+spark run "test mobile checkout flow" --browser chrome --device "iPhone 12"
+
+# Headless automation
+spark run "get daily stock prices" --headless --browser firefox
+
+# Debug mode
+spark run "complex automation task" --debug
+
+# Combined options
+spark run "test signup flow" \
+  --url https://app.com \
+  --browser safari \
+  --headless \
+  --data '{"email":"test@example.com"}' \
+  --guardrails "don't complete signup, just test the flow"
+```
+
+## Configuration
+
+Spark supports multiple AI providers and stores configuration globally:
+
+```bash
+# Setup wizard (recommended for first use)
+spark config --init
+
+# Manual configuration
+spark config --set provider=openai
+spark config --set openai_api_key=sk-your-key
+
+# Or use OpenRouter
+spark config --set provider=openrouter
+spark config --set openrouter_api_key=sk-or-your-key
+
+# Set defaults
+spark config --set browser=chrome
+spark config --set headless=true
+
+# View settings
+spark config --show
+
+# Reset everything
+spark config --reset
+```
+
+**Configuration priority:**
+
+1. Environment variables (highest)
+2. Local `.env` file (development)
+3. Global config file (lowest)
 
 ## Requirements
 
-- Node.js 20+
-- OpenAI API key
-- Firefox browser (for Playwright)
+- **Node.js 20+**
+- **AI Provider API key:**
+  - [OpenAI API key](https://platform.openai.com/api-keys) (default), or
+  - [OpenRouter API key](https://openrouter.ai/keys) (alternative)
+- **Browsers:** Automatically installed by Playwright (Firefox, Chrome, Safari, Edge)
+
+## API Reference
+
+### WebAgent Constructor
+
+```javascript
+new WebAgent(browser, {
+  provider: LanguageModel,    // Required: AI model instance
+  debug?: boolean,            // Enable debug logging
+  guardrails?: string         // Safety constraints
+})
+```
+
+### PlaywrightBrowser Constructor
+
+```javascript
+new PlaywrightBrowser({
+  headless?: boolean,         // Run without GUI
+  blockAds?: boolean,         // Block ads/trackers
+  blockResources?: string[],  // Block resource types
+  device?: string,            // Device emulation
+  browser?: string            // Browser choice
+})
+```
+
+### WebAgent.execute()
+
+```javascript
+await agent.execute(
+  task: string,               // Natural language task
+  startingUrl?: string,       // Optional starting URL
+  data?: object               // Optional context data
+)
+```
+
+Returns `TaskExecutionResult` with success status and details.
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run tests
+pnpm test
+pnpm run test:watch
+
+# Build
+pnpm run build
+
+# Format code
+pnpm run format
+```
+
+Built with TypeScript, Playwright, and the Vercel AI SDK.
 
 ## License
 
@@ -246,4 +290,4 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit a Pull Request.
