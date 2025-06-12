@@ -1,24 +1,44 @@
 {
   "name": "spark",
   "version": "1.0.0",
-  "description": "Web automation agent CLI utility",
+  "description": "AI-powered web automation library and CLI tool",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "spark": "./dist/index.js"
+    "spark": "./dist/cli.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
-    "spark": "node --no-warnings --loader ts-node/esm src/index.ts",
+    "spark": "node --no-warnings --loader ts-node/esm src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "install-cli": "npm run build && chmod +x dist/index.js && npm install -g .",
+    "install-cli": "npm run build && chmod +x dist/cli.js && npm install -g .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "automation",
+    "web-scraping",
+    "playwright",
+    "browser-automation",
+    "cli"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
