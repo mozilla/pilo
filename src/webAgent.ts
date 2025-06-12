@@ -79,7 +79,7 @@ export interface WebAgentOptions {
   /** Enable debug mode with additional logging */
   debug?: boolean;
 
-  /** AI Provider to use for LLM requests (defaults to openai("gpt-4.1-nano")) */
+  /** AI Provider to use for LLM requests (defaults to openai("gpt-4.1")) */
   provider?: LanguageModel;
 
   /** Optional guardrails to limit what the agent can do */

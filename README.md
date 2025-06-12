@@ -131,7 +131,7 @@ pnpm run spark "find company contact info" "https://company.com" "" "Do not navi
 
 ## Development
 
-Built with TypeScript, Playwright, and OpenAI's GPT-4.
+Built with TypeScript, Playwright, and OpenAI's GPT-4.1.
 
 ```bash
 # Run tests
