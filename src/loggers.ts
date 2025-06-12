@@ -38,6 +38,39 @@ export interface Logger {
 }
 
 /**
+ * Generic logger that forwards all events to a callback function
+ * Useful for custom logging implementations like streaming or external services
+ */
+export class GenericLogger implements Logger {
+  private emitter: WebAgentEventEmitter | null = null;
+  private eventHandler: (eventType: string, data: any) => void;
+
+  constructor(eventHandler: (eventType: string, data: any) => void) {
+    this.eventHandler = eventHandler;
+  }
+
+  initialize(emitter: WebAgentEventEmitter): void {
+    if (this.emitter) {
+      this.dispose();
+    }
+    this.emitter = emitter;
+
+    // Listen to all events using wildcard
+    emitter.on("*", (eventType: string, data: any) => {
+      this.eventHandler(eventType, data);
+    });
+  }
+
+  dispose(): void {
+    if (this.emitter) {
+      // Remove wildcard listener
+      this.emitter.removeAllListeners("*");
+      this.emitter = null;
+    }
+  }
+}
+
+/**
  * Console logger that outputs colored text to the console
  */
 export class ConsoleLogger implements Logger {
@@ -51,76 +84,63 @@ export class ConsoleLogger implements Logger {
     this.emitter = emitter;
 
     // Task events
-    emitter.onEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
-    emitter.onEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
-    emitter.onEvent(WebAgentEventType.TASK_VALIDATION, this.handleTaskValidation);
+    emitter.onEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
+    emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
+    emitter.onEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
+    emitter.onEvent(WebAgentEventType.TASK_VALIDATION_ERROR, this.handleValidationError);
 
-    // Page events
-    emitter.onEvent(WebAgentEventType.PAGE_NAVIGATION, this.handlePageNavigation);
+    // Browser events
+    emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
+    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
+    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
 
     // Agent reasoning events
-    emitter.onEvent(WebAgentEventType.CURRENT_STEP, this.handleCurrentStep);
-    emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
-    emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
-    emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
-    emitter.onEvent(WebAgentEventType.THINKING, this.handleThinking);
-
-    // Action events
-    emitter.onEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
-    emitter.onEvent(WebAgentEventType.ACTION_RESULT, this.handleActionResult);
+    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
+    emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
+    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+    emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
+    emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+    emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
+    emitter.onEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
     // Debug events
-    emitter.onEvent(WebAgentEventType.DEBUG_COMPRESSION, this.handleCompressionDebug);
-    emitter.onEvent(WebAgentEventType.DEBUG_MESSAGES, this.handleMessagesDebug);
-
-    // Waiting events
-    emitter.onEvent(WebAgentEventType.WAITING, this.handleWaiting);
-    emitter.onEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
-    emitter.onEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
-
-    // Validation events
-    emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
-
-    // Status events
-    emitter.onEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
+    emitter.onEvent(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, this.handleCompressionDebug);
+    emitter.onEvent(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, this.handleMessagesDebug);
   }
 
   dispose(): void {
     // Clean up event listeners to prevent memory leaks
     if (this.emitter) {
       // Task events
-      this.emitter.offEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
-      this.emitter.offEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
-      this.emitter.offEvent(WebAgentEventType.TASK_VALIDATION, this.handleTaskValidation);
+      this.emitter.offEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
+      this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
+      this.emitter.offEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
+      this.emitter.offEvent(WebAgentEventType.TASK_VALIDATION_ERROR, this.handleValidationError);
 
-      // Page events
-      this.emitter.offEvent(WebAgentEventType.PAGE_NAVIGATION, this.handlePageNavigation);
+      // Browser events
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
 
       // Agent reasoning events
-      this.emitter.offEvent(WebAgentEventType.CURRENT_STEP, this.handleCurrentStep);
-      this.emitter.offEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
-      this.emitter.offEvent(WebAgentEventType.THOUGHT, this.handleThought);
-      this.emitter.offEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
-      this.emitter.offEvent(WebAgentEventType.THINKING, this.handleThinking);
-
-      // Action events
-      this.emitter.offEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
-      this.emitter.offEvent(WebAgentEventType.ACTION_RESULT, this.handleActionResult);
+      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
+      this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
+      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+      this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
+      this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+      this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
+      this.emitter.offEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
       // Debug events
-      this.emitter.offEvent(WebAgentEventType.DEBUG_COMPRESSION, this.handleCompressionDebug);
-      this.emitter.offEvent(WebAgentEventType.DEBUG_MESSAGES, this.handleMessagesDebug);
-
-      // Waiting events
-      this.emitter.offEvent(WebAgentEventType.WAITING, this.handleWaiting);
-      this.emitter.offEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
-      this.emitter.offEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
-
-      // Validation events
-      this.emitter.offEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
-
-      // Status events
-      this.emitter.offEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
+      this.emitter.offEvent(
+        WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
+        this.handleCompressionDebug,
+      );
+      this.emitter.offEvent(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, this.handleMessagesDebug);
 
       // Reset emitter reference
       this.emitter = null;
@@ -180,27 +200,27 @@ export class ConsoleLogger implements Logger {
   };
 
   private handleCurrentStep = (data: CurrentStepEventData): void => {
-    console.log(chalk.magenta.bold("🔄 Current Step:"));
+    console.log(chalk.magenta.bold("🎯 Agent Step:"));
     console.log(chalk.whiteBright("   " + data.currentStep));
   };
 
   private handleObservation = (data: ObservationEventData): void => {
-    console.log(chalk.yellow.bold("🔭 Observation:"));
+    console.log(chalk.yellow.bold("👁️ Agent Observed:"));
     console.log(chalk.whiteBright("   " + data.observation));
   };
 
   private handleThought = (data: ThoughtEventData): void => {
-    console.log(chalk.yellow.bold("\n💭 Thought:"));
+    console.log(chalk.yellow.bold("\n🧠 Agent Reasoned:"));
     console.log(chalk.whiteBright("   " + data.thought));
   };
 
   private handleExtractedData = (data: ExtractedDataEventData): void => {
-    console.log(chalk.green.bold("\n📋 Extracted Data:"));
+    console.log(chalk.green.bold("\n📊 Agent Extracted:"));
     console.log(chalk.whiteBright("   " + data.extractedData));
   };
 
   private handleActionExecution = (data: ActionExecutionEventData): void => {
-    console.log(chalk.yellow.bold("\n🎯 Actions:"));
+    console.log(chalk.yellow.bold("\n🎯 Planned Action:"));
     console.log(
       chalk.whiteBright(`   1. ${data.action.toUpperCase()}`),
       data.ref ? chalk.cyan(`ref: ${data.ref}`) : "",
@@ -208,7 +228,7 @@ export class ConsoleLogger implements Logger {
     );
 
     console.log(
-      chalk.cyan.bold("\n▶️ Executing action:"),
+      chalk.cyan.bold("\n🤖 Browser Executing:"),
       chalk.whiteBright(data.action.toUpperCase()),
       data.ref ? chalk.cyan(`ref: ${data.ref}`) : "",
       data.value ? chalk.green(`value: "${data.value}"`) : "",
@@ -218,7 +238,7 @@ export class ConsoleLogger implements Logger {
   private handleActionResult = (data: ActionResultEventData): void => {
     if (!data.success) {
       console.error(
-        chalk.red.bold(`❌ Failed to execute action: `),
+        chalk.red.bold(`❌ Browser Action Failed: `),
         chalk.whiteBright(data.error || "Unknown error"),
       );
     }
@@ -226,43 +246,41 @@ export class ConsoleLogger implements Logger {
 
   private handleCompressionDebug = (data: CompressionDebugEventData): void => {
     console.log(
-      chalk.gray("\n📝 Compression:"),
+      chalk.gray("\n🗜️ System Debug - Compression:"),
       chalk.green(`${data.compressionPercent}%`),
       chalk.gray(`(${data.originalSize} → ${data.compressedSize} chars)`),
     );
   };
 
   private handleMessagesDebug = (data: MessagesDebugEventData): void => {
-    console.log(chalk.cyan.bold("\n🤔 Messages:"));
+    console.log(chalk.cyan.bold("\n💬 System Debug - Messages:"));
     console.log(chalk.gray(JSON.stringify(data.messages, null, 2)));
   };
 
   private handleWaiting = (data: WaitingEventData): void => {
     console.log(
-      chalk.yellow.bold(`⏳ Waiting for ${data.seconds} second${data.seconds !== 1 ? "s" : ""}...`),
+      chalk.yellow.bold(
+        `⏳ Agent Waiting ${data.seconds} second${data.seconds !== 1 ? "s" : ""}...`,
+      ),
     );
   };
 
   private handleNetworkWaiting = (data: NetworkWaitingEventData): void => {
-    console.log(
-      chalk.gray(`   🌐 Waiting for network activity to settle after "${data.action}"...`),
-    );
+    console.log(chalk.gray(`   🌐 Browser Network Waiting after "${data.action}"...`));
   };
 
   private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
-    console.log(chalk.gray(`   ⚠️  Network wait timed out for "${data.action}", continuing...`));
+    console.log(chalk.gray(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`));
   };
 
   private handleThinking = (data: ThinkingEventData): void => {
     if (data.status === "start") {
-      console.log(chalk.cyan.bold(`\n🤔 ${data.operation}...`));
+      console.log(chalk.cyan.bold(`\n🧮 Agent Processing: ${data.operation}...`));
     }
   };
 
   private handleValidationError = (data: ValidationErrorEventData): void => {
-    console.error(
-      chalk.red.bold(`\n⚠️ Action validation failed (attempt ${data.retryCount + 1}):`),
-    );
+    console.error(chalk.red.bold(`\n⚠️ Task Validation Error (attempt ${data.retryCount + 1}):`));
     data.errors.forEach((error, index) => {
       console.error(chalk.red(`   ${index + 1}. ${error}`));
     });
@@ -272,6 +290,6 @@ export class ConsoleLogger implements Logger {
   };
 
   private handleStatusMessage = (data: StatusMessageEventData): void => {
-    console.log(chalk.green.bold("📡 Status:"), chalk.whiteBright(data.message));
+    console.log(chalk.green.bold("💬 Agent Status:"), chalk.whiteBright(data.message));
   };
 }

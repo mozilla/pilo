@@ -39,9 +39,9 @@ describe("WebAgentEventEmitter", () => {
         url: "https://example.com",
       };
 
-      emitter.onEvent(WebAgentEventType.TASK_START, listener);
+      emitter.onEvent(WebAgentEventType.TASK_STARTED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_START,
+        type: WebAgentEventType.TASK_STARTED,
         data: eventData,
       });
 
@@ -56,13 +56,13 @@ describe("WebAgentEventEmitter", () => {
         finalAnswer: "Test answer",
       };
 
-      emitter.onceEvent(WebAgentEventType.TASK_COMPLETE, listener);
+      emitter.onceEvent(WebAgentEventType.TASK_COMPLETED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_COMPLETE,
+        type: WebAgentEventType.TASK_COMPLETED,
         data: eventData,
       });
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_COMPLETE,
+        type: WebAgentEventType.TASK_COMPLETED,
         data: eventData,
       });
 
@@ -78,10 +78,10 @@ describe("WebAgentEventEmitter", () => {
         url: "https://example.com",
       };
 
-      emitter.onEvent(WebAgentEventType.PAGE_NAVIGATION, listener);
-      emitter.offEvent(WebAgentEventType.PAGE_NAVIGATION, listener);
+      emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, listener);
+      emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.PAGE_NAVIGATION,
+        type: WebAgentEventType.BROWSER_NAVIGATED,
         data: eventData,
       });
 
@@ -96,10 +96,10 @@ describe("WebAgentEventEmitter", () => {
         currentStep: "Step 1",
       };
 
-      emitter.onEvent(WebAgentEventType.CURRENT_STEP, listener1);
-      emitter.onEvent(WebAgentEventType.CURRENT_STEP, listener2);
+      emitter.onEvent(WebAgentEventType.AGENT_STEP, listener1);
+      emitter.onEvent(WebAgentEventType.AGENT_STEP, listener2);
       emitter.emitEvent({
-        type: WebAgentEventType.CURRENT_STEP,
+        type: WebAgentEventType.AGENT_STEP,
         data: eventData,
       });
 
@@ -114,24 +114,24 @@ describe("WebAgentEventEmitter", () => {
     it("should handle all WebAgentEventType values", () => {
       // Verify all event types are defined
       const expectedEventTypes = [
-        "task:start",
-        "task:complete",
-        "page:navigation",
-        "agent:current_step",
-        "agent:observation",
-        "agent:thought",
-        "agent:extracted_data",
-        "agent:thinking",
-        "action:execution",
-        "action:result",
-        "debug:compression",
-        "debug:messages",
-        "validation:error",
-        "system:waiting",
-        "system:network_waiting",
-        "system:network_timeout",
-        "task:validation",
-        "status:message",
+        "task:started",
+        "task:completed",
+        "task:validated",
+        "task:validation_error",
+        "agent:step",
+        "agent:observed",
+        "agent:reasoned",
+        "agent:extracted",
+        "agent:processing",
+        "agent:status",
+        "agent:waiting",
+        "browser:action_started",
+        "browser:action_completed",
+        "browser:navigated",
+        "browser:network_waiting",
+        "browser:network_timeout",
+        "system:debug_compression",
+        "system:debug_message",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);
@@ -151,7 +151,7 @@ describe("WebAgentEventEmitter", () => {
       // Test each event type
       const testEvents: WebAgentEvent[] = [
         {
-          type: WebAgentEventType.TASK_START,
+          type: WebAgentEventType.TASK_STARTED,
           data: {
             timestamp: Date.now(),
             task: "test",
@@ -161,39 +161,39 @@ describe("WebAgentEventEmitter", () => {
           },
         },
         {
-          type: WebAgentEventType.TASK_COMPLETE,
+          type: WebAgentEventType.TASK_COMPLETED,
           data: { timestamp: Date.now(), finalAnswer: "test" },
         },
         {
-          type: WebAgentEventType.PAGE_NAVIGATION,
+          type: WebAgentEventType.BROWSER_NAVIGATED,
           data: { timestamp: Date.now(), title: "test", url: "test" },
         },
         {
-          type: WebAgentEventType.CURRENT_STEP,
+          type: WebAgentEventType.AGENT_STEP,
           data: { timestamp: Date.now(), currentStep: "test" },
         },
         {
-          type: WebAgentEventType.OBSERVATION,
+          type: WebAgentEventType.AGENT_OBSERVED,
           data: { timestamp: Date.now(), observation: "test" },
         },
         {
-          type: WebAgentEventType.THOUGHT,
+          type: WebAgentEventType.AGENT_REASONED,
           data: { timestamp: Date.now(), thought: "test" },
         },
         {
-          type: WebAgentEventType.EXTRACTED_DATA,
+          type: WebAgentEventType.AGENT_EXTRACTED,
           data: { timestamp: Date.now(), extractedData: "test" },
         },
         {
-          type: WebAgentEventType.ACTION_EXECUTION,
+          type: WebAgentEventType.BROWSER_ACTION_STARTED,
           data: { timestamp: Date.now(), action: "click", ref: "s1e23" },
         },
         {
-          type: WebAgentEventType.ACTION_RESULT,
+          type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
           data: { timestamp: Date.now(), success: true },
         },
         {
-          type: WebAgentEventType.DEBUG_COMPRESSION,
+          type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
           data: {
             timestamp: Date.now(),
             originalSize: 1000,
@@ -202,23 +202,23 @@ describe("WebAgentEventEmitter", () => {
           },
         },
         {
-          type: WebAgentEventType.DEBUG_MESSAGES,
+          type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
           data: { timestamp: Date.now(), messages: [] },
         },
         {
-          type: WebAgentEventType.WAITING,
+          type: WebAgentEventType.AGENT_WAITING,
           data: { timestamp: Date.now(), seconds: 5 },
         },
         {
-          type: WebAgentEventType.NETWORK_WAITING,
+          type: WebAgentEventType.BROWSER_NETWORK_WAITING,
           data: { timestamp: Date.now(), action: "click" },
         },
         {
-          type: WebAgentEventType.NETWORK_TIMEOUT,
+          type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
           data: { timestamp: Date.now(), action: "click" },
         },
         {
-          type: WebAgentEventType.TASK_VALIDATION,
+          type: WebAgentEventType.TASK_VALIDATED,
           data: {
             timestamp: Date.now(),
             observation: "test observation",
@@ -228,10 +228,27 @@ describe("WebAgentEventEmitter", () => {
           },
         },
         {
-          type: WebAgentEventType.STATUS_MESSAGE,
+          type: WebAgentEventType.AGENT_STATUS,
           data: {
             timestamp: Date.now(),
             message: "Processing data",
+          },
+        },
+        {
+          type: WebAgentEventType.TASK_VALIDATION_ERROR,
+          data: {
+            timestamp: Date.now(),
+            errors: ["Test error"],
+            retryCount: 1,
+            rawResponse: {},
+          },
+        },
+        {
+          type: WebAgentEventType.AGENT_PROCESSING,
+          data: {
+            timestamp: Date.now(),
+            status: "start" as const,
+            operation: "test operation",
           },
         },
       ];
@@ -255,9 +272,9 @@ describe("WebAgentEventEmitter", () => {
         url: "https://example.com/contact",
       };
 
-      emitter.onEvent(WebAgentEventType.TASK_START, listener);
+      emitter.onEvent(WebAgentEventType.TASK_STARTED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_START,
+        type: WebAgentEventType.TASK_STARTED,
         data: eventData,
       });
 
@@ -275,9 +292,9 @@ describe("WebAgentEventEmitter", () => {
         value: "test@example.com",
       };
 
-      emitter.onEvent(WebAgentEventType.ACTION_EXECUTION, listener);
+      emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_EXECUTION,
+        type: WebAgentEventType.BROWSER_ACTION_STARTED,
         data: fullEventData,
       });
 
@@ -291,7 +308,7 @@ describe("WebAgentEventEmitter", () => {
 
       listener.mockClear();
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_EXECUTION,
+        type: WebAgentEventType.BROWSER_ACTION_STARTED,
         data: minimalEventData,
       });
 
@@ -307,9 +324,9 @@ describe("WebAgentEventEmitter", () => {
         success: true,
       };
 
-      emitter.onEvent(WebAgentEventType.ACTION_RESULT, listener);
+      emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
+        type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
         data: successData,
       });
 
@@ -324,7 +341,7 @@ describe("WebAgentEventEmitter", () => {
 
       listener.mockClear();
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
+        type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
         data: errorData,
       });
 
@@ -343,9 +360,9 @@ describe("WebAgentEventEmitter", () => {
         finalAnswer: "Form submitted",
       };
 
-      emitter.onEvent(WebAgentEventType.TASK_VALIDATION, listener);
+      emitter.onEvent(WebAgentEventType.TASK_VALIDATED, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_VALIDATION,
+        type: WebAgentEventType.TASK_VALIDATED,
         data: withFeedback,
       });
 
@@ -361,7 +378,7 @@ describe("WebAgentEventEmitter", () => {
 
       listener.mockClear();
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_VALIDATION,
+        type: WebAgentEventType.TASK_VALIDATED,
         data: withoutFeedback,
       });
 
@@ -375,9 +392,9 @@ describe("WebAgentEventEmitter", () => {
         message: "Analyzing search results",
       };
 
-      emitter.onEvent(WebAgentEventType.STATUS_MESSAGE, listener);
+      emitter.onEvent(WebAgentEventType.AGENT_STATUS, listener);
       emitter.emitEvent({
-        type: WebAgentEventType.STATUS_MESSAGE,
+        type: WebAgentEventType.AGENT_STATUS,
         data: eventData,
       });
 
@@ -398,13 +415,13 @@ describe("WebAgentEventEmitter", () => {
         observation: "Test observation",
       };
 
-      emitter.onEvent(WebAgentEventType.OBSERVATION, errorListener);
-      emitter.onEvent(WebAgentEventType.OBSERVATION, successListener);
+      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, errorListener);
+      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, successListener);
 
       // EventEmitter will throw when a listener throws, but both listeners should be called
       expect(() => {
         emitter.emitEvent({
-          type: WebAgentEventType.OBSERVATION,
+          type: WebAgentEventType.AGENT_OBSERVED,
           data: eventData,
         });
       }).toThrow("Listener error");
@@ -419,23 +436,23 @@ describe("WebAgentEventEmitter", () => {
     it("should not leak memory when listeners are removed", () => {
       const listener = vi.fn();
 
-      emitter.onEvent(WebAgentEventType.THOUGHT, listener);
-      expect(emitter.listenerCount(WebAgentEventType.THOUGHT)).toBe(1);
+      emitter.onEvent(WebAgentEventType.AGENT_REASONED, listener);
+      expect(emitter.listenerCount(WebAgentEventType.AGENT_REASONED)).toBe(1);
 
-      emitter.offEvent(WebAgentEventType.THOUGHT, listener);
-      expect(emitter.listenerCount(WebAgentEventType.THOUGHT)).toBe(0);
+      emitter.offEvent(WebAgentEventType.AGENT_REASONED, listener);
+      expect(emitter.listenerCount(WebAgentEventType.AGENT_REASONED)).toBe(0);
     });
 
     it("should support removing all listeners", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
 
-      emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, listener1);
-      emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, listener2);
-      expect(emitter.listenerCount(WebAgentEventType.EXTRACTED_DATA)).toBe(2);
+      emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, listener1);
+      emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, listener2);
+      expect(emitter.listenerCount(WebAgentEventType.AGENT_EXTRACTED)).toBe(2);
 
-      emitter.removeAllListeners(WebAgentEventType.EXTRACTED_DATA);
-      expect(emitter.listenerCount(WebAgentEventType.EXTRACTED_DATA)).toBe(0);
+      emitter.removeAllListeners(WebAgentEventType.AGENT_EXTRACTED);
+      expect(emitter.listenerCount(WebAgentEventType.AGENT_EXTRACTED)).toBe(0);
     });
   });
 });

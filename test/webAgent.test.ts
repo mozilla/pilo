@@ -491,7 +491,7 @@ describe("WebAgent", () => {
       it("should emit validation error events", async () => {
         const eventSpy = vi.fn();
         const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
-        emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, eventSpy);
+        emitter.onEvent(WebAgentEventType.TASK_VALIDATION_ERROR, eventSpy);
 
         const invalidResponse = createMockActionResponse({
           currentStep: "",
@@ -799,7 +799,7 @@ describe("WebAgent", () => {
 
       // Access the private event emitter for testing
       const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
-      emitter.onEvent(WebAgentEventType.TASK_START, eventSpy);
+      emitter.onEvent(WebAgentEventType.TASK_STARTED, eventSpy);
 
       webAgent.emitTaskStartEvent("test task");
 
@@ -908,7 +908,7 @@ describe("WebAgent", () => {
     it("should track navigation events during execute", async () => {
       const eventSpy = vi.fn();
       const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
-      emitter.onEvent(WebAgentEventType.PAGE_NAVIGATION, eventSpy);
+      emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, eventSpy);
 
       const planResponse = {
         object: {
@@ -1490,7 +1490,7 @@ describe("WebAgent", () => {
   describe("Thinking events wrapper", () => {
     it("should emit thinking start and end events around task execution", async () => {
       const eventSpy = vi.fn();
-      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+      webAgent["eventEmitter"].on(WebAgentEventType.AGENT_PROCESSING, eventSpy);
 
       const mockTask = vi.fn().mockResolvedValue("test result");
 
@@ -1523,7 +1523,7 @@ describe("WebAgent", () => {
 
     it("should emit end event even when task throws error", async () => {
       const eventSpy = vi.fn();
-      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+      webAgent["eventEmitter"].on(WebAgentEventType.AGENT_PROCESSING, eventSpy);
 
       const mockTask = vi.fn().mockRejectedValue(new Error("Test error"));
 

@@ -465,7 +465,7 @@ export class WebAgent {
    * that may have already been recorded elsewhere.
    */
   private emitNavigationEvent(title: string, url: string): void {
-    this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
+    this.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
   }
 
   /**
@@ -516,7 +516,7 @@ export class WebAgent {
       const originalSize = pageSnapshot.length;
       const compressedSize = compressedSnapshot.length;
       const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-      this.emit(WebAgentEventType.DEBUG_COMPRESSION, {
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
         originalSize,
         compressedSize,
         compressionPercent,
@@ -528,7 +528,7 @@ export class WebAgent {
 
     // Debug logging: show full conversation history
     if (this.DEBUG) {
-      this.emit(WebAgentEventType.DEBUG_MESSAGES, { messages: this.messages });
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
     }
 
     // Ask the LLM to analyze the page and decide on the next action
@@ -541,7 +541,7 @@ export class WebAgent {
 
     if (!isValid) {
       // Emit validation error event for logging
-      this.emit(WebAgentEventType.VALIDATION_ERROR, {
+      this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
         errors,
         retryCount,
         rawResponse: response,
@@ -604,14 +604,14 @@ export class WebAgent {
    * @returns The result of the AI operation
    */
   protected async withThinkingEvents<T>(operation: string, task: () => Promise<T>): Promise<T> {
-    this.emit(WebAgentEventType.THINKING, { status: "start", operation });
+    this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "start", operation });
     try {
       const result = await task();
-      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
       return result;
     } catch (error) {
       // Critical: Always emit 'end' even on errors to prevent UI getting stuck in 'thinking' state
-      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
       throw error;
     }
   }
@@ -730,28 +730,28 @@ export class WebAgent {
    * Broadcasts all details of the current action for logging/display
    */
   protected broadcastActionDetails(result: any) {
-    this.emit(WebAgentEventType.CURRENT_STEP, { currentStep: result.currentStep });
+    this.emit(WebAgentEventType.AGENT_STEP, { currentStep: result.currentStep });
 
-    this.emit(WebAgentEventType.OBSERVATION, { observation: result.observation });
-    this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.observationStatusMessage });
+    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: result.observation });
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.observationStatusMessage });
 
     // Only emit extractedData if it exists and has content
     if (result.extractedData && result.extractedData.trim()) {
-      this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData });
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
       if (result.extractedDataStatusMessage) {
-        this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.extractedDataStatusMessage });
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: result.extractedDataStatusMessage });
       }
     }
 
-    this.emit(WebAgentEventType.THOUGHT, { thought: result.thought });
+    this.emit(WebAgentEventType.AGENT_REASONED, { thought: result.thought });
 
-    this.emit(WebAgentEventType.ACTION_EXECUTION, {
+    this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
       action: result.action.action,
       ref: result.action.ref || undefined,
       value: result.action.value || undefined,
     });
     if (result.actionStatusMessage) {
-      this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.actionStatusMessage });
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: result.actionStatusMessage });
     }
   }
 
@@ -815,7 +815,7 @@ export class WebAgent {
       }
       return true;
     } catch (error) {
-      this.emit(WebAgentEventType.ACTION_RESULT, {
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -826,7 +826,7 @@ export class WebAgent {
   private recordActionResult(result: any, actionSuccess: boolean) {
     if (actionSuccess) {
       this.addAssistantMessage(result);
-      this.emit(WebAgentEventType.ACTION_RESULT, { success: true });
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, { success: true });
     } else {
       this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
     }
@@ -834,7 +834,7 @@ export class WebAgent {
 
   // Helper function to wait for a specified number of seconds
   async wait(seconds: number) {
-    this.emit(WebAgentEventType.WAITING, { seconds });
+    this.emit(WebAgentEventType.AGENT_WAITING, { seconds });
 
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   }
@@ -843,7 +843,7 @@ export class WebAgent {
    * Emits the task start event with all initial task information
    */
   private emitTaskStartEvent(task: string) {
-    this.emit(WebAgentEventType.TASK_START, {
+    this.emit(WebAgentEventType.TASK_STARTED, {
       task,
       explanation: this.taskExplanation,
       plan: this.plan,
@@ -880,7 +880,7 @@ export class WebAgent {
       ),
     );
 
-    this.emit(WebAgentEventType.TASK_VALIDATION, {
+    this.emit(WebAgentEventType.TASK_VALIDATED, {
       observation: response.observation,
       completionQuality: response.completionQuality,
       feedback: response.feedback,
@@ -981,7 +981,7 @@ export class WebAgent {
 
         // Check if validation shows successful completion
         if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-          this.emit(WebAgentEventType.TASK_COMPLETE, { finalAnswer });
+          this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
           break; // Exit: task completed successfully
         } else {
           // Task marked as done but validation failed
