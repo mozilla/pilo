@@ -58,6 +58,7 @@ spark.post("/run", async (c) => {
         const browser = new PlaywrightBrowser({
           headless: true,
           browser: "firefox",
+          pwEndpoint: process.env.PW_ENDPOINT,
         });
 
         const logger = new StreamLogger(sendEvent);

@@ -30,39 +30,64 @@ export class PlaywrightBrowser implements AriaBrowser {
       bypassCSP?: boolean;
       blockAds?: boolean;
       blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
+      pwEndpoint?: string;
     } = {},
   ) {}
 
   async start(): Promise<void> {
-    // Merge constructor options with launch options
-    const mergedOptions = {
-      headless: this.options.headless ?? false,
-    };
-
-    // Determine which browser to launch
+    // Determine which browser to use
     const browserType = this.options.browser ?? "firefox";
 
-    switch (browserType) {
-      case "firefox":
-        this.browser = await firefox.launch(mergedOptions);
-        break;
-      case "chrome":
-      case "chromium":
-        this.browser = await chromium.launch(mergedOptions);
-        break;
-      case "safari":
-      case "webkit":
-        this.browser = await webkit.launch(mergedOptions);
-        break;
-      case "edge":
-        // Edge uses the same engine as Chrome/Chromium
-        this.browser = await chromium.launch({
-          ...mergedOptions,
-          channel: "msedge",
-        });
-        break;
-      default:
-        throw new Error(`Unsupported browser: ${browserType}`);
+    // Check if we should connect to remote browser
+    if (this.options.pwEndpoint) {
+      switch (browserType) {
+        case "firefox":
+          this.browser = await firefox.connect(this.options.pwEndpoint);
+          break;
+        case "chrome":
+        case "chromium":
+          this.browser = await chromium.connect(this.options.pwEndpoint);
+          break;
+        case "safari":
+        case "webkit":
+          this.browser = await webkit.connect(this.options.pwEndpoint);
+          break;
+        case "edge":
+          // Edge uses the same engine as Chrome/Chromium
+          this.browser = await chromium.connect(this.options.pwEndpoint);
+          break;
+        default:
+          throw new Error(`Unsupported browser: ${browserType}`);
+      }
+    } else {
+      // Launch local browser
+      // Merge constructor options with launch options
+      const mergedOptions = {
+        headless: this.options.headless ?? false,
+      };
+
+      switch (browserType) {
+        case "firefox":
+          this.browser = await firefox.launch(mergedOptions);
+          break;
+        case "chrome":
+        case "chromium":
+          this.browser = await chromium.launch(mergedOptions);
+          break;
+        case "safari":
+        case "webkit":
+          this.browser = await webkit.launch(mergedOptions);
+          break;
+        case "edge":
+          // Edge uses the same engine as Chrome/Chromium
+          this.browser = await chromium.launch({
+            ...mergedOptions,
+            channel: "msedge",
+          });
+          break;
+        default:
+          throw new Error(`Unsupported browser: ${browserType}`);
+      }
     }
 
     // Setup context with device configuration
