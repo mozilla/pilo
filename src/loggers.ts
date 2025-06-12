@@ -11,11 +11,14 @@ import type {
   NetworkWaitingEventData,
   ObservationEventData,
   PageNavigationEventData,
+  StatusMessageEventData,
   TaskCompleteEventData,
   TaskStartEventData,
   ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
+  ThinkingEventData,
+  ValidationErrorEventData,
 } from "./events.js";
 
 /**
@@ -41,6 +44,10 @@ export class ConsoleLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
 
   initialize(emitter: WebAgentEventEmitter): void {
+    if (this.emitter) {
+      // Dispose existing listeners before reinitializing
+      this.dispose();
+    }
     this.emitter = emitter;
 
     // Task events
@@ -56,6 +63,7 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
     emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
     emitter.onEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
+    emitter.onEvent(WebAgentEventType.THINKING, this.handleThinking);
 
     // Action events
     emitter.onEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
@@ -69,6 +77,12 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.WAITING, this.handleWaiting);
     emitter.onEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+
+    // Validation events
+    emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
+
+    // Status events
+    emitter.onEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
   }
 
   dispose(): void {
@@ -87,6 +101,7 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
       this.emitter.offEvent(WebAgentEventType.THOUGHT, this.handleThought);
       this.emitter.offEvent(WebAgentEventType.EXTRACTED_DATA, this.handleExtractedData);
+      this.emitter.offEvent(WebAgentEventType.THINKING, this.handleThinking);
 
       // Action events
       this.emitter.offEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
@@ -100,6 +115,12 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.WAITING, this.handleWaiting);
       this.emitter.offEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+
+      // Validation events
+      this.emitter.offEvent(WebAgentEventType.VALIDATION_ERROR, this.handleValidationError);
+
+      // Status events
+      this.emitter.offEvent(WebAgentEventType.STATUS_MESSAGE, this.handleStatusMessage);
 
       // Reset emitter reference
       this.emitter = null;
@@ -228,5 +249,27 @@ export class ConsoleLogger implements Logger {
 
   private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
     console.log(chalk.gray("   ⚠️  Network wait timed out, continuing..."));
+  };
+
+  private handleThinking = (data: ThinkingEventData): void => {
+    if (data.status === "start") {
+      console.log(chalk.cyan.bold(`\n🤔 ${data.operation}...`));
+    }
+  };
+
+  private handleValidationError = (data: ValidationErrorEventData): void => {
+    console.error(
+      chalk.red.bold(`\n⚠️ Action validation failed (attempt ${data.retryCount + 1}):`),
+    );
+    data.errors.forEach((error, index) => {
+      console.error(chalk.red(`   ${index + 1}. ${error}`));
+    });
+    if (data.retryCount < 2) {
+      console.log(chalk.yellow("   🔄 Retrying with corrected feedback..."));
+    }
+  };
+
+  private handleStatusMessage = (data: StatusMessageEventData): void => {
+    console.log(chalk.green.bold("📡 Status:"), chalk.whiteBright(data.message));
   };
 }

@@ -59,13 +59,16 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
   "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note the type of data you should extract from the page to complete the task.",
-  "extractedData": "Only extract important data from the page that is needed to complete the task. This shouldn't include any element refs. Use markdown to structure this data clearly.",
+  "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
+  "extractedData": "OPTIONAL: Only extract important data from the page that is needed to complete the task. This shouldn't include any element refs. Use markdown to structure this data clearly. Omit this field if no relevant data needs extraction.",
+  "extractedDataStatusMessage": "CONDITIONAL: Required if extractedData is present. Short, friendly message (3-8 words) about what data was found. Examples: 'Flight options noted', 'Product details saved', 'Search results ready'",
   "thought": "Reasoning for your next action.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
   "action": {
-    "action": "The type of action to perform (e.g., 'click', 'fill', 'done').",
-    "ref": "reference to the element on the page (e.g., 's#e##'). Not needed for done/wait/goto/back/forward.",
-    "value": "Required for fill/select/goto, seconds for wait, result for done."
-  }
+    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, wait, goto, back, forward, done",
+    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
+    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, final result for done"
+  },
+  "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
 }`);
 
 const buildActionLoopPrompt = (hasGuardrails: boolean) =>
@@ -187,11 +190,15 @@ Please correct your response to match this exact format:
 \`\`\`
 
 Remember:
+- "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
+- "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
+- "extractedDataStatusMessage" is REQUIRED if "extractedData" is present
 - For "select", "fill", "click", "hover", "check", "uncheck" actions, you MUST provide a "ref"
 - For "fill", "select", "goto" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds
 - For "done" action, you MUST provide a "value" with the final result
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
+- "extractedData" is optional - only include if there's relevant data to extract
 {{#if hasGuardrails}}
 - ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {{/if}}

@@ -18,6 +18,7 @@ import {
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
   TaskValidationEventData,
+  StatusMessageEventData,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -120,14 +121,17 @@ describe("WebAgentEventEmitter", () => {
         "agent:observation",
         "agent:thought",
         "agent:extracted_data",
+        "agent:thinking",
         "action:execution",
         "action:result",
         "debug:compression",
         "debug:messages",
+        "validation:error",
         "system:waiting",
         "system:network_waiting",
         "system:network_timeout",
         "task:validation",
+        "status:message",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);
@@ -221,6 +225,13 @@ describe("WebAgentEventEmitter", () => {
             completionQuality: "complete" as const,
             feedback: "test",
             finalAnswer: "test",
+          },
+        },
+        {
+          type: WebAgentEventType.STATUS_MESSAGE,
+          data: {
+            timestamp: Date.now(),
+            message: "Processing data",
           },
         },
       ];
@@ -355,6 +366,23 @@ describe("WebAgentEventEmitter", () => {
       });
 
       expect(listener).toHaveBeenCalledWith(withoutFeedback);
+    });
+
+    it("should handle StatusMessageEventData correctly", () => {
+      const listener = vi.fn();
+      const eventData: StatusMessageEventData = {
+        timestamp: Date.now(),
+        message: "Analyzing search results",
+      };
+
+      emitter.onEvent(WebAgentEventType.STATUS_MESSAGE, listener);
+      emitter.emitEvent({
+        type: WebAgentEventType.STATUS_MESSAGE,
+        data: eventData,
+      });
+
+      expect(listener).toHaveBeenCalledWith(eventData);
+      expect(listener).toHaveBeenCalledTimes(1);
     });
   });
 

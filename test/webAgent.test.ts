@@ -18,6 +18,25 @@ vi.mock("@ai-sdk/openai", () => ({
 import { generateObject } from "ai";
 const mockGenerateObject = vi.mocked(generateObject);
 
+// Helper function to create valid action responses with all required fields
+function createMockActionResponse(overrides: any = {}) {
+  return {
+    object: {
+      currentStep: "Working on step",
+      observation: "Page analyzed",
+      observationStatusMessage: "Page analyzed",
+      extractedData: "",
+      thought: "Deciding next action",
+      action: {
+        action: PageAction.Click,
+        ref: "s1e23",
+      },
+      actionStatusMessage: "Performing action",
+      ...overrides,
+    },
+  };
+}
+
 // Mock browser implementation for testing
 class MockAriaBrowser implements AriaBrowser {
   private currentUrl = "https://example.com";
@@ -153,7 +172,7 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("createPlanAndUrl", () => {
+  describe("generatePlanWithUrl", () => {
     it("should create plan with URL", async () => {
       const mockResponse = {
         object: {
@@ -165,7 +184,7 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlanAndUrl("Book a flight to Paris");
+      const result = await webAgent.generatePlanWithUrl("Book a flight to Paris");
 
       expect(result.plan).toBe("1. Search flights\n2. Select dates\n3. Book ticket");
       expect(result.url).toBe("https://airline.com");
@@ -180,11 +199,11 @@ describe("WebAgent", () => {
     it("should handle LLM errors", async () => {
       mockGenerateObject.mockRejectedValue(new Error("LLM error"));
 
-      await expect(webAgent.createPlanAndUrl("test task")).rejects.toThrow("LLM error");
+      await expect(webAgent.generatePlanWithUrl("test task")).rejects.toThrow("LLM error");
     });
   });
 
-  describe("createPlan", () => {
+  describe("generatePlan", () => {
     it("should create plan without URL", async () => {
       const mockResponse = {
         object: {
@@ -195,7 +214,7 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlan("Fill contact form");
+      const result = await webAgent.generatePlan("Fill contact form");
 
       expect(result.plan).toBe("1. Navigate to form\n2. Fill fields\n3. Submit");
       expect(mockGenerateObject).toHaveBeenCalledWith({
@@ -216,7 +235,10 @@ describe("WebAgent", () => {
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
-      const result = await webAgent.createPlan("Fill contact form", "https://example.com/contact");
+      const result = await webAgent.generatePlan(
+        "Fill contact form",
+        "https://example.com/contact",
+      );
 
       expect(result.plan).toBe("1. Fill fields\n2. Submit");
       expect(mockGenerateObject).toHaveBeenCalledWith({
@@ -228,9 +250,9 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("setupMessages", () => {
+  describe("initializeConversation", () => {
     it("should setup initial messages", () => {
-      const messages = webAgent.setupMessages("Test task");
+      const messages = webAgent.initializeConversation("Test task");
 
       expect(messages).toHaveLength(2);
       expect(messages[0].role).toBe("system");
@@ -240,79 +262,417 @@ describe("WebAgent", () => {
   });
 
   describe("Action validation", () => {
-    it("should validate correct aria refs", async () => {
-      const mockResponse = {
-        object: {
-          currentStep: "Working on Step 1",
+    describe("Enhanced validation logic", () => {
+      it("should validate wait action with zero value", async () => {
+        const validResponse = createMockActionResponse({
+          currentStep: "Waiting",
+          observation: "Pausing briefly",
+          observationStatusMessage: "Pausing briefly",
+          thought: "Need to wait 0 seconds",
+          action: {
+            action: PageAction.Wait,
+            value: "0",
+          },
+          actionStatusMessage: "Waiting",
+        });
+
+        mockGenerateObject.mockResolvedValue(validResponse);
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.action.value).toBe("0");
+      });
+
+      it("should reject wait action with non-numeric value", async () => {
+        const invalidResponse = createMockActionResponse({
+          currentStep: "Waiting",
+          observation: "Pausing",
+          observationStatusMessage: "Pausing",
+          thought: "Need to wait",
+          action: {
+            action: PageAction.Wait,
+            value: "not a number",
+          },
+          actionStatusMessage: "Waiting",
+        });
+
+        const validResponse = createMockActionResponse({
+          currentStep: "Waiting",
+          observation: "Pausing",
+          observationStatusMessage: "Pausing",
+          thought: "Need to wait",
+          action: {
+            action: PageAction.Wait,
+            value: "5",
+          },
+          actionStatusMessage: "Waiting",
+        });
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.action.value).toBe("5");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should validate all actions requiring refs", async () => {
+        const actionsWithRefs = [
+          PageAction.Click,
+          PageAction.Hover,
+          PageAction.Fill,
+          PageAction.Focus,
+          PageAction.Check,
+          PageAction.Uncheck,
+          PageAction.Select,
+        ];
+
+        for (const action of actionsWithRefs) {
+          const invalidResponse = createMockActionResponse({
+            currentStep: "Working",
+            observation: "Found element",
+            observationStatusMessage: "Found element",
+            thought: "Perform action",
+            action: {
+              action,
+              // Missing ref
+              ...(action === PageAction.Fill || action === PageAction.Select
+                ? { value: "test" }
+                : {}),
+            },
+            actionStatusMessage: "Performing action",
+          });
+
+          const validResponse = createMockActionResponse({
+            currentStep: "Working",
+            observation: "Found element",
+            observationStatusMessage: "Found element",
+            thought: "Perform action",
+            action: {
+              action,
+              ref: "s1e23",
+              ...(action === PageAction.Fill || action === PageAction.Select
+                ? { value: "test" }
+                : {}),
+            },
+            actionStatusMessage: "Performing action",
+          });
+
+          mockGenerateObject
+            .mockResolvedValueOnce(invalidResponse)
+            .mockResolvedValueOnce(validResponse);
+
+          mockBrowser.setCurrentText("element [ref=s1e23]");
+
+          const result = await webAgent.generateNextAction("element [ref=s1e23]");
+          expect(result.action.ref).toBe("s1e23");
+
+          mockGenerateObject.mockClear();
+        }
+      });
+
+      it("should validate actions prohibiting ref and value", async () => {
+        const actionsProhibiting = [PageAction.Back, PageAction.Forward];
+
+        for (const action of actionsProhibiting) {
+          const invalidResponse = createMockActionResponse({
+            currentStep: "Navigating",
+            observation: "Going back",
+            observationStatusMessage: "Going back",
+            thought: "Navigate",
+            action: {
+              action,
+              ref: "s1e23", // Should not have ref
+              value: "test", // Should not have value
+            },
+            actionStatusMessage: "Navigating",
+          });
+
+          const validResponse = createMockActionResponse({
+            currentStep: "Navigating",
+            observation: "Going back",
+            observationStatusMessage: "Going back",
+            thought: "Navigate",
+            action: {
+              action,
+            },
+            actionStatusMessage: "Navigating",
+          });
+
+          mockGenerateObject
+            .mockResolvedValueOnce(invalidResponse)
+            .mockResolvedValueOnce(validResponse);
+
+          mockBrowser.setCurrentText("page content");
+
+          const result = await webAgent.generateNextAction("page content");
+          expect(result.action.ref).toBeUndefined();
+          expect(result.action.value).toBeUndefined();
+
+          mockGenerateObject.mockClear();
+        }
+      });
+
+      it("should validate string field types", async () => {
+        const invalidResponse = createMockActionResponse({
+          currentStep: 123, // Should be string
+          observation: null, // Should be string
+          observationStatusMessage: "Invalid observation",
+          thought: "", // Empty string
+          action: {
+            action: PageAction.Done,
+            value: "Complete",
+          },
+          actionStatusMessage: "Completing",
+        });
+
+        const validResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Valid observation",
+          observationStatusMessage: "Valid observation",
+          thought: "Valid thought",
+          action: {
+            action: PageAction.Done,
+            value: "Complete",
+          },
+          actionStatusMessage: "Completing",
+        });
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("page content");
+
+        const result = await webAgent.generateNextAction("page content");
+        expect(result.currentStep).toBe("Step 1");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should handle invalid action type", async () => {
+        const invalidResponse = createMockActionResponse({
+          currentStep: "Working",
           observation: "Found element",
-          extractedData: "Button element located",
-          thought: "Click the button",
+          observationStatusMessage: "Found element",
+          thought: "Perform action",
+          action: {
+            action: "invalid_action",
+            ref: "s1e23",
+          },
+          actionStatusMessage: "Performing action",
+        });
+
+        const validResponse = createMockActionResponse({
+          currentStep: "Working",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Perform action",
           action: {
             action: PageAction.Click,
             ref: "s1e23",
           },
+          actionStatusMessage: "Performing action",
+        });
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.action).toBe(PageAction.Click);
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+
+      it("should emit validation error events", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.VALIDATION_ERROR, eventSpy);
+
+        const invalidResponse = createMockActionResponse({
+          currentStep: "",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            // Missing ref
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        const validResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "s1e23",
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        await webAgent.generateNextAction("button [ref=s1e23]");
+
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            errors: expect.arrayContaining([
+              expect.stringContaining('Missing or empty required field "currentStep"'),
+              expect.stringContaining('Action "click" requires a "ref" field'),
+            ]),
+            retryCount: 0,
+            rawResponse: invalidResponse.object,
+          }),
+        );
+      });
+    });
+
+    describe("Aria ref validation improvements", () => {
+      it("should handle whitespace in aria refs", async () => {
+        const mockResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "  s1e23  ", // Has whitespace
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject.mockResolvedValue(mockResponse);
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.ref).toBe("  s1e23  "); // Should pass as trimmed ref is valid
+      });
+
+      it("should handle empty string aria refs", async () => {
+        const invalidResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "", // Empty string
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        const validResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "s1e23",
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject
+          .mockResolvedValueOnce(invalidResponse)
+          .mockResolvedValueOnce(validResponse);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+        expect(result.action.ref).toBe("s1e23");
+        expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it("should validate correct aria refs", async () => {
+      const mockResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "Button element located",
+        extractedDataStatusMessage: "Button element located",
+        thought: "Click the button",
+        action: {
+          action: PageAction.Click,
+          ref: "s1e23",
         },
-      };
+        actionStatusMessage: "Clicking button",
+      });
 
       mockGenerateObject.mockResolvedValue(mockResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("button 'Click me' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("button 'Click me' [ref=s1e23]");
 
       expect(result.action.action).toBe(PageAction.Click);
       expect(result.action.ref).toBe("s1e23");
     });
 
     it("should correct malformed aria refs", async () => {
-      const mockResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found element",
-          extractedData: "Button element located",
-          thought: "Click the button",
-          action: {
-            action: PageAction.Click,
-            ref: "click s1e23 button",
-          },
+      const mockResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "Button element located",
+        extractedDataStatusMessage: "Button element located",
+        thought: "Click the button",
+        action: {
+          action: PageAction.Click,
+          ref: "click s1e23 button",
         },
-      };
+        actionStatusMessage: "Clicking button",
+      });
 
       mockGenerateObject.mockResolvedValue(mockResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("button 'Click me' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("button 'Click me' [ref=s1e23]");
 
       expect(result.action.ref).toBe("s1e23");
     });
 
     it("should validate fill action requires value", async () => {
-      const invalidResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found input",
-          extractedData: "Input field located",
-          thought: "Fill the input",
-          action: {
-            action: PageAction.Fill,
-            ref: "s1e23",
-            // Missing value
-          },
+      const invalidResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found input",
+        observationStatusMessage: "Found input",
+        extractedData: "Input field located",
+        extractedDataStatusMessage: "Input field located",
+        thought: "Fill the input",
+        action: {
+          action: PageAction.Fill,
+          ref: "s1e23",
+          // Missing value
         },
-      };
+        actionStatusMessage: "Filling input",
+      });
 
-      const validResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found input",
-          extractedData: "Input field located",
-          thought: "Fill the input",
-          action: {
-            action: PageAction.Fill,
-            ref: "s1e23",
-            value: "test@example.com",
-          },
+      const validResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found input",
+        observationStatusMessage: "Found input",
+        extractedData: "Input field located",
+        extractedDataStatusMessage: "Input field located",
+        thought: "Fill the input",
+        action: {
+          action: PageAction.Fill,
+          ref: "s1e23",
+          value: "test@example.com",
         },
-      };
+        actionStatusMessage: "Filling input",
+      });
 
       mockGenerateObject
         .mockResolvedValueOnce(invalidResponse)
@@ -320,38 +680,40 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText("input 'Email' [ref=s1e23]");
 
-      const result = await webAgent.getNextActions("input 'Email' [ref=s1e23]");
+      const result = await webAgent.generateNextAction("input 'Email' [ref=s1e23]");
 
       expect(result.action.value).toBe("test@example.com");
       expect(mockGenerateObject).toHaveBeenCalledTimes(2);
     });
 
     it("should validate done action requires value", async () => {
-      const invalidResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data collected",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            // Missing value
-          },
+      const invalidResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data collected",
+        extractedDataStatusMessage: "Final data collected",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          // Missing value
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
-      const validResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data collected",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed successfully",
-          },
+      const validResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data collected",
+        extractedDataStatusMessage: "Final data collected",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed successfully",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       mockGenerateObject
         .mockResolvedValueOnce(invalidResponse)
@@ -359,30 +721,30 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText("Success message displayed");
 
-      const result = await webAgent.getNextActions("Success message displayed");
+      const result = await webAgent.generateNextAction("Success message displayed");
 
       expect(result.action.value).toBe("Task completed successfully");
       expect(mockGenerateObject).toHaveBeenCalledTimes(2);
     });
 
     it("should fail after maximum retry attempts", async () => {
-      const invalidResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found element",
-          extractedData: "",
-          thought: "Click the button",
-          action: {
-            action: PageAction.Click,
-            // Missing ref
-          },
+      const invalidResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "",
+        thought: "Click the button",
+        action: {
+          action: PageAction.Click,
+          // Missing ref
         },
-      };
+        actionStatusMessage: "Clicking button",
+      });
 
       mockGenerateObject.mockResolvedValue(invalidResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      await expect(webAgent.getNextActions("button 'Click me' [ref=s1e23]")).rejects.toThrow(
+      await expect(webAgent.generateNextAction("button 'Click me' [ref=s1e23]")).rejects.toThrow(
         "Failed to get valid response after 3 attempts",
       );
 
@@ -408,14 +770,14 @@ describe("WebAgent", () => {
   describe("resetState", () => {
     it("should reset internal state", () => {
       // First create some state
-      webAgent.setupMessages("test task");
+      webAgent.initializeConversation("test task");
 
       // Reset state
       webAgent.resetState();
 
       // State should be cleared (we can't directly test private properties,
       // but we can test that setupMessages works correctly after reset)
-      const messages = webAgent.setupMessages("new task");
+      const messages = webAgent.initializeConversation("new task");
       expect(messages[1].content).toContain("new task");
     });
   });
@@ -452,18 +814,19 @@ describe("WebAgent", () => {
 
   describe("Snapshot compression", () => {
     it("should compress aria tree snapshots", async () => {
-      const mockResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found element",
-          extractedData: "Page content analyzed",
-          thought: "Click the button",
-          action: {
-            action: PageAction.Click,
-            ref: "s1e23",
-          },
+      const mockResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "Page content analyzed",
+        extractedDataStatusMessage: "Page content analyzed",
+        thought: "Click the button",
+        action: {
+          action: PageAction.Click,
+          ref: "s1e23",
         },
-      };
+        actionStatusMessage: "Clicking button",
+      });
 
       mockGenerateObject.mockResolvedValue(mockResponse);
 
@@ -478,7 +841,7 @@ describe("WebAgent", () => {
 
       mockBrowser.setCurrentText(longSnapshot);
 
-      await webAgent.getNextActions(longSnapshot);
+      await webAgent.generateNextAction(longSnapshot);
 
       // Check that compression occurred (private method, so we test indirectly)
       expect(mockGenerateObject).toHaveBeenCalled();
@@ -491,31 +854,32 @@ describe("WebAgent", () => {
     });
 
     it("should handle browser errors during actions", async () => {
-      const mockResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found element",
-          extractedData: "",
-          thought: "Click the button",
-          action: {
-            action: PageAction.Click,
-            ref: "invalid",
-          },
+      const mockResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "",
+        thought: "Click the button",
+        action: {
+          action: PageAction.Click,
+          ref: "invalid",
         },
-      };
+        actionStatusMessage: "Clicking button",
+      });
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed with errors",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed with errors",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -553,31 +917,33 @@ describe("WebAgent", () => {
         },
       };
 
-      const actionResponse = {
-        object: {
-          currentStep: "Working on Step 1",
-          observation: "Found element",
-          extractedData: "Page content found",
-          thought: "Navigate to another page",
-          action: {
-            action: PageAction.Goto,
-            value: "https://example.com/page2",
-          },
+      const actionResponse = createMockActionResponse({
+        currentStep: "Working on Step 1",
+        observation: "Found element",
+        observationStatusMessage: "Found element",
+        extractedData: "Page content found",
+        extractedDataStatusMessage: "Page content found",
+        thought: "Navigate to another page",
+        action: {
+          action: PageAction.Goto,
+          value: "https://example.com/page2",
         },
-      };
+        actionStatusMessage: "Navigating to page",
+      });
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Navigation completed",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Navigation completed",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -609,18 +975,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed with data",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed with data",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -660,18 +1027,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed with data included",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed with data included",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -701,7 +1069,7 @@ describe("WebAgent", () => {
       webAgent.resetState();
 
       // After reset, setupMessages should work without data
-      const messages = webAgent.setupMessages("test task");
+      const messages = webAgent.initializeConversation("test task");
       expect(messages).toHaveLength(2);
       expect(messages[1].content).not.toContain("Input Data:");
     });
@@ -714,18 +1082,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed without data",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed without data",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -753,18 +1122,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed without data",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed without data",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -792,18 +1162,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Complex data task completed",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Complex data task completed",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -846,18 +1217,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Final data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Task completed successfully",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Final data",
+        extractedDataStatusMessage: "Final data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Task completed successfully",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const validationResponse = {
         object: {
@@ -893,31 +1265,33 @@ describe("WebAgent", () => {
         },
       };
 
-      const firstDoneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Incomplete data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Incomplete task result",
-          },
+      const firstDoneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Incomplete data",
+        extractedDataStatusMessage: "Incomplete data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Incomplete task result",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
-      const secondDoneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished properly",
-          extractedData: "Complete data",
-          thought: "Task is done correctly",
-          action: {
-            action: PageAction.Done,
-            value: "Complete task result",
-          },
+      const secondDoneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished properly",
+        observationStatusMessage: "Task finished properly",
+        extractedData: "Complete data",
+        extractedDataStatusMessage: "Complete data",
+        thought: "Task is done correctly",
+        action: {
+          action: PageAction.Done,
+          value: "Complete task result",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const failedValidationResponse = {
         object: {
@@ -963,18 +1337,19 @@ describe("WebAgent", () => {
         },
       };
 
-      const doneResponse = {
-        object: {
-          currentStep: "Completing task",
-          observation: "Task finished",
-          extractedData: "Incomplete data",
-          thought: "Task is done",
-          action: {
-            action: PageAction.Done,
-            value: "Incomplete task result",
-          },
+      const doneResponse = createMockActionResponse({
+        currentStep: "Completing task",
+        observation: "Task finished",
+        observationStatusMessage: "Task finished",
+        extractedData: "Incomplete data",
+        extractedDataStatusMessage: "Incomplete data",
+        thought: "Task is done",
+        action: {
+          action: PageAction.Done,
+          value: "Incomplete task result",
         },
-      };
+        actionStatusMessage: "Task completing",
+      });
 
       const failedValidationResponse = {
         object: {
@@ -1022,7 +1397,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       expect(clippedMessages).toHaveLength(4);
       expect(clippedMessages[0].content).toBe("You are a helpful assistant");
@@ -1048,7 +1423,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       expect(clippedMessages).toEqual(messages);
     });
@@ -1069,7 +1444,7 @@ describe("WebAgent", () => {
         },
       ];
 
-      const clippedMessages = webAgent["clipSnapshotsFromMessages"](messages);
+      const clippedMessages = webAgent["truncateSnapshotsInMessages"](messages);
 
       // Should not clip - has ``` but no "snapshot"
       expect(clippedMessages[0].content).toBe("This has ```code``` but no page content");
@@ -1077,6 +1452,96 @@ describe("WebAgent", () => {
       expect(clippedMessages[1].content).toBe("This mentions snapshot but has no code blocks");
       // Should clip - has both "snapshot" and ```
       expect(clippedMessages[2].content).toBe("Page snapshot: ```[snapshot clipped for length]```");
+    });
+  });
+
+  describe("Page state management", () => {
+    it("should update page state without side effects", () => {
+      // Initial state should be empty
+      expect(webAgent["currentPage"]).toEqual({ url: "", title: "" });
+
+      // Update page state
+      webAgent["updatePageState"]("Test Page", "https://test.com");
+
+      // Should update internal state
+      expect(webAgent["currentPage"]).toEqual({
+        url: "https://test.com",
+        title: "Test Page",
+      });
+    });
+
+    it("should refresh page state from browser", async () => {
+      mockBrowser.setCurrentTitle("Browser Page");
+      mockBrowser.setCurrentUrl("https://browser.com");
+
+      const result = await webAgent["refreshPageState"]();
+
+      expect(result).toEqual({
+        title: "Browser Page",
+        url: "https://browser.com",
+      });
+      expect(webAgent["currentPage"]).toEqual({
+        url: "https://browser.com",
+        title: "Browser Page",
+      });
+    });
+  });
+
+  describe("Thinking events wrapper", () => {
+    it("should emit thinking start and end events around task execution", async () => {
+      const eventSpy = vi.fn();
+      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+
+      const mockTask = vi.fn().mockResolvedValue("test result");
+
+      const result = await webAgent["withThinkingEvents"]("Test Operation", mockTask);
+
+      expect(result).toBe("test result");
+      expect(mockTask).toHaveBeenCalledOnce();
+      expect(eventSpy).toHaveBeenCalledTimes(2);
+
+      // Check start event
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          status: "start",
+          operation: "Test Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
+
+      // Check end event
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          status: "end",
+          operation: "Test Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
+    });
+
+    it("should emit end event even when task throws error", async () => {
+      const eventSpy = vi.fn();
+      webAgent["eventEmitter"].on(WebAgentEventType.THINKING, eventSpy);
+
+      const mockTask = vi.fn().mockRejectedValue(new Error("Test error"));
+
+      await expect(webAgent["withThinkingEvents"]("Failed Operation", mockTask)).rejects.toThrow(
+        "Test error",
+      );
+
+      expect(eventSpy).toHaveBeenCalledTimes(2);
+
+      // Should still emit end event after error
+      expect(eventSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          status: "end",
+          operation: "Failed Operation",
+          timestamp: expect.any(Number),
+        }),
+      );
     });
   });
 });

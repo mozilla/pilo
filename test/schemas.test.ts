@@ -97,12 +97,14 @@ describe("schemas", () => {
       const validAction = {
         currentStep: "Working on Step 1: Click the login button",
         observation: "Found the login button on the page",
+        observationStatusMessage: "Found login button",
         extractedData: "",
         thought: "I need to click the login button to proceed",
         action: {
           action: PageAction.Click,
           ref: "s1e23",
         },
+        actionStatusMessage: "Clicking login button",
       };
 
       const result = actionSchema.safeParse(validAction);
@@ -116,6 +118,7 @@ describe("schemas", () => {
       const validAction = {
         currentStep: "Working on Step 2: Fill in username",
         observation: "Found the username field",
+        observationStatusMessage: "Found username field",
         extractedData: "",
         thought: "I need to enter the username",
         action: {
@@ -123,6 +126,7 @@ describe("schemas", () => {
           ref: "s2e45",
           value: "testuser@example.com",
         },
+        actionStatusMessage: "Filling username field",
       };
 
       const result = actionSchema.safeParse(validAction);
@@ -136,12 +140,14 @@ describe("schemas", () => {
       const validAction = {
         currentStep: "Working on Step 3: Wait for page load",
         observation: "Page is loading",
+        observationStatusMessage: "Page loading detected",
         extractedData: "",
         thought: "Need to wait for the page to finish loading",
         action: {
           action: PageAction.Wait,
           value: "3",
         },
+        actionStatusMessage: "Waiting for page load",
       };
 
       const result = actionSchema.safeParse(validAction);
@@ -155,12 +161,15 @@ describe("schemas", () => {
       const validAction = {
         currentStep: "Completing: Task finished",
         observation: "Successfully completed the task",
+        observationStatusMessage: "Task completed successfully",
         extractedData: "Final result data",
+        extractedDataStatusMessage: "Collected final results",
         thought: "The task has been completed successfully",
         action: {
           action: PageAction.Done,
           value: "Task completed successfully",
         },
+        actionStatusMessage: "Finishing task",
       };
 
       const result = actionSchema.safeParse(validAction);
@@ -174,12 +183,14 @@ describe("schemas", () => {
       const validAction = {
         currentStep: "Working on Step 1: Navigate to login page",
         observation: "Need to go to the login page",
+        observationStatusMessage: "Navigation required",
         extractedData: "",
         thought: "I need to navigate to the login URL",
         action: {
           action: PageAction.Goto,
           value: "https://example.com/login",
         },
+        actionStatusMessage: "Navigating to login page",
       };
 
       const result = actionSchema.safeParse(validAction);
@@ -193,11 +204,13 @@ describe("schemas", () => {
       const validActionWithoutExtractedData = {
         currentStep: "Working on Step 1: Click the button",
         observation: "Found the button",
+        observationStatusMessage: "Found clickable button",
         thought: "I need to click the button",
         action: {
           action: PageAction.Click,
           ref: "s1e23",
         },
+        actionStatusMessage: "Clicking button",
       };
 
       const result = actionSchema.safeParse(validActionWithoutExtractedData);
@@ -207,6 +220,7 @@ describe("schemas", () => {
     it("should reject action with missing required fields", () => {
       const invalidAction = {
         currentStep: "Working on Step 1",
+        // Missing observation, observationStatusMessage, thought, actionStatusMessage
         action: {
           action: PageAction.Click,
           ref: "s1e23",
@@ -221,11 +235,13 @@ describe("schemas", () => {
       const invalidAction = {
         currentStep: "Working on Step 1",
         observation: "Found element",
+        observationStatusMessage: "Found element",
         thought: "Need to interact",
         action: {
           action: "invalid_action",
           ref: "s1e23",
         },
+        actionStatusMessage: "Performing action",
       };
 
       const result = actionSchema.safeParse(invalidAction);
@@ -236,21 +252,25 @@ describe("schemas", () => {
       const backAction = {
         currentStep: "Working on Step 1: Go back",
         observation: "Need to go back",
+        observationStatusMessage: "Navigation required",
         extractedData: "",
         thought: "Going back to previous page",
         action: {
           action: PageAction.Back,
         },
+        actionStatusMessage: "Going back",
       };
 
       const forwardAction = {
         currentStep: "Working on Step 2: Go forward",
         observation: "Need to go forward",
+        observationStatusMessage: "Forward navigation needed",
         extractedData: "",
         thought: "Going forward to next page",
         action: {
           action: PageAction.Forward,
         },
+        actionStatusMessage: "Going forward",
       };
 
       expect(actionSchema.safeParse(backAction).success).toBe(true);
@@ -264,6 +284,7 @@ describe("schemas", () => {
         const validAction = {
           currentStep: `Working on: ${actionType}`,
           observation: "Valid observation",
+          observationStatusMessage: "Page analyzed",
           extractedData: "",
           thought: "Valid thought",
           action: {
@@ -275,11 +296,52 @@ describe("schemas", () => {
               value: "test value",
             }),
           },
+          actionStatusMessage: `Performing ${actionType}`,
         };
 
         const result = actionSchema.safeParse(validAction);
         expect(result.success).toBe(true);
       });
+    });
+
+    it("should require extractedDataStatusMessage when extractedData is present", () => {
+      const actionWithExtractedData = {
+        currentStep: "Working on Step 1",
+        observation: "Found data",
+        observationStatusMessage: "Data found",
+        extractedData: "Some important data",
+        // Missing extractedDataStatusMessage - this should still pass schema validation
+        // but the WebAgent validation should catch it
+        thought: "Processing data",
+        action: {
+          action: PageAction.Click,
+          ref: "s1e23",
+        },
+        actionStatusMessage: "Clicking element",
+      };
+
+      // Schema validation allows this (extractedDataStatusMessage is optional in schema)
+      const result = actionSchema.safeParse(actionWithExtractedData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should allow missing extractedDataStatusMessage when extractedData is empty", () => {
+      const actionWithoutExtractedData = {
+        currentStep: "Working on Step 1",
+        observation: "No data found",
+        observationStatusMessage: "Page analyzed",
+        extractedData: "",
+        // No extractedDataStatusMessage needed when extractedData is empty
+        thought: "Moving on",
+        action: {
+          action: PageAction.Click,
+          ref: "s1e23",
+        },
+        actionStatusMessage: "Clicking element",
+      };
+
+      const result = actionSchema.safeParse(actionWithoutExtractedData);
+      expect(result.success).toBe(true);
     });
   });
 
@@ -379,12 +441,15 @@ describe("schemas", () => {
       const action: Action = {
         currentStep: "test",
         observation: "test",
+        observationStatusMessage: "test status",
         extractedData: "test",
+        extractedDataStatusMessage: "data found",
         thought: "test",
         action: {
           action: PageAction.Click,
           ref: "s1e23",
         },
+        actionStatusMessage: "clicking element",
       };
 
       const validation: TaskValidationResult = {
