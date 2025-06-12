@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Create package tarball
+        run: npm pack
+
+      - name: Get package info
+        id: package
+        run: |
+          echo "name=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        run: |
+          gh release create "v${{ steps.package.outputs.version }}" \
+            --title "Release v${{ steps.package.outputs.version }}" \
+            --notes "## Installation
+
+          **Option 1: Install Latest (Auto-builds)**
+          \`\`\`bash
+          npm install https://github.com/${{ github.repository }}.git
+          npm install -g https://github.com/${{ github.repository }}.git  # global CLI
+          \`\`\`
+
+          **Option 2: Install This Specific Release (Pre-built)**
+          \`\`\`bash
+          npm install https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz
+          npm install -g https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz  # global CLI
+          \`\`\`
+
+          ## What's New in v${{ steps.package.outputs.version }}
+
+          - Built and packaged release with TypeScript compiled to JavaScript
+          - Includes all dependencies and type definitions
+          - Ready for production use
+
+          ## Usage
+
+          **As a library:**
+          \`\`\`javascript
+          import { WebAgent, PlaywrightBrowser } from 'spark';
+          \`\`\`
+
+          **As CLI:**
+          \`\`\`bash
+          spark \"your task here\"
+          \`\`\`" \
+            ./${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

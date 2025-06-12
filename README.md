@@ -15,14 +15,25 @@ Use Spark as a **library** in your Node.js applications or as a **CLI tool** for
 
 ## Installation
 
-### Install from GitHub (for development)
+### Install from GitHub (Recommended)
 
 ```bash
+# Install as library
 npm install https://github.com/Mozilla-Ocho/spark.git
-# or
-pnpm add https://github.com/Mozilla-Ocho/spark.git
-# or
-yarn add https://github.com/Mozilla-Ocho/spark.git
+
+# Or install globally for CLI usage
+npm install -g https://github.com/Mozilla-Ocho/spark.git
+```
+
+**What happens:** npm automatically builds the project after installation using the `prepare` script.
+
+### Install from Source (for development)
+
+```bash
+git clone https://github.com/Mozilla-Ocho/spark.git
+cd spark
+pnpm install
+pnpm run build
 ```
 
 ### Development Setup
@@ -211,6 +222,17 @@ pnpm run test:watch  # for development
 # Build
 pnpm run build
 ```
+
+### Creating Releases
+
+Releases are automated via GitHub Actions using git flow:
+
+1. `git flow release start 1.0.1`
+2. Update the version in `package.json` to match
+3. `git flow release finish 1.0.1`
+4. When the release merges to `main`, GitHub Actions automatically builds and creates a release
+
+Tags are created automatically based on the package.json version.
 
 ## Requirements
 
