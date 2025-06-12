@@ -596,6 +596,70 @@ describe("WebAgent", () => {
       });
     });
 
+    describe("New ref validation logic", () => {
+      it("should validate refs that exist in page snapshot (new format)", async () => {
+        const mockResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "e123", // New format
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject.mockResolvedValue(mockResponse);
+        mockBrowser.setCurrentText("button [ref=e123]"); // New format in snapshot
+
+        const result = await webAgent.generateNextAction("button [ref=e123]");
+        expect(result.action.ref).toBe("e123");
+      });
+
+      it("should reject refs that don't exist in page snapshot", async () => {
+        const mockResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "e999", // Doesn't exist
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject.mockResolvedValue(mockResponse);
+        mockBrowser.setCurrentText("button [ref=e123]"); // Only e123 exists
+
+        await expect(webAgent.generateNextAction("button [ref=e123]")).rejects.toThrow(
+          'Reference "e999" not found on current page',
+        );
+      });
+
+      it("should reject refs when no page snapshot available", async () => {
+        const mockResponse = createMockActionResponse({
+          currentStep: "Step 1",
+          observation: "Found element",
+          observationStatusMessage: "Found element",
+          thought: "Click button",
+          action: {
+            action: PageAction.Click,
+            ref: "e123",
+          },
+          actionStatusMessage: "Clicking button",
+        });
+
+        mockGenerateObject.mockResolvedValue(mockResponse);
+        mockBrowser.setCurrentText(""); // Empty snapshot
+
+        await expect(webAgent.generateNextAction("")).rejects.toThrow(
+          "Cannot validate ref: no page snapshot available",
+        );
+      });
+    });
+
     it("should validate correct aria refs", async () => {
       const mockResponse = createMockActionResponse({
         currentStep: "Working on Step 1",
@@ -620,7 +684,7 @@ describe("WebAgent", () => {
       expect(result.action.ref).toBe("s1e23");
     });
 
-    it("should correct malformed aria refs", async () => {
+    it("should reject malformed aria refs", async () => {
       const mockResponse = createMockActionResponse({
         currentStep: "Working on Step 1",
         observation: "Found element",
@@ -638,9 +702,9 @@ describe("WebAgent", () => {
       mockGenerateObject.mockResolvedValue(mockResponse);
       mockBrowser.setCurrentText("button 'Click me' [ref=s1e23]");
 
-      const result = await webAgent.generateNextAction("button 'Click me' [ref=s1e23]");
-
-      expect(result.action.ref).toBe("s1e23");
+      await expect(webAgent.generateNextAction("button 'Click me' [ref=s1e23]")).rejects.toThrow(
+        'Reference "click s1e23 button" not found on current page',
+      );
     });
 
     it("should validate fill action requires value", async () => {

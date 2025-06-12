@@ -161,11 +161,10 @@ export class WebAgent {
   private currentPage: { url: string; title: string } = { url: "", title: "" };
 
   // === Validation Patterns ===
-  /** Regex for valid aria reference format (s<number>e<number>) */
-  private readonly ARIA_REF_REGEX = /^s\d+e\d+$/;
+  // No regex patterns needed - we just check if refs exist in the page snapshot
 
-  /** Regex to extract aria references from malformed input for auto-correction */
-  private readonly ARIA_REF_EXTRACT_REGEX = /\b(s\d+e\d+)\b/;
+  /** Current page snapshot for ref validation */
+  private currentPageSnapshot: string = "";
 
   /**
    * Initialize WebAgent with browser interface and configuration options
@@ -271,12 +270,11 @@ export class WebAgent {
   }
 
   /**
-   * Validates aria reference format and attempts to auto-correct common issues
+   * Validates aria reference by checking if it exists in the current page snapshot
    */
   protected validateAriaRef(ref: string): {
     isValid: boolean;
     error?: string;
-    correctedRef?: string;
   } {
     if (!ref?.trim()) {
       return { isValid: false, error: "Aria ref cannot be empty" };
@@ -284,33 +282,29 @@ export class WebAgent {
 
     const trimmedRef = ref.trim();
 
-    // Check if it's already in the correct format (s<number>e<number>)
-    if (this.ARIA_REF_REGEX.test(trimmedRef)) {
-      return { isValid: true };
+    // We must have a page snapshot to validate refs
+    if (!this.currentPageSnapshot) {
+      return { isValid: false, error: "Cannot validate ref: no page snapshot available" };
     }
 
-    // Try to extract a valid ref from the input (auto-correction)
-    const match = trimmedRef.match(this.ARIA_REF_EXTRACT_REGEX);
-    if (match?.[1]) {
-      return {
-        isValid: true,
-        correctedRef: match[1],
-      };
+    // Check if the ref exists in the page snapshot (new format only)
+    const refExists = this.currentPageSnapshot.includes(`[ref=${trimmedRef}]`);
+
+    if (refExists) {
+      return { isValid: true };
     }
 
     return {
       isValid: false,
-      error: `Invalid aria ref format "${trimmedRef}". Expected: s<number>e<number> (e.g., s1e23)`,
+      error: `Reference "${trimmedRef}" not found on current page. Please use a valid ref from the page snapshot.`,
     };
   }
 
   protected validateActionResponse(response: any): {
     isValid: boolean;
     errors: string[];
-    correctedResponse?: any;
   } {
     const errors: string[] = [];
-    const correctedResponse = { ...response };
 
     // Validate required top-level fields
     this.validateRequiredStringField(response, "currentStep", errors);
@@ -331,13 +325,12 @@ export class WebAgent {
     }
 
     // Validate action object structure
-    const actionErrors = this.validateActionObject(response.action, correctedResponse);
+    const actionErrors = this.validateActionObject(response.action);
     errors.push(...actionErrors);
 
     return {
       isValid: errors.length === 0,
       errors,
-      correctedResponse: errors.length === 0 ? correctedResponse : undefined,
     };
   }
 
@@ -354,7 +347,7 @@ export class WebAgent {
   /**
    * Validates the action object structure and requirements
    */
-  private validateActionObject(action: any, correctedResponse: any): string[] {
+  private validateActionObject(action: any): string[] {
     const errors: string[] = [];
 
     // Validate action type
@@ -396,11 +389,9 @@ export class WebAgent {
       if (!action.ref || typeof action.ref !== "string") {
         errors.push(`Action "${actionType}" requires a "ref" field`);
       } else {
-        const { isValid, error, correctedRef } = this.validateAriaRef(action.ref);
+        const { isValid, error } = this.validateAriaRef(action.ref);
         if (!isValid && error) {
           errors.push(`Invalid ref for "${actionType}" action: ${error}`);
-        } else if (correctedRef) {
-          correctedResponse.action.ref = correctedRef;
         }
       }
     }
@@ -505,6 +496,9 @@ export class WebAgent {
    * @returns The validated action to execute
    */
   async generateNextAction(pageSnapshot: string, retryCount = 0): Promise<Action> {
+    // Store the current page snapshot for ref validation
+    this.currentPageSnapshot = pageSnapshot;
+
     // Compress the page snapshot to reduce token usage while preserving essential information
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
 
@@ -537,7 +531,7 @@ export class WebAgent {
     );
 
     // Validate the LLM response to ensure it's properly formatted and actionable
-    const { isValid, errors, correctedResponse } = this.validateActionResponse(response);
+    const { isValid, errors } = this.validateActionResponse(response);
 
     if (!isValid) {
       // Emit validation error event for logging
@@ -553,10 +547,6 @@ export class WebAgent {
             retryCount + 1
           } attempts. Errors: ${errors.join(", ")}`,
         );
-      }
-
-      if (correctedResponse) {
-        return correctedResponse;
       }
 
       this.addValidationErrorFeedback(errors, response);
@@ -858,6 +848,7 @@ export class WebAgent {
     this.messages = [];
     this.data = null;
     this.currentPage = { url: "", title: "" };
+    this.currentPageSnapshot = "";
   }
 
   private formatConversationHistory(): string {

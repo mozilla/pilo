@@ -11,6 +11,11 @@ import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 
+// Type extension for Playwright's private AI snapshot function
+type PageEx = Page & {
+  _snapshotForAI: () => Promise<string>;
+};
+
 /**
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
  */
@@ -255,7 +260,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getText(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    return await this.page.locator("html").ariaSnapshot({ ref: true });
+    return await (this.page as PageEx)._snapshotForAI();
   }
 
   async getScreenshot(): Promise<Buffer> {
