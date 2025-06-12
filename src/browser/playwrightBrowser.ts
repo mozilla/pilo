@@ -1,5 +1,7 @@
 import {
   firefox,
+  chromium,
+  webkit,
   devices,
   Browser as PlaywrightOriginalBrowser,
   BrowserContext,
@@ -24,6 +26,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     private options: {
       headless?: boolean;
       device?: string;
+      browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
       bypassCSP?: boolean;
       blockAds?: boolean;
       blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
@@ -36,12 +39,57 @@ export class PlaywrightBrowser implements AriaBrowser {
       headless: this.options.headless ?? false,
     };
 
-    this.browser = await firefox.launch(mergedOptions);
+    // Determine which browser to launch
+    const browserType = this.options.browser ?? "firefox";
+
+    switch (browserType) {
+      case "firefox":
+        this.browser = await firefox.launch(mergedOptions);
+        break;
+      case "chrome":
+      case "chromium":
+        this.browser = await chromium.launch(mergedOptions);
+        break;
+      case "safari":
+      case "webkit":
+        this.browser = await webkit.launch(mergedOptions);
+        break;
+      case "edge":
+        // Edge uses the same engine as Chrome/Chromium
+        this.browser = await chromium.launch({
+          ...mergedOptions,
+          channel: "msedge",
+        });
+        break;
+      default:
+        throw new Error(`Unsupported browser: ${browserType}`);
+    }
 
     // Setup context with device configuration
-    const deviceConfig = this.options.device
-      ? devices[this.options.device]
-      : devices["Desktop Firefox"];
+    let deviceConfig = {};
+    if (this.options.device) {
+      deviceConfig = devices[this.options.device] || {};
+    } else {
+      // Set default device based on browser
+      switch (browserType) {
+        case "firefox":
+          deviceConfig = devices["Desktop Firefox"] || {};
+          break;
+        case "chrome":
+        case "chromium":
+          deviceConfig = devices["Desktop Chrome"] || {};
+          break;
+        case "safari":
+        case "webkit":
+          deviceConfig = devices["Desktop Safari"] || {};
+          break;
+        case "edge":
+          deviceConfig = devices["Desktop Edge"] || {};
+          break;
+        default:
+          deviceConfig = {};
+      }
+    }
 
     this.context = await this.browser.newContext({
       ...deviceConfig,
