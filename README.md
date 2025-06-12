@@ -1,6 +1,8 @@
 # Spark 🔥
 
-A powerful AI-powered web automation tool that helps you get answers and take actions in the browser. Spark uses advanced language models to understand web pages and perform complex tasks automatically.
+A powerful AI-powered web automation library and CLI tool that helps you get answers and take actions in the browser. Spark uses advanced language models to understand web pages and perform complex tasks automatically.
+
+Use Spark as a **library** in your Node.js applications or as a **CLI tool** for interactive automation.
 
 ## Features
 
@@ -11,7 +13,30 @@ A powerful AI-powered web automation tool that helps you get answers and take ac
 - 📝 **Natural Language Interface**: Simply describe what you want to do in plain English
 - 🔄 **Interactive Feedback**: Real-time updates on what the agent is thinking and doing
 
-## Quick Start
+## Installation
+
+### Install from GitHub (Recommended)
+
+```bash
+# Install as library
+npm install https://github.com/Mozilla-Ocho/spark.git
+
+# Or install globally for CLI usage
+npm install -g https://github.com/Mozilla-Ocho/spark.git
+```
+
+**What happens:** npm automatically builds the project after installation using the `prepare` script.
+
+### Install from Source (for development)
+
+```bash
+git clone https://github.com/Mozilla-Ocho/spark.git
+cd spark
+pnpm install
+pnpm run build
+```
+
+### Development Setup
 
 1. Clone and install:
 
@@ -41,6 +66,62 @@ pnpm run spark "what is the current temperature in London?"
 ```
 
 ## Usage
+
+### Programmatic Usage (Library)
+
+```javascript
+import { WebAgent, PlaywrightBrowser } from "spark";
+
+// Setup: Set OPENAI_API_KEY environment variable
+// Install browsers: npx playwright install firefox
+
+// Create a browser instance
+const browser = new PlaywrightBrowser({
+  headless: false,
+  blockAds: true,
+});
+
+// Create WebAgent
+const webAgent = new WebAgent(browser, {
+  debug: false,
+  guardrails: "Do not make any purchases",
+});
+
+// Execute a task
+try {
+  const result = await webAgent.execute("find flights to Tokyo", "https://airline.com", {
+    departure: "NYC",
+    passengers: 2,
+  });
+  console.log("Task completed:", result.success);
+} finally {
+  await webAgent.close();
+}
+```
+
+#### Library API Reference
+
+**WebAgent Constructor Options:**
+
+- `debug`: boolean - Enable debug logging and page snapshots
+- `guardrails`: string - Constraints to limit agent actions
+
+**PlaywrightBrowser Constructor Options:**
+
+- `headless`: boolean - Run browser in headless mode
+- `blockAds`: boolean - Block ads and trackers
+- `blockResources`: string[] - Block specific resource types
+- `device`: string - Device type for emulation
+
+**WebAgent.execute() Parameters:**
+
+- `task`: string - Natural language task description
+- `startingUrl`: string (optional) - Starting URL
+- `data`: object (optional) - Contextual data for the task
+
+**Returns:** `TaskExecutionResult` with success status and details
+
+### CLI Usage
 
 Spark accepts up to four arguments:
 
@@ -141,6 +222,17 @@ pnpm run test:watch  # for development
 # Build
 pnpm run build
 ```
+
+### Creating Releases
+
+Releases are automated via GitHub Actions using git flow:
+
+1. `git flow release start 1.0.1`
+2. Update the version in `package.json` to match
+3. `git flow release finish 1.0.1`
+4. When the release merges to `main`, GitHub Actions automatically builds and creates a release
+
+Tags are created automatically based on the package.json version.
 
 ## Requirements
 

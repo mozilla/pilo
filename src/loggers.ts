@@ -244,11 +244,13 @@ export class ConsoleLogger implements Logger {
   };
 
   private handleNetworkWaiting = (data: NetworkWaitingEventData): void => {
-    console.log(chalk.gray("   🌐 Waiting for network activity to settle..."));
+    console.log(
+      chalk.gray(`   🌐 Waiting for network activity to settle after "${data.action}"...`),
+    );
   };
 
   private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
-    console.log(chalk.gray("   ⚠️  Network wait timed out, continuing..."));
+    console.log(chalk.gray(`   ⚠️  Network wait timed out for "${data.action}", continuing...`));
   };
 
   private handleThinking = (data: ThinkingEventData): void => {

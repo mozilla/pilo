@@ -22,7 +22,7 @@ Setup commands:
 
 ## Architecture
 
-Spark is an AI-powered web automation tool that combines natural language understanding with browser automation. The architecture consists of several key components:
+Spark is an AI-powered web automation library and CLI tool that combines natural language understanding with browser automation. The architecture consists of several key components:
 
 ### Core Components
 
@@ -57,7 +57,9 @@ Spark is an AI-powered web automation tool that combines natural language unders
 
 ### File Structure
 
-- `src/index.ts` - CLI entry point with task, URL, and data argument parsing
+- `src/index.ts` - Main library export point for programmatic usage
+- `src/lib.ts` - Library exports (WebAgent, PlaywrightBrowser, types)
+- `src/cli.ts` - CLI entry point with task, URL, and data argument parsing
 - `src/webAgent.ts` - Main automation logic
 - `src/browser/` - Browser implementations
 - `src/events.ts` - Event system
