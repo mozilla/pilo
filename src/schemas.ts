@@ -1,69 +1,46 @@
 import { z } from "zod";
+import { PageAction } from "./browser/ariaBrowser.js";
 
-// Schema for the initial plan creation
+// Schema for plan creation (without URL)
 export const planSchema = z.object({
-  explanation: z
-    .string()
-    .describe(
-      "Clearly and precisely restate the task exactly as given, without adding any analysis or expansion"
-    ),
-  plan: z
-    .string()
-    .describe(
-      "Create a high-level plan for this web navigation task. Focus on general steps without assuming specific page features. One step per line."
-    ),
-  url: z
-    .string()
-    .describe(
-      "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"
-    ),
+  explanation: z.string(),
+  plan: z.string(),
+});
+
+// Schema for plan creation with URL
+export const planAndUrlSchema = z.object({
+  explanation: z.string(),
+  plan: z.string(),
+  url: z.string(),
 });
 
 // Schema for the action loop responses
 export const actionSchema = z.object({
-  observation: z
-    .string()
-    .describe(
-      "Brief assessment of previous step's outcome. Was it a success or failure? Note important information you might need to complete the task."
-    ),
-  thought: z
-    .string()
-    .describe(
-      "Reasoning for your next action. If the previous action failed, retry once then try an alternative approach."
-    ),
-  action: z
-    .object({
-      action: z
-        .enum([
-          "select", // Choose from dropdown
-          "fill", // Enter text
-          "click", // Click element
-          "hover", // Move mouse over element
-          "check", // Check a checkbox
-          "uncheck", // Uncheck a checkbox
-          "wait", // Pause execution
-          "done", // Complete task
-          "goto", // Navigate to URL
-          "back", // Go to previous page
-          "forward", // Go to next page
-        ])
-        .describe("The type of action to perform"),
-      ref: z
-        .string()
-        .optional()
-        .describe(
-          "Aria reference (e.g., 's1e33') from the page snapshot. Not needed for done/wait/goto/back"
-        ),
-      value: z
-        .string()
-        .optional()
-        .describe(
-          "Required for fill/select/goto, seconds for wait, result for done"
-        ),
-    })
-    .describe("The action to perform on the page"),
+  currentStep: z.string(),
+  observation: z.string(),
+  observationStatusMessage: z.string(),
+  extractedData: z.string().optional(),
+  extractedDataStatusMessage: z.string().optional(),
+  thought: z.string(),
+  action: z.object({
+    action: z.nativeEnum(PageAction),
+    ref: z.string().optional(),
+    value: z.string().optional(),
+  }),
+  actionStatusMessage: z.string(),
 });
 
 // Export the types
 export type Plan = z.infer<typeof planSchema>;
+export type PlanAndUrl = z.infer<typeof planAndUrlSchema>;
 export type Action = z.infer<typeof actionSchema>;
+
+// Schema for task validation results
+export const taskValidationSchema = z.object({
+  observation: z.string(),
+  completionQuality: z.enum(["failed", "partial", "complete", "excellent"]),
+  feedback: z.string().optional(),
+});
+
+// Export the type for task validation result
+export type TaskValidationResult = z.infer<typeof taskValidationSchema>;

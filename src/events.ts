@@ -12,8 +12,11 @@ export enum WebAgentEventType {
   PAGE_NAVIGATION = "page:navigation",
 
   // Agent reasoning events
+  CURRENT_STEP = "agent:current_step",
   OBSERVATION = "agent:observation",
   THOUGHT = "agent:thought",
+  EXTRACTED_DATA = "agent:extracted_data",
+  THINKING = "agent:thinking",
 
   // Action events
   ACTION_EXECUTION = "action:execution",
@@ -23,10 +26,17 @@ export enum WebAgentEventType {
   DEBUG_COMPRESSION = "debug:compression",
   DEBUG_MESSAGES = "debug:messages",
 
+  // Validation events
+  VALIDATION_ERROR = "validation:error",
+
   // Waiting events
   WAITING = "system:waiting",
   NETWORK_WAITING = "system:network_waiting",
   NETWORK_TIMEOUT = "system:network_timeout",
+  TASK_VALIDATION = "task:validation",
+
+  // Status events
+  STATUS_MESSAGE = "status:message",
 }
 
 /**
@@ -62,6 +72,13 @@ export interface PageNavigationEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for current step tracking
+ */
+export interface CurrentStepEventData extends WebAgentEventData {
+  currentStep: string;
+}
+
+/**
  * Event data for agent observations
  */
 export interface ObservationEventData extends WebAgentEventData {
@@ -73,6 +90,21 @@ export interface ObservationEventData extends WebAgentEventData {
  */
 export interface ThoughtEventData extends WebAgentEventData {
   thought: string;
+}
+
+/**
+ * Event data for extracted data
+ */
+export interface ExtractedDataEventData extends WebAgentEventData {
+  extractedData: string;
+}
+
+/**
+ * Event data for thinking status
+ */
+export interface ThinkingEventData extends WebAgentEventData {
+  status: "start" | "end";
+  operation: string;
 }
 
 /**
@@ -130,14 +162,43 @@ export interface NetworkTimeoutEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for task validation
+ */
+export interface TaskValidationEventData extends WebAgentEventData {
+  observation: string;
+  completionQuality: "failed" | "partial" | "complete" | "excellent";
+  feedback?: string;
+  finalAnswer: string;
+}
+
+/**
+ * Event data for validation errors during action response processing
+ */
+export interface ValidationErrorEventData extends WebAgentEventData {
+  errors: string[];
+  retryCount: number;
+  rawResponse: any;
+}
+
+/**
+ * Event data for status messages
+ */
+export interface StatusMessageEventData extends WebAgentEventData {
+  message: string;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_START; data: TaskStartEventData }
   | { type: WebAgentEventType.TASK_COMPLETE; data: TaskCompleteEventData }
   | { type: WebAgentEventType.PAGE_NAVIGATION; data: PageNavigationEventData }
+  | { type: WebAgentEventType.CURRENT_STEP; data: CurrentStepEventData }
   | { type: WebAgentEventType.OBSERVATION; data: ObservationEventData }
   | { type: WebAgentEventType.THOUGHT; data: ThoughtEventData }
+  | { type: WebAgentEventType.EXTRACTED_DATA; data: ExtractedDataEventData }
+  | { type: WebAgentEventType.THINKING; data: ThinkingEventData }
   | { type: WebAgentEventType.ACTION_EXECUTION; data: ActionExecutionEventData }
   | { type: WebAgentEventType.ACTION_RESULT; data: ActionResultEventData }
   | {
@@ -147,7 +208,10 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.DEBUG_MESSAGES; data: MessagesDebugEventData }
   | { type: WebAgentEventType.WAITING; data: WaitingEventData }
   | { type: WebAgentEventType.NETWORK_WAITING; data: NetworkWaitingEventData }
-  | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData };
+  | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
+  | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData }
+  | { type: WebAgentEventType.VALIDATION_ERROR; data: ValidationErrorEventData }
+  | { type: WebAgentEventType.STATUS_MESSAGE; data: StatusMessageEventData };
 
 /**
  * Event emitter for WebAgent events
@@ -165,7 +229,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   onEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.on(eventType, listener);
   }
@@ -175,7 +239,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   onceEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.once(eventType, listener);
   }
@@ -185,7 +249,7 @@ export class WebAgentEventEmitter extends EventEmitter {
    */
   offEvent<T extends WebAgentEventType>(
     eventType: T,
-    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void
+    listener: (data: Extract<WebAgentEvent, { type: T }>["data"]) => void,
   ): this {
     return this.off(eventType, listener);
   }

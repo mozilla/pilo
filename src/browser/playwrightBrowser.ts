@@ -5,7 +5,7 @@ import {
   BrowserContext,
   Page,
 } from "playwright";
-import { AriaBrowser } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 
@@ -17,16 +17,17 @@ export class PlaywrightBrowser implements AriaBrowser {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
 
+  // Default timeouts
+  private readonly ACTION_TIMEOUT_MS = 5000; // 5 seconds timeout for interactive actions
+
   constructor(
     private options: {
       headless?: boolean;
       device?: string;
       bypassCSP?: boolean;
       blockAds?: boolean;
-      blockResources?: Array<
-        "image" | "stylesheet" | "font" | "media" | "manifest"
-      >;
-    } = {}
+      blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
+    } = {},
   ) {}
 
   async start(): Promise<void> {
@@ -48,6 +49,9 @@ export class PlaywrightBrowser implements AriaBrowser {
     });
 
     this.page = await this.context.newPage();
+
+    // Set consistent default timeout for all operations
+    this.page.setDefaultTimeout(this.ACTION_TIMEOUT_MS);
 
     // Enable ad blocking if requested
     if (this.options.blockAds) {
@@ -80,17 +84,90 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    await this.page.goto(url);
+    try {
+      console.debug(`🔄 Navigating to: ${url}`);
+      // Use "commit" for fastest initial navigation (just waits for document to start loading)
+      await this.page.goto(url, {
+        waitUntil: "commit",
+        timeout: this.ACTION_TIMEOUT_MS,
+      });
+      console.debug(`✅ Navigation committed to: ${url}`);
+      await this.ensureOptimizedPageLoad();
+    } catch (error) {
+      console.error(
+        `❌ Navigation failed to: ${url} - ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async goBack(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    await this.page.goBack();
+    try {
+      console.debug(`🔄 Navigating back`);
+      await this.page.goBack({
+        waitUntil: "commit",
+        timeout: this.ACTION_TIMEOUT_MS,
+      });
+      console.debug(`✅ Back navigation committed`);
+      await this.ensureOptimizedPageLoad();
+    } catch (error) {
+      console.error(
+        `❌ Back navigation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async goForward(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    await this.page.goForward();
+    try {
+      console.debug(`🔄 Navigating forward`);
+      await this.page.goForward({
+        waitUntil: "commit",
+        timeout: this.ACTION_TIMEOUT_MS,
+      });
+      console.debug(`✅ Forward navigation committed`);
+      await this.ensureOptimizedPageLoad();
+    } catch (error) {
+      console.error(
+        `❌ Forward navigation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error; // Re-throw to allow caller to handle
+    }
+  }
+
+  // Private helper method to ensure page is usable with appropriate timeouts
+  private async ensureOptimizedPageLoad(): Promise<void> {
+    if (!this.page) throw new Error("Browser not started");
+
+    try {
+      // 1. Wait for DOM to be ready - this is critical for interactivity
+      await this.page.waitForLoadState("domcontentloaded");
+      console.debug("✅ DOM content loaded successfully");
+    } catch (error) {
+      console.error(
+        `❌ DOM content load failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Still continue since we might be able to interact with what's loaded
+    }
+
+    // 2. Try to wait for full load, but cap at 5 seconds
+    // We catch and ignore timeout errors since the page is usable after domcontentloaded
+    try {
+      await this.page.waitForLoadState("load", {
+        timeout: this.ACTION_TIMEOUT_MS,
+      });
+      console.debug("✅ Page fully loaded");
+    } catch (error) {
+      console.debug(
+        `⚠️ Page load timed out after ${this.ACTION_TIMEOUT_MS}ms: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   async getUrl(): Promise<string> {
@@ -113,63 +190,127 @@ export class PlaywrightBrowser implements AriaBrowser {
     return await this.page.screenshot();
   }
 
-  async waitForLoadState(
-    state: "networkidle" | "domcontentloaded" | "load",
-    options?: { timeout?: number }
-  ): Promise<void> {
+  async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    await this.page.waitForLoadState(state, options);
+    try {
+      console.debug(
+        `🔄 Waiting for load state: ${state}${
+          options?.timeout ? ` with timeout ${options.timeout}ms` : ""
+        }`,
+      );
+      await this.page.waitForLoadState(state, options);
+      console.debug(`✅ Load state "${state}" reached successfully`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to reach load state "${state}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
-  async performAction(
-    ref: string,
-    action: string,
-    value?: string
-  ): Promise<void> {
+  async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
 
-    const element = this.page.locator(`aria-ref=${ref}`);
-
     try {
-      switch (action.toLowerCase()) {
-        case "click":
-          await element.click();
+      // Log the action being attempted
+      console.debug(
+        `🔄 Performing ${action} action on element with ref=${ref}${
+          value ? ` with value="${value}"` : ""
+        }`,
+      );
+
+      // Create a locator for the element
+      const locator = this.page.locator(`aria-ref=${ref}`);
+
+      switch (action) {
+        // Element interactions
+        case PageAction.Click:
+          await locator.click({ timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Click successful on ref=${ref}`);
+          // Ensure page is usable after click that may cause navigation
+          await this.ensureOptimizedPageLoad();
           break;
 
-        case "hover":
-          await element.hover();
+        case PageAction.Hover:
+          await locator.hover({ timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Hover successful on ref=${ref}`);
           break;
 
-        case "fill":
+        case PageAction.Fill:
           if (!value) throw new Error("Value required for fill action");
-          await element.fill(value);
+          await locator.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Fill successful on ref=${ref} with value="${value}"`);
           break;
 
-        case "focus":
-          await element.focus();
+        case PageAction.Focus:
+          await locator.focus({ timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Focus successful on ref=${ref}`);
           break;
 
-        case "check":
-          await element.check();
+        case PageAction.Check:
+          await locator.check({ timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Check successful on ref=${ref}`);
           break;
 
-        case "uncheck":
-          await element.uncheck();
+        case PageAction.Uncheck:
+          await locator.uncheck({ timeout: this.ACTION_TIMEOUT_MS });
+          console.debug(`✅ Uncheck successful on ref=${ref}`);
           break;
 
-        case "select":
+        case PageAction.Select:
           if (!value) throw new Error("Value required for select action");
-          await element.selectOption(value);
+          await locator.selectOption(value, {
+            timeout: this.ACTION_TIMEOUT_MS,
+          });
+          console.debug(`✅ Select successful on ref=${ref} with value="${value}"`);
+          // Forms might trigger page reloads on select
+          await this.ensureOptimizedPageLoad();
+          break;
+
+        // Navigation and workflow
+        case PageAction.Wait:
+          if (!value) throw new Error("Value required for wait action");
+          const seconds = parseInt(value, 10);
+          console.debug(`🕒 Waiting for ${seconds} seconds`);
+          await this.page.waitForTimeout(seconds * 1000);
+          console.debug(`✅ Wait completed for ${seconds} seconds`);
+          break;
+
+        case PageAction.Goto:
+          if (!value) throw new Error("URL required for goto action");
+          await this.goto(value);
+          // Note: goto already calls ensureOptimizedPageLoad internally
+          break;
+
+        case PageAction.Back:
+          await this.goBack();
+          // Note: goBack already calls ensureOptimizedPageLoad internally
+          break;
+
+        case PageAction.Forward:
+          await this.goForward();
+          // Note: goForward already calls ensureOptimizedPageLoad internally
+          break;
+
+        case PageAction.Done:
+          // This is a no-op in the browser implementation
+          // It's handled at a higher level in the automation flow
+          console.debug(`✅ Done action received`);
           break;
 
         default:
           throw new Error(`Unsupported action: ${action}`);
       }
     } catch (error) {
+      console.error(
+        `❌ Failed to perform ${action} action on ref=${ref}${
+          value ? ` with value="${value}"` : ""
+        }: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new Error(
-        `Failed to perform action: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
