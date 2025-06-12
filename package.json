@@ -29,7 +29,8 @@
     "test:watch": "vitest",
     "install-cli": "npm run build && chmod +x dist/cli.js && npm install -g .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "release": "./scripts/release.sh"
   },
   "keywords": [
     "ai",
