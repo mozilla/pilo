@@ -1,0 +1,34 @@
+# Use Node.js LTS version
+FROM node:22-alpine
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy root package files and build main spark package
+COPY package.json pnpm-lock.yaml ./
+COPY src ./src
+COPY tsconfig.json ./
+RUN pnpm install
+RUN pnpm run build
+
+# Now work on the server
+WORKDIR /app/server
+COPY server/package.json server/pnpm-lock.yaml ./
+RUN pnpm install
+
+# Copy server source and build
+COPY server/src ./src
+COPY server/tsconfig.json ./
+RUN pnpm run build
+
+# Expose the port
+EXPOSE 3000
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Start the server
+CMD ["pnpm", "start"]
