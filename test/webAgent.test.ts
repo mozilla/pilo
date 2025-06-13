@@ -150,7 +150,7 @@ describe("WebAgent", () => {
 
   describe("Constructor and initialization", () => {
     it("should create WebAgent with default options", () => {
-      const agent = new WebAgent(mockBrowser);
+      const agent = new WebAgent(mockBrowser, { provider: mockProvider });
       expect(agent).toBeInstanceOf(WebAgent);
     });
 
@@ -167,7 +167,7 @@ describe("WebAgent", () => {
     });
 
     it("should use default logger when none provided", () => {
-      const agent = new WebAgent(mockBrowser, { debug: false });
+      const agent = new WebAgent(mockBrowser, { debug: false, provider: mockProvider });
       expect(agent).toBeInstanceOf(WebAgent);
     });
   });
