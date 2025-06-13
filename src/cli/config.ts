@@ -20,6 +20,9 @@ export interface SparkConfig {
   proxy?: string;
   proxy_username?: string;
   proxy_password?: string;
+
+  // Logging Configuration
+  logger?: "console" | "json";
 }
 
 export class ConfigManager {
@@ -98,6 +101,11 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_PROXY_PASSWORD && {
         proxy_password: process.env.SPARK_PROXY_PASSWORD,
+      }),
+
+      // Logging Configuration
+      ...(process.env.SPARK_LOGGER && {
+        logger: process.env.SPARK_LOGGER as SparkConfig["logger"],
       }),
     };
 
@@ -216,6 +224,9 @@ export class ConfigManager {
     if (process.env.SPARK_PROXY) env.proxy = process.env.SPARK_PROXY;
     if (process.env.SPARK_PROXY_USERNAME) env.proxy_username = process.env.SPARK_PROXY_USERNAME;
     if (process.env.SPARK_PROXY_PASSWORD) env.proxy_password = process.env.SPARK_PROXY_PASSWORD;
+
+    // Logging Configuration
+    if (process.env.SPARK_LOGGER) env.logger = process.env.SPARK_LOGGER as SparkConfig["logger"];
 
     const merged = this.getConfig();
 

@@ -39,6 +39,7 @@ function createMockActionResponse(overrides: any = {}) {
 
 // Mock browser implementation for testing
 class MockAriaBrowser implements AriaBrowser {
+  public browserName = "mockariabrowser";
   private currentUrl = "https://example.com";
   private currentTitle = "Example Page";
   private currentText = "Example page content";

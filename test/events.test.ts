@@ -19,6 +19,7 @@ import {
   NetworkTimeoutEventData,
   TaskValidationEventData,
   StatusMessageEventData,
+  WEB_AGENT_EVENT_TYPES,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -114,10 +115,13 @@ describe("WebAgentEventEmitter", () => {
     it("should handle all WebAgentEventType values", () => {
       // Verify all event types are defined
       const expectedEventTypes = [
+        "task:setup",
         "task:started",
         "task:completed",
         "task:validated",
         "task:validation_error",
+        "ai:generation",
+        "ai:generation:error",
         "agent:step",
         "agent:observed",
         "agent:reasoned",

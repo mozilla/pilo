@@ -663,8 +663,28 @@ export class WebAgent {
 
     try {
       const response = await generateObject(config);
+      this.emit(WebAgentEventType.AI_GENERATION, {
+        prompt,
+        schema,
+        messages,
+        temperature: config.temperature,
+        object: response.object,
+        finishReason: response.finishReason,
+        usage: response.usage,
+        warnings: response.warnings,
+        providerMetadata: response.providerMetadata,
+      });
       return response.object as T;
     } catch (error) {
+      if (error instanceof Error) {
+        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+          error: error.message,
+          prompt,
+          schema,
+          messages,
+        });
+      }
+
       // Handle AI generation failures with retry logic
       if (
         error instanceof Error &&
@@ -909,6 +929,22 @@ export class WebAgent {
   }
 
   /**
+   * Emits the task setup event with initial task information
+   */
+  private emitTaskSetupEvent(task: string) {
+    this.emit(WebAgentEventType.TASK_SETUP, {
+      task,
+      browserName: this.browser.browserName,
+      url: this.url,
+      guardrails: this.guardrails,
+      data: this.data,
+      pwEndpoint: (this.browser as any).pwEndpoint || null,
+      proxy: (this.browser as any).proxyServer || null,
+      vision: this.vision,
+    });
+  }
+
+  /**
    * Emits the task start event with all initial task information
    */
   private emitTaskStartEvent(task: string) {
@@ -997,6 +1033,8 @@ export class WebAgent {
     }
 
     // === SETUP PHASE ===
+    this.emitTaskSetupEvent(task);
+
     // Reset any previous task state to ensure clean execution
     this.resetState();
 
