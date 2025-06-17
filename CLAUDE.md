@@ -13,6 +13,7 @@ Development commands:
 - `pnpm run test:watch` - Run tests in watch mode
 - `pnpm run format` - Format code with Prettier
 - `pnpm run format:check` - Check code formatting without modifying files
+- `pnpm run check` - **Recommended for Claude Code**: Format code, run type checking, and run tests in sequence
 
 Setup commands:
 
@@ -89,3 +90,12 @@ Requires `.env` file with `OPENAI_API_KEY` for LLM functionality. Tests run in j
 - Individual test files can be run with `pnpm test <filename>`
 - Tests use Vitest with jsdom for browser environment simulation
 - Test files are located in `test/` directory and mirror the `src/` structure
+- Use `pnpm run check` to format, type check, and test in one command
+
+## Server Development
+
+The server subdirectory (`server/`) has its own package.json with identical development commands:
+
+- `cd server && pnpm run check` - Format, type check, and test the server
+- `cd server && pnpm run dev` - Start server in development mode
+- `cd server && pnpm run build` - Build server for production

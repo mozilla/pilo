@@ -1,9 +1,27 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { cors } from "hono/cors";
 import sparkRoutes from "./routes/spark.js";
 
 const app = new Hono();
+
+// Add CORS middleware
+app.use(
+  "*",
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+    ],
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Type"],
+    credentials: false,
+  }),
+);
 
 // Health check endpoint
 app.get("/health", (c) => {

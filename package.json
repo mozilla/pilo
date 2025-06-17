@@ -28,9 +28,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "install-cli": "npm run build && chmod +x dist/cli.js && npm install -g .",
-    "format": "prettier --write .",
+    "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
-    "release": "./scripts/release.sh"
+    "release": "./scripts/release.sh",
+    "check": "pnpm run format && pnpm run typecheck && pnpm test"
   },
   "keywords": [
     "ai",

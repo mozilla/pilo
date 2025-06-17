@@ -4,6 +4,24 @@ import type { TaskExecutionResult } from "spark";
 import { openai } from "@ai-sdk/openai";
 import { StreamLogger } from "../StreamLogger.js";
 
+interface ErrorResponse {
+  success: false;
+  error: {
+    message: string;
+    code: string;
+    timestamp: string;
+  };
+}
+
+const createErrorResponse = (message: string, code: string): ErrorResponse => ({
+  success: false,
+  error: {
+    message,
+    code,
+    timestamp: new Date().toISOString(),
+  },
+});
+
 const spark = new Hono();
 
 interface SparkTaskRequest {
@@ -19,15 +37,16 @@ spark.post("/run", async (c) => {
     const body = (await c.req.json()) as SparkTaskRequest;
 
     if (!body.task) {
-      return c.json({ error: "Task is required" }, 400);
+      return c.json(createErrorResponse("Task is required", "MISSING_TASK"), 400);
     }
 
     // Check for OpenAI API key
     if (!process.env.OPENAI_API_KEY) {
       return c.json(
-        {
-          error: "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.",
-        },
+        createErrorResponse(
+          "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.",
+          "MISSING_API_KEY",
+        ),
         500,
       );
     }
@@ -36,8 +55,6 @@ spark.post("/run", async (c) => {
     c.header("Content-Type", "text/event-stream");
     c.header("Cache-Control", "no-cache");
     c.header("Connection", "keep-alive");
-    c.header("Access-Control-Allow-Origin", "*");
-    c.header("Access-Control-Allow-Headers", "Cache-Control");
 
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
@@ -81,7 +98,11 @@ spark.post("/run", async (c) => {
       } catch (error) {
         console.error("Spark task execution failed:", error);
         await sendEvent("error", {
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: {
+            message: error instanceof Error ? error.message : "Unknown error",
+            code: "TASK_EXECUTION_FAILED",
+            timestamp: new Date().toISOString(),
+          },
         });
       } finally {
         await sendEvent("done", {});
@@ -94,16 +115,15 @@ spark.post("/run", async (c) => {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (error) {
     console.error("Spark task setup failed:", error);
     return c.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      createErrorResponse(
+        error instanceof Error ? error.message : "Unknown error",
+        "TASK_SETUP_FAILED",
+      ),
       500,
     );
   }
