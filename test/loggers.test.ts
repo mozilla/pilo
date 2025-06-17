@@ -104,7 +104,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_START,
+        type: WebAgentEventType.TASK_STARTED,
         data: eventData,
       });
 
@@ -126,7 +126,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_COMPLETE,
+        type: WebAgentEventType.TASK_COMPLETED,
         data: eventData,
       });
 
@@ -143,7 +143,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_COMPLETE,
+        type: WebAgentEventType.TASK_COMPLETED,
         data: eventData,
       });
 
@@ -160,7 +160,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_VALIDATION,
+        type: WebAgentEventType.TASK_VALIDATED,
         data: eventData,
       });
 
@@ -179,7 +179,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_VALIDATION,
+        type: WebAgentEventType.TASK_VALIDATED,
         data: eventData,
       });
 
@@ -199,7 +199,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.PAGE_NAVIGATION,
+        type: WebAgentEventType.BROWSER_NAVIGATED,
         data: eventData,
       });
 
@@ -218,7 +218,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.PAGE_NAVIGATION,
+        type: WebAgentEventType.BROWSER_NAVIGATED,
         data: eventData,
       });
 
@@ -237,7 +237,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.CURRENT_STEP,
+        type: WebAgentEventType.AGENT_STEP,
         data: eventData,
       });
 
@@ -253,7 +253,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.OBSERVATION,
+        type: WebAgentEventType.AGENT_OBSERVED,
         data: eventData,
       });
 
@@ -269,7 +269,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.THOUGHT,
+        type: WebAgentEventType.AGENT_REASONED,
         data: eventData,
       });
 
@@ -285,7 +285,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.EXTRACTED_DATA,
+        type: WebAgentEventType.AGENT_EXTRACTED,
         data: eventData,
       });
 
@@ -305,7 +305,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_EXECUTION,
+        type: WebAgentEventType.BROWSER_ACTION_STARTED,
         data: eventData,
       });
 
@@ -323,7 +323,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_EXECUTION,
+        type: WebAgentEventType.BROWSER_ACTION_STARTED,
         data: eventData,
       });
 
@@ -339,7 +339,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
+        type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
         data: eventData,
       });
 
@@ -356,7 +356,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
+        type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
         data: eventData,
       });
 
@@ -372,7 +372,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.ACTION_RESULT,
+        type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
         data: eventData,
       });
 
@@ -392,7 +392,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.DEBUG_COMPRESSION,
+        type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
         data: eventData,
       });
 
@@ -413,7 +413,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.DEBUG_MESSAGES,
+        type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
         data: eventData,
       });
 
@@ -432,7 +432,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.WAITING,
+        type: WebAgentEventType.AGENT_WAITING,
         data: eventData,
       });
 
@@ -449,7 +449,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.WAITING,
+        type: WebAgentEventType.AGENT_WAITING,
         data: eventData,
       });
 
@@ -465,13 +465,13 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.NETWORK_WAITING,
+        type: WebAgentEventType.BROWSER_NETWORK_WAITING,
         data: eventData,
       });
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("network activity");
+      expect(allOutput).toContain("Network Waiting");
     });
 
     it("should handle NETWORK_TIMEOUT events", () => {
@@ -481,13 +481,13 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.NETWORK_TIMEOUT,
+        type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
         data: eventData,
       });
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("timed out");
+      expect(allOutput).toContain("Network Timeout");
     });
   });
 
@@ -500,14 +500,14 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.THINKING,
+        type: WebAgentEventType.AGENT_PROCESSING,
         data: eventData,
       });
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("Planning next action");
-      expect(allOutput).toContain("🤔");
+      expect(allOutput).toContain("🧮");
     });
 
     it("should not log THINKING end events", () => {
@@ -518,7 +518,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.THINKING,
+        type: WebAgentEventType.AGENT_PROCESSING,
         data: eventData,
       });
 
@@ -530,21 +530,21 @@ describe("ConsoleLogger", () => {
   describe("Event listener management", () => {
     it("should remove all listeners on dispose", () => {
       const eventCounts = [
-        WebAgentEventType.TASK_START,
-        WebAgentEventType.TASK_COMPLETE,
-        WebAgentEventType.PAGE_NAVIGATION,
-        WebAgentEventType.CURRENT_STEP,
-        WebAgentEventType.OBSERVATION,
-        WebAgentEventType.THOUGHT,
-        WebAgentEventType.EXTRACTED_DATA,
-        WebAgentEventType.ACTION_EXECUTION,
-        WebAgentEventType.ACTION_RESULT,
-        WebAgentEventType.DEBUG_COMPRESSION,
-        WebAgentEventType.DEBUG_MESSAGES,
-        WebAgentEventType.WAITING,
-        WebAgentEventType.NETWORK_WAITING,
-        WebAgentEventType.NETWORK_TIMEOUT,
-        WebAgentEventType.TASK_VALIDATION,
+        WebAgentEventType.TASK_STARTED,
+        WebAgentEventType.TASK_COMPLETED,
+        WebAgentEventType.BROWSER_NAVIGATED,
+        WebAgentEventType.AGENT_STEP,
+        WebAgentEventType.AGENT_OBSERVED,
+        WebAgentEventType.AGENT_REASONED,
+        WebAgentEventType.AGENT_EXTRACTED,
+        WebAgentEventType.BROWSER_ACTION_STARTED,
+        WebAgentEventType.BROWSER_ACTION_COMPLETED,
+        WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
+        WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
+        WebAgentEventType.AGENT_WAITING,
+        WebAgentEventType.BROWSER_NETWORK_WAITING,
+        WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
+        WebAgentEventType.TASK_VALIDATED,
       ].map((eventType) => ({
         eventType,
         count: emitter.listenerCount(eventType),
@@ -588,7 +588,7 @@ describe("ConsoleLogger", () => {
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.TASK_START,
+        type: WebAgentEventType.TASK_STARTED,
         data: eventData,
       });
 

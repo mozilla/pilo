@@ -161,11 +161,10 @@ export class WebAgent {
   private currentPage: { url: string; title: string } = { url: "", title: "" };
 
   // === Validation Patterns ===
-  /** Regex for valid aria reference format (s<number>e<number>) */
-  private readonly ARIA_REF_REGEX = /^s\d+e\d+$/;
+  // No regex patterns needed - we just check if refs exist in the page snapshot
 
-  /** Regex to extract aria references from malformed input for auto-correction */
-  private readonly ARIA_REF_EXTRACT_REGEX = /\b(s\d+e\d+)\b/;
+  /** Current page snapshot for ref validation */
+  private currentPageSnapshot: string = "";
 
   /**
    * Initialize WebAgent with browser interface and configuration options
@@ -271,12 +270,11 @@ export class WebAgent {
   }
 
   /**
-   * Validates aria reference format and attempts to auto-correct common issues
+   * Validates aria reference by checking if it exists in the current page snapshot
    */
   protected validateAriaRef(ref: string): {
     isValid: boolean;
     error?: string;
-    correctedRef?: string;
   } {
     if (!ref?.trim()) {
       return { isValid: false, error: "Aria ref cannot be empty" };
@@ -284,33 +282,29 @@ export class WebAgent {
 
     const trimmedRef = ref.trim();
 
-    // Check if it's already in the correct format (s<number>e<number>)
-    if (this.ARIA_REF_REGEX.test(trimmedRef)) {
-      return { isValid: true };
+    // We must have a page snapshot to validate refs
+    if (!this.currentPageSnapshot) {
+      return { isValid: false, error: "Cannot validate ref: no page snapshot available" };
     }
 
-    // Try to extract a valid ref from the input (auto-correction)
-    const match = trimmedRef.match(this.ARIA_REF_EXTRACT_REGEX);
-    if (match?.[1]) {
-      return {
-        isValid: true,
-        correctedRef: match[1],
-      };
+    // Check if the ref exists in the page snapshot (new format only)
+    const refExists = this.currentPageSnapshot.includes(`[ref=${trimmedRef}]`);
+
+    if (refExists) {
+      return { isValid: true };
     }
 
     return {
       isValid: false,
-      error: `Invalid aria ref format "${trimmedRef}". Expected: s<number>e<number> (e.g., s1e23)`,
+      error: `Reference "${trimmedRef}" not found on current page. Please use a valid ref from the page snapshot.`,
     };
   }
 
   protected validateActionResponse(response: any): {
     isValid: boolean;
     errors: string[];
-    correctedResponse?: any;
   } {
     const errors: string[] = [];
-    const correctedResponse = { ...response };
 
     // Validate required top-level fields
     this.validateRequiredStringField(response, "currentStep", errors);
@@ -331,13 +325,12 @@ export class WebAgent {
     }
 
     // Validate action object structure
-    const actionErrors = this.validateActionObject(response.action, correctedResponse);
+    const actionErrors = this.validateActionObject(response.action);
     errors.push(...actionErrors);
 
     return {
       isValid: errors.length === 0,
       errors,
-      correctedResponse: errors.length === 0 ? correctedResponse : undefined,
     };
   }
 
@@ -354,7 +347,7 @@ export class WebAgent {
   /**
    * Validates the action object structure and requirements
    */
-  private validateActionObject(action: any, correctedResponse: any): string[] {
+  private validateActionObject(action: any): string[] {
     const errors: string[] = [];
 
     // Validate action type
@@ -396,11 +389,9 @@ export class WebAgent {
       if (!action.ref || typeof action.ref !== "string") {
         errors.push(`Action "${actionType}" requires a "ref" field`);
       } else {
-        const { isValid, error, correctedRef } = this.validateAriaRef(action.ref);
+        const { isValid, error } = this.validateAriaRef(action.ref);
         if (!isValid && error) {
           errors.push(`Invalid ref for "${actionType}" action: ${error}`);
-        } else if (correctedRef) {
-          correctedResponse.action.ref = correctedRef;
         }
       }
     }
@@ -465,7 +456,7 @@ export class WebAgent {
    * that may have already been recorded elsewhere.
    */
   private emitNavigationEvent(title: string, url: string): void {
-    this.emit(WebAgentEventType.PAGE_NAVIGATION, { title, url });
+    this.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
   }
 
   /**
@@ -505,6 +496,9 @@ export class WebAgent {
    * @returns The validated action to execute
    */
   async generateNextAction(pageSnapshot: string, retryCount = 0): Promise<Action> {
+    // Store the current page snapshot for ref validation
+    this.currentPageSnapshot = pageSnapshot;
+
     // Compress the page snapshot to reduce token usage while preserving essential information
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
 
@@ -516,7 +510,7 @@ export class WebAgent {
       const originalSize = pageSnapshot.length;
       const compressedSize = compressedSnapshot.length;
       const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-      this.emit(WebAgentEventType.DEBUG_COMPRESSION, {
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
         originalSize,
         compressedSize,
         compressionPercent,
@@ -528,7 +522,7 @@ export class WebAgent {
 
     // Debug logging: show full conversation history
     if (this.DEBUG) {
-      this.emit(WebAgentEventType.DEBUG_MESSAGES, { messages: this.messages });
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
     }
 
     // Ask the LLM to analyze the page and decide on the next action
@@ -537,11 +531,11 @@ export class WebAgent {
     );
 
     // Validate the LLM response to ensure it's properly formatted and actionable
-    const { isValid, errors, correctedResponse } = this.validateActionResponse(response);
+    const { isValid, errors } = this.validateActionResponse(response);
 
     if (!isValid) {
       // Emit validation error event for logging
-      this.emit(WebAgentEventType.VALIDATION_ERROR, {
+      this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
         errors,
         retryCount,
         rawResponse: response,
@@ -553,10 +547,6 @@ export class WebAgent {
             retryCount + 1
           } attempts. Errors: ${errors.join(", ")}`,
         );
-      }
-
-      if (correctedResponse) {
-        return correctedResponse;
       }
 
       this.addValidationErrorFeedback(errors, response);
@@ -604,14 +594,14 @@ export class WebAgent {
    * @returns The result of the AI operation
    */
   protected async withThinkingEvents<T>(operation: string, task: () => Promise<T>): Promise<T> {
-    this.emit(WebAgentEventType.THINKING, { status: "start", operation });
+    this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "start", operation });
     try {
       const result = await task();
-      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
       return result;
     } catch (error) {
       // Critical: Always emit 'end' even on errors to prevent UI getting stuck in 'thinking' state
-      this.emit(WebAgentEventType.THINKING, { status: "end", operation });
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
       throw error;
     }
   }
@@ -730,28 +720,28 @@ export class WebAgent {
    * Broadcasts all details of the current action for logging/display
    */
   protected broadcastActionDetails(result: any) {
-    this.emit(WebAgentEventType.CURRENT_STEP, { currentStep: result.currentStep });
+    this.emit(WebAgentEventType.AGENT_STEP, { currentStep: result.currentStep });
 
-    this.emit(WebAgentEventType.OBSERVATION, { observation: result.observation });
-    this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.observationStatusMessage });
+    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: result.observation });
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.observationStatusMessage });
 
     // Only emit extractedData if it exists and has content
     if (result.extractedData && result.extractedData.trim()) {
-      this.emit(WebAgentEventType.EXTRACTED_DATA, { extractedData: result.extractedData });
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
       if (result.extractedDataStatusMessage) {
-        this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.extractedDataStatusMessage });
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: result.extractedDataStatusMessage });
       }
     }
 
-    this.emit(WebAgentEventType.THOUGHT, { thought: result.thought });
+    this.emit(WebAgentEventType.AGENT_REASONED, { thought: result.thought });
 
-    this.emit(WebAgentEventType.ACTION_EXECUTION, {
+    this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
       action: result.action.action,
       ref: result.action.ref || undefined,
       value: result.action.value || undefined,
     });
     if (result.actionStatusMessage) {
-      this.emit(WebAgentEventType.STATUS_MESSAGE, { message: result.actionStatusMessage });
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: result.actionStatusMessage });
     }
   }
 
@@ -815,7 +805,7 @@ export class WebAgent {
       }
       return true;
     } catch (error) {
-      this.emit(WebAgentEventType.ACTION_RESULT, {
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -826,7 +816,7 @@ export class WebAgent {
   private recordActionResult(result: any, actionSuccess: boolean) {
     if (actionSuccess) {
       this.addAssistantMessage(result);
-      this.emit(WebAgentEventType.ACTION_RESULT, { success: true });
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, { success: true });
     } else {
       this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
     }
@@ -834,7 +824,7 @@ export class WebAgent {
 
   // Helper function to wait for a specified number of seconds
   async wait(seconds: number) {
-    this.emit(WebAgentEventType.WAITING, { seconds });
+    this.emit(WebAgentEventType.AGENT_WAITING, { seconds });
 
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   }
@@ -843,7 +833,7 @@ export class WebAgent {
    * Emits the task start event with all initial task information
    */
   private emitTaskStartEvent(task: string) {
-    this.emit(WebAgentEventType.TASK_START, {
+    this.emit(WebAgentEventType.TASK_STARTED, {
       task,
       explanation: this.taskExplanation,
       plan: this.plan,
@@ -858,6 +848,7 @@ export class WebAgent {
     this.messages = [];
     this.data = null;
     this.currentPage = { url: "", title: "" };
+    this.currentPageSnapshot = "";
   }
 
   private formatConversationHistory(): string {
@@ -880,7 +871,7 @@ export class WebAgent {
       ),
     );
 
-    this.emit(WebAgentEventType.TASK_VALIDATION, {
+    this.emit(WebAgentEventType.TASK_VALIDATED, {
       observation: response.observation,
       completionQuality: response.completionQuality,
       feedback: response.feedback,
@@ -981,7 +972,7 @@ export class WebAgent {
 
         // Check if validation shows successful completion
         if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-          this.emit(WebAgentEventType.TASK_COMPLETE, { finalAnswer });
+          this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
           break; // Exit: task completed successfully
         } else {
           // Task marked as done but validation failed

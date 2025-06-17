@@ -1,0 +1,28 @@
+services:
+  spark:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: spark-server
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PW_ENDPOINT=ws://browserless:3000/playwright/chromium
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BROWSER=${BROWSER:-chromium}
+
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: spark-browserless
+    ports:
+      - "3001:3000" # Map browserless port to avoid conflict with spark server
+    environment:
+      - DEBUG=browserless*
+      - MAX_CONCURRENT_SESSIONS=5
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=10
+
+networks:
+  default:
+    name: spark-network
