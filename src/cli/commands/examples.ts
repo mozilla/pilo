@@ -67,9 +67,6 @@ function showAdvancedOptionsExamples(): void {
     `  ${chalk.cyan("spark run")} ${chalk.green('"check my dashboard"')} ${chalk.yellow("--headless --debug")}`,
   );
   console.log(
-    `  ${chalk.cyan("spark run")} ${chalk.green('"mobile test"')} ${chalk.yellow('--device "iPhone 12"')}`,
-  );
-  console.log(
     `  ${chalk.cyan("spark run")} ${chalk.green('"test in Chrome"')} ${chalk.yellow("--browser chrome")}`,
   );
   console.log(

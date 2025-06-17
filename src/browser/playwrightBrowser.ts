@@ -2,10 +2,12 @@ import {
   firefox,
   chromium,
   webkit,
-  devices,
   Browser as PlaywrightOriginalBrowser,
   BrowserContext,
   Page,
+  LaunchOptions,
+  BrowserContextOptions,
+  ConnectOptions,
 } from "playwright";
 import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
@@ -15,6 +17,30 @@ import fetch from "cross-fetch";
 type PageEx = Page & {
   _snapshotForAI: () => Promise<string>;
 };
+
+export interface PlaywrightBrowserOptions {
+  /** Browser type to use (defaults to 'firefox') */
+  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  /** Enable ad blocking using Ghostery's adblocker */
+  blockAds?: boolean;
+  /** Block specific resource types to improve performance */
+  blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
+  /** Playwright endpoint URL to connect to remote browser */
+  pwEndpoint?: string;
+  /** Run browser in headless mode (maps to launchOptions.headless) */
+  headless?: boolean;
+  /** Bypass Content Security Policy (maps to contextOptions.bypassCSP) */
+  bypassCSP?: boolean;
+}
+
+export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
+  /** Playwright browser launch options (passed directly to browser.launch()) */
+  launchOptions?: LaunchOptions;
+  /** Playwright browser context options (passed directly to browser.newContext()) */
+  contextOptions?: BrowserContextOptions;
+  /** Playwright connect options (passed directly to browser.connect()) */
+  connectOptions?: ConnectOptions;
+}
 
 /**
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
@@ -27,104 +53,88 @@ export class PlaywrightBrowser implements AriaBrowser {
   // Default timeouts
   private readonly ACTION_TIMEOUT_MS = 5000; // 5 seconds timeout for interactive actions
 
-  constructor(
-    private options: {
-      headless?: boolean;
-      device?: string;
-      browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
-      bypassCSP?: boolean;
-      blockAds?: boolean;
-      blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
-      pwEndpoint?: string;
-    } = {},
-  ) {}
+  constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {}
+
+  /**
+   * Maps Spark's top-level options into the appropriate Playwright options
+   * Top-level options take precedence over Playwright options
+   */
+  private mapOptionsToPlaywright(): {
+    launchOptions: LaunchOptions;
+    contextOptions: BrowserContextOptions;
+    connectOptions: ConnectOptions;
+  } {
+    const launchOptions: LaunchOptions = {
+      headless: false, // Spark default
+      ...this.options.launchOptions, // User-provided Playwright options
+    };
+
+    const contextOptions: BrowserContextOptions = {
+      bypassCSP: true, // Spark default
+      ...this.options.contextOptions, // User-provided Playwright options
+    };
+
+    const connectOptions: ConnectOptions = {
+      ...this.options.connectOptions, // User-provided Playwright options
+    };
+
+    // Top-level options override Playwright options (clear precedence)
+    if (this.options.headless !== undefined) {
+      launchOptions.headless = this.options.headless;
+    }
+    if (this.options.bypassCSP !== undefined) {
+      contextOptions.bypassCSP = this.options.bypassCSP;
+    }
+
+    return { launchOptions, contextOptions, connectOptions };
+  }
 
   async start(): Promise<void> {
+    if (this.browser) {
+      throw new Error("Browser already started. Call shutdown() first.");
+    }
+
+    // Map all options upfront for clear precedence
+    const { launchOptions, contextOptions, connectOptions } = this.mapOptionsToPlaywright();
+
     // Determine which browser to use
     const browserType = this.options.browser ?? "firefox";
 
-    // Check if we should connect to remote browser
-    if (this.options.pwEndpoint) {
-      switch (browserType) {
-        case "firefox":
-          this.browser = await firefox.connect(this.options.pwEndpoint);
-          break;
-        case "chrome":
-        case "chromium":
-          this.browser = await chromium.connect(this.options.pwEndpoint);
-          break;
-        case "safari":
-        case "webkit":
-          this.browser = await webkit.connect(this.options.pwEndpoint);
-          break;
-        case "edge":
-          // Edge uses the same engine as Chrome/Chromium
-          this.browser = await chromium.connect(this.options.pwEndpoint);
-          break;
-        default:
-          throw new Error(`Unsupported browser: ${browserType}`);
-      }
-    } else {
-      // Launch local browser
-      // Merge constructor options with launch options
-      const mergedOptions = {
-        headless: this.options.headless ?? false,
-      };
+    // Single switch to handle both launch and connect cases
+    switch (browserType) {
+      case "firefox":
+        this.browser = this.options.pwEndpoint
+          ? await firefox.connect(this.options.pwEndpoint, connectOptions)
+          : await firefox.launch(launchOptions);
+        break;
 
-      switch (browserType) {
-        case "firefox":
-          this.browser = await firefox.launch(mergedOptions);
-          break;
-        case "chrome":
-        case "chromium":
-          this.browser = await chromium.launch(mergedOptions);
-          break;
-        case "safari":
-        case "webkit":
-          this.browser = await webkit.launch(mergedOptions);
-          break;
-        case "edge":
-          // Edge uses the same engine as Chrome/Chromium
-          this.browser = await chromium.launch({
-            ...mergedOptions,
-            channel: "msedge",
-          });
-          break;
-        default:
-          throw new Error(`Unsupported browser: ${browserType}`);
-      }
+      case "chrome":
+      case "chromium":
+        this.browser = this.options.pwEndpoint
+          ? await chromium.connect(this.options.pwEndpoint, connectOptions)
+          : await chromium.launch(launchOptions);
+        break;
+
+      case "safari":
+      case "webkit":
+        this.browser = this.options.pwEndpoint
+          ? await webkit.connect(this.options.pwEndpoint, connectOptions)
+          : await webkit.launch(launchOptions);
+        break;
+
+      case "edge":
+        // Edge uses chromium with channel setting
+        this.browser = this.options.pwEndpoint
+          ? await chromium.connect(this.options.pwEndpoint, connectOptions)
+          : await chromium.launch({ ...launchOptions, channel: "msedge" });
+        break;
+
+      default:
+        throw new Error(`Unsupported browser: ${browserType}`);
     }
 
-    // Setup context with device configuration
-    let deviceConfig = {};
-    if (this.options.device) {
-      deviceConfig = devices[this.options.device] || {};
-    } else {
-      // Set default device based on browser
-      switch (browserType) {
-        case "firefox":
-          deviceConfig = devices["Desktop Firefox"] || {};
-          break;
-        case "chrome":
-        case "chromium":
-          deviceConfig = devices["Desktop Chrome"] || {};
-          break;
-        case "safari":
-        case "webkit":
-          deviceConfig = devices["Desktop Safari"] || {};
-          break;
-        case "edge":
-          deviceConfig = devices["Desktop Edge"] || {};
-          break;
-        default:
-          deviceConfig = {};
-      }
-    }
-
-    this.context = await this.browser.newContext({
-      ...deviceConfig,
-      bypassCSP: this.options.bypassCSP ?? true,
-    });
+    // Setup context
+    this.context = await this.browser.newContext(contextOptions);
 
     this.page = await this.context.newPage();
 
@@ -140,43 +150,52 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Set up resource blocking based on options
     if (this.options.blockResources && this.options.blockResources.length > 0) {
       await this.page.route("**/*", async (route) => {
-        const request = route.request();
-        const resourceType = request.resourceType();
+        try {
+          const request = route.request();
+          const resourceType = request.resourceType();
 
-        // Block if the resource type is in the block list
-        if (this.options.blockResources!.includes(resourceType as any)) {
-          await route.abort();
-        } else {
-          await route.continue();
+          // Block if the resource type is in the block list
+          if (this.options.blockResources!.includes(resourceType as any)) {
+            await route.abort();
+          } else {
+            await route.continue();
+          }
+        } catch (error) {
+          // If route handling fails, continue to avoid blocking navigation
+          try {
+            await route.continue();
+          } catch (continueError) {
+            // Route may already be handled, ignore
+          }
         }
       });
     }
   }
 
   async shutdown(): Promise<void> {
-    if (this.browser) await this.browser.close();
-    this.browser = null;
-    this.context = null;
-    this.page = null;
+    try {
+      if (this.browser) {
+        await this.browser.close();
+      }
+    } catch (error) {
+      // Continue with cleanup even if close() fails
+    } finally {
+      this.browser = null;
+      this.context = null;
+      this.page = null;
+    }
   }
 
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     try {
-      console.debug(`🔄 Navigating to: ${url}`);
       // Use "commit" for fastest initial navigation (just waits for document to start loading)
       await this.page.goto(url, {
         waitUntil: "commit",
         timeout: this.ACTION_TIMEOUT_MS,
       });
-      console.debug(`✅ Navigation committed to: ${url}`);
       await this.ensureOptimizedPageLoad();
     } catch (error) {
-      console.error(
-        `❌ Navigation failed to: ${url} - ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -184,17 +203,12 @@ export class PlaywrightBrowser implements AriaBrowser {
   async goBack(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     try {
-      console.debug(`🔄 Navigating back`);
       await this.page.goBack({
         waitUntil: "commit",
         timeout: this.ACTION_TIMEOUT_MS,
       });
-      console.debug(`✅ Back navigation committed`);
       await this.ensureOptimizedPageLoad();
     } catch (error) {
-      console.error(
-        `❌ Back navigation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -202,17 +216,12 @@ export class PlaywrightBrowser implements AriaBrowser {
   async goForward(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     try {
-      console.debug(`🔄 Navigating forward`);
       await this.page.goForward({
         waitUntil: "commit",
         timeout: this.ACTION_TIMEOUT_MS,
       });
-      console.debug(`✅ Forward navigation committed`);
       await this.ensureOptimizedPageLoad();
     } catch (error) {
-      console.error(
-        `❌ Forward navigation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -224,11 +233,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     try {
       // 1. Wait for DOM to be ready - this is critical for interactivity
       await this.page.waitForLoadState("domcontentloaded");
-      console.debug("✅ DOM content loaded successfully");
     } catch (error) {
-      console.error(
-        `❌ DOM content load failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
       // Still continue since we might be able to interact with what's loaded
     }
 
@@ -238,13 +243,8 @@ export class PlaywrightBrowser implements AriaBrowser {
       await this.page.waitForLoadState("load", {
         timeout: this.ACTION_TIMEOUT_MS,
       });
-      console.debug("✅ Page fully loaded");
     } catch (error) {
-      console.debug(
-        `⚠️ Page load timed out after ${this.ACTION_TIMEOUT_MS}ms: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      // Page load timed out - continue anyway
     }
   }
 
@@ -271,19 +271,8 @@ export class PlaywrightBrowser implements AriaBrowser {
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     try {
-      console.debug(
-        `🔄 Waiting for load state: ${state}${
-          options?.timeout ? ` with timeout ${options.timeout}ms` : ""
-        }`,
-      );
       await this.page.waitForLoadState(state, options);
-      console.debug(`✅ Load state "${state}" reached successfully`);
     } catch (error) {
-      console.error(
-        `❌ Failed to reach load state "${state}": ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -292,13 +281,6 @@ export class PlaywrightBrowser implements AriaBrowser {
     if (!this.page) throw new Error("Browser not started");
 
     try {
-      // Log the action being attempted
-      console.debug(
-        `🔄 Performing ${action} action on element with ref=${ref}${
-          value ? ` with value="${value}"` : ""
-        }`,
-      );
-
       // Create a locator for the element
       const locator = this.page.locator(`aria-ref=${ref}`);
 
@@ -306,35 +288,29 @@ export class PlaywrightBrowser implements AriaBrowser {
         // Element interactions
         case PageAction.Click:
           await locator.click({ timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Click successful on ref=${ref}`);
           // Ensure page is usable after click that may cause navigation
           await this.ensureOptimizedPageLoad();
           break;
 
         case PageAction.Hover:
           await locator.hover({ timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Hover successful on ref=${ref}`);
           break;
 
         case PageAction.Fill:
           if (!value) throw new Error("Value required for fill action");
           await locator.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Fill successful on ref=${ref} with value="${value}"`);
           break;
 
         case PageAction.Focus:
           await locator.focus({ timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Focus successful on ref=${ref}`);
           break;
 
         case PageAction.Check:
           await locator.check({ timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Check successful on ref=${ref}`);
           break;
 
         case PageAction.Uncheck:
           await locator.uncheck({ timeout: this.ACTION_TIMEOUT_MS });
-          console.debug(`✅ Uncheck successful on ref=${ref}`);
           break;
 
         case PageAction.Select:
@@ -342,7 +318,6 @@ export class PlaywrightBrowser implements AriaBrowser {
           await locator.selectOption(value, {
             timeout: this.ACTION_TIMEOUT_MS,
           });
-          console.debug(`✅ Select successful on ref=${ref} with value="${value}"`);
           // Forms might trigger page reloads on select
           await this.ensureOptimizedPageLoad();
           break;
@@ -351,14 +326,16 @@ export class PlaywrightBrowser implements AriaBrowser {
         case PageAction.Wait:
           if (!value) throw new Error("Value required for wait action");
           const seconds = parseInt(value, 10);
-          console.debug(`🕒 Waiting for ${seconds} seconds`);
+          if (isNaN(seconds) || seconds < 0) {
+            throw new Error(`Invalid wait time: ${value}. Must be a positive number.`);
+          }
           await this.page.waitForTimeout(seconds * 1000);
-          console.debug(`✅ Wait completed for ${seconds} seconds`);
           break;
 
         case PageAction.Goto:
           if (!value) throw new Error("URL required for goto action");
-          await this.goto(value);
+          if (!value.trim()) throw new Error("URL cannot be empty");
+          await this.goto(value.trim());
           // Note: goto already calls ensureOptimizedPageLoad internally
           break;
 
@@ -375,18 +352,12 @@ export class PlaywrightBrowser implements AriaBrowser {
         case PageAction.Done:
           // This is a no-op in the browser implementation
           // It's handled at a higher level in the automation flow
-          console.debug(`✅ Done action received`);
           break;
 
         default:
           throw new Error(`Unsupported action: ${action}`);
       }
     } catch (error) {
-      console.error(
-        `❌ Failed to perform ${action} action on ref=${ref}${
-          value ? ` with value="${value}"` : ""
-        }: ${error instanceof Error ? error.message : String(error)}`,
-      );
       throw new Error(
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
       );

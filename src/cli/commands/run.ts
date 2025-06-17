@@ -24,11 +24,6 @@ export function createRunCommand(): Command {
     )
     .option("--headless", "Run browser in headless mode", config.get("headless") || false)
     .option("--debug", "Enable debug mode with page snapshots", false)
-    .option(
-      "--device <device>",
-      "Device to emulate (auto-selected based on browser if not specified)",
-      config.get("device"),
-    )
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
@@ -73,12 +68,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create browser instance
     const browser = new PlaywrightBrowser({
-      headless: options.headless,
-      device: options.device,
       browser: options.browser,
       blockAds: options.blockAds,
       blockResources,
       pwEndpoint: options.pwEndpoint,
+      headless: options.headless,
     });
 
     // Create AI provider

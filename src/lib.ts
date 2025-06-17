@@ -8,6 +8,10 @@
 export { WebAgent } from "./webAgent.js";
 export { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 export type { AriaBrowser, PageAction, LoadState } from "./browser/ariaBrowser.js";
+export type {
+  PlaywrightBrowserOptions,
+  ExtendedPlaywrightBrowserOptions,
+} from "./browser/playwrightBrowser.js";
 export type { TaskExecutionResult } from "./webAgent.js";
 export { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 export type {

@@ -73,9 +73,9 @@ spark.post("/run", async (c) => {
 
         // Create browser and agent instances
         const browser = new PlaywrightBrowser({
-          headless: true,
           browser: (process.env.BROWSER as any) || "firefox",
           pwEndpoint: process.env.PW_ENDPOINT,
+          headless: true, // Top-level option (cleaner)
         });
 
         const logger = new StreamLogger(sendEvent);
