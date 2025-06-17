@@ -4,39 +4,31 @@ import { EventEmitter } from "eventemitter3";
  * Enum of all possible event types in the web agent
  */
 export enum WebAgentEventType {
-  // Task events
-  TASK_START = "task:start",
-  TASK_COMPLETE = "task:complete",
+  // Task lifecycle
+  TASK_STARTED = "task:started",
+  TASK_COMPLETED = "task:completed",
+  TASK_VALIDATED = "task:validated",
+  TASK_VALIDATION_ERROR = "task:validation_error",
 
-  // Page events
-  PAGE_NAVIGATION = "page:navigation",
+  // Agent reasoning and status
+  AGENT_STEP = "agent:step",
+  AGENT_OBSERVED = "agent:observed",
+  AGENT_REASONED = "agent:reasoned",
+  AGENT_EXTRACTED = "agent:extracted",
+  AGENT_PROCESSING = "agent:processing",
+  AGENT_STATUS = "agent:status",
+  AGENT_WAITING = "agent:waiting",
 
-  // Agent reasoning events
-  CURRENT_STEP = "agent:current_step",
-  OBSERVATION = "agent:observation",
-  THOUGHT = "agent:thought",
-  EXTRACTED_DATA = "agent:extracted_data",
-  THINKING = "agent:thinking",
+  // Browser operations
+  BROWSER_ACTION_STARTED = "browser:action_started",
+  BROWSER_ACTION_COMPLETED = "browser:action_completed",
+  BROWSER_NAVIGATED = "browser:navigated",
+  BROWSER_NETWORK_WAITING = "browser:network_waiting",
+  BROWSER_NETWORK_TIMEOUT = "browser:network_timeout",
 
-  // Action events
-  ACTION_EXECUTION = "action:execution",
-  ACTION_RESULT = "action:result",
-
-  // Debug events
-  DEBUG_COMPRESSION = "debug:compression",
-  DEBUG_MESSAGES = "debug:messages",
-
-  // Validation events
-  VALIDATION_ERROR = "validation:error",
-
-  // Waiting events
-  WAITING = "system:waiting",
-  NETWORK_WAITING = "system:network_waiting",
-  NETWORK_TIMEOUT = "system:network_timeout",
-  TASK_VALIDATION = "task:validation",
-
-  // Status events
-  STATUS_MESSAGE = "status:message",
+  // System/Debug
+  SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
+  SYSTEM_DEBUG_MESSAGE = "system:debug_message",
 }
 
 /**
@@ -191,32 +183,41 @@ export interface StatusMessageEventData extends WebAgentEventData {
  * Union type of all event data types
  */
 export type WebAgentEvent =
-  | { type: WebAgentEventType.TASK_START; data: TaskStartEventData }
-  | { type: WebAgentEventType.TASK_COMPLETE; data: TaskCompleteEventData }
-  | { type: WebAgentEventType.PAGE_NAVIGATION; data: PageNavigationEventData }
-  | { type: WebAgentEventType.CURRENT_STEP; data: CurrentStepEventData }
-  | { type: WebAgentEventType.OBSERVATION; data: ObservationEventData }
-  | { type: WebAgentEventType.THOUGHT; data: ThoughtEventData }
-  | { type: WebAgentEventType.EXTRACTED_DATA; data: ExtractedDataEventData }
-  | { type: WebAgentEventType.THINKING; data: ThinkingEventData }
-  | { type: WebAgentEventType.ACTION_EXECUTION; data: ActionExecutionEventData }
-  | { type: WebAgentEventType.ACTION_RESULT; data: ActionResultEventData }
-  | {
-      type: WebAgentEventType.DEBUG_COMPRESSION;
-      data: CompressionDebugEventData;
-    }
-  | { type: WebAgentEventType.DEBUG_MESSAGES; data: MessagesDebugEventData }
-  | { type: WebAgentEventType.WAITING; data: WaitingEventData }
-  | { type: WebAgentEventType.NETWORK_WAITING; data: NetworkWaitingEventData }
-  | { type: WebAgentEventType.NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
-  | { type: WebAgentEventType.TASK_VALIDATION; data: TaskValidationEventData }
-  | { type: WebAgentEventType.VALIDATION_ERROR; data: ValidationErrorEventData }
-  | { type: WebAgentEventType.STATUS_MESSAGE; data: StatusMessageEventData };
+  | { type: WebAgentEventType.TASK_STARTED; data: TaskStartEventData }
+  | { type: WebAgentEventType.TASK_COMPLETED; data: TaskCompleteEventData }
+  | { type: WebAgentEventType.TASK_VALIDATED; data: TaskValidationEventData }
+  | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
+  | { type: WebAgentEventType.AGENT_STEP; data: CurrentStepEventData }
+  | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
+  | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }
+  | { type: WebAgentEventType.AGENT_EXTRACTED; data: ExtractedDataEventData }
+  | { type: WebAgentEventType.AGENT_PROCESSING; data: ThinkingEventData }
+  | { type: WebAgentEventType.AGENT_STATUS; data: StatusMessageEventData }
+  | { type: WebAgentEventType.AGENT_WAITING; data: WaitingEventData }
+  | { type: WebAgentEventType.BROWSER_ACTION_STARTED; data: ActionExecutionEventData }
+  | { type: WebAgentEventType.BROWSER_ACTION_COMPLETED; data: ActionResultEventData }
+  | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
+  | { type: WebAgentEventType.BROWSER_NETWORK_WAITING; data: NetworkWaitingEventData }
+  | { type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };
 
 /**
  * Event emitter for WebAgent events
  */
 export class WebAgentEventEmitter extends EventEmitter {
+  /**
+   * Override emit to also trigger wildcard listeners
+   */
+  emit(event: string | symbol, ...args: any[]): boolean {
+    const result = super.emit(event, ...args);
+    // Also emit to wildcard listeners if this isn't already a wildcard event
+    if (event !== "*") {
+      super.emit("*", event, ...args);
+    }
+    return result;
+  }
+
   /**
    * Emit a WebAgent event
    */

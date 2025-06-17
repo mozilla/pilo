@@ -35,6 +35,7 @@ export function createRunCommand(): Command {
       "Comma-separated list of resources to block",
       config.get("block_resources") || "media,manifest",
     )
+    .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
     .action(executeRunCommand);
 }
 
@@ -77,6 +78,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       browser: options.browser,
       blockAds: options.blockAds,
       blockResources,
+      pwEndpoint: options.pwEndpoint,
     });
 
     // Create AI provider
@@ -92,6 +94,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
     console.log(chalk.gray(`Task: ${task}`));
     console.log(chalk.gray(`Browser: ${options.browser}`));
+    if (options.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${options.pwEndpoint}`));
     if (options.url) console.log(chalk.gray(`Starting URL: ${options.url}`));
     if (data) console.log(chalk.gray(`Data: ${JSON.stringify(data)}`));
     if (options.guardrails) console.log(chalk.gray(`Guardrails: ${options.guardrails}`));
