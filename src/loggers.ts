@@ -17,7 +17,8 @@ import type {
   ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
-  ThinkingEventData,
+  ProcessingEventData,
+  ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
 
@@ -95,13 +96,14 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
+    emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
     emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
     emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
     emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
     emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
-    emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+    emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
     emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
     emitter.onEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
@@ -125,13 +127,17 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
+      this.emitter.offEvent(
+        WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+        this.handleScreenshotCaptured,
+      );
 
       // Agent reasoning events
       this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
       this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
       this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
       this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
-      this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+      this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
       this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
       this.emitter.offEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
@@ -273,9 +279,15 @@ export class ConsoleLogger implements Logger {
     console.log(chalk.gray(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`));
   };
 
-  private handleThinking = (data: ThinkingEventData): void => {
+  private handleScreenshotCaptured = (data: ScreenshotCapturedEventData): void => {
+    const sizeKB = Math.round(data.size / 1024);
+    console.log(chalk.gray(`   📸 Screenshot captured (${sizeKB}KB ${data.format.toUpperCase()})`));
+  };
+
+  private handleProcessing = (data: ProcessingEventData): void => {
     if (data.status === "start") {
-      console.log(chalk.cyan.bold(`\n🧮 Agent Processing: ${data.operation}...`));
+      const visionIndicator = data.hasScreenshot ? "👁️ " : "";
+      console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
     }
   };
 

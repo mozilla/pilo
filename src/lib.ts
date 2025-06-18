@@ -12,7 +12,7 @@ export type {
   PlaywrightBrowserOptions,
   ExtendedPlaywrightBrowserOptions,
 } from "./browser/playwrightBrowser.js";
-export type { TaskExecutionResult } from "./webAgent.js";
+export type { TaskExecutionResult, WebAgentOptions } from "./webAgent.js";
 export { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 export type {
   WebAgentEvent,
@@ -23,7 +23,7 @@ export type {
   ObservationEventData,
   ThoughtEventData,
   ExtractedDataEventData,
-  ThinkingEventData,
+  ProcessingEventData,
   ActionExecutionEventData,
   ActionResultEventData,
   TaskValidationEventData,
@@ -31,6 +31,7 @@ export type {
   WaitingEventData,
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
+  ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
 export { ConsoleLogger, GenericLogger } from "./loggers.js";

@@ -78,6 +78,9 @@ export interface WebAgentOptions {
   /** Enable debug mode with additional logging */
   debug?: boolean;
 
+  /** Enable vision capabilities to include screenshots */
+  vision?: boolean;
+
   /** AI Provider to use for LLM requests (required) */
   provider: LanguageModel;
 
@@ -126,6 +129,9 @@ export class WebAgent {
 
   /** Debug mode flag for additional logging */
   private DEBUG = false;
+
+  /** Vision mode flag for including screenshots */
+  private vision = false;
 
   /** Optional guardrails to constrain agent behavior */
   private guardrails: string | null = null;
@@ -178,6 +184,7 @@ export class WebAgent {
   ) {
     // Initialize configuration from options with sensible defaults
     this.DEBUG = options.debug || false;
+    this.vision = options.vision || false;
     this.provider = options.provider;
     this.guardrails = options.guardrails || null;
     this.maxValidationAttempts = options.maxValidationAttempts || 3;
@@ -518,7 +525,7 @@ export class WebAgent {
     }
 
     // Add the current page snapshot to the conversation for LLM context
-    this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
+    await this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
 
     // Debug logging: show full conversation history
     if (this.DEBUG) {
@@ -526,8 +533,10 @@ export class WebAgent {
     }
 
     // Ask the LLM to analyze the page and decide on the next action
-    const response = await this.withThinkingEvents("Planning next action", () =>
-      this.generateAIResponse<Action>(actionSchema, undefined, this.messages),
+    const response = await this.withProcessingEvents(
+      "Planning next action",
+      () => this.generateAIResponse<Action>(actionSchema, undefined, this.messages),
+      this.vision,
     );
 
     // Validate the LLM response to ensure it's properly formatted and actionable
@@ -582,26 +591,31 @@ export class WebAgent {
   }
 
   /**
-   * Helper to emit thinking start/end events around AI operations
+   * Helper to emit processing start/end events around AI operations
    *
    * This wrapper ensures we always emit both start and end events, even if the AI operation
-   * fails. This is important for UI consistency - users need to know when thinking has stopped.
+   * fails. This is important for UI consistency - users need to know when processing has stopped.
    *
    * Design pattern: Using higher-order function to guarantee paired events
    *
-   * @param operation - Human-readable description of what the AI is thinking about
+   * @param operation - Human-readable description of what the AI is processing
    * @param task - The async AI operation to execute
+   * @param hasScreenshot - Whether this processing includes screenshot data
    * @returns The result of the AI operation
    */
-  protected async withThinkingEvents<T>(operation: string, task: () => Promise<T>): Promise<T> {
-    this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "start", operation });
+  protected async withProcessingEvents<T>(
+    operation: string,
+    task: () => Promise<T>,
+    hasScreenshot?: boolean,
+  ): Promise<T> {
+    this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "start", operation, hasScreenshot });
     try {
       const result = await task();
-      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation, hasScreenshot });
       return result;
     } catch (error) {
-      // Critical: Always emit 'end' even on errors to prevent UI getting stuck in 'thinking' state
-      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation });
+      // Critical: Always emit 'end' even on errors to prevent UI getting stuck in 'processing' state
+      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation, hasScreenshot });
       throw error;
     }
   }
@@ -690,24 +704,89 @@ export class WebAgent {
 
   private truncateSnapshotsInMessages(messages: any[]): any[] {
     return messages.map((msg) => {
-      if (msg.role === "user" && msg.content.includes("snapshot") && msg.content.includes("```")) {
-        return {
-          ...msg,
-          content: msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
-        };
+      if (msg.role === "user") {
+        // Handle text-only messages
+        if (
+          typeof msg.content === "string" &&
+          msg.content.includes("snapshot") &&
+          msg.content.includes("```")
+        ) {
+          return {
+            ...msg,
+            content: msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
+          };
+        }
+        // Handle multimodal messages (text + image)
+        if (Array.isArray(msg.content)) {
+          return {
+            ...msg,
+            content: msg.content.map((item: any) => {
+              if (
+                item.type === "text" &&
+                item.text.includes("snapshot") &&
+                item.text.includes("```")
+              ) {
+                return {
+                  ...item,
+                  text: item.text.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
+                };
+              }
+              if (item.type === "image") {
+                return {
+                  type: "text",
+                  text: "[screenshot clipped for length]",
+                };
+              }
+              return item;
+            }),
+          };
+        }
       }
       return msg;
     });
   }
 
-  private updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
+  private async updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
     // Clip old snapshots from existing messages
     this.messages = this.truncateSnapshotsInMessages(this.messages);
 
-    this.messages.push({
-      role: "user",
-      content: buildPageSnapshotPrompt(pageTitle, pageUrl, snapshot),
-    });
+    const textContent = buildPageSnapshotPrompt(pageTitle, pageUrl, snapshot, this.vision);
+
+    if (this.vision) {
+      try {
+        const screenshot = await this.browser.getScreenshot();
+        this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
+          size: screenshot.length,
+          format: "jpeg" as const,
+        });
+        this.messages.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: textContent,
+            },
+            {
+              type: "image",
+              image: screenshot,
+              mimeType: "image/jpeg",
+            },
+          ],
+        });
+      } catch (error) {
+        // If screenshot fails, fall back to text-only
+        console.warn("Screenshot capture failed, falling back to text-only:", error);
+        this.messages.push({
+          role: "user",
+          content: textContent,
+        });
+      }
+    } else {
+      this.messages.push({
+        role: "user",
+        content: textContent,
+      });
+    }
   }
 
   private addValidationErrorFeedback(errors: string[], response: any) {
@@ -855,7 +934,18 @@ export class WebAgent {
     // Clip snapshots for validation - we don't need massive page content for validation
     const clippedMessages = this.truncateSnapshotsInMessages(this.messages);
 
-    return clippedMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n");
+    return clippedMessages
+      .map((msg) => {
+        let content = msg.content;
+        // Handle multimodal content by extracting text parts
+        if (Array.isArray(content)) {
+          content = content
+            .map((item: any) => (item.type === "text" ? item.text : `[${item.type}]`))
+            .join(" ");
+        }
+        return `${msg.role}: ${content}`;
+      })
+      .join("\n\n");
   }
 
   protected async validateTaskCompletion(
@@ -864,7 +954,7 @@ export class WebAgent {
   ): Promise<TaskValidationResult> {
     const conversationHistory = this.formatConversationHistory();
 
-    const response = await this.withThinkingEvents("Validating task completion", () =>
+    const response = await this.withProcessingEvents("Validating task completion", () =>
       this.generateAIResponse<TaskValidationResult>(
         taskValidationSchema,
         buildTaskValidationPrompt(task, finalAnswer, conversationHistory),

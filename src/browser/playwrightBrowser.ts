@@ -237,7 +237,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       // Still continue since we might be able to interact with what's loaded
     }
 
-    // 2. Try to wait for full load, but cap at 5 seconds
+    // 2. Try to wait for full load, but cap at 10 seconds
     // We catch and ignore timeout errors since the page is usable after domcontentloaded
     try {
       await this.page.waitForLoadState("load", {
@@ -246,6 +246,9 @@ export class PlaywrightBrowser implements AriaBrowser {
     } catch (error) {
       // Page load timed out - continue anyway
     }
+
+    // 3. Wait 1 second for page to settle (animations, dynamic content, etc.)
+    await this.page.waitForTimeout(1000);
   }
 
   async getUrl(): Promise<string> {
@@ -265,7 +268,12 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getScreenshot(): Promise<Buffer> {
     if (!this.page) throw new Error("Browser not started");
-    return await this.page.screenshot();
+    return await this.page.screenshot({
+      fullPage: true,
+      type: "jpeg",
+      quality: 80,
+      scale: "css",
+    });
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {

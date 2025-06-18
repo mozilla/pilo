@@ -17,7 +17,8 @@ import type {
   WaitingEventData,
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
-  ThinkingEventData,
+  ProcessingEventData,
+  ScreenshotCapturedEventData,
 } from "../src/events.js";
 
 // Mock console methods
@@ -489,11 +490,30 @@ describe("ConsoleLogger", () => {
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("Network Timeout");
     });
+
+    it("should handle SCREENSHOT_CAPTURED events", () => {
+      const eventData: ScreenshotCapturedEventData = {
+        timestamp: Date.now(),
+        size: 51200, // 50KB in bytes
+        format: "jpeg",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Screenshot captured");
+      expect(allOutput).toContain("50KB");
+      expect(allOutput).toContain("JPEG");
+    });
   });
 
-  describe("Thinking events", () => {
-    it("should handle THINKING start events", () => {
-      const eventData: ThinkingEventData = {
+  describe("Processing events", () => {
+    it("should handle PROCESSING start events", () => {
+      const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         status: "start",
         operation: "Planning next action",
@@ -508,10 +528,31 @@ describe("ConsoleLogger", () => {
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("Planning next action");
       expect(allOutput).toContain("🧮");
+      expect(allOutput).not.toContain("👁️");
     });
 
-    it("should not log THINKING end events", () => {
-      const eventData: ThinkingEventData = {
+    it("should handle PROCESSING start events with vision", () => {
+      const eventData: ProcessingEventData = {
+        timestamp: Date.now(),
+        status: "start",
+        operation: "Planning next action",
+        hasScreenshot: true,
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AGENT_PROCESSING,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Planning next action");
+      expect(allOutput).toContain("🧮");
+      expect(allOutput).toContain("👁️");
+    });
+
+    it("should not log PROCESSING end events", () => {
+      const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         status: "end",
         operation: "Planning next action",
