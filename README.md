@@ -39,6 +39,7 @@ spark run "search hotels in Tokyo" --guardrails "browse only, don't book anythin
 - 🤖 **Natural Language Control**: Just describe what you want to do in plain English
 - 🎯 **Smart Navigation**: Automatically finds and interacts with the right page elements
 - 🔍 **Intelligent Planning**: Breaks down complex tasks into actionable steps
+- 👁️ **Vision Capabilities**: AI can see full-page screenshots to better understand layouts
 - 🌐 **Multi-Browser Support**: Works with Firefox, Chrome, Safari, and Edge
 - 🛡️ **Safety First**: Provide guardrails to prevent unintended actions
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
@@ -74,6 +75,7 @@ spark run "<task description>" [options]
 - `--browser <name>` - Browser choice (firefox, chrome, safari, edge)
 - `--headless` - Run without visible browser window
 - `--debug` - Show detailed logs and page snapshots
+- `--vision` - Enable vision capabilities with full-page screenshots
 
 **Configuration:**
 
@@ -94,6 +96,7 @@ const provider = openai("gpt-4.1");
 
 const agent = new WebAgent(browser, {
   provider,
+  vision: true, // Enable screenshots for better visual understanding
   guardrails: "Do not make purchases",
 });
 
@@ -166,6 +169,9 @@ spark run "get daily stock prices" --headless --browser firefox
 # Debug mode
 spark run "complex automation task" --debug
 
+# Vision mode for complex visual layouts
+spark run "fill out complex form" --vision
+
 # Combined options
 spark run "test signup flow" \
   --url https://app.com \
@@ -229,6 +235,7 @@ const provider = openai("gpt-4.1");
 
 const agent = new WebAgent(browser, {
   provider,
+  vision: true, // Enable screenshots for better visual understanding
   guardrails: "Do not make purchases",
 });
 
