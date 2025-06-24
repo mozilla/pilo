@@ -1551,14 +1551,14 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("Thinking events wrapper", () => {
-    it("should emit thinking start and end events around task execution", async () => {
+  describe("Processing events wrapper", () => {
+    it("should emit processing start and end events around task execution", async () => {
       const eventSpy = vi.fn();
       webAgent["eventEmitter"].on(WebAgentEventType.AGENT_PROCESSING, eventSpy);
 
       const mockTask = vi.fn().mockResolvedValue("test result");
 
-      const result = await webAgent["withThinkingEvents"]("Test Operation", mockTask);
+      const result = await webAgent["withProcessingEvents"]("Test Operation", mockTask);
 
       expect(result).toBe("test result");
       expect(mockTask).toHaveBeenCalledOnce();
@@ -1591,7 +1591,7 @@ describe("WebAgent", () => {
 
       const mockTask = vi.fn().mockRejectedValue(new Error("Test error"));
 
-      await expect(webAgent["withThinkingEvents"]("Failed Operation", mockTask)).rejects.toThrow(
+      await expect(webAgent["withProcessingEvents"]("Failed Operation", mockTask)).rejects.toThrow(
         "Test error",
       );
 

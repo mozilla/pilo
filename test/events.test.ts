@@ -130,6 +130,7 @@ describe("WebAgentEventEmitter", () => {
         "browser:navigated",
         "browser:network_waiting",
         "browser:network_timeout",
+        "browser:screenshot_captured",
         "system:debug_compression",
         "system:debug_message",
       ];

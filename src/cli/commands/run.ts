@@ -24,6 +24,7 @@ export function createRunCommand(): Command {
     )
     .option("--headless", "Run browser in headless mode", config.get("headless") || false)
     .option("--debug", "Enable debug mode with page snapshots", false)
+    .option("--vision", "Enable vision capabilities to include screenshots", false)
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
@@ -81,6 +82,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: options.debug,
+      vision: options.vision,
       guardrails: options.guardrails,
       provider: aiProvider,
     });
@@ -92,6 +94,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     if (options.url) console.log(chalk.gray(`Starting URL: ${options.url}`));
     if (data) console.log(chalk.gray(`Data: ${JSON.stringify(data)}`));
     if (options.guardrails) console.log(chalk.gray(`Guardrails: ${options.guardrails}`));
+    if (options.vision) console.log(chalk.gray(`Vision: enabled`));
     console.log("");
 
     // Execute the task

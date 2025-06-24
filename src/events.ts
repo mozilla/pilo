@@ -25,6 +25,7 @@ export enum WebAgentEventType {
   BROWSER_NAVIGATED = "browser:navigated",
   BROWSER_NETWORK_WAITING = "browser:network_waiting",
   BROWSER_NETWORK_TIMEOUT = "browser:network_timeout",
+  BROWSER_SCREENSHOT_CAPTURED = "browser:screenshot_captured",
 
   // System/Debug
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
@@ -92,11 +93,12 @@ export interface ExtractedDataEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for thinking status
+ * Event data for processing status
  */
-export interface ThinkingEventData extends WebAgentEventData {
+export interface ProcessingEventData extends WebAgentEventData {
   status: "start" | "end";
   operation: string;
+  hasScreenshot?: boolean;
 }
 
 /**
@@ -154,6 +156,14 @@ export interface NetworkTimeoutEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for screenshot capture
+ */
+export interface ScreenshotCapturedEventData extends WebAgentEventData {
+  size: number;
+  format: "jpeg" | "png";
+}
+
+/**
  * Event data for task validation
  */
 export interface TaskValidationEventData extends WebAgentEventData {
@@ -191,7 +201,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
   | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }
   | { type: WebAgentEventType.AGENT_EXTRACTED; data: ExtractedDataEventData }
-  | { type: WebAgentEventType.AGENT_PROCESSING; data: ThinkingEventData }
+  | { type: WebAgentEventType.AGENT_PROCESSING; data: ProcessingEventData }
   | { type: WebAgentEventType.AGENT_STATUS; data: StatusMessageEventData }
   | { type: WebAgentEventType.AGENT_WAITING; data: WaitingEventData }
   | { type: WebAgentEventType.BROWSER_ACTION_STARTED; data: ActionExecutionEventData }

@@ -102,6 +102,7 @@ ${hasGuardrails ? "7. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE 
 
 Best Practices:
 - Use click instead of goto whenever possible, especially for navigation elements on the page.
+- Close any open modals or popups that obstruct the task.
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
 ${hasGuardrails ? "- Before taking any action, verify it does not violate the guardrails" : ""}
@@ -155,7 +156,7 @@ export const buildTaskAndPlanPrompt = (
 
 const pageSnapshotTemplate = buildPromptTemplate(
   `
-This is a text snapshot of the current page in the browser.
+This is a text snapshot of the current page in the browser.{{#if hasScreenshot}} A screenshot is also provided to help you understand the visual layout.{{/if}}
 
 Title: {{title}}
 URL: {{url}}
@@ -168,14 +169,21 @@ Assess the current state and choose your next action.
 Focus on the most relevant elements that help complete your task.
 If content appears dynamic or paginated, consider waiting or exploring navigation options.
 If an action has failed twice, try something else or move on.
+{{#if hasScreenshot}}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{{/if}}
 `.trim(),
 );
 
-export const buildPageSnapshotPrompt = (title: string, url: string, snapshot: string) =>
+export const buildPageSnapshotPrompt = (
+  title: string,
+  url: string,
+  snapshot: string,
+  hasScreenshot: boolean = false,
+) =>
   pageSnapshotTemplate({
     title,
     url,
     snapshot,
+    hasScreenshot,
   });
 
 const validationFeedbackTemplate = buildPromptTemplate(
