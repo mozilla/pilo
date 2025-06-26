@@ -32,6 +32,21 @@ export function createRunCommand(): Command {
       config.get("block_resources") || "media,manifest",
     )
     .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option(
+      "--proxy <url>",
+      "Proxy server URL (http://host:port, https://host:port, socks5://host:port)",
+      config.get("proxy"),
+    )
+    .option(
+      "--proxy-username <username>",
+      "Proxy authentication username",
+      config.get("proxy_username"),
+    )
+    .option(
+      "--proxy-password <password>",
+      "Proxy authentication password",
+      config.get("proxy_password"),
+    )
     .action(executeRunCommand);
 }
 
@@ -74,6 +89,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       blockResources,
       pwEndpoint: options.pwEndpoint,
       headless: options.headless,
+      proxyServer: options.proxy,
+      proxyUsername: options.proxyUsername,
+      proxyPassword: options.proxyPassword,
     });
 
     // Create AI provider
@@ -91,6 +109,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     console.log(chalk.gray(`Task: ${task}`));
     console.log(chalk.gray(`Browser: ${options.browser}`));
     if (options.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${options.pwEndpoint}`));
+    if (options.proxy) console.log(chalk.gray(`Proxy: ${options.proxy}`));
     if (options.url) console.log(chalk.gray(`Starting URL: ${options.url}`));
     if (data) console.log(chalk.gray(`Data: ${JSON.stringify(data)}`));
     if (options.guardrails) console.log(chalk.gray(`Guardrails: ${options.guardrails}`));

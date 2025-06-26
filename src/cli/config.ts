@@ -15,6 +15,11 @@ export interface SparkConfig {
   headless?: boolean;
   block_ads?: boolean;
   block_resources?: string;
+
+  // Proxy Configuration
+  proxy?: string;
+  proxy_username?: string;
+  proxy_password?: string;
 }
 
 export class ConfigManager {
@@ -82,6 +87,17 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_BLOCK_RESOURCES && {
         block_resources: process.env.SPARK_BLOCK_RESOURCES,
+      }),
+
+      // Proxy Configuration
+      ...(process.env.SPARK_PROXY && {
+        proxy: process.env.SPARK_PROXY,
+      }),
+      ...(process.env.SPARK_PROXY_USERNAME && {
+        proxy_username: process.env.SPARK_PROXY_USERNAME,
+      }),
+      ...(process.env.SPARK_PROXY_PASSWORD && {
+        proxy_password: process.env.SPARK_PROXY_PASSWORD,
       }),
     };
 
@@ -195,6 +211,11 @@ export class ConfigManager {
     if (process.env.SPARK_HEADLESS) env.headless = process.env.SPARK_HEADLESS === "true";
     if (process.env.SPARK_BLOCK_ADS) env.block_ads = process.env.SPARK_BLOCK_ADS === "true";
     if (process.env.SPARK_BLOCK_RESOURCES) env.block_resources = process.env.SPARK_BLOCK_RESOURCES;
+
+    // Proxy Configuration
+    if (process.env.SPARK_PROXY) env.proxy = process.env.SPARK_PROXY;
+    if (process.env.SPARK_PROXY_USERNAME) env.proxy_username = process.env.SPARK_PROXY_USERNAME;
+    if (process.env.SPARK_PROXY_PASSWORD) env.proxy_password = process.env.SPARK_PROXY_PASSWORD;
 
     const merged = this.getConfig();
 

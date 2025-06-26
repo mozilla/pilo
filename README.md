@@ -76,6 +76,9 @@ spark run "<task description>" [options]
 - `--headless` - Run without visible browser window
 - `--debug` - Show detailed logs and page snapshots
 - `--vision` - Enable vision capabilities with full-page screenshots
+- `--proxy <url>` - Proxy server URL (http://host:port, https://host:port, socks5://host:port)
+- `--proxy-username <username>` - Proxy authentication username
+- `--proxy-password <password>` - Proxy authentication password
 
 **Configuration:**
 
@@ -179,6 +182,28 @@ spark run "test signup flow" \
   --headless \
   --data '{"email":"test@example.com"}' \
   --guardrails "don't complete signup, just test the flow"
+```
+
+### Proxy Configuration
+
+```bash
+# Using an HTTP proxy
+spark run "search for products" --proxy http://proxy.company.com:8080
+
+# Using authenticated proxy
+spark run "access internal site" \
+  --proxy http://proxy.company.com:8080 \
+  --proxy-username myuser \
+  --proxy-password mypass
+
+# Using SOCKS5 proxy
+spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+
+# Environment variables (alternative to CLI options)
+export SPARK_PROXY=http://proxy.company.com:8080
+export SPARK_PROXY_USERNAME=myuser
+export SPARK_PROXY_PASSWORD=mypass
+spark run "task with proxy from env vars"
 ```
 
 ## Configuration

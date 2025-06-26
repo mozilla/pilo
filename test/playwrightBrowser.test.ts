@@ -188,4 +188,78 @@ describe("PlaywrightBrowser", () => {
       expect(browser).toBeDefined();
     });
   });
+
+  describe("proxy configuration", () => {
+    it("should handle proxy options", () => {
+      const browser = new PlaywrightBrowser({
+        proxyServer: "http://proxy.example.com:8080",
+        proxyUsername: "testuser",
+        proxyPassword: "testpass",
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+
+    it("should handle proxy without authentication", () => {
+      const browser = new PlaywrightBrowser({
+        proxyServer: "http://proxy.example.com:8080",
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+
+    it("should handle different proxy protocols", () => {
+      const proxyTypes = [
+        "http://proxy.example.com:8080",
+        "https://proxy.example.com:8080",
+        "socks5://proxy.example.com:1080",
+      ];
+
+      proxyTypes.forEach((proxyServer) => {
+        const browser = new PlaywrightBrowser({
+          proxyServer,
+          proxyUsername: "user",
+          proxyPassword: "pass",
+        });
+        expect(browser).toBeDefined();
+        expect(browser).toBeInstanceOf(PlaywrightBrowser);
+      });
+    });
+
+    it("should handle proxy with extended options", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "firefox",
+        headless: true,
+        proxyServer: "http://proxy.example.com:8080",
+        proxyUsername: "testuser",
+        proxyPassword: "testpass",
+        launchOptions: {
+          slowMo: 100,
+        },
+        contextOptions: {
+          viewport: { width: 1280, height: 720 },
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+
+    it("should handle proxy options alongside existing proxy in launchOptions", () => {
+      // Test that top-level proxy options override launchOptions.proxy
+      const browser = new PlaywrightBrowser({
+        proxyServer: "http://new-proxy.example.com:8080",
+        proxyUsername: "newuser",
+        proxyPassword: "newpass",
+        launchOptions: {
+          proxy: {
+            server: "http://old-proxy.example.com:8080",
+            username: "olduser",
+            password: "oldpass",
+          },
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+  });
 });

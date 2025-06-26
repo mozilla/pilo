@@ -31,6 +31,12 @@ export interface PlaywrightBrowserOptions {
   headless?: boolean;
   /** Bypass Content Security Policy (maps to contextOptions.bypassCSP) */
   bypassCSP?: boolean;
+  /** Proxy server URL (http://host:port, https://host:port, socks5://host:port) */
+  proxyServer?: string;
+  /** Proxy authentication username */
+  proxyUsername?: string;
+  /** Proxy authentication password */
+  proxyPassword?: string;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -84,6 +90,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
     if (this.options.bypassCSP !== undefined) {
       contextOptions.bypassCSP = this.options.bypassCSP;
+    }
+    if (this.options.proxyServer) {
+      launchOptions.proxy = {
+        server: this.options.proxyServer,
+        ...(this.options.proxyUsername && { username: this.options.proxyUsername }),
+        ...(this.options.proxyPassword && { password: this.options.proxyPassword }),
+      };
     }
 
     return { launchOptions, contextOptions, connectOptions };
