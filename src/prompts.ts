@@ -26,7 +26,9 @@ Best Practices:
 {{#if startingUrl}}- Use the provided starting URL as your starting point for the task.{{/if}}
 {{#if guardrails}}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{{/if}}
 
-Respond with a JSON object matching this structure:
+IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+
+Respond with a JSON object matching this exact structure:
 \`\`\`json
 {
   "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
@@ -107,7 +109,9 @@ Best Practices:
 - If an element isn't found, try looking for alternative elements
 ${hasGuardrails ? "- Before taking any action, verify it does not violate the guardrails" : ""}
 
-Respond with a JSON object matching this structure:
+IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+
+Respond with a JSON object matching this exact structure:
 \`\`\`json
 ${actionLoopResponseFormatTemplate({ hasGuardrails })}
 \`\`\`
@@ -246,7 +250,9 @@ Evaluation criteria:
 4. Was the approach reasonable and efficient?
 5. Are there any significant errors or omissions?
 
-Respond with a JSON object matching this structure:
+IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+
+Respond with a JSON object matching this exact structure:
 \`\`\`json
 {
   "observation": "Analyze how the agent approached the task: sequence of actions taken, appropriateness of actions, reasoning quality, and whether the agent worked efficiently toward the goal or got sidetracked.",
