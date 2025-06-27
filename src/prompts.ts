@@ -62,15 +62,15 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 
 const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
-  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Note the type of data you should extract from the page to complete the task.",
+  "extractedData": "REQUIRED: You MUST extract relevant data from this page. Look for ANY information that helps with the task: search results, product names, prices, features, ratings, links, sources, etc. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items. Only use 'There's nothing useful on this page.' if the page is completely broken, blank, or contains absolutely zero task-related content.",
+  "extractedDataStatusMessage": "REQUIRED: Always provide a short, friendly message (3-8 words) about what data was found or why none was extracted. Examples: 'Flight options noted', 'Product details saved', 'Search results ready', 'No relevant data found'",
+  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Comment on any important data that should be extracted from the current page state.",
   "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
-  "extractedData": "OPTIONAL: Only extract important data from the page that is needed to complete the task. This shouldn't include any element refs. Use markdown to structure this data clearly. Omit this field if no relevant data needs extraction.",
-  "extractedDataStatusMessage": "CONDITIONAL: Required if extractedData is present. Short, friendly message (3-8 words) about what data was found. Examples: 'Flight options noted', 'Product details saved', 'Search results ready'",
-  "thought": "Reasoning for your next action.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
+  "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
   "action": {
     "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, wait, goto, back, forward, done",
     "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
-    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, final result for done"
+    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, final answer for done"
   },
   "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
 }`);
@@ -93,16 +93,17 @@ Actions:
 - "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
 - "back": Go to previous page
 - "forward": Go to next page
-- "done": Task is complete (value=final result)
+- "done": The ENTIRE task is complete - ONLY use when you have fully completed the task and are ready to provide a comprehensive final answer that synthesizes ALL the data you extracted during this session. This is NOT for marking individual steps complete.
 
 Rules:
 1. Use refs from page snapshot (e.g., [ref=s1e33])
 2. Perform only one action per step
 3. After each action, you'll receive an updated page snapshot
-4. For "done", include the final result in value
-5. Use "wait" for page loads, animations, or dynamic content
-6. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
-${hasGuardrails ? "7. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION" : ""}
+4. You MUST complete ALL steps in your plan before using "done" - continue working through each step
+5. "done" means the ENTIRE task is finished - see FINAL ANSWER REQUIREMENTS below
+6. Use "wait" for page loads, animations, or dynamic content
+7. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
+${hasGuardrails ? "8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION" : ""}
 
 Best Practices:
 - You can see the entire page content - do not scroll or click links just to navigate within the page
@@ -112,6 +113,14 @@ Best Practices:
 - If an element isn't found, try looking for alternative elements
 - Focus on direct interaction with elements needed for your task
 ${hasGuardrails ? "- Before taking any action, verify it does not violate the guardrails" : ""}
+
+**FINAL ANSWER REQUIREMENTS (for "done" action):**
+When you use the "done" action, your value field MUST contain a comprehensive final answer that:
+- Synthesizes ALL data you extracted during this session
+- Uses ONLY information you actually found and recorded on the pages you visited
+- Provides clear results based on the data you collected
+- Includes relevant details from your web interactions and observations
+- Does NOT include external knowledge or assumptions beyond what you found during the task
 
 IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
 
@@ -209,13 +218,13 @@ Please correct your response to match this exact format:
 Remember:
 - "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
 - "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "extractedDataStatusMessage" is REQUIRED if "extractedData" is present
+- "extractedData" is REQUIRED - you MUST find and extract relevant information from every page. Use "There's nothing useful on this page." only if the page is completely broken or blank
+- "extractedDataStatusMessage" is REQUIRED - always provide a status message about data extraction
 - For "select", "fill", "click", "hover", "check", "uncheck" actions, you MUST provide a "ref"
 - For "fill", "select", "goto" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds
-- For "done" action, you MUST provide a "value" with the final result
+- For "done" action, you MUST provide a "value" following the FINAL ANSWER REQUIREMENTS
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
-- "extractedData" is optional - only include if there's relevant data to extract
 {{#if hasGuardrails}}
 - ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {{/if}}
