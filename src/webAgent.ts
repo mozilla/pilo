@@ -378,6 +378,7 @@ export class WebAgent {
       PageAction.Check,
       PageAction.Uncheck,
       PageAction.Select,
+      PageAction.Enter,
     ];
     const actionsRequiringValue = [
       PageAction.Fill,
@@ -1051,30 +1052,30 @@ export class WebAgent {
         // Broadcast the AI's reasoning and planned action for logging
         this.broadcastActionDetails(result);
 
-      // === TASK COMPLETION HANDLING ===
-      // If AI says task is done, validate the completion quality
-      if (result.action.action === "done") {
-        finalAnswer = result.action.value!; // validateActionResponse ensures this exists
-        const validationResult = await this.validateTaskCompletion(task, finalAnswer);
-        lastValidationResult = validationResult;
-        validationAttempts++;
+        // === TASK COMPLETION HANDLING ===
+        // If AI says task is done, validate the completion quality
+        if (result.action.action === "done") {
+          finalAnswer = result.action.value!; // validateActionResponse ensures this exists
+          const validationResult = await this.validateTaskCompletion(task, finalAnswer);
+          lastValidationResult = validationResult;
+          validationAttempts++;
 
-        // Check if validation shows successful completion
-        if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-          this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
-          break; // Exit: task completed successfully
-        } else {
-          // Task marked as done but validation failed
-          if (validationAttempts >= this.maxValidationAttempts) {
-            break; // Exit: max validation attempts reached, give up
+          // Check if validation shows successful completion
+          if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
+            this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
+            break; // Exit: task completed successfully
+          } else {
+            // Task marked as done but validation failed
+            if (validationAttempts >= this.maxValidationAttempts) {
+              break; // Exit: max validation attempts reached, give up
+            }
+
+            // Give AI feedback about what went wrong and try again
+            this.addTaskRetryFeedback(result, validationResult);
+            finalAnswer = null; // Reset for next attempt
+            continue; // Continue loop for retry
           }
-
-          // Give AI feedback about what went wrong and try again
-          this.addTaskRetryFeedback(result, validationResult);
-          finalAnswer = null; // Reset for next attempt
-          continue; // Continue loop for retry
         }
-      }
 
         // === ACTION EXECUTION ===
         // Execute the action on the browser (click, fill, navigate, etc.)

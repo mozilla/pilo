@@ -25,7 +25,8 @@ function createMockActionResponse(overrides: any = {}) {
       currentStep: "Working on step",
       observation: "Page analyzed",
       observationStatusMessage: "Page analyzed",
-      extractedData: "",
+      extractedData: "Page content analyzed for task progress",
+      extractedDataStatusMessage: "Page data extracted",
       thought: "Deciding next action",
       action: {
         action: PageAction.Click,
@@ -328,6 +329,7 @@ describe("WebAgent", () => {
           PageAction.Check,
           PageAction.Uncheck,
           PageAction.Select,
+          PageAction.Enter,
         ];
 
         for (const action of actionsWithRefs) {

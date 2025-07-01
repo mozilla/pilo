@@ -343,6 +343,12 @@ export class PlaywrightBrowser implements AriaBrowser {
           await this.ensureOptimizedPageLoad();
           break;
 
+        case PageAction.Enter:
+          await locator.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
+          // Forms might trigger page reloads on enter
+          await this.ensureOptimizedPageLoad();
+          break;
+
         // Navigation and workflow
         case PageAction.Wait:
           if (!value) throw new Error("Value required for wait action");

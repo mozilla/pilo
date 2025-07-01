@@ -85,7 +85,7 @@ describe("Provider", () => {
     it("should create OpenRouter provider", () => {
       mockConfig.getConfig.mockReturnValue({
         provider: "openrouter",
-        model: "anthropic/claude-3-5-sonnet-20241022",
+        model: "openai/gpt-4.1",
         openrouter_api_key: "sk-or-test123",
       });
 
@@ -181,7 +181,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openrouter",
-        model: "anthropic/claude-3-5-sonnet-20241022",
+        model: "openai/gpt-4.1",
         hasApiKey: true,
         keySource: "global",
       });
@@ -227,7 +227,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openrouter",
-        model: "anthropic/claude-3-5-sonnet-20241022",
+        model: "openai/gpt-4.1",
         hasApiKey: true,
         keySource: "env",
       });

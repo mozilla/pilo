@@ -14,6 +14,7 @@ export enum PageAction {
   Check = "check",
   Uncheck = "uncheck",
   Select = "select",
+  Enter = "enter",
 
   // Navigation and workflow
   Wait = "wait",

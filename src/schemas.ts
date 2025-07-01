@@ -22,11 +22,13 @@ export const actionSchema = z.object({
   observation: z.string().describe("Assessment of previous step outcome"),
   observationStatusMessage: z.string().describe("Short friendly message about observation"),
   thought: z.string().describe("Reasoning for next action"),
-  action: z.object({
-    action: z.nativeEnum(PageAction).describe("Action to perform"),
-    ref: z.string().optional().describe("Element reference when needed"),
-    value: z.string().optional().describe("Value for action when needed"),
-  }).describe("Browser action to execute"),
+  action: z
+    .object({
+      action: z.nativeEnum(PageAction).describe("Action to perform"),
+      ref: z.string().optional().describe("Element reference when needed"),
+      value: z.string().optional().describe("Value for action when needed"),
+    })
+    .describe("Browser action to execute"),
   actionStatusMessage: z.string().describe("Short friendly status about action"),
 });
 
@@ -38,7 +40,9 @@ export type Action = z.infer<typeof actionSchema>;
 // Schema for task validation results
 export const taskValidationSchema = z.object({
   observation: z.string().describe("Analysis of agent's approach and actions"),
-  completionQuality: z.enum(["failed", "partial", "complete", "excellent"]).describe("Quality level of task completion"),
+  completionQuality: z
+    .enum(["failed", "partial", "complete", "excellent"])
+    .describe("Quality level of task completion"),
   feedback: z.string().optional().describe("Actionable guidance for improvement"),
 });
 

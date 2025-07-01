@@ -98,7 +98,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Click the login button",
         observation: "Found the login button on the page",
         observationStatusMessage: "Found login button",
-        extractedData: "",
+        extractedData: "Found login page with username field and login button",
+        extractedDataStatusMessage: "Login page elements found",
         thought: "I need to click the login button to proceed",
         action: {
           action: PageAction.Click,
@@ -119,7 +120,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 2: Fill in username",
         observation: "Found the username field",
         observationStatusMessage: "Found username field",
-        extractedData: "",
+        extractedData: "Login form with username field ready for input",
+        extractedDataStatusMessage: "Username field located",
         thought: "I need to enter the username",
         action: {
           action: PageAction.Fill,
@@ -141,7 +143,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 3: Wait for page load",
         observation: "Page is loading",
         observationStatusMessage: "Page loading detected",
-        extractedData: "",
+        extractedData: "Page showing loading spinner, content not yet fully loaded",
+        extractedDataStatusMessage: "Loading state detected",
         thought: "Need to wait for the page to finish loading",
         action: {
           action: PageAction.Wait,
@@ -184,7 +187,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Navigate to login page",
         observation: "Need to go to the login page",
         observationStatusMessage: "Navigation required",
-        extractedData: "",
+        extractedData: "Current page has login link, need to navigate to login form",
+        extractedDataStatusMessage: "Login navigation identified",
         thought: "I need to navigate to the login URL",
         action: {
           action: PageAction.Goto,
@@ -205,6 +209,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Click the button",
         observation: "Found the button",
         observationStatusMessage: "Found clickable button",
+        extractedData: "Button available for clicking",
+        extractedDataStatusMessage: "Button located",
         thought: "I need to click the button",
         action: {
           action: PageAction.Click,
@@ -253,7 +259,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Go back",
         observation: "Need to go back",
         observationStatusMessage: "Navigation required",
-        extractedData: "",
+        extractedData: "Current page doesn't have needed info, going back",
+        extractedDataStatusMessage: "Navigation decision made",
         thought: "Going back to previous page",
         action: {
           action: PageAction.Back,
@@ -265,7 +272,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 2: Go forward",
         observation: "Need to go forward",
         observationStatusMessage: "Forward navigation needed",
-        extractedData: "",
+        extractedData: "Ready to proceed to next page in workflow",
+        extractedDataStatusMessage: "Forward navigation ready",
         thought: "Going forward to next page",
         action: {
           action: PageAction.Forward,
@@ -285,11 +293,14 @@ describe("schemas", () => {
           currentStep: `Working on: ${actionType}`,
           observation: "Valid observation",
           observationStatusMessage: "Page analyzed",
-          extractedData: "",
+          extractedData: `Data relevant to ${actionType} action`,
+          extractedDataStatusMessage: "Action data found",
           thought: "Valid thought",
           action: {
             action: actionType,
-            ...(["click", "fill", "select", "hover", "check", "uncheck"].includes(actionType) && {
+            ...(["click", "fill", "select", "hover", "check", "uncheck", "enter"].includes(
+              actionType,
+            ) && {
               ref: "s1e23",
             }),
             ...(["fill", "select", "wait", "goto", "done"].includes(actionType) && {
@@ -310,8 +321,7 @@ describe("schemas", () => {
         observation: "Found data",
         observationStatusMessage: "Data found",
         extractedData: "Some important data",
-        // Missing extractedDataStatusMessage - this should still pass schema validation
-        // but the WebAgent validation should catch it
+        extractedDataStatusMessage: "Important data extracted",
         thought: "Processing data",
         action: {
           action: PageAction.Click,
@@ -330,8 +340,8 @@ describe("schemas", () => {
         currentStep: "Working on Step 1",
         observation: "No data found",
         observationStatusMessage: "Page analyzed",
-        extractedData: "",
-        // No extractedDataStatusMessage needed when extractedData is empty
+        extractedData: "No relevant data found on this page",
+        extractedDataStatusMessage: "No data found",
         thought: "Moving on",
         action: {
           action: PageAction.Click,

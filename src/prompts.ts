@@ -68,8 +68,8 @@ const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
   "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
   "action": {
-    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, wait, goto, back, forward, done",
-    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
+    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, done",
+    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
     "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, final answer for done"
   },
   "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
@@ -89,6 +89,7 @@ Actions:
 - "hover": Hover over element (ref=element reference)
 - "check": Check checkbox (ref=element reference)
 - "uncheck": Uncheck checkbox (ref=element reference)
+- "enter": Press Enter key on element (ref=element reference) - useful for submitting forms
 - "wait": Wait for specified time (value=seconds)
 - "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
 - "back": Go to previous page
@@ -220,7 +221,7 @@ Remember:
 - "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
 - "extractedData" is REQUIRED - extract actionable information from every page. For navigation tasks: UI elements, options, requirements. For research tasks: detailed facts, figures, quotes, sources, specifications - capture enough detail for a comprehensive final answer
 - "extractedDataStatusMessage" is REQUIRED - always provide a status message about what you learned from the page
-- For "select", "fill", "click", "hover", "check", "uncheck" actions, you MUST provide a "ref"
+- For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
 - For "fill", "select", "goto" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds
 - For "done" action, you MUST provide a "value" following the FINAL ANSWER REQUIREMENTS

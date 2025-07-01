@@ -317,7 +317,9 @@ describe("prompts", () => {
     it("should include guidance text", () => {
       const prompt = buildPageSnapshotPrompt("Test", "https://test.com", "content");
 
-      expect(prompt).toContain("This is a text snapshot of the current page");
+      expect(prompt).toContain(
+        "This is a complete accessibility tree snapshot of the current page",
+      );
       expect(prompt).toContain("Assess the current state");
       expect(prompt).toContain("most relevant elements");
       expect(prompt).toContain("If an action has failed twice");
