@@ -18,7 +18,6 @@ export const planAndUrlSchema = z.object({
 export const actionSchema = z.object({
   currentStep: z.string().describe("Current progress status in the plan"),
   extractedData: z.string().describe("Data extracted from the current page"),
-  extractedDataStatusMessage: z.string().describe("Brief status about data extraction"),
   observation: z.string().describe("Assessment of previous step outcome"),
   observationStatusMessage: z.string().describe("Short friendly message about observation"),
   thought: z.string().describe("Reasoning for next action"),

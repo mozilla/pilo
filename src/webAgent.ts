@@ -316,7 +316,6 @@ export class WebAgent {
     // Validate required top-level fields
     this.validateRequiredStringField(response, "currentStep", errors);
     this.validateRequiredStringField(response, "extractedData", errors);
-    this.validateRequiredStringField(response, "extractedDataStatusMessage", errors);
     this.validateRequiredStringField(response, "observation", errors);
     this.validateRequiredStringField(response, "observationStatusMessage", errors);
     this.validateRequiredStringField(response, "thought", errors);
@@ -804,7 +803,6 @@ export class WebAgent {
 
     // Emit extracted data first (now required)
     this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.extractedDataStatusMessage });
 
     // Then emit observation
     this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: result.observation });

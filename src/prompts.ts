@@ -62,8 +62,7 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 
 const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
-  "extractedData": "REQUIRED: Extract any data that helps with your task. For navigation/action tasks: navigation options, form fields, error messages, loading states, menu items, search suggestions, requirements, restrictions. For research tasks: capture detailed information like facts, figures, quotes, sources, dates, prices, specifications, comparisons, pros/cons - enough detail to provide a comprehensive final answer. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items for navigation tasks, more detail for research tasks.",
-  "extractedDataStatusMessage": "REQUIRED: Always provide a short, friendly message (3-8 words) about what you learned from this page. Examples: 'Flight options noted', 'Product details saved', 'Search results ready', 'Navigation options found'",
+  "extractedData": "REQUIRED: Extract any data that helps with your task. For navigation/action tasks: navigation options, form fields, error messages, loading states, menu items, search suggestions, requirements, restrictions. For research tasks: capture detailed information like facts, figures, quotes, sources, dates, prices, specifications, comparisons, pros/cons - enough detail to provide a comprehensive final answer. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items for navigation tasks, more detail for research tasks. If no task-related data is available, use: 'No task related data.'",
   "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Comment on any important data that should be extracted from the current page state.",
   "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
   "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
@@ -219,8 +218,7 @@ Please correct your response to match this exact format:
 Remember:
 - "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
 - "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "extractedData" is REQUIRED - extract actionable information from every page. For navigation tasks: UI elements, options, requirements. For research tasks: detailed facts, figures, quotes, sources, specifications - capture enough detail for a comprehensive final answer
-- "extractedDataStatusMessage" is REQUIRED - always provide a status message about what you learned from the page
+- "extractedData" is REQUIRED - extract actionable information from every page. For navigation tasks: UI elements, options, requirements. For research tasks: detailed facts, figures, quotes, sources, specifications - capture enough detail for a comprehensive final answer. If no task-related data is available, use: 'No task related data.'
 - For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
 - For "fill", "select", "goto" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds

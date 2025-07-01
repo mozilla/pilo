@@ -57,7 +57,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private page: Page | null = null;
 
   // Default timeouts
-  private readonly ACTION_TIMEOUT_MS = 5000; // 5 seconds timeout for interactive actions
+  private readonly ACTION_TIMEOUT_MS = 3000; // 3 seconds timeout for interactive actions
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {}
 
