@@ -25,7 +25,7 @@ function createMockActionResponse(overrides: any = {}) {
       currentStep: "Working on step",
       observation: "Page analyzed",
       observationStatusMessage: "Page analyzed",
-      extractedData: "",
+      extractedData: "Page content analyzed for task progress",
       thought: "Deciding next action",
       action: {
         action: PageAction.Click,
@@ -328,6 +328,7 @@ describe("WebAgent", () => {
           PageAction.Check,
           PageAction.Uncheck,
           PageAction.Select,
+          PageAction.Enter,
         ];
 
         for (const action of actionsWithRefs) {
@@ -666,7 +667,6 @@ describe("WebAgent", () => {
         observation: "Found element",
         observationStatusMessage: "Found element",
         extractedData: "Button element located",
-        extractedDataStatusMessage: "Button element located",
         thought: "Click the button",
         action: {
           action: PageAction.Click,
@@ -690,7 +690,6 @@ describe("WebAgent", () => {
         observation: "Found element",
         observationStatusMessage: "Found element",
         extractedData: "Button element located",
-        extractedDataStatusMessage: "Button element located",
         thought: "Click the button",
         action: {
           action: PageAction.Click,
@@ -713,7 +712,6 @@ describe("WebAgent", () => {
         observation: "Found input",
         observationStatusMessage: "Found input",
         extractedData: "Input field located",
-        extractedDataStatusMessage: "Input field located",
         thought: "Fill the input",
         action: {
           action: PageAction.Fill,
@@ -728,7 +726,6 @@ describe("WebAgent", () => {
         observation: "Found input",
         observationStatusMessage: "Found input",
         extractedData: "Input field located",
-        extractedDataStatusMessage: "Input field located",
         thought: "Fill the input",
         action: {
           action: PageAction.Fill,
@@ -756,7 +753,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data collected",
-        extractedDataStatusMessage: "Final data collected",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -770,7 +766,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data collected",
-        extractedDataStatusMessage: "Final data collected",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -883,7 +878,6 @@ describe("WebAgent", () => {
         observation: "Found element",
         observationStatusMessage: "Found element",
         extractedData: "Page content analyzed",
-        extractedDataStatusMessage: "Page content analyzed",
         thought: "Click the button",
         action: {
           action: PageAction.Click,
@@ -936,7 +930,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -986,7 +979,6 @@ describe("WebAgent", () => {
         observation: "Found element",
         observationStatusMessage: "Found element",
         extractedData: "Page content found",
-        extractedDataStatusMessage: "Page content found",
         thought: "Navigate to another page",
         action: {
           action: PageAction.Goto,
@@ -1000,7 +992,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1044,7 +1035,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1096,7 +1086,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1151,7 +1140,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1191,7 +1179,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1231,7 +1218,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1286,7 +1272,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Final data",
-        extractedDataStatusMessage: "Final data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1334,7 +1319,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Incomplete data",
-        extractedDataStatusMessage: "Incomplete data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,
@@ -1348,7 +1332,6 @@ describe("WebAgent", () => {
         observation: "Task finished properly",
         observationStatusMessage: "Task finished properly",
         extractedData: "Complete data",
-        extractedDataStatusMessage: "Complete data",
         thought: "Task is done correctly",
         action: {
           action: PageAction.Done,
@@ -1406,7 +1389,6 @@ describe("WebAgent", () => {
         observation: "Task finished",
         observationStatusMessage: "Task finished",
         extractedData: "Incomplete data",
-        extractedDataStatusMessage: "Incomplete data",
         thought: "Task is done",
         action: {
           action: PageAction.Done,

@@ -5,7 +5,7 @@ import {
   actionLoopPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildValidationFeedbackPrompt,
+  buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "../src/prompts.js";
 
@@ -32,6 +32,16 @@ describe("prompts", () => {
       expect(prompt).toContain("Jan 15, 2024");
       expect(prompt).toContain('"url"');
       expect(prompt).toContain("step-by-step plan, and starting URL");
+    });
+
+    it("should contain required instructions", () => {
+      const task = "Test task";
+      const prompt = buildPlanAndUrlPrompt(task);
+
+      // Verify youArePrompt content is included
+      expect(prompt).toContain("You are an expert at completing tasks using a web browser");
+      // Verify JSON-only instruction is included
+      expect(prompt).toContain("You must respond with valid JSON only");
     });
 
     it("should include current date in prompt", () => {
@@ -72,6 +82,16 @@ describe("prompts", () => {
       expect(prompt).not.toContain("starting URL");
     });
 
+    it("should contain required instructions", () => {
+      const task = "Test task";
+      const prompt = buildPlanPrompt(task);
+
+      // Verify youArePrompt content is included
+      expect(prompt).toContain("You are an expert at completing tasks using a web browser");
+      // Verify JSON-only instruction is included
+      expect(prompt).toContain("You must respond with valid JSON only");
+    });
+
     it("should include starting URL when provided", () => {
       const task = "Submit feedback form";
       const startingUrl = "https://example.com/feedback";
@@ -106,6 +126,15 @@ describe("prompts", () => {
       expect(actionLoopPrompt).toContain("Actions:");
       expect(actionLoopPrompt).toContain("Rules:");
       expect(actionLoopPrompt).toContain("Best Practices:");
+    });
+
+    it("should contain required instructions", () => {
+      // Verify youArePrompt content is included
+      expect(actionLoopPrompt).toContain(
+        "You are an expert at completing tasks using a web browser",
+      );
+      // Verify JSON-only instruction is included
+      expect(actionLoopPrompt).toContain("You must respond with valid JSON only");
     });
 
     it("should list all available actions", () => {
@@ -317,7 +346,9 @@ describe("prompts", () => {
     it("should include guidance text", () => {
       const prompt = buildPageSnapshotPrompt("Test", "https://test.com", "content");
 
-      expect(prompt).toContain("This is a text snapshot of the current page");
+      expect(prompt).toContain(
+        "This is a complete accessibility tree snapshot of the current page",
+      );
       expect(prompt).toContain("Assess the current state");
       expect(prompt).toContain("most relevant elements");
       expect(prompt).toContain("If an action has failed twice");
@@ -343,10 +374,10 @@ describe("prompts", () => {
     });
   });
 
-  describe("buildValidationFeedbackPrompt", () => {
+  describe("buildStepValidationFeedbackPrompt", () => {
     it("should format validation errors", () => {
       const errors = "Missing ref field\nInvalid action type\nValue is required";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain("did not match the required format");
       expect(prompt).toContain("Missing ref field");
@@ -356,7 +387,7 @@ describe("prompts", () => {
 
     it("should include format reminder", () => {
       const errors = "Some error";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain("correct your response");
       expect(prompt).toContain("exact format");
@@ -368,7 +399,7 @@ describe("prompts", () => {
 
     it("should include field requirements", () => {
       const errors = "Test error";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain('you MUST provide a "ref"');
       expect(prompt).toContain('you MUST provide a "value"');
@@ -376,7 +407,7 @@ describe("prompts", () => {
     });
 
     it("should handle empty errors", () => {
-      const prompt = buildValidationFeedbackPrompt("");
+      const prompt = buildStepValidationFeedbackPrompt("");
 
       expect(prompt).toContain("validation errors:");
       expect(prompt).toContain("Remember:");
@@ -401,6 +432,13 @@ describe("prompts", () => {
       expect(prompt).toContain("Does the final answer directly address the task");
       expect(prompt).toContain("Is the answer complete and specific enough");
       expect(prompt).toContain("perform the requested action or provide the requested information");
+    });
+
+    it("should contain required instructions", () => {
+      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
+
+      // Verify JSON-only instruction is included (task validation doesn't include youArePrompt)
+      expect(prompt).toContain("You must respond with valid JSON only");
     });
 
     it("should include feedback instruction", () => {
@@ -466,7 +504,7 @@ describe("prompts", () => {
         actionLoopPrompt,
         buildTaskAndPlanPrompt("test", "explanation", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
-        buildValidationFeedbackPrompt("errors"),
+        buildStepValidationFeedbackPrompt("errors"),
         buildTaskValidationPrompt("task", "answer"),
       ];
 
@@ -482,7 +520,7 @@ describe("prompts", () => {
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopPrompt,
-        buildValidationFeedbackPrompt("errors"),
+        buildStepValidationFeedbackPrompt("errors"),
       ];
 
       jsonPrompts.forEach((prompt) => {

@@ -4,7 +4,7 @@ import { WebAgent } from "../../webAgent.js";
 import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
 import { config } from "../config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
-import { createAIProvider } from "../provider.js";
+import { createAIProvider, getAIProviderInfo } from "../provider.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -105,8 +105,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       provider: aiProvider,
     });
 
+    // Get AI provider information
+    const providerInfo = getAIProviderInfo();
+
     console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
     console.log(chalk.gray(`Task: ${task}`));
+    console.log(chalk.gray(`Provider: ${providerInfo.provider}`));
+    console.log(chalk.gray(`Model: ${providerInfo.model}`));
     console.log(chalk.gray(`Browser: ${options.browser}`));
     if (options.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${options.pwEndpoint}`));
     if (options.proxy) console.log(chalk.gray(`Proxy: ${options.proxy}`));
