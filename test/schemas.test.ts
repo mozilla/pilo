@@ -441,7 +441,6 @@ describe("schemas", () => {
         observation: "test",
         observationStatusMessage: "test status",
         extractedData: "test",
-        extractedDataStatusMessage: "data found",
         thought: "test",
         action: {
           action: PageAction.Click,

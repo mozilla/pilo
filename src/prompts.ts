@@ -7,11 +7,14 @@ You adapt to situations and find creative ways to complete tasks without getting
 IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
 `.trim();
 
+const jsonOnlyInstruction =
+  "IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.";
+
 import { buildPromptTemplate } from "./templateUtils.js";
 
 const planPromptTemplate = buildPromptTemplate(
   `
-{{youArePrompt}}
+${youArePrompt}
 Create a plan for this web navigation task.
 Provide a clear explanation{{#if includeUrl}}, step-by-step plan, and starting URL{{else}} and step-by-step plan{{/if}}.
 Focus on general steps and goals rather than specific page features or UI elements.
@@ -28,7 +31,7 @@ Best Practices:
 {{#if startingUrl}}- Use the provided starting URL as your starting point for the task.{{/if}}
 {{#if guardrails}}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{{/if}}
 
-IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+${jsonOnlyInstruction}
 
 Respond with a JSON object matching this exact structure:
 \`\`\`json
@@ -43,7 +46,6 @@ Respond with a JSON object matching this exact structure:
 
 export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
   planPromptTemplate({
-    youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: true,
@@ -52,7 +54,6 @@ export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) 
 
 export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?: string | null) =>
   planPromptTemplate({
-    youArePrompt,
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: false,
@@ -74,12 +75,14 @@ const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
 }`);
 
-const buildActionLoopPrompt = (hasGuardrails: boolean) =>
+const actionLoopPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 For each step, assess the current state and decide on the next action to take.
 Consider the outcome of previous actions and explain your reasoning.
-${hasGuardrails ? "\n🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN." : ""}
+{{#if hasGuardrails}}
+🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
+{{/if}}
 
 Actions:
 - "select": Select option from dropdown (ref=element reference, value=option)
@@ -103,7 +106,7 @@ Rules:
 5. "done" means the ENTIRE task is finished - see FINAL ANSWER REQUIREMENTS below
 6. Use "wait" for page loads, animations, or dynamic content
 7. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
-${hasGuardrails ? "8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION" : ""}
+{{#if hasGuardrails}}8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION{{/if}}
 
 Best Practices:
 - You can see the entire page content - do not scroll or click links just to navigate within the page
@@ -112,7 +115,7 @@ Best Practices:
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
 - Focus on direct interaction with elements needed for your task
-${hasGuardrails ? "- Before taking any action, verify it does not violate the guardrails" : ""}
+{{#if hasGuardrails}}- Before taking any action, verify it does not violate the guardrails{{/if}}
 
 **FINAL ANSWER REQUIREMENTS (for "done" action):**
 When you use the "done" action, your value field MUST contain a comprehensive final answer that:
@@ -124,13 +127,20 @@ When you use the "done" action, your value field MUST contain a comprehensive fi
 - Does NOT include external knowledge or assumptions beyond what you found during the task
 - Should be written as if responding directly to the user's original task request
 
-IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+${jsonOnlyInstruction}
 
 Respond with a JSON object matching this exact structure:
 \`\`\`json
-${actionLoopResponseFormatTemplate({ hasGuardrails })}
+{{actionLoopResponseFormat}}
 \`\`\`
-`.trim();
+`.trim(),
+);
+
+const buildActionLoopPrompt = (hasGuardrails: boolean) =>
+  actionLoopPromptTemplate({
+    hasGuardrails,
+    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
+  });
 
 export const actionLoopPrompt = buildActionLoopPrompt(false);
 export { buildActionLoopPrompt };
@@ -265,7 +275,7 @@ Evaluation criteria:
 4. Was the approach reasonable and efficient?
 5. Are there any significant errors or omissions?
 
-IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
+${jsonOnlyInstruction}
 
 Respond with a JSON object matching this exact structure:
 \`\`\`json

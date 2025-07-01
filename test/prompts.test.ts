@@ -34,6 +34,16 @@ describe("prompts", () => {
       expect(prompt).toContain("step-by-step plan, and starting URL");
     });
 
+    it("should contain required instructions", () => {
+      const task = "Test task";
+      const prompt = buildPlanAndUrlPrompt(task);
+
+      // Verify youArePrompt content is included
+      expect(prompt).toContain("You are an expert at completing tasks using a web browser");
+      // Verify JSON-only instruction is included
+      expect(prompt).toContain("You must respond with valid JSON only");
+    });
+
     it("should include current date in prompt", () => {
       const task = "Find weather forecast";
       const prompt = buildPlanAndUrlPrompt(task);
@@ -72,6 +82,16 @@ describe("prompts", () => {
       expect(prompt).not.toContain("starting URL");
     });
 
+    it("should contain required instructions", () => {
+      const task = "Test task";
+      const prompt = buildPlanPrompt(task);
+
+      // Verify youArePrompt content is included
+      expect(prompt).toContain("You are an expert at completing tasks using a web browser");
+      // Verify JSON-only instruction is included
+      expect(prompt).toContain("You must respond with valid JSON only");
+    });
+
     it("should include starting URL when provided", () => {
       const task = "Submit feedback form";
       const startingUrl = "https://example.com/feedback";
@@ -106,6 +126,15 @@ describe("prompts", () => {
       expect(actionLoopPrompt).toContain("Actions:");
       expect(actionLoopPrompt).toContain("Rules:");
       expect(actionLoopPrompt).toContain("Best Practices:");
+    });
+
+    it("should contain required instructions", () => {
+      // Verify youArePrompt content is included
+      expect(actionLoopPrompt).toContain(
+        "You are an expert at completing tasks using a web browser",
+      );
+      // Verify JSON-only instruction is included
+      expect(actionLoopPrompt).toContain("You must respond with valid JSON only");
     });
 
     it("should list all available actions", () => {
@@ -403,6 +432,13 @@ describe("prompts", () => {
       expect(prompt).toContain("Does the final answer directly address the task");
       expect(prompt).toContain("Is the answer complete and specific enough");
       expect(prompt).toContain("perform the requested action or provide the requested information");
+    });
+
+    it("should contain required instructions", () => {
+      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
+
+      // Verify JSON-only instruction is included (task validation doesn't include youArePrompt)
+      expect(prompt).toContain("You must respond with valid JSON only");
     });
 
     it("should include feedback instruction", () => {
