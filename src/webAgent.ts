@@ -16,7 +16,7 @@ import {
   buildPlanAndUrlPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildValidationFeedbackPrompt,
+  buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
@@ -793,7 +793,7 @@ export class WebAgent {
   private addValidationErrorFeedback(errors: string[], response: any) {
     const hasGuardrails = !!this.guardrails;
     this.addAssistantMessage(response);
-    this.addUserMessage(buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
+    this.addUserMessage(buildStepValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
   }
 
   /**

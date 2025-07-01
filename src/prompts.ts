@@ -4,7 +4,7 @@ You have deep knowledge of the web and use only the highest quality sources.
 You focus on the task at hand and complete one step at a time.
 You adapt to situations and find creative ways to complete tasks without getting stuck.
 
-IMPORTANT: You can see the entire page content at once through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
+IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
 `.trim();
 
 import { buildPromptTemplate } from "./templateUtils.js";
@@ -205,7 +205,7 @@ export const buildPageSnapshotPrompt = (
     hasScreenshot,
   });
 
-const validationFeedbackTemplate = buildPromptTemplate(
+const stepValidationFeedbackTemplate = buildPromptTemplate(
   `
 Your previous response did not match the required format. Here are the validation errors:
 
@@ -232,11 +232,11 @@ Remember:
 `.trim(),
 );
 
-export const buildValidationFeedbackPrompt = (
+export const buildStepValidationFeedbackPrompt = (
   validationErrors: string,
   hasGuardrails: boolean = false,
 ) =>
-  validationFeedbackTemplate({
+  stepValidationFeedbackTemplate({
     validationErrors,
     actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
     hasGuardrails,
@@ -272,7 +272,7 @@ Respond with a JSON object matching this exact structure:
 {
   "observation": "Analyze how the agent approached the task: sequence of actions taken, appropriateness of actions, reasoning quality, and whether the agent worked efficiently toward the goal or got sidetracked.",
   "completionQuality": "failed|partial|complete|excellent",
-  "feedback": "If quality is not 'complete' or 'excellent', provide specific, actionable guidance on what needs to be improved. Focus on what the agent should do differently next time. If quality is 'complete' or 'excellent', this field is optional."
+  "feedback": "If quality is not 'complete' or 'excellent', provide specific, actionable guidance on what the agent should do to fix or improve the current task. Give concrete steps, strategies, or approaches the agent should take right now to complete the task successfully. Focus on actionable improvements for the current situation, not just what could have been better. If quality is 'complete' or 'excellent', this field is optional."
 }
 \`\`\`
 `.trim(),

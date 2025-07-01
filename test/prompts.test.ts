@@ -5,7 +5,7 @@ import {
   actionLoopPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildValidationFeedbackPrompt,
+  buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "../src/prompts.js";
 
@@ -345,10 +345,10 @@ describe("prompts", () => {
     });
   });
 
-  describe("buildValidationFeedbackPrompt", () => {
+  describe("buildStepValidationFeedbackPrompt", () => {
     it("should format validation errors", () => {
       const errors = "Missing ref field\nInvalid action type\nValue is required";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain("did not match the required format");
       expect(prompt).toContain("Missing ref field");
@@ -358,7 +358,7 @@ describe("prompts", () => {
 
     it("should include format reminder", () => {
       const errors = "Some error";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain("correct your response");
       expect(prompt).toContain("exact format");
@@ -370,7 +370,7 @@ describe("prompts", () => {
 
     it("should include field requirements", () => {
       const errors = "Test error";
-      const prompt = buildValidationFeedbackPrompt(errors);
+      const prompt = buildStepValidationFeedbackPrompt(errors);
 
       expect(prompt).toContain('you MUST provide a "ref"');
       expect(prompt).toContain('you MUST provide a "value"');
@@ -378,7 +378,7 @@ describe("prompts", () => {
     });
 
     it("should handle empty errors", () => {
-      const prompt = buildValidationFeedbackPrompt("");
+      const prompt = buildStepValidationFeedbackPrompt("");
 
       expect(prompt).toContain("validation errors:");
       expect(prompt).toContain("Remember:");
@@ -468,7 +468,7 @@ describe("prompts", () => {
         actionLoopPrompt,
         buildTaskAndPlanPrompt("test", "explanation", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
-        buildValidationFeedbackPrompt("errors"),
+        buildStepValidationFeedbackPrompt("errors"),
         buildTaskValidationPrompt("task", "answer"),
       ];
 
@@ -484,7 +484,7 @@ describe("prompts", () => {
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopPrompt,
-        buildValidationFeedbackPrompt("errors"),
+        buildStepValidationFeedbackPrompt("errors"),
       ];
 
       jsonPrompts.forEach((prompt) => {
