@@ -69,7 +69,7 @@ const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "action": {
     "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, done",
     "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
-    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, final answer for done"
+    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, plain text final answer for done"
   },
   "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
 }`);
@@ -116,11 +116,13 @@ ${hasGuardrails ? "- Before taking any action, verify it does not violate the gu
 
 **FINAL ANSWER REQUIREMENTS (for "done" action):**
 When you use the "done" action, your value field MUST contain a comprehensive final answer that:
+- Is written in plain text format
 - Synthesizes ALL data you extracted during this session
 - Uses ONLY information you actually found and recorded on the pages you visited
 - Provides clear results based on the data you collected
 - Includes relevant details from your web interactions and observations
 - Does NOT include external knowledge or assumptions beyond what you found during the task
+- Should be written as if responding directly to the user's original task request
 
 IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.
 
@@ -222,7 +224,7 @@ Remember:
 - For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
 - For "fill", "select", "goto" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds
-- For "done" action, you MUST provide a "value" following the FINAL ANSWER REQUIREMENTS
+- For "done" action, you MUST provide a "value" with a plain text final answer following the FINAL ANSWER REQUIREMENTS
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
 {{#if hasGuardrails}}
 - ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
