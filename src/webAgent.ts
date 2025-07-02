@@ -30,6 +30,7 @@ import {
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
+import { getAIProviderInfo } from "./cli/provider.js";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -660,8 +661,28 @@ export class WebAgent {
 
     try {
       const response = await generateObject(config);
+      this.emit(WebAgentEventType.AI_GENERATION, {
+        prompt,
+        schema,
+        messages,
+        temperature: config.temperature,
+        object: response.object,
+        finishReason: response.finishReason,
+        usage: response.usage,
+        warnings: response.warnings,
+        providerMetadata: response.providerMetadata,
+      });
       return response.object as T;
     } catch (error) {
+      if (error instanceof Error) {
+        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+          error: error.message,
+          prompt,
+          schema,
+          messages,
+        });
+      }
+
       // Handle AI generation failures with retry logic
       if (
         error instanceof Error &&
@@ -905,6 +926,28 @@ export class WebAgent {
   }
 
   /**
+   * Emits the task setup event with initial task information
+   */
+  private emitTaskSetupEvent(task: string) {
+    const providerInfo = getAIProviderInfo();
+
+    this.emit(WebAgentEventType.TASK_SETUP, {
+      task,
+      browserName: this.browser.browserName,
+      url: this.url,
+      guardrails: this.guardrails,
+      data: this.data,
+      pwEndpoint: (this.browser as any).pwEndpoint,
+      proxy: (this.browser as any).proxyServer,
+      vision: this.vision,
+      provider: providerInfo.provider,
+      model: providerInfo.model,
+      hasApiKey: providerInfo.hasApiKey,
+      keySource: providerInfo.keySource,
+    });
+  }
+
+  /**
    * Emits the task start event with all initial task information
    */
   private emitTaskStartEvent(task: string) {
@@ -993,6 +1036,8 @@ export class WebAgent {
     }
 
     // === SETUP PHASE ===
+    this.emitTaskSetupEvent(task);
+
     // Reset any previous task state to ensure clean execution
     this.resetState();
 

@@ -4,11 +4,16 @@ import { EventEmitter } from "eventemitter3";
  * Enum of all possible event types in the web agent
  */
 export enum WebAgentEventType {
-  // Task lifecycle
+  // Task events
+  TASK_SETUP = "task:setup",
   TASK_STARTED = "task:started",
   TASK_COMPLETED = "task:completed",
   TASK_VALIDATED = "task:validated",
   TASK_VALIDATION_ERROR = "task:validation_error",
+
+  // AI events
+  AI_GENERATION = "ai:generation",
+  AI_GENERATION_ERROR = "ai:generation:error",
 
   // Agent reasoning and status
   AGENT_STEP = "agent:step",
@@ -40,6 +45,24 @@ export interface WebAgentEventData {
 }
 
 /**
+ * Event data when a task is setup
+ */
+export interface TaskSetupEventData extends WebAgentEventData {
+  task: string;
+  url?: string;
+  browserName: string;
+  guardrails?: string;
+  data?: any;
+  pwEndpoint?: string;
+  proxy?: string;
+  vision?: boolean;
+  provider?: string;
+  model?: string;
+  hasApiKey?: boolean;
+  keySource?: "global" | "env" | "not_set";
+}
+
+/**
  * Event data when a task is started
  */
 export interface TaskStartEventData extends WebAgentEventData {
@@ -54,6 +77,35 @@ export interface TaskStartEventData extends WebAgentEventData {
  */
 export interface TaskCompleteEventData extends WebAgentEventData {
   finalAnswer: string | null;
+}
+
+/**
+ * Event data when AI generation occurs
+ */
+export interface AIGenerationEventData extends WebAgentEventData {
+  prompt: string;
+  schema: any;
+  messages?: any[];
+  object?: any;
+  finishReason?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  providerMetadata?: any;
+  warnings?: string[];
+  temperature?: number;
+}
+
+/**
+ * Event data when AI generation error occurs
+ */
+export interface AIGenerationErrorEventData extends WebAgentEventData {
+  prompt: string;
+  error: string;
+  schema: any;
+  messages?: any[];
 }
 
 /**
@@ -193,10 +245,13 @@ export interface StatusMessageEventData extends WebAgentEventData {
  * Union type of all event data types
  */
 export type WebAgentEvent =
+  | { type: WebAgentEventType.TASK_SETUP; data: TaskSetupEventData }
   | { type: WebAgentEventType.TASK_STARTED; data: TaskStartEventData }
   | { type: WebAgentEventType.TASK_COMPLETED; data: TaskCompleteEventData }
   | { type: WebAgentEventType.TASK_VALIDATED; data: TaskValidationEventData }
   | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
+  | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
+  | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
   | { type: WebAgentEventType.AGENT_STEP; data: CurrentStepEventData }
   | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
   | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }

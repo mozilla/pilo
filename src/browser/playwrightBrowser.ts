@@ -52,6 +52,7 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
  */
 export class PlaywrightBrowser implements AriaBrowser {
+  public browserName: string;
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
@@ -59,7 +60,17 @@ export class PlaywrightBrowser implements AriaBrowser {
   // Default timeouts
   private readonly ACTION_TIMEOUT_MS = 3000; // 3 seconds timeout for interactive actions
 
-  constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {}
+  constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
+    this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
+  }
+
+  get pwEndpoint(): string | undefined {
+    return this.options.pwEndpoint;
+  }
+
+  get proxyServer(): string | undefined {
+    return this.options.proxyServer;
+  }
 
   /**
    * Maps Spark's top-level options into the appropriate Playwright options
