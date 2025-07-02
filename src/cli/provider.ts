@@ -40,7 +40,7 @@ export function createAIProvider(): LanguageModel {
 function getProviderConfig(provider: string, currentConfig: any) {
   const defaultModels = {
     openai: "gpt-4.1",
-    openrouter: "anthropic/claude-3-5-sonnet-20241022",
+    openrouter: "openai/gpt-4.1",
   };
 
   const model = currentConfig.model || defaultModels[provider as keyof typeof defaultModels];
@@ -85,7 +85,7 @@ export function getAIProviderInfo() {
   const provider = currentConfig.provider || "openai";
   const defaultModels = {
     openai: "gpt-4.1",
-    openrouter: "anthropic/claude-3-5-sonnet-20241022",
+    openrouter: "openai/gpt-4.1",
   };
   const model = currentConfig.model || defaultModels[provider as keyof typeof defaultModels];
 

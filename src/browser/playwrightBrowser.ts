@@ -58,7 +58,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private page: Page | null = null;
 
   // Default timeouts
-  private readonly ACTION_TIMEOUT_MS = 5000; // 5 seconds timeout for interactive actions
+  private readonly ACTION_TIMEOUT_MS = 3000; // 3 seconds timeout for interactive actions
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
@@ -351,6 +351,12 @@ export class PlaywrightBrowser implements AriaBrowser {
             timeout: this.ACTION_TIMEOUT_MS,
           });
           // Forms might trigger page reloads on select
+          await this.ensureOptimizedPageLoad();
+          break;
+
+        case PageAction.Enter:
+          await locator.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
+          // Forms might trigger page reloads on enter
           await this.ensureOptimizedPageLoad();
           break;
 

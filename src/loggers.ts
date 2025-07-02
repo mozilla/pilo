@@ -166,13 +166,16 @@ export class ConsoleLogger implements Logger {
 
   private handleTaskSetup = (data: TaskSetupEventData): void => {
     console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
-    console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(data.task));
+    console.log(chalk.gray(`Task: ${data.task}`));
+    if (data.provider) console.log(chalk.gray(`Provider: ${data.provider}`));
+    if (data.model) console.log(chalk.gray(`Model: ${data.model}`));
     console.log(chalk.gray(`Browser: ${data.browserName}`));
     if (data.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${data.pwEndpoint}`));
     if (data.proxy) console.log(chalk.gray(`Proxy: ${data.proxy}`));
-    if (data.data) console.log(chalk.gray(`Data: ${JSON.stringify(data.data)}`));
+    if (data.url) console.log(chalk.gray(`Starting URL: ${data.url}`));
     if (data.guardrails) console.log(chalk.gray(`Guardrails: ${data.guardrails}`));
     if (data.vision) console.log(chalk.gray(`Vision: enabled`));
+    console.log("");
   };
 
   private handleTaskStart = (data: TaskStartEventData): void => {

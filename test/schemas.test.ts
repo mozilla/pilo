@@ -98,7 +98,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Click the login button",
         observation: "Found the login button on the page",
         observationStatusMessage: "Found login button",
-        extractedData: "",
+        extractedData: "Found login page with username field and login button",
         thought: "I need to click the login button to proceed",
         action: {
           action: PageAction.Click,
@@ -119,7 +119,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 2: Fill in username",
         observation: "Found the username field",
         observationStatusMessage: "Found username field",
-        extractedData: "",
+        extractedData: "Login form with username field ready for input",
         thought: "I need to enter the username",
         action: {
           action: PageAction.Fill,
@@ -141,7 +141,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 3: Wait for page load",
         observation: "Page is loading",
         observationStatusMessage: "Page loading detected",
-        extractedData: "",
+        extractedData: "Page showing loading spinner, content not yet fully loaded",
         thought: "Need to wait for the page to finish loading",
         action: {
           action: PageAction.Wait,
@@ -163,7 +163,6 @@ describe("schemas", () => {
         observation: "Successfully completed the task",
         observationStatusMessage: "Task completed successfully",
         extractedData: "Final result data",
-        extractedDataStatusMessage: "Collected final results",
         thought: "The task has been completed successfully",
         action: {
           action: PageAction.Done,
@@ -184,7 +183,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Navigate to login page",
         observation: "Need to go to the login page",
         observationStatusMessage: "Navigation required",
-        extractedData: "",
+        extractedData: "Current page has login link, need to navigate to login form",
         thought: "I need to navigate to the login URL",
         action: {
           action: PageAction.Goto,
@@ -205,6 +204,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Click the button",
         observation: "Found the button",
         observationStatusMessage: "Found clickable button",
+        extractedData: "Button available for clicking",
         thought: "I need to click the button",
         action: {
           action: PageAction.Click,
@@ -253,7 +253,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 1: Go back",
         observation: "Need to go back",
         observationStatusMessage: "Navigation required",
-        extractedData: "",
+        extractedData: "Current page doesn't have needed info, going back",
         thought: "Going back to previous page",
         action: {
           action: PageAction.Back,
@@ -265,7 +265,7 @@ describe("schemas", () => {
         currentStep: "Working on Step 2: Go forward",
         observation: "Need to go forward",
         observationStatusMessage: "Forward navigation needed",
-        extractedData: "",
+        extractedData: "Ready to proceed to next page in workflow",
         thought: "Going forward to next page",
         action: {
           action: PageAction.Forward,
@@ -285,11 +285,13 @@ describe("schemas", () => {
           currentStep: `Working on: ${actionType}`,
           observation: "Valid observation",
           observationStatusMessage: "Page analyzed",
-          extractedData: "",
+          extractedData: `Data relevant to ${actionType} action`,
           thought: "Valid thought",
           action: {
             action: actionType,
-            ...(["click", "fill", "select", "hover", "check", "uncheck"].includes(actionType) && {
+            ...(["click", "fill", "select", "hover", "check", "uncheck", "enter"].includes(
+              actionType,
+            ) && {
               ref: "s1e23",
             }),
             ...(["fill", "select", "wait", "goto", "done"].includes(actionType) && {
@@ -304,14 +306,12 @@ describe("schemas", () => {
       });
     });
 
-    it("should require extractedDataStatusMessage when extractedData is present", () => {
+    it("should validate action with extractedData", () => {
       const actionWithExtractedData = {
         currentStep: "Working on Step 1",
         observation: "Found data",
         observationStatusMessage: "Data found",
         extractedData: "Some important data",
-        // Missing extractedDataStatusMessage - this should still pass schema validation
-        // but the WebAgent validation should catch it
         thought: "Processing data",
         action: {
           action: PageAction.Click,
@@ -320,18 +320,16 @@ describe("schemas", () => {
         actionStatusMessage: "Clicking element",
       };
 
-      // Schema validation allows this (extractedDataStatusMessage is optional in schema)
       const result = actionSchema.safeParse(actionWithExtractedData);
       expect(result.success).toBe(true);
     });
 
-    it("should allow missing extractedDataStatusMessage when extractedData is empty", () => {
-      const actionWithoutExtractedData = {
+    it("should validate action with fallback extractedData", () => {
+      const actionWithFallbackData = {
         currentStep: "Working on Step 1",
         observation: "No data found",
         observationStatusMessage: "Page analyzed",
-        extractedData: "",
-        // No extractedDataStatusMessage needed when extractedData is empty
+        extractedData: "No task related data.",
         thought: "Moving on",
         action: {
           action: PageAction.Click,
@@ -340,7 +338,7 @@ describe("schemas", () => {
         actionStatusMessage: "Clicking element",
       };
 
-      const result = actionSchema.safeParse(actionWithoutExtractedData);
+      const result = actionSchema.safeParse(actionWithFallbackData);
       expect(result.success).toBe(true);
     });
   });
@@ -443,7 +441,6 @@ describe("schemas", () => {
         observation: "test",
         observationStatusMessage: "test status",
         extractedData: "test",
-        extractedDataStatusMessage: "data found",
         thought: "test",
         action: {
           action: PageAction.Click,

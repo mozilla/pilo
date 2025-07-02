@@ -49,12 +49,17 @@ export interface WebAgentEventData {
  */
 export interface TaskSetupEventData extends WebAgentEventData {
   task: string;
+  url?: string;
   browserName: string;
-  guardrails: string | null;
-  data: any;
-  pwEndpoint: string | null;
-  proxy: string | null;
-  vision: boolean | null;
+  guardrails?: string;
+  data?: any;
+  pwEndpoint?: string;
+  proxy?: string;
+  vision?: boolean;
+  provider?: string;
+  model?: string;
+  hasApiKey?: boolean;
+  keySource?: "global" | "env" | "not_set";
 }
 
 /**

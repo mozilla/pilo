@@ -16,7 +16,7 @@ import {
   buildPlanAndUrlPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildValidationFeedbackPrompt,
+  buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
@@ -30,6 +30,7 @@ import {
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
+import { getAIProviderInfo } from "./cli/provider.js";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -315,15 +316,11 @@ export class WebAgent {
 
     // Validate required top-level fields
     this.validateRequiredStringField(response, "currentStep", errors);
+    this.validateRequiredStringField(response, "extractedData", errors);
     this.validateRequiredStringField(response, "observation", errors);
     this.validateRequiredStringField(response, "observationStatusMessage", errors);
     this.validateRequiredStringField(response, "thought", errors);
     this.validateRequiredStringField(response, "actionStatusMessage", errors);
-
-    // Validate conditional status message requirements
-    if (response.extractedData && response.extractedData.trim()) {
-      this.validateRequiredStringField(response, "extractedDataStatusMessage", errors);
-    }
 
     // Validate action object exists
     if (!response.action || typeof response.action !== "object") {
@@ -381,6 +378,7 @@ export class WebAgent {
       PageAction.Check,
       PageAction.Uncheck,
       PageAction.Select,
+      PageAction.Enter,
     ];
     const actionsRequiringValue = [
       PageAction.Fill,
@@ -690,7 +688,10 @@ export class WebAgent {
         error instanceof Error &&
         (error.message.includes("response did not match schema") ||
           error.message.includes("AI_NoObjectGeneratedError") ||
-          error.message.includes("No object generated"))
+          error.message.includes("No object generated") ||
+          error.message.includes("Invalid JSON response") ||
+          error.message.includes("AI_APICallError") ||
+          error.name === "AI_APICallError")
       ) {
         console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
 
@@ -812,7 +813,7 @@ export class WebAgent {
   private addValidationErrorFeedback(errors: string[], response: any) {
     const hasGuardrails = !!this.guardrails;
     this.addAssistantMessage(response);
-    this.addUserMessage(buildValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
+    this.addUserMessage(buildStepValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
   }
 
   /**
@@ -821,27 +822,23 @@ export class WebAgent {
   protected broadcastActionDetails(result: any) {
     this.emit(WebAgentEventType.AGENT_STEP, { currentStep: result.currentStep });
 
+    // Emit extracted data first (now required)
+    this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
+
+    // Then emit observation
     this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: result.observation });
     this.emit(WebAgentEventType.AGENT_STATUS, { message: result.observationStatusMessage });
 
-    // Only emit extractedData if it exists and has content
-    if (result.extractedData && result.extractedData.trim()) {
-      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
-      if (result.extractedDataStatusMessage) {
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: result.extractedDataStatusMessage });
-      }
-    }
-
+    // Then reasoning
     this.emit(WebAgentEventType.AGENT_REASONED, { thought: result.thought });
 
+    // Finally the planned action
     this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
       action: result.action.action,
       ref: result.action.ref || undefined,
       value: result.action.value || undefined,
     });
-    if (result.actionStatusMessage) {
-      this.emit(WebAgentEventType.AGENT_STATUS, { message: result.actionStatusMessage });
-    }
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.actionStatusMessage });
   }
 
   private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
@@ -932,15 +929,21 @@ export class WebAgent {
    * Emits the task setup event with initial task information
    */
   private emitTaskSetupEvent(task: string) {
+    const providerInfo = getAIProviderInfo();
+
     this.emit(WebAgentEventType.TASK_SETUP, {
       task,
       browserName: this.browser.browserName,
       url: this.url,
       guardrails: this.guardrails,
       data: this.data,
-      pwEndpoint: (this.browser as any).pwEndpoint || null,
-      proxy: (this.browser as any).proxyServer || null,
+      pwEndpoint: (this.browser as any).pwEndpoint,
+      proxy: (this.browser as any).proxyServer,
       vision: this.vision,
+      provider: providerInfo.provider,
+      model: providerInfo.model,
+      hasApiKey: providerInfo.hasApiKey,
+      keySource: providerInfo.keySource,
     });
   }
 
@@ -1076,6 +1079,7 @@ export class WebAgent {
     // 1. Task successfully completed ("done" action + successful validation)
     // 2. Max validation attempts reached (task marked done but validation keeps failing)
     // 3. Max iterations reached (safety mechanism to prevent infinite loops)
+    // 4. Unrecoverable AI generation error
     while (true) {
       // Safety check: prevent infinite loops
       currentIteration++;
@@ -1083,44 +1087,51 @@ export class WebAgent {
         break; // Exit: hit iteration limit
       }
 
-      // Get current page state and ask AI what to do next
-      const pageSnapshot = await this.browser.getText();
-      const result = await this.generateNextAction(pageSnapshot);
+      try {
+        // Get current page state and ask AI what to do next
+        const pageSnapshot = await this.browser.getText();
+        const result = await this.generateNextAction(pageSnapshot);
 
-      // Broadcast the AI's reasoning and planned action for logging
-      this.broadcastActionDetails(result);
+        // Broadcast the AI's reasoning and planned action for logging
+        this.broadcastActionDetails(result);
 
-      // === TASK COMPLETION HANDLING ===
-      // If AI says task is done, validate the completion quality
-      if (result.action.action === "done") {
-        finalAnswer = result.action.value!; // validateActionResponse ensures this exists
-        const validationResult = await this.validateTaskCompletion(task, finalAnswer);
-        lastValidationResult = validationResult;
-        validationAttempts++;
+        // === TASK COMPLETION HANDLING ===
+        // If AI says task is done, validate the completion quality
+        if (result.action.action === "done") {
+          finalAnswer = result.action.value!; // validateActionResponse ensures this exists
+          const validationResult = await this.validateTaskCompletion(task, finalAnswer);
+          lastValidationResult = validationResult;
+          validationAttempts++;
 
-        // Check if validation shows successful completion
-        if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-          this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
-          break; // Exit: task completed successfully
-        } else {
-          // Task marked as done but validation failed
-          if (validationAttempts >= this.maxValidationAttempts) {
-            break; // Exit: max validation attempts reached, give up
+          // Check if validation shows successful completion
+          if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
+            this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
+            break; // Exit: task completed successfully
+          } else {
+            // Task marked as done but validation failed
+            if (validationAttempts >= this.maxValidationAttempts) {
+              break; // Exit: max validation attempts reached, give up
+            }
+
+            // Give AI feedback about what went wrong and try again
+            this.addTaskRetryFeedback(result, validationResult);
+            finalAnswer = null; // Reset for next attempt
+            continue; // Continue loop for retry
           }
-
-          // Give AI feedback about what went wrong and try again
-          this.addTaskRetryFeedback(result, validationResult);
-          finalAnswer = null; // Reset for next attempt
-          continue; // Continue loop for retry
         }
+
+        // === ACTION EXECUTION ===
+        // Execute the action on the browser (click, fill, navigate, etc.)
+        const actionSuccess = await this.executeAction(result);
+
+        // Add the action result to conversation history for AI context
+        this.recordActionResult(result, actionSuccess);
+      } catch (error) {
+        // Handle unrecoverable AI generation errors
+        console.error("❌ Unrecoverable error in main execution loop:", error);
+        finalAnswer = `Task failed due to AI generation error: ${error instanceof Error ? error.message : String(error)}`;
+        break; // Exit: unrecoverable error
       }
-
-      // === ACTION EXECUTION ===
-      // Execute the action on the browser (click, fill, navigate, etc.)
-      const actionSuccess = await this.executeAction(result);
-
-      // Add the action result to conversation history for AI context
-      this.recordActionResult(result, actionSuccess);
     }
 
     // Determine success: task completed and validation result shows success

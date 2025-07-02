@@ -12,6 +12,7 @@ describe("AriaBrowser interface", () => {
         "check",
         "uncheck",
         "select",
+        "enter",
         "wait",
         "goto",
         "back",
@@ -36,6 +37,7 @@ describe("AriaBrowser interface", () => {
       expect(PageAction.Check).toBe("check");
       expect(PageAction.Uncheck).toBe("uncheck");
       expect(PageAction.Select).toBe("select");
+      expect(PageAction.Enter).toBe("enter");
       expect(PageAction.Wait).toBe("wait");
       expect(PageAction.Goto).toBe("goto");
       expect(PageAction.Back).toBe("back");
@@ -53,6 +55,7 @@ describe("AriaBrowser interface", () => {
         PageAction.Check,
         PageAction.Uncheck,
         PageAction.Select,
+        PageAction.Enter,
       ];
 
       // Navigation actions
@@ -132,6 +135,7 @@ describe("AriaBrowser interface", () => {
         PageAction.Check,
         PageAction.Uncheck,
         PageAction.Select,
+        PageAction.Enter,
       ];
 
       // These actions operate on specific elements and need refs
