@@ -5,10 +5,12 @@ import { config as loadDotenv } from "dotenv";
 
 export interface SparkConfig {
   // AI Configuration
-  provider?: "openai" | "openrouter";
+  provider?: "openai" | "openrouter" | "vertex";
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
+  vertex_project?: string;
+  vertex_location?: string;
 
   // Browser Configuration
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
@@ -77,6 +79,17 @@ export class ConfigManager {
       ...(process.env.SPARK_MODEL && { model: process.env.SPARK_MODEL }),
       ...(process.env.OPENAI_API_KEY && { openai_api_key: process.env.OPENAI_API_KEY }),
       ...(process.env.OPENROUTER_API_KEY && { openrouter_api_key: process.env.OPENROUTER_API_KEY }),
+      ...((process.env.GOOGLE_VERTEX_PROJECT ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCP_PROJECT) && {
+        vertex_project:
+          process.env.GOOGLE_VERTEX_PROJECT ||
+          process.env.GOOGLE_CLOUD_PROJECT ||
+          process.env.GCP_PROJECT,
+      }),
+      ...((process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) && {
+        vertex_location: process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION,
+      }),
 
       // Browser Configuration
       ...(process.env.SPARK_BROWSER && {
@@ -212,6 +225,19 @@ export class ConfigManager {
     if (process.env.SPARK_MODEL) env.model = process.env.SPARK_MODEL;
     if (process.env.OPENAI_API_KEY) env.openai_api_key = process.env.OPENAI_API_KEY;
     if (process.env.OPENROUTER_API_KEY) env.openrouter_api_key = process.env.OPENROUTER_API_KEY;
+    if (
+      process.env.GOOGLE_VERTEX_PROJECT ||
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.GCP_PROJECT
+    ) {
+      env.vertex_project =
+        process.env.GOOGLE_VERTEX_PROJECT ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCP_PROJECT;
+    }
+    if (process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) {
+      env.vertex_location = process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION;
+    }
 
     // Browser Configuration
     if (process.env.SPARK_BROWSER)
