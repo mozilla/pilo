@@ -64,10 +64,7 @@ Execute a web automation task using natural language.
   // Proxy configuration overrides
   "proxy": "string (optional)",
   "proxyUsername": "string (optional)",
-  "proxyPassword": "string (optional)",
-
-  // Logging configuration
-  "logger": "console|json (optional)"
+  "proxyPassword": "string (optional)"
 }
 ```
 

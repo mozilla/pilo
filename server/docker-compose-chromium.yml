@@ -1,16 +1,16 @@
 services:
   spark:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
     container_name: spark-server
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PW_ENDPOINT=ws://browserless:3000/playwright/chromium
+      - SPARK_PW_ENDPOINT=ws://browserless:3000/playwright/chromium
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - BROWSER=chromium
+      - SPARK_BROWSER=chromium
 
   browserless:
     image: ghcr.io/browserless/chromium:latest
