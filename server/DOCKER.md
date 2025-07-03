@@ -9,11 +9,11 @@ Containerized Spark server with Browserless browser automation.
 cp .env.docker .env
 # Edit .env and add your OPENAI_API_KEY
 
-# Start services with Chromium (default)
-docker-compose -f docker-compose-chromium.yml up -d
-
-# OR start services with Firefox
+# Start services with Firefox
 docker-compose -f docker-compose-firefox.yml up -d
+
+# OR Start services with Chromium
+docker-compose -f docker-compose-chromium.yml up -d
 
 # Test it
 curl -X POST http://localhost:3000/spark/run \
@@ -38,13 +38,13 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ```bash
 # View logs (replace with your chosen compose file)
-docker-compose -f docker-compose-chromium.yml logs -f
+docker-compose -f docker-compose-firefox.yml logs -f
 
 # Stop services
-docker-compose -f docker-compose-chromium.yml down
+docker-compose -f docker-compose-firefox.yml down
 
 # Rebuild and restart
-docker-compose -f docker-compose-chromium.yml up --build
+docker-compose -f docker-compose-firefox.yml up --build
 ```
 
 ## Browser Options

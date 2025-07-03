@@ -34,20 +34,6 @@ describe("Spark Routes", () => {
     vi.restoreAllMocks();
   });
 
-  describe("GET /spark/status", () => {
-    it("should return status information", async () => {
-      const res = await app.request("/spark/status");
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data).toEqual({
-        status: "ready",
-        service: "spark-automation",
-        timestamp: expect.any(String),
-      });
-    });
-  });
-
   describe("POST /spark/run", () => {
     beforeEach(() => {
       process.env.OPENAI_API_KEY = "test-key";

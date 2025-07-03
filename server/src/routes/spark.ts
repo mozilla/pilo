@@ -51,10 +51,13 @@ spark.post("/run", async (c) => {
       );
     }
 
-    // Set up Server-Sent Events
-    c.header("Content-Type", "text/event-stream");
-    c.header("Cache-Control", "no-cache");
-    c.header("Connection", "keep-alive");
+    // Set up Server-Sent Events headers
+    const sseHeaders = {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    };
+    Object.entries(sseHeaders).forEach(([key, value]) => c.header(key, value));
 
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
@@ -97,26 +100,20 @@ spark.post("/run", async (c) => {
         await agent.close();
       } catch (error) {
         console.error("Spark task execution failed:", error);
-        await sendEvent("error", {
-          error: {
-            message: error instanceof Error ? error.message : "Unknown error",
-            code: "TASK_EXECUTION_FAILED",
-            timestamp: new Date().toISOString(),
-          },
-        });
+        await sendEvent(
+          "error",
+          createErrorResponse(
+            error instanceof Error ? error.message : "Unknown error",
+            "TASK_EXECUTION_FAILED",
+          ),
+        );
       } finally {
         await sendEvent("done", {});
         await writer.close();
       }
     })();
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return new Response(readable, { headers: sseHeaders });
   } catch (error) {
     console.error("Spark task setup failed:", error);
     return c.json(
@@ -127,15 +124,6 @@ spark.post("/run", async (c) => {
       500,
     );
   }
-});
-
-// GET /spark/status - Get Spark service status
-spark.get("/status", (c) => {
-  return c.json({
-    status: "ready",
-    service: "spark-automation",
-    timestamp: new Date().toISOString(),
-  });
 });
 
 export default spark;
