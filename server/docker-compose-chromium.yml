@@ -1,7 +1,7 @@
 services:
   spark:
     build:
-      context: .
+      context: ..
       dockerfile: server/Dockerfile
     container_name: spark-server
     ports:

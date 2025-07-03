@@ -14,24 +14,24 @@ npm install -g https://github.com/Mozilla-Ocho/spark.git
 spark config --init
 
 # Run your first task
-spark run "what's the weather in Tokyo?"
+spark run "find the weather forecast for Tokyo"
 ```
 
 ### Basic Usage
 
 ```bash
 # Simple web queries
-spark run "find the latest news on Reuters"
-spark run "what's the current price of AAPL stock?"
+spark run "find the latest technology news on Reuters"
+spark run "search for AAPL stock price on Yahoo Finance"
 
 # With specific starting URL
-spark run "find flight deals to Paris" --url https://booking.com/
+spark run "search for hotels in Tokyo" --url https://booking.com/
 
 # With structured data
-spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+spark run "search for flights" --url https://kayak.com --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
 
 # With safety constraints
-spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
+spark run "research travel options to Tokyo" --guardrails "browse only, don't make any bookings"
 ```
 
 ## Features
@@ -104,7 +104,7 @@ const agent = new WebAgent(browser, {
 });
 
 try {
-  const result = await agent.execute("find flights to Tokyo", "https://airline.com");
+  const result = await agent.execute("search for flights to Tokyo", "https://kayak.com");
   console.log("Success:", result.success);
 } finally {
   await agent.close();
@@ -116,23 +116,23 @@ try {
 ### Simple Tasks
 
 ```bash
-spark run "is it raining in London?"
-spark run "what's trending on Hacker News?"
-spark run "find the contact email for example.com"
+spark run "check weather conditions in London"
+spark run "find trending stories on Hacker News"
+spark run "find contact information on Wikipedia"
 ```
 
 ### With URLs
 
 ```bash
-spark run "find flight deals" --url https://kayak.com
-spark run "check if items are in stock" --url https://store.com
+spark run "find flights from NYC to London departing next week" --url https://kayak.com
+spark run "check if Nintendo Switch 2 is in stock" --url https://bestbuy.com
 ```
 
 ### With Structured Data
 
 ```bash
 # Hotel search
-spark run "find hotels" --url https://booking.com --data '{
+spark run "search for hotels" --url https://booking.com --data '{
   "location": "Paris",
   "checkIn": "2024-12-20",
   "checkOut": "2024-12-22",
@@ -140,10 +140,10 @@ spark run "find hotels" --url https://booking.com --data '{
 }'
 
 # Form filling
-spark run "submit contact form" --url https://company.com/contact --data '{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "message": "Hello world"
+spark run "search for healthy dinner recipes under 30 minutes" --url https://allrecipes.com --data '{
+  "cookTime": "30 minutes",
+  "dietType": "healthy",
+  "mealType": "dinner"
 }'
 ```
 
@@ -151,59 +151,60 @@ spark run "submit contact form" --url https://company.com/contact --data '{
 
 ```bash
 # Browse-only mode
-spark run "research product prices" --guardrails "only browse, don't buy anything"
+spark run "research noise cancelling headphones for air travel" --url https://amazon.com --guardrails "only browse, don't buy anything"
 
 # Domain restrictions
-spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
+spark run "search for chicken tikka masala recipes" --url https://allrecipes.com --guardrails "stay on current domain only"
 
 # Form restrictions
-spark run "check shipping costs" --guardrails "don't submit any payment forms"
+spark run "check shipping costs for a gaming chair to Texas" --url https://amazon.com --guardrails "don't submit any payment forms"
 ```
 
 ### Advanced Options
 
 ```bash
-# Chrome browser testing
-spark run "test checkout flow" --browser chrome --headless
+# Firefox browser testing
+spark run "search for weekend getaway deals" --url https://expedia.com --browser firefox --headless
 
 # Headless automation
-spark run "get daily stock prices" --headless --browser firefox
+spark run "search for stock prices on Yahoo Finance" --headless --browser firefox
 
 # Debug mode
-spark run "complex automation task" --debug
+spark run "compare hotel prices in Paris for December 20-22" --url https://booking.com --debug
 
 # Vision mode for complex visual layouts
-spark run "fill out complex form" --vision
+spark run "fill out flight search form for NYC to Tokyo" --url https://kayak.com --vision
 
 # Combined options
-spark run "test signup flow" \
-  --url https://app.com \
-  --browser safari \
+spark run "research wireless earbuds under $200" \
+  --url https://bestbuy.com \
+  --browser firefox \
   --headless \
-  --data '{"email":"test@example.com"}' \
-  --guardrails "don't complete signup, just test the flow"
+  --data '{"maxPrice":200,"category":"wireless earbuds"}' \
+  --guardrails "only browse, don't add to cart"
 ```
 
 ### Proxy Configuration
 
 ```bash
 # Using an HTTP proxy
-spark run "search for products" --proxy http://proxy.company.com:8080
+spark run "find latest AI technology news" --url https://reuters.com --proxy http://proxy.company.com:8080
 
 # Using authenticated proxy
-spark run "access internal site" \
+spark run "find React hooks documentation" \
+  --url https://react.dev \
   --proxy http://proxy.company.com:8080 \
   --proxy-username myuser \
   --proxy-password mypass
 
 # Using SOCKS5 proxy
-spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+spark run "find breaking technology news" --url https://techcrunch.com --proxy socks5://127.0.0.1:1080
 
 # Environment variables (alternative to CLI options)
 export SPARK_PROXY=http://proxy.company.com:8080
 export SPARK_PROXY_USERNAME=myuser
 export SPARK_PROXY_PASSWORD=mypass
-spark run "task with proxy from env vars"
+spark run "find latest JavaScript framework news" --url https://github.com/trending
 ```
 
 ## Configuration
@@ -264,7 +265,7 @@ const agent = new WebAgent(browser, {
   guardrails: "Do not make purchases",
 });
 
-const result = await agent.execute("find flights to Tokyo", "https://airline.com");
+const result = await agent.execute("search flights to Tokyo", "https://kayak.com");
 ```
 
 ### PlaywrightBrowser Options
