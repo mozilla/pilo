@@ -44,8 +44,12 @@ describe("Provider", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    // Clear environment variables that could interfere with tests
-    process.env = {};
+    process.env = { ...originalEnv };
+    // Clear only Spark-related environment variables that could interfere with tests
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.SPARK_PROVIDER;
+    delete process.env.SPARK_MODEL;
     vi.clearAllMocks();
   });
 
