@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { WebAgent, PlaywrightBrowser } from "spark";
 import type { TaskExecutionResult } from "spark";
-import { openai } from "@ai-sdk/openai";
 import { StreamLogger } from "../StreamLogger.js";
+import { createAIProvider, getAIProviderInfo } from "../provider.js";
+import { config } from "../config.js";
 
 interface ErrorResponse {
   success: false;
@@ -25,10 +26,37 @@ const createErrorResponse = (message: string, code: string): ErrorResponse => ({
 const spark = new Hono();
 
 interface SparkTaskRequest {
+  // Core task parameters
   task: string;
   url?: string;
   data?: Record<string, any>;
   guardrails?: string;
+
+  // AI configuration overrides
+  provider?: "openai" | "openrouter";
+  model?: string;
+
+  // Browser configuration overrides
+  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  headless?: boolean;
+  vision?: boolean;
+  debug?: boolean;
+  blockAds?: boolean;
+  blockResources?: string[];
+  pwEndpoint?: string;
+  bypassCSP?: boolean;
+
+  // WebAgent behavior overrides
+  maxIterations?: number;
+  maxValidationAttempts?: number;
+
+  // Proxy configuration overrides
+  proxy?: string;
+  proxyUsername?: string;
+  proxyPassword?: string;
+
+  // Logging configuration
+  logger?: "console" | "json";
 }
 
 // POST /spark/run - Execute a Spark task with real-time streaming
@@ -40,11 +68,18 @@ spark.post("/run", async (c) => {
       return c.json(createErrorResponse("Task is required", "MISSING_TASK"), 400);
     }
 
-    // Check for OpenAI API key
-    if (!process.env.OPENAI_API_KEY) {
+    // Get server configuration
+    const serverConfig = config.getConfig();
+
+    // Validate that we have some AI provider configured
+
+    try {
+      // This will throw if no API key is available
+      getAIProviderInfo();
+    } catch (error) {
       return c.json(
         createErrorResponse(
-          "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.",
+          `AI provider not configured: ${error instanceof Error ? error.message : String(error)}`,
           "MISSING_API_KEY",
         ),
         500,
@@ -74,20 +109,51 @@ spark.post("/run", async (c) => {
       try {
         await sendEvent("start", { task: body.task, url: body.url });
 
+        // Merge server config with request overrides
+        const browserConfig = {
+          browser: body.browser || serverConfig.browser || "firefox",
+          headless:
+            body.headless !== undefined
+              ? body.headless
+              : serverConfig.headless !== undefined
+                ? serverConfig.headless
+                : true,
+          blockAds: body.blockAds !== undefined ? body.blockAds : serverConfig.block_ads,
+          blockResources: (body.blockResources ||
+            (serverConfig.block_resources
+              ? serverConfig.block_resources.split(",")
+              : undefined)) as
+            | Array<"image" | "stylesheet" | "font" | "media" | "manifest">
+            | undefined,
+          pwEndpoint: body.pwEndpoint || serverConfig.pw_endpoint,
+          bypassCSP: body.bypassCSP !== undefined ? body.bypassCSP : serverConfig.bypass_csp,
+          proxyServer: body.proxy || serverConfig.proxy,
+          proxyUsername: body.proxyUsername || serverConfig.proxy_username,
+          proxyPassword: body.proxyPassword || serverConfig.proxy_password,
+        };
+
+        const webAgentConfig = {
+          debug: body.debug !== undefined ? body.debug : serverConfig.debug,
+          vision: body.vision !== undefined ? body.vision : serverConfig.vision,
+          maxIterations: body.maxIterations || serverConfig.max_iterations,
+          maxValidationAttempts: body.maxValidationAttempts || serverConfig.max_validation_attempts,
+          guardrails: body.guardrails,
+        };
+
         // Create browser and agent instances
-        const browser = new PlaywrightBrowser({
-          browser: (process.env.BROWSER as any) || "firefox",
-          pwEndpoint: process.env.PW_ENDPOINT,
-          headless: true, // Top-level option (cleaner)
+        const browser = new PlaywrightBrowser(browserConfig);
+        const logger = new StreamLogger(sendEvent);
+
+        // Create AI provider with potential overrides
+        const provider = createAIProvider({
+          provider: body.provider,
+          model: body.model,
         });
 
-        const logger = new StreamLogger(sendEvent);
-        const provider = openai("gpt-4.1");
-
         const agent = new WebAgent(browser, {
+          ...webAgentConfig,
           provider,
           logger,
-          guardrails: body.guardrails,
         });
 
         // Execute the task

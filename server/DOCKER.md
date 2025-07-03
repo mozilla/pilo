@@ -6,8 +6,8 @@ Containerized Spark server with Browserless browser automation.
 
 ```bash
 # Setup environment
-cp .env.docker .env
-# Edit .env and add your OPENAI_API_KEY
+cp .env.example .env
+# Edit .env with your AI provider API key and settings
 
 # Start services with Firefox
 docker-compose -f docker-compose-firefox.yml up -d
@@ -28,11 +28,25 @@ curl -X POST http://localhost:3000/spark/run \
 
 ## Environment
 
-Create `.env` file:
+Copy and configure environment file:
 
 ```bash
-OPENAI_API_KEY=your_openai_api_key_here
+cp .env.example .env
+# Edit .env with your settings
 ```
+
+**Minimal Docker configuration:**
+
+```bash
+# Required - choose your AI provider
+OPENAI_API_KEY=your_openai_api_key_here
+SPARK_PROVIDER=openai
+# OR
+# OPENROUTER_API_KEY=your_openrouter_api_key_here
+# SPARK_PROVIDER=openrouter
+```
+
+**See `.env.example` for complete configuration options.**
 
 ## Useful Commands
 

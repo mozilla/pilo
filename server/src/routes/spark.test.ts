@@ -5,10 +5,30 @@ import sparkRoutes from "./spark.js";
 // Mock the spark library
 vi.mock("spark", () => ({
   WebAgent: vi.fn().mockImplementation(() => ({
-    execute: vi.fn(),
-    close: vi.fn(),
+    execute: vi.fn().mockResolvedValue({
+      success: true,
+      finalAnswer: "Task completed successfully",
+      plan: "Test plan",
+      taskExplanation: "Test explanation",
+      iterations: 1,
+      validationAttempts: 1,
+    }),
+    close: vi.fn().mockResolvedValue(undefined),
   })),
   PlaywrightBrowser: vi.fn().mockImplementation(() => ({})),
+  config: {
+    getConfig: vi.fn(() => ({
+      provider: "openai",
+      openai_api_key: "sk-test123",
+    })),
+  },
+  createAIProvider: vi.fn(() => ({})),
+  getAIProviderInfo: vi.fn(() => ({
+    provider: "openai",
+    model: "gpt-4.1",
+    hasApiKey: true,
+    keySource: "env",
+  })),
 }));
 
 // Mock the AI SDK
@@ -27,16 +47,23 @@ describe("Spark Routes", () => {
   beforeEach(() => {
     app = new Hono();
     app.route("/spark", sparkRoutes);
-    vi.clearAllMocks();
-  });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+    // Don't clear mocks - it breaks our mock setup
+    // vi.clearAllMocks();
   });
 
   describe("POST /spark/run", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       process.env.OPENAI_API_KEY = "test-key";
+
+      // Reset the getAIProviderInfo mock to its default success state
+      const { getAIProviderInfo } = await import("spark");
+      vi.mocked(getAIProviderInfo).mockReturnValue({
+        provider: "openai",
+        model: "gpt-4.1",
+        hasApiKey: true,
+        keySource: "env",
+      });
     });
 
     afterEach(() => {
@@ -59,7 +86,13 @@ describe("Spark Routes", () => {
     });
 
     it("should reject requests without OpenAI API key", async () => {
-      delete process.env.OPENAI_API_KEY;
+      // Mock getAIProviderInfo to throw an error for missing API key
+      const { getAIProviderInfo } = await import("spark");
+      vi.mocked(getAIProviderInfo).mockImplementation(() => {
+        throw new Error(
+          "No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
+        );
+      });
 
       const res = await app.request("/spark/run", {
         method: "POST",
@@ -71,7 +104,7 @@ describe("Spark Routes", () => {
       const data = await res.json();
       expect(data.success).toBe(false);
       expect(data.error.message).toBe(
-        "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.",
+        "AI provider not configured: No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
       );
       expect(data.error.code).toBe("MISSING_API_KEY");
       expect(data.error.timestamp).toBeDefined();

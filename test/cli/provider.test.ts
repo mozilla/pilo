@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createAIProvider, getAIProviderInfo } from "../../src/cli/provider.js";
+import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
 import { LanguageModel } from "ai";
 
-// Mock the config module
-vi.mock("../../src/cli/config.js", () => ({
+// Mock the shared config module that CLI now imports from
+vi.mock("../../src/config.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
@@ -31,7 +31,7 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   })),
 }));
 
-import { config } from "../../src/cli/config.js";
+import { config } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
@@ -44,7 +44,8 @@ describe("Provider", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    // Clear environment variables that could interfere with tests
+    process.env = {};
     vi.clearAllMocks();
   });
 
@@ -94,7 +95,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/your-org/spark",
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
           "X-Title": "Spark Web Automation Tool",
         },
       });
