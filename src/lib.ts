@@ -37,3 +37,8 @@ export type {
 export { ConsoleLogger, GenericLogger } from "./loggers.js";
 export type { Logger } from "./loggers.js";
 export * from "./schemas.js";
+
+// Configuration and Provider System
+export { config, ConfigManager } from "./config.js";
+export type { SparkConfig } from "./config.js";
+export { createAIProvider, getAIProviderInfo } from "./provider.js";
