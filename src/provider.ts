@@ -7,12 +7,24 @@ import { config } from "./config.js";
  * Creates and configures an AI language model based on the current configuration
  * Can be used by both CLI and server with optional overrides
  */
-export function createAIProvider(overrides?: { provider?: string; model?: string }): LanguageModel {
+export function createAIProvider(overrides?: {
+  provider?: string;
+  model?: string;
+  openai_api_key?: string;
+  openrouter_api_key?: string;
+}): LanguageModel {
   const currentConfig = config.getConfig();
   const provider = overrides?.provider || currentConfig.provider || "openai";
 
+  // Create temporary config with overrides
+  const configWithOverrides = {
+    ...currentConfig,
+    ...(overrides?.openai_api_key && { openai_api_key: overrides.openai_api_key }),
+    ...(overrides?.openrouter_api_key && { openrouter_api_key: overrides.openrouter_api_key }),
+  };
+
   // Get API key and model
-  const { apiKey, model } = getProviderConfig(provider, currentConfig, overrides?.model);
+  const { apiKey, model } = getProviderConfig(provider, configWithOverrides, overrides?.model);
 
   // Create provider instance
   switch (provider) {

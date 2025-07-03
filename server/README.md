@@ -46,6 +46,8 @@ Execute a web automation task using natural language.
   // AI configuration overrides
   "provider": "openai|openrouter (optional)",
   "model": "string (optional)",
+  "openaiApiKey": "string (optional)",
+  "openrouterApiKey": "string (optional)",
 
   // Browser configuration overrides
   "browser": "firefox|chrome|safari|edge (optional)",

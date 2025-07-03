@@ -35,6 +35,8 @@ interface SparkTaskRequest {
   // AI configuration overrides
   provider?: "openai" | "openrouter";
   model?: string;
+  openaiApiKey?: string;
+  openrouterApiKey?: string;
 
   // Browser configuration overrides
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
@@ -148,6 +150,8 @@ spark.post("/run", async (c) => {
         const provider = createAIProvider({
           provider: body.provider,
           model: body.model,
+          openai_api_key: body.openaiApiKey,
+          openrouter_api_key: body.openrouterApiKey,
         });
 
         const agent = new WebAgent(browser, {

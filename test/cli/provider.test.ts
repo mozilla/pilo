@@ -155,6 +155,88 @@ describe("Provider", () => {
         apiKey: "sk-test123",
       });
     });
+
+    it("should accept provider override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        openai_api_key: "sk-test123",
+        openrouter_api_key: "sk-or-test123",
+      });
+
+      createAIProvider({ provider: "openrouter" });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-test123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
+      });
+    });
+
+    it("should accept model override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        model: "gpt-4.1",
+        openai_api_key: "sk-test123",
+      });
+
+      createAIProvider({ model: "gpt-4-turbo" });
+
+      expect(mockCreateOpenAI).toHaveBeenCalledWith({
+        apiKey: "sk-test123",
+      });
+    });
+
+    it("should accept API key overrides", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+      });
+
+      createAIProvider({ openai_api_key: "sk-override123" });
+
+      expect(mockCreateOpenAI).toHaveBeenCalledWith({
+        apiKey: "sk-override123",
+      });
+    });
+
+    it("should accept OpenRouter API key override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openrouter",
+      });
+
+      createAIProvider({ openrouter_api_key: "sk-or-override123" });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-override123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
+      });
+    });
+
+    it("should combine multiple overrides", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        model: "gpt-4.1",
+        openai_api_key: "sk-config123",
+      });
+
+      createAIProvider({
+        provider: "openrouter",
+        model: "anthropic/claude-3-sonnet",
+        openrouter_api_key: "sk-or-override123",
+      });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-override123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
+      });
+    });
   });
 
   describe("getAIProviderInfo", () => {
