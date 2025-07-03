@@ -120,5 +120,44 @@ describe("Spark Routes", () => {
       expect(data.error.code).toBe("TASK_SETUP_FAILED");
       expect(data.error.timestamp).toBeDefined();
     });
+
+    it("should return readable stream for SSE", async () => {
+      const res = await app.request("/spark/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toBeInstanceOf(ReadableStream);
+      expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+      expect(res.headers.get("Cache-Control")).toBe("no-cache");
+      expect(res.headers.get("Connection")).toBe("keep-alive");
+    });
+
+    it("should stream SSE events with proper format", async () => {
+      const res = await app.request("/spark/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toBeInstanceOf(ReadableStream);
+
+      // Read the stream
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+
+      // Read first chunk (should be start event)
+      const { value, done } = await reader.read();
+      expect(done).toBe(false);
+
+      const chunk = decoder.decode(value);
+      expect(chunk).toMatch(/^event: start\ndata: /);
+      expect(chunk).toContain('"task":"test task"');
+
+      reader.releaseLock();
+    });
   });
 });
