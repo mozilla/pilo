@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./SidePanel.css";
+import { EventLog } from "../../src/EventLog";
+import { useEventStore } from "../../src/useEventStore";
 
 interface Settings {
   apiKey: string;
@@ -18,11 +20,27 @@ export default function SidePanel() {
     model: "gpt-4-turbo",
   });
   const [showSettings, setShowSettings] = useState(false);
+  const { events, logger, clearEvents } = useEventStore();
 
   // Load settings on component mount
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Listen for real-time events from background script
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === "realtimeEvent" && message.event) {
+        logger.addEvent(message.event.type, message.event.data);
+      }
+    };
+
+    browser.runtime.onMessage.addListener(handleMessage);
+
+    return () => {
+      browser.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [logger]);
 
   const loadSettings = async () => {
     try {
@@ -76,6 +94,7 @@ export default function SidePanel() {
 
     setIsExecuting(true);
     setResult(null);
+    clearEvents(); // Clear previous events
 
     try {
       // Get current tab ID and URL for the background script
@@ -95,8 +114,22 @@ export default function SidePanel() {
       if (response && response.success) {
         setResult(response.result || "Task completed successfully!");
         setTask("");
+
+        // Add events from background script to our logger (fallback for any missed real-time events)
+        if (response.events && response.events.length > 0) {
+          response.events.forEach((event) => {
+            logger.addEvent(event.type, event.data);
+          });
+        }
       } else {
         setResult(`Error: ${response?.message || "Task execution failed"}`);
+
+        // Add events even on error
+        if (response?.events && response.events.length > 0) {
+          response.events.forEach((event) => {
+            logger.addEvent(event.type, event.data);
+          });
+        }
       }
     } catch (error) {
       setResult(`Error: ${error.message}`);
@@ -206,9 +239,7 @@ export default function SidePanel() {
           </div>
         )}
 
-        <div className="log-area">
-          <p>Check the browser console for detailed logging output.</p>
-        </div>
+        <EventLog events={events} />
       </div>
 
       <div className="sidepanel-footer">

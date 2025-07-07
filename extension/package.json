@@ -15,11 +15,13 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.3.23",
+    "@wxt-dev/webextension-polyfill": "^1.0.0",
+    "ai": "^4.3.17",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "spark": "file:..",
-    "@ai-sdk/openai": "^1.3.23",
-    "ai": "^4.3.17"
+    "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.2",

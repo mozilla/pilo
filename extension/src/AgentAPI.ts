@@ -1,4 +1,5 @@
 import { ExtensionBrowser } from "./ExtensionBrowser";
+import { EventStoreLogger } from "./EventStoreLogger";
 
 // Import shared code - browser-safe imports only
 import { WebAgent, Logger } from "spark/core";
@@ -34,7 +35,7 @@ export class AgentAPI {
     const agent = new WebAgent(browser, {
       provider,
       logger: options.logger,
-      debug: true,
+      debug: false,
     });
 
     try {
@@ -47,4 +48,4 @@ export class AgentAPI {
 }
 
 // Export for use in other parts of the extension
-export { ExtensionBrowser };
+export { ExtensionBrowser, EventStoreLogger };

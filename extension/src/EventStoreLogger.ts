@@ -20,11 +20,29 @@ export class EventStoreLogger extends GenericLogger {
    * Generic event handler - stores any event that comes through
    */
   private handleEvent = (eventType: string, data: any): void => {
-    this.events.push({
+    const event = {
       type: eventType,
       data,
       timestamp: data.timestamp || Date.now(),
-    });
+    };
+
+    this.events.push(event);
+
+    // Send real-time event to SidePanel if in background script context
+    if (typeof browser !== "undefined" && browser.runtime) {
+      try {
+        browser.runtime
+          .sendMessage({
+            type: "realtimeEvent",
+            event: event,
+          })
+          .catch(() => {
+            // Ignore errors if SidePanel isn't listening
+          });
+      } catch (error) {
+        // Ignore errors in case we're not in background script context
+      }
+    }
 
     // Notify all subscribers that new events are available
     this.notifySubscribers();

@@ -129,14 +129,17 @@ export function EventLog({ events }: EventLogProps) {
           No events yet. Run a task to see agent activity here.
         </div>
       ) : (
-        events.map((event, index) => (
-          <div
-            key={index}
-            style={{ marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}
-          >
-            {formatEvent(event)}
-          </div>
-        ))
+        events
+          .slice()
+          .reverse()
+          .map((event, index) => (
+            <div
+              key={events.length - index - 1}
+              style={{ marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}
+            >
+              {formatEvent(event)}
+            </div>
+          ))
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { defineConfig } from "wxt";
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ["@wxt-dev/module-react"],
+  modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   manifest: ({ browser }) => {
     // Common configuration for all browsers
     const baseManifest = {
