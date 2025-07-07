@@ -29,7 +29,7 @@ export class AgentAPI {
     const openai = createOpenAI({
       apiKey: options.apiKey,
     });
-    const provider = openai(options.model || "gpt-4o");
+    const provider = openai(options.model || "gpt-4.1");
 
     // Create WebAgent - same as CLI and server
     const agent = new WebAgent(browser, {

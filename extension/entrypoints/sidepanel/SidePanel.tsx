@@ -17,7 +17,7 @@ export default function SidePanel() {
   const [settings, setSettings] = useState<Settings>({
     apiKey: "",
     apiEndpoint: "https://api.openai.com/v1",
-    model: "gpt-4-turbo",
+    model: "gpt-4.1",
   });
   const [showSettings, setShowSettings] = useState(false);
   const { events, logger, clearEvents } = useEventStore();
@@ -49,7 +49,7 @@ export default function SidePanel() {
       const newSettings = {
         apiKey: stored.apiKey || "",
         apiEndpoint: stored.apiEndpoint || "https://api.openai.com/v1",
-        model: stored.model || "gpt-4-turbo",
+        model: stored.model || "gpt-4.1",
       };
       setSettings(newSettings);
 
@@ -174,7 +174,7 @@ export default function SidePanel() {
                 type="text"
                 value={settings.model}
                 onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                placeholder="gpt-4-turbo"
+                placeholder="gpt-4.1"
               />
             </label>
 

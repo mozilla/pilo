@@ -70,7 +70,7 @@ export default defineBackground(() => {
               // Use AgentAPI to run the task
               const result = await AgentAPI.runTask(message.task, {
                 apiKey: settings.apiKey,
-                model: settings.model || "gpt-4o",
+                model: settings.model || "gpt-4.1",
                 logger: logger,
                 tabId: message.tabId,
                 startUrl: message.startUrl,
