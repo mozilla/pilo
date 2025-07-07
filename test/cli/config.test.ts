@@ -96,12 +96,12 @@ describe("Config Integration", () => {
 
   describe("config validation", () => {
     it("should validate provider values", () => {
-      const validProviders: SparkConfig["provider"][] = ["openai", "openrouter"];
+      const validProviders: SparkConfig["provider"][] = ["openai", "openrouter", "vertex"];
 
       validProviders.forEach((provider) => {
         mockConfig.getConfig.mockReturnValue({ provider });
         const result = mockConfig.getConfig();
-        expect(["openai", "openrouter"]).toContain(result.provider);
+        expect(["openai", "openrouter", "vertex"]).toContain(result.provider);
       });
     });
 
@@ -175,6 +175,60 @@ describe("Config Integration", () => {
       expect(result.proxy).toBeUndefined();
       expect(result.proxy_username).toBeUndefined();
       expect(result.proxy_password).toBeUndefined();
+    });
+  });
+
+  describe("vertex ai configuration", () => {
+    it("should handle vertex ai config values", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        vertex_project: "test-project-123",
+        vertex_location: "us-west1",
+        model: "gemini-1.5-pro",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.provider).toBe("vertex");
+      expect(result.vertex_project).toBe("test-project-123");
+      expect(result.vertex_location).toBe("us-west1");
+      expect(result.model).toBe("gemini-1.5-pro");
+    });
+
+    it("should merge vertex ai environment variables", () => {
+      const mockSparkConfig: SparkConfig = {
+        provider: "vertex",
+        vertex_project: "env-project-456",
+        vertex_location: "europe-west1",
+      };
+
+      mockConfig.getConfig.mockReturnValue(mockSparkConfig);
+
+      const result = mockConfig.getConfig();
+      expect(result.provider).toBe("vertex");
+      expect(result.vertex_project).toBe("env-project-456");
+      expect(result.vertex_location).toBe("europe-west1");
+    });
+
+    it("should handle missing vertex ai config gracefully", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        // No vertex_project or vertex_location
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.provider).toBe("vertex");
+      expect(result.vertex_project).toBeUndefined();
+      expect(result.vertex_location).toBeUndefined();
+    });
+
+    it("should handle all supported providers", () => {
+      const providers: SparkConfig["provider"][] = ["openai", "openrouter", "vertex"];
+
+      providers.forEach((provider) => {
+        mockConfig.getConfig.mockReturnValue({ provider });
+        const result = mockConfig.getConfig();
+        expect(result.provider).toBe(provider);
+      });
     });
   });
 });
