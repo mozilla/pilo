@@ -36,12 +36,12 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async getUrl(): Promise<string> {
     const tab = await this.getActiveTab();
-    return tab.url || '';
+    return tab.url || "";
   }
 
   async getTitle(): Promise<string> {
     const tab = await this.getActiveTab();
-    return tab.title || '';
+    return tab.title || "";
   }
 
   async getText(): Promise<string> {
@@ -50,15 +50,15 @@ export class ExtensionBrowser implements AriaBrowser {
       target: { tabId: tab.id },
       func: () => {
         // Use the globally available functions from content script
-        const snapshot = (window as any).generateAriaTree(document.body, { 
-          forAI: true, 
-          refPrefix: 's1' 
+        const snapshot = (window as any).generateAriaTree(document.body, {
+          forAI: true,
+          refPrefix: "s1",
         });
-        return (window as any).renderAriaTree(snapshot, { 
-          mode: 'raw', 
-          forAI: true 
+        return (window as any).renderAriaTree(snapshot, {
+          mode: "raw",
+          forAI: true,
         });
-      }
+      },
     });
     return result;
   }
@@ -66,12 +66,12 @@ export class ExtensionBrowser implements AriaBrowser {
   async getScreenshot(): Promise<Buffer> {
     const tab = await this.getActiveTab();
     const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
-      format: 'png'
+      format: "png",
     });
-    
+
     // Convert data URL to Buffer
-    const base64Data = dataUrl.split(',')[1];
-    return Buffer.from(base64Data, 'base64');
+    const base64Data = dataUrl.split(",")[1];
+    return Buffer.from(base64Data, "base64");
   }
 
   async performAction(ref: string, action: string, value?: string): Promise<void> {
@@ -80,9 +80,9 @@ export class ExtensionBrowser implements AriaBrowser {
       target: { tabId: tab.id },
       func: (ref: string, action: string, value?: string) => {
         // Use the globally available functions from content script
-        const snapshot = (window as any).generateAriaTree(document.body, { 
-          forAI: true, 
-          refPrefix: 's1' 
+        const snapshot = (window as any).generateAriaTree(document.body, {
+          forAI: true,
+          refPrefix: "s1",
         });
         const element = snapshot.elements.get(ref);
 
@@ -91,31 +91,33 @@ export class ExtensionBrowser implements AriaBrowser {
         }
 
         switch (action) {
-          case 'click':
+          case "click":
             if (element instanceof HTMLElement) {
               element.click();
               return true;
             }
             break;
-          case 'type':
+          case "type":
             if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-              element.value = value || '';
-              element.dispatchEvent(new Event('input', { bubbles: true }));
-              element.dispatchEvent(new Event('change', { bubbles: true }));
+              element.value = value || "";
+              element.dispatchEvent(new Event("input", { bubbles: true }));
+              element.dispatchEvent(new Event("change", { bubbles: true }));
               return true;
             }
             break;
-          case 'select':
+          case "select":
             if (element instanceof HTMLSelectElement) {
-              element.value = value || '';
-              element.dispatchEvent(new Event('change', { bubbles: true }));
+              element.value = value || "";
+              element.dispatchEvent(new Event("change", { bubbles: true }));
               return true;
             }
             break;
         }
-        throw new Error(`Action ${action} not supported for element type ${element.constructor.name}`);
+        throw new Error(
+          `Action ${action} not supported for element type ${element.constructor.name}`,
+        );
       },
-      args: [ref, action, value]
+      args: [ref, action, value],
     });
 
     if (!result) {
@@ -125,11 +127,11 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async waitForLoadState(
     state: "networkidle" | "domcontentloaded" | "load",
-    options?: { timeout?: number }
+    options?: { timeout?: number },
   ): Promise<void> {
     // Simple implementation - wait for specified time
     // TODO: Could be improved with actual load state detection
-    await new Promise(resolve => setTimeout(resolve, options?.timeout ?? 1000));
+    await new Promise((resolve) => setTimeout(resolve, options?.timeout ?? 1000));
   }
 
   /**

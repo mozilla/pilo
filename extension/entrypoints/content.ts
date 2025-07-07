@@ -1,8 +1,8 @@
 // Import ariaSnapshot functionality
-import { generateAriaTree, renderAriaTree } from '../src/vendor/ariaSnapshot.js';
+import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot.js";
 
 export default defineContentScript({
-  matches: ['<all_urls>'],
+  matches: ["<all_urls>"],
   main() {
     // Make ARIA tree functions available globally for executeScript
     declare global {
@@ -18,7 +18,7 @@ export default defineContentScript({
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       switch (request.type) {
-        case 'getPageInfo':
+        case "getPageInfo":
           // Extract page information for Spark automation
           sendResponse({
             title: document.title,
@@ -26,14 +26,14 @@ export default defineContentScript({
             // Add more page analysis here
           });
           break;
-        case 'executePageAction':
+        case "executePageAction":
           // Execute specific actions on the page
           sendResponse({ success: true });
           break;
         default:
-          sendResponse({ success: false, message: 'Unknown message type' });
+          sendResponse({ success: false, message: "Unknown message type" });
       }
-      
+
       return true; // Keep message channel open for async response
     });
   },

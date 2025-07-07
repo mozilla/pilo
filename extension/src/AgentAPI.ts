@@ -13,21 +13,21 @@ export class AgentAPI {
    * Run a web automation task using Spark
    */
   static async runTask(
-    task: string, 
+    task: string,
     options: {
-      provider?: 'openai' | 'openrouter' | 'vertex';
+      provider?: "openai" | "openrouter" | "vertex";
       apiKey: string;
       apiEndpoint?: string;
       model?: string;
       logger?: ExtensionLogger;
-    }
+    },
   ): Promise<string> {
     const browser = new ExtensionBrowser();
-    
+
     // Use the same provider creation system as CLI/server
-    const providerType = options.provider || 'openai';
+    const providerType = options.provider || "openai";
     const model = options.model || DEFAULT_MODELS[providerType];
-    
+
     const provider = createProvider({
       provider: providerType,
       model,
@@ -43,7 +43,7 @@ export class AgentAPI {
 
     try {
       const result = await agent.execute(task);
-      return result.finalAnswer || 'Task completed successfully';
+      return result.finalAnswer || "Task completed successfully";
     } finally {
       await agent.close();
     }

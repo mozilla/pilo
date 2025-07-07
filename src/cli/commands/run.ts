@@ -5,7 +5,8 @@ import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
 import { config } from "../config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
-import { ConsoleLogger, JSONConsoleLogger } from "../../loggers.js";
+import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "../../loggers/json.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -104,7 +105,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     }
 
     // Create logger
-    const logger = options.logger === "json" ? new JSONConsoleLogger() : new ConsoleLogger();
+    const logger = options.logger === "json" ? new JSONConsoleLogger() : new ChalkConsoleLogger();
 
     // Create browser instance
     const browser = new PlaywrightBrowser({

@@ -29,8 +29,8 @@ import {
   TaskValidationResult,
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
-import { Logger, ConsoleLogger } from "./loggers.js";
-// No longer need to import getAIProviderInfo - provider info is injected via options
+import { Logger } from "./loggers/types.js";
+import { ConsoleLogger } from "./loggers/console.js";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {

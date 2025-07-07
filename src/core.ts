@@ -28,8 +28,10 @@ export type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
-export { ConsoleLogger, GenericLogger } from "./loggers.js";
-export type { Logger } from "./loggers.js";
-export { createProvider, DEFAULT_MODELS } from "./providers.js";
-export type { ProviderConfig } from "./providers.js";
+export { GenericLogger } from "./loggers/generic.js";
+export { ConsoleLogger } from "./loggers/console.js";
+export { JSONConsoleLogger } from "./loggers/json.js";
+export type { Logger } from "./loggers/types.js";
+// Note: createProvider not exported in core to avoid Node.js dependencies in browser
+// Use provider libraries directly in browser environments
 export * from "./schemas.js";

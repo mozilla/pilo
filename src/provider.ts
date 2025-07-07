@@ -3,6 +3,7 @@ import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { config } from "./config.js";
+import { getEnv } from "./env.js";
 
 /**
  * Creates and configures an AI language model based on the current configuration
@@ -44,15 +45,13 @@ export function createProviderFromConfig(
     apiKey?: string;
     model: string;
     configWithOverrides?: any;
-  }
+  },
 ): LanguageModel {
   const { apiKey, model, configWithOverrides } = config;
 
   switch (provider) {
     case "openai":
-      return apiKey !== process.env.OPENAI_API_KEY
-        ? createOpenAI({ apiKey })(model)
-        : openai(model);
+      return apiKey !== getEnv("OPENAI_API_KEY") ? createOpenAI({ apiKey })(model) : openai(model);
 
     case "openrouter":
       return createOpenRouter({
@@ -133,9 +132,9 @@ function getVertexConfig(currentConfig: any) {
   // 3. Google Cloud metadata service (if running in GCP)
   const project =
     currentConfig.vertex_project ||
-    process.env.GOOGLE_VERTEX_PROJECT ||
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCP_PROJECT;
+    getEnv("GOOGLE_VERTEX_PROJECT") ||
+    getEnv("GOOGLE_CLOUD_PROJECT") ||
+    getEnv("GCP_PROJECT");
 
   // Try to get location from various sources:
   // 1. Explicit configuration
@@ -144,8 +143,8 @@ function getVertexConfig(currentConfig: any) {
   // 4. Default to us-central1
   const location =
     currentConfig.vertex_location ||
-    process.env.GOOGLE_VERTEX_LOCATION ||
-    process.env.GOOGLE_CLOUD_REGION ||
+    getEnv("GOOGLE_VERTEX_LOCATION") ||
+    getEnv("GOOGLE_CLOUD_REGION") ||
     "us-central1";
 
   if (!project) {
@@ -182,7 +181,7 @@ export function getAIProviderInfo() {
   let keySource: "global" | "env" | "not_set" | "adc" = "not_set";
 
   if (provider === "openrouter") {
-    if (process.env.OPENROUTER_API_KEY) {
+    if (getEnv("OPENROUTER_API_KEY")) {
       hasApiKey = true;
       keySource = "env";
     } else if (currentConfig.openrouter_api_key) {
@@ -193,16 +192,16 @@ export function getAIProviderInfo() {
     // For Vertex AI, check if project is configured (ADC is assumed)
     const hasProject = !!(
       currentConfig.vertex_project ||
-      process.env.GOOGLE_VERTEX_PROJECT ||
-      process.env.GOOGLE_CLOUD_PROJECT ||
-      process.env.GCP_PROJECT
+      getEnv("GOOGLE_VERTEX_PROJECT") ||
+      getEnv("GOOGLE_CLOUD_PROJECT") ||
+      getEnv("GCP_PROJECT")
     );
     if (hasProject) {
       hasApiKey = true;
       keySource = "adc";
     }
   } else {
-    if (process.env.OPENAI_API_KEY) {
+    if (getEnv("OPENAI_API_KEY")) {
       hasApiKey = true;
       keySource = "env";
     } else if (currentConfig.openai_api_key) {

@@ -176,7 +176,8 @@
   gap: 8px;
 }
 
-.save-btn, .cancel-btn {
+.save-btn,
+.cancel-btn {
   flex: 1;
   padding: 8px 12px;
   border: none;

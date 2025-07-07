@@ -1,4 +1,4 @@
-import type { 
+import type {
   Logger,
   WebAgentEventEmitter,
   TaskStartEventData,
@@ -22,13 +22,13 @@ export class ExtensionLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
   private logElement: HTMLElement | null;
 
-  constructor(elementId: string = 'spark-log') {
-    this.logElement = typeof document !== 'undefined' ? document.getElementById(elementId) : null;
+  constructor(elementId: string = "spark-log") {
+    this.logElement = typeof document !== "undefined" ? document.getElementById(elementId) : null;
   }
 
   private append(msg: string) {
     if (this.logElement) {
-      const div = document.createElement('div');
+      const div = document.createElement("div");
       div.innerHTML = msg;
       this.logElement.appendChild(div);
       this.logElement.scrollTop = this.logElement.scrollHeight;
@@ -37,7 +37,7 @@ export class ExtensionLogger implements Logger {
 
   initialize(emitter: WebAgentEventEmitter): void {
     this.emitter = emitter;
-    
+
     // Subscribe to key events
     emitter.onEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
     emitter.onEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
@@ -82,7 +82,7 @@ export class ExtensionLogger implements Logger {
 
   private handlePageNavigation = (data: PageNavigationEventData): void => {
     this.append(`<div style='color:#aaa;margin:8px 0 2px 0;'>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`);
-    const truncatedTitle = data.title.length > 50 ? data.title.slice(0, 47) + '...' : data.title;
+    const truncatedTitle = data.title.length > 50 ? data.title.slice(0, 47) + "..." : data.title;
     this.append(`<b>📍 Current Page:</b> <span>${truncatedTitle}</span>`);
   };
 
@@ -103,7 +103,9 @@ export class ExtensionLogger implements Logger {
 
   private handleActionResult = (data: ActionResultEventData): void => {
     if (!data.success) {
-      this.append(`<span style='color:red;'><b>❌ Failed:</b> ${data.error || 'Unknown error'}</span>`);
+      this.append(
+        `<span style='color:red;'><b>❌ Failed:</b> ${data.error || "Unknown error"}</span>`,
+      );
     } else {
       this.append(`<span style='color:green;'><b>✅ Success</b></span>`);
     }

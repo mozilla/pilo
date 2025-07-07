@@ -1,7 +1,6 @@
 import chalk from "chalk";
-import { WebAgentEventType, WebAgentEventEmitter } from "./events.js";
+import { WebAgentEventType, WebAgentEventEmitter } from "../events.js";
 import type {
-  WebAgentEvent,
   ActionExecutionEventData,
   ActionResultEventData,
   CompressionDebugEventData,
@@ -23,61 +22,14 @@ import type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
   AIGenerationErrorEventData,
-} from "./events.js";
-
-/**
- * Base logger interface that all loggers must implement
- */
-export interface Logger {
-  /**
-   * Initialize the logger with an event emitter
-   */
-  initialize(emitter: WebAgentEventEmitter): void;
-
-  /**
-   * Clean up any resources used by the logger,
-   * including removing event listeners
-   */
-  dispose(): void;
-}
-
-/**
- * Generic logger that forwards all events to a callback function
- * Useful for custom logging implementations like streaming or external services
- */
-export class GenericLogger implements Logger {
-  private emitter: WebAgentEventEmitter | null = null;
-  private eventHandler: (eventType: string, data: any) => void;
-
-  constructor(eventHandler: (eventType: string, data: any) => void) {
-    this.eventHandler = eventHandler;
-  }
-
-  initialize(emitter: WebAgentEventEmitter): void {
-    if (this.emitter) {
-      this.dispose();
-    }
-    this.emitter = emitter;
-
-    // Listen to all events using wildcard
-    emitter.on("*", (eventType: string, data: any) => {
-      this.eventHandler(eventType, data);
-    });
-  }
-
-  dispose(): void {
-    if (this.emitter) {
-      // Remove wildcard listener
-      this.emitter.removeAllListeners("*");
-      this.emitter = null;
-    }
-  }
-}
+} from "../events.js";
+import { Logger } from "./types.js";
 
 /**
  * Console logger that outputs colored text to the console
+ * Note: Uses Node.js specific APIs (chalk) - not suitable for browser environments
  */
-export class ConsoleLogger implements Logger {
+export class ChalkConsoleLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
 
   initialize(emitter: WebAgentEventEmitter): void {
@@ -333,39 +285,4 @@ export class ConsoleLogger implements Logger {
   private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
     console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
   };
-}
-
-export class JSONConsoleLogger implements Logger {
-  private emitter: WebAgentEventEmitter | null = null;
-  private handlers: [WebAgentEventType, (data: any) => void][] = [];
-
-  initialize(emitter: WebAgentEventEmitter): void {
-    if (this.emitter) {
-      this.dispose();
-    }
-    this.emitter = emitter;
-    this.handlers = [];
-
-    for (const event of Object.values(WebAgentEventType)) {
-      const handler = this.buildEventHandler(event);
-      this.handlers.push([event, handler]);
-      emitter.onEvent(event, handler);
-    }
-  }
-
-  dispose(): void {
-    if (this.emitter) {
-      for (const [event, handler] of this.handlers) {
-        this.emitter.offEvent(event, handler);
-      }
-      this.emitter = null;
-    }
-  }
-
-  private buildEventHandler(type: WebAgentEventType) {
-    return (data: WebAgentEvent["data"]): void => {
-      const json = JSON.stringify({ event: type, data }, null, 0);
-      console.log(json);
-    };
-  }
 }

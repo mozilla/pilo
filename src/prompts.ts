@@ -16,20 +16,20 @@ const planPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 Create a plan for this web navigation task.
-Provide a clear explanation{{#if includeUrl}}, step-by-step plan, and starting URL{{else}} and step-by-step plan{{/if}}.
+Provide a clear explanation{% if includeUrl %}, step-by-step plan, and starting URL{% else %} and step-by-step plan{% endif %}.
 Focus on general steps and goals rather than specific page features or UI elements.
 
-Today's Date: {{currentDate}}
-Task: {{task}}
-{{#if startingUrl}}Starting URL: {{startingUrl}}{{/if}}
-{{#if guardrails}}Guardrails: {{guardrails}}{{/if}}
+Today's Date: {{ currentDate }}
+Task: {{ task }}
+{% if startingUrl %}Starting URL: {{ startingUrl }}{% endif %}
+{% if guardrails %}Guardrails: {{ guardrails }}{% endif %}
 
 Best Practices:
 - When explaining the task, make sure to expand all dates to include the year.
 - For booking tasks, all dates must be in the future.
 - Avoid assumptions about specific UI layouts that may change.
-{{#if startingUrl}}- Use the provided starting URL as your starting point for the task.{{/if}}
-{{#if guardrails}}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{{/if}}
+{% if startingUrl %}- Use the provided starting URL as your starting point for the task.{% endif %}
+{% if guardrails %}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{% endif %}
 
 ${jsonOnlyInstruction}
 
@@ -37,8 +37,8 @@ Respond with a JSON object matching this exact structure:
 \`\`\`json
 {
   "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
-  "plan": "Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features."{{#if includeUrl}},
-  "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"{{/if}}
+  "plan": "Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features."{% if includeUrl %},
+  "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"{% endif %}
 }
 \`\`\`
 `.trim(),
@@ -66,7 +66,7 @@ const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
   "extractedData": "REQUIRED: Extract any data that helps with your task. For navigation/action tasks: navigation options, form fields, error messages, loading states, menu items, search suggestions, requirements, restrictions. For research tasks: capture detailed information like facts, figures, quotes, sources, dates, prices, specifications, comparisons, pros/cons - enough detail to provide a comprehensive final answer. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items for navigation tasks, more detail for research tasks. If no task-related data is available, use: 'No task related data.'",
   "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Comment on any important data that should be extracted from the current page state.",
   "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
-  "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{{#if hasGuardrails}} Your actions MUST COMPLY with the provided guardrails.{{/if}} If the previous action failed, retry once then try an alternative approach.",
+  "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{% if hasGuardrails %} Your actions MUST COMPLY with the provided guardrails.{% endif %} If the previous action failed, retry once then try an alternative approach.",
   "action": {
     "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, done",
     "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
@@ -80,9 +80,9 @@ const actionLoopPromptTemplate = buildPromptTemplate(
 ${youArePrompt}
 For each step, assess the current state and decide on the next action to take.
 Consider the outcome of previous actions and explain your reasoning.
-{{#if hasGuardrails}}
+{% if hasGuardrails %}
 🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
-{{/if}}
+{% endif %}
 
 Actions:
 - "select": Select option from dropdown (ref=element reference, value=option)
@@ -106,7 +106,7 @@ Rules:
 5. "done" means the ENTIRE task is finished - see FINAL ANSWER REQUIREMENTS below
 6. Use "wait" for page loads, animations, or dynamic content
 7. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
-{{#if hasGuardrails}}8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION{{/if}}
+{% if hasGuardrails %}8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION{% endif %}
 
 Best Practices:
 - You can see the entire page content - do not scroll or click links just to navigate within the page
@@ -115,7 +115,7 @@ Best Practices:
 - For forms, click the submit button after filling all fields
 - If an element isn't found, try looking for alternative elements
 - Focus on direct interaction with elements needed for your task
-{{#if hasGuardrails}}- Before taking any action, verify it does not violate the guardrails{{/if}}
+{% if hasGuardrails %}- Before taking any action, verify it does not violate the guardrails{% endif %}
 
 **FINAL ANSWER REQUIREMENTS (for "done" action):**
 When you use the "done" action, your value field MUST contain a comprehensive final answer that:
@@ -131,7 +131,7 @@ ${jsonOnlyInstruction}
 
 Respond with a JSON object matching this exact structure:
 \`\`\`json
-{{actionLoopResponseFormat}}
+{{ actionLoopResponseFormat }}
 \`\`\`
 `.trim(),
 );
@@ -147,23 +147,23 @@ export { buildActionLoopPrompt };
 
 const taskAndPlanTemplate = buildPromptTemplate(
   `
-Task: {{task}}
-Explanation: {{explanation}}
-Plan: {{plan}}
-Today's Date: {{currentDate}}
-{{#if data}}
+Task: {{ task }}
+Explanation: {{ explanation }}
+Plan: {{ plan }}
+Today's Date: {{ currentDate }}
+{% if data %}
 Input Data:
 \`\`\`json
-{{data}}
+{{ data }}
 \`\`\`
-{{/if}}
-{{#if guardrails}}
+{% endif %}
+{% if guardrails %}
 
 **MANDATORY GUARDRAILS**
-{{guardrails}}
+{{ guardrails }}
 
 These guardrails are ABSOLUTE REQUIREMENTS that you MUST follow at all times. Any action that violates these guardrails is STRICTLY FORBIDDEN.
-{{/if}}
+{% endif %}
 `.trim(),
 );
 
@@ -185,13 +185,13 @@ export const buildTaskAndPlanPrompt = (
 
 const pageSnapshotTemplate = buildPromptTemplate(
   `
-This is a complete accessibility tree snapshot of the current page in the browser showing ALL page content.{{#if hasScreenshot}} A screenshot is also provided to help you understand the visual layout.{{/if}}
+This is a complete accessibility tree snapshot of the current page in the browser showing ALL page content.{% if hasScreenshot %} A screenshot is also provided to help you understand the visual layout.{% endif %}
 
-Title: {{title}}
-URL: {{url}}
+Title: {{ title }}
+URL: {{ url }}
 
 \`\`\`
-{{snapshot}}
+{{ snapshot }}
 \`\`\`
 
 The snapshot above contains the entire page content - you can see everything without scrolling or navigating within the page.
@@ -199,7 +199,7 @@ Assess the current state and choose your next action.
 Focus on the most relevant elements that help complete your task.
 If content appears dynamic or paginated, consider waiting or exploring navigation options.
 If an action has failed twice, try something else or move on.
-{{#if hasScreenshot}}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{{/if}}
+{% if hasScreenshot %}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
 `.trim(),
 );
 
@@ -220,11 +220,11 @@ const stepValidationFeedbackTemplate = buildPromptTemplate(
   `
 Your previous response did not match the required format. Here are the validation errors:
 
-{{validationErrors}}
+{{ validationErrors }}
 
 Please correct your response to match this exact format:
 \`\`\`json
-{{actionLoopResponseFormat}}
+{{ actionLoopResponseFormat }}
 \`\`\`
 
 Remember:
@@ -236,9 +236,9 @@ Remember:
 - For "wait" action, you MUST provide a "value" with the number of seconds
 - For "done" action, you MUST provide a "value" with a plain text final answer following the FINAL ANSWER REQUIREMENTS
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
-{{#if hasGuardrails}}
+{% if hasGuardrails %}
 - ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
-{{/if}}
+{% endif %}
 `.trim(),
 );
 
@@ -256,11 +256,11 @@ const taskValidationTemplate = buildPromptTemplate(
   `
 Review the task completion and determine if it was successful by analyzing both the final answer and the conversation that led to it.
 
-Task: {{task}}
-Final Answer: {{finalAnswer}}
+Task: {{ task }}
+Final Answer: {{ finalAnswer }}
 
 Conversation History:
-{{conversationHistory}}
+{{ conversationHistory }}
 
 Analyze the task completion using these quality levels:
 - **failed**: Task not completed or completed incorrectly

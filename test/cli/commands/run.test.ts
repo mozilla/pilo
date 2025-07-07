@@ -28,8 +28,11 @@ vi.mock("../../../src/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
 }));
 
-vi.mock("../../../src/loggers.js", () => ({
-  ConsoleLogger: vi.fn().mockImplementation(() => ({})),
+vi.mock("../../../src/loggers/chalkConsole.js", () => ({
+  ChalkConsoleLogger: vi.fn().mockImplementation(() => ({})),
+}));
+
+vi.mock("../../../src/loggers/json.js", () => ({
   JSONConsoleLogger: vi.fn().mockImplementation(() => ({})),
 }));
 
@@ -44,13 +47,14 @@ import { WebAgent } from "../../../src/webAgent.js";
 import { PlaywrightBrowser } from "../../../src/browser/playwrightBrowser.js";
 import { config } from "../../../src/config.js";
 import { createAIProvider } from "../../../src/provider.js";
-import { ConsoleLogger, JSONConsoleLogger } from "../../../src/loggers.js";
+import { ChalkConsoleLogger } from "../../../src/loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "../../../src/loggers/json.js";
 
 const mockWebAgent = vi.mocked(WebAgent);
 const mockPlaywrightBrowser = vi.mocked(PlaywrightBrowser);
 const mockConfig = vi.mocked(config);
 const mockCreateAIProvider = vi.mocked(createAIProvider);
-const mockConsoleLogger = vi.mocked(ConsoleLogger);
+const mockChalkConsoleLogger = vi.mocked(ChalkConsoleLogger);
 const mockJSONConsoleLogger = vi.mocked(JSONConsoleLogger);
 
 describe("CLI Run Command", () => {
@@ -298,14 +302,14 @@ describe("CLI Run Command", () => {
       await command.parseAsync(args, { from: "user" });
 
       expect(mockJSONConsoleLogger).toHaveBeenCalled();
-      expect(mockConsoleLogger).not.toHaveBeenCalled();
+      expect(mockChalkConsoleLogger).not.toHaveBeenCalled();
     });
 
     it("should use console logger by default", async () => {
       const args = ["test task"];
       await command.parseAsync(args, { from: "user" });
 
-      expect(mockConsoleLogger).toHaveBeenCalled();
+      expect(mockChalkConsoleLogger).toHaveBeenCalled();
       expect(mockJSONConsoleLogger).not.toHaveBeenCalled();
     });
 

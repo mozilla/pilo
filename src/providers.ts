@@ -2,6 +2,7 @@ import { LanguageModel } from "ai";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
+import { getEnv } from "./env.js";
 
 /**
  * Provider configuration for creating AI providers
@@ -31,9 +32,10 @@ export function createProvider(config: ProviderConfig): LanguageModel {
       if (!apiKey) {
         throw new Error("OpenAI API key is required");
       }
-      return apiKey !== process.env.OPENAI_API_KEY
-        ? createOpenAI({ apiKey })(model)
-        : openai(model);
+      // In browser environments, always use the provided apiKey
+      // In Node.js environments, check against environment variable
+      const shouldUseCustomKey = apiKey !== getEnv("OPENAI_API_KEY");
+      return shouldUseCustomKey ? createOpenAI({ apiKey })(model) : openai(model);
 
     case "openrouter":
       if (!apiKey) {
@@ -66,6 +68,6 @@ export function createProvider(config: ProviderConfig): LanguageModel {
  */
 export const DEFAULT_MODELS = {
   openai: "gpt-4.1",
-  openrouter: "openai/gpt-4.1", 
+  openrouter: "openai/gpt-4.1",
   vertex: "gemini-2.5-flash",
 } as const;

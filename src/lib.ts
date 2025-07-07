@@ -34,8 +34,11 @@ export type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
-export { ConsoleLogger, GenericLogger } from "./loggers.js";
-export type { Logger } from "./loggers.js";
+export { ConsoleLogger } from "./loggers/console.js";
+export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
+export { GenericLogger } from "./loggers/generic.js";
+export { JSONConsoleLogger } from "./loggers/json.js";
+export type { Logger } from "./loggers/types.js";
 export * from "./schemas.js";
 
 // Configuration and Provider System
