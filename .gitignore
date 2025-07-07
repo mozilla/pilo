@@ -4,3 +4,4 @@ dist
 .DS_Store
 *.txt
 CLAUDE.md
+scripts/docker-build.sh
