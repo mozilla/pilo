@@ -1,5 +1,5 @@
-import { WebAgent } from "spark/core";
-import { createOpenAI } from "@ai-sdk/openai";
+import { AgentAPI } from "../src/AgentAPI";
+import { ConsoleLogger } from "spark/core";
 
 export default defineBackground(() => {
   console.log("Background script loaded");
@@ -44,17 +44,23 @@ export default defineBackground(() => {
             }
 
             try {
-              // Create OpenAI provider directly (no need for provider factory in browser)
-              const openai = createOpenAI({
+              // Create console logger for debugging
+              const logger = new ConsoleLogger();
+
+              console.log(
+                `Starting task execution for tab ${message.tabId} with URL: ${message.startUrl}`,
+              );
+
+              // Use AgentAPI to run the task
+              const result = await AgentAPI.runTask(message.task, {
                 apiKey: settings.apiKey,
+                model: settings.model || "gpt-4o",
+                logger: logger,
+                tabId: message.tabId,
+                startUrl: message.startUrl,
               });
-              const provider = openai(settings.model || "gpt-4o");
 
-              // Create WebAgent instance
-              const webAgent = new WebAgent({ provider });
-
-              // Execute the task
-              const result = await webAgent.run(message.task);
+              console.log(`Task completed successfully:`, result);
 
               response = {
                 success: true,

@@ -39,30 +39,30 @@ export class ExtensionLogger implements Logger {
     this.emitter = emitter;
 
     // Subscribe to key events
-    emitter.onEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
-    emitter.onEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
-    emitter.onEvent(WebAgentEventType.PAGE_NAVIGATION, this.handlePageNavigation);
-    emitter.onEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
-    emitter.onEvent(WebAgentEventType.THOUGHT, this.handleThought);
-    emitter.onEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
-    emitter.onEvent(WebAgentEventType.ACTION_RESULT, this.handleActionResult);
-    emitter.onEvent(WebAgentEventType.WAITING, this.handleWaiting);
-    emitter.onEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
-    emitter.onEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+    emitter.onEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
+    emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
+    emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
+    emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
+    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
+    emitter.onEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
+    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
+    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
   }
 
   dispose(): void {
     if (this.emitter) {
-      this.emitter.offEvent(WebAgentEventType.TASK_START, this.handleTaskStart);
-      this.emitter.offEvent(WebAgentEventType.TASK_COMPLETE, this.handleTaskComplete);
-      this.emitter.offEvent(WebAgentEventType.PAGE_NAVIGATION, this.handlePageNavigation);
-      this.emitter.offEvent(WebAgentEventType.OBSERVATION, this.handleObservation);
-      this.emitter.offEvent(WebAgentEventType.THOUGHT, this.handleThought);
-      this.emitter.offEvent(WebAgentEventType.ACTION_EXECUTION, this.handleActionExecution);
-      this.emitter.offEvent(WebAgentEventType.ACTION_RESULT, this.handleActionResult);
-      this.emitter.offEvent(WebAgentEventType.WAITING, this.handleWaiting);
-      this.emitter.offEvent(WebAgentEventType.NETWORK_WAITING, this.handleNetworkWaiting);
-      this.emitter.offEvent(WebAgentEventType.NETWORK_TIMEOUT, this.handleNetworkTimeout);
+      this.emitter.offEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
+      this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
+      this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
+      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
+      this.emitter.offEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
       this.emitter = null;
     }
   }

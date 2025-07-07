@@ -1,8 +1,8 @@
 import { ExtensionBrowser } from "./ExtensionBrowser";
-import { ExtensionLogger } from "./ExtensionLogger";
 
-// Import shared code - same as CLI and server use
-import { WebAgent, createProvider, DEFAULT_MODELS } from "spark/core";
+// Import shared code - browser-safe imports only
+import { WebAgent, Logger } from "spark/core";
+import { createOpenAI } from "@ai-sdk/openai";
 
 /**
  * AgentAPI - Main entry point for running Spark tasks in the extension
@@ -15,24 +15,20 @@ export class AgentAPI {
   static async runTask(
     task: string,
     options: {
-      provider?: "openai" | "openrouter" | "vertex";
       apiKey: string;
-      apiEndpoint?: string;
       model?: string;
-      logger?: ExtensionLogger;
+      logger?: Logger;
+      tabId?: number;
+      startUrl?: string;
     },
   ): Promise<string> {
-    const browser = new ExtensionBrowser();
+    const browser = new ExtensionBrowser(options.tabId);
 
-    // Use the same provider creation system as CLI/server
-    const providerType = options.provider || "openai";
-    const model = options.model || DEFAULT_MODELS[providerType];
-
-    const provider = createProvider({
-      provider: providerType,
-      model,
+    // Create OpenAI provider directly for browser extension
+    const openai = createOpenAI({
       apiKey: options.apiKey,
     });
+    const provider = openai(options.model || "gpt-4o");
 
     // Create WebAgent - same as CLI and server
     const agent = new WebAgent(browser, {
@@ -42,7 +38,7 @@ export class AgentAPI {
     });
 
     try {
-      const result = await agent.execute(task);
+      const result = await agent.execute(task, options.startUrl);
       return result.finalAnswer || "Task completed successfully";
     } finally {
       await agent.close();
@@ -51,4 +47,4 @@ export class AgentAPI {
 }
 
 // Export for use in other parts of the extension
-export { ExtensionBrowser, ExtensionLogger };
+export { ExtensionBrowser };

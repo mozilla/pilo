@@ -78,6 +78,9 @@ export default function SidePanel() {
     setResult(null);
 
     try {
+      // Get current tab ID and URL for the background script
+      const [currentTab] = await browser.tabs.query({ active: true, currentWindow: true });
+
       // Only use background worker for actual Spark task execution
       const response = await browser.runtime.sendMessage({
         type: "executeTask",
@@ -85,6 +88,8 @@ export default function SidePanel() {
         apiKey: settings.apiKey,
         apiEndpoint: settings.apiEndpoint,
         model: settings.model,
+        tabId: currentTab?.id,
+        startUrl: currentTab?.url,
       });
 
       if (response && response.success) {
@@ -201,7 +206,9 @@ export default function SidePanel() {
           </div>
         )}
 
-        <div id="spark-log" className="log-area"></div>
+        <div className="log-area">
+          <p>Check the browser console for detailed logging output.</p>
+        </div>
       </div>
 
       <div className="sidepanel-footer">
