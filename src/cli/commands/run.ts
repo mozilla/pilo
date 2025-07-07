@@ -19,6 +19,14 @@ export function createRunCommand(): Command {
     .option("-d, --data <json>", "JSON data to provide context for the task")
     .option("-g, --guardrails <text>", "Safety constraints for the task execution")
     .option(
+      "--provider <provider>",
+      "AI provider to use (openai, openrouter)",
+      config.get("provider") || "openai",
+    )
+    .option("--model <model>", "AI model to use", config.get("model"))
+    .option("--openai-api-key <key>", "OpenAI API key")
+    .option("--openrouter-api-key <key>", "OpenRouter API key")
+    .option(
       "-b, --browser <browser>",
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
       config.get("browser") || "firefox",
@@ -33,6 +41,17 @@ export function createRunCommand(): Command {
       config.get("block_resources") || "media,manifest",
     )
     .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp") || false)
+    .option(
+      "--max-iterations <number>",
+      "Maximum total iterations to prevent infinite loops",
+      String(config.get("max_iterations") || 50),
+    )
+    .option(
+      "--max-validation-attempts <number>",
+      "Maximum validation attempts",
+      String(config.get("max_validation_attempts") || 3),
+    )
     .option(
       "--proxy <url>",
       "Proxy server URL (http://host:port, https://host:port, socks5://host:port)",
@@ -94,19 +113,30 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       blockResources,
       pwEndpoint: options.pwEndpoint,
       headless: options.headless,
+      bypassCSP: options.bypassCsp,
       proxyServer: options.proxy,
       proxyUsername: options.proxyUsername,
       proxyPassword: options.proxyPassword,
     });
 
-    // Create AI provider
-    const aiProvider = createAIProvider();
+    // Create AI provider with CLI overrides
+    const providerOverrides: any = {};
+    if (options.provider) providerOverrides.provider = options.provider;
+    if (options.model) providerOverrides.model = options.model;
+    if (options.openaiApiKey) providerOverrides.openai_api_key = options.openaiApiKey;
+    if (options.openrouterApiKey) providerOverrides.openrouter_api_key = options.openrouterApiKey;
+
+    const aiProvider = createAIProvider(providerOverrides);
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: options.debug,
       vision: options.vision,
       guardrails: options.guardrails,
+      maxIterations: options.maxIterations ? parseInt(options.maxIterations) : undefined,
+      maxValidationAttempts: options.maxValidationAttempts
+        ? parseInt(options.maxValidationAttempts)
+        : undefined,
       provider: aiProvider,
       logger,
     });

@@ -9,6 +9,10 @@ type EventSender = (event: string, data: any) => Promise<void>;
 export class StreamLogger extends GenericLogger {
   constructor(sendEvent: EventSender) {
     super(async (eventType: string, data: any) => {
+      // Skip events starting with "ai:"
+      if (eventType.startsWith("ai:")) {
+        return;
+      }
       await sendEvent(eventType, data);
     });
   }

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createAIProvider, getAIProviderInfo } from "../../src/cli/provider.js";
+import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
 import { LanguageModel } from "ai";
 
-// Mock the config module
-vi.mock("../../src/cli/config.js", () => ({
+// Mock the shared config module that CLI now imports from
+vi.mock("../../src/config.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
@@ -40,7 +40,7 @@ vi.mock("@ai-sdk/google-vertex", () => ({
   })),
 }));
 
-import { config } from "../../src/cli/config.js";
+import { config } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
@@ -56,6 +56,11 @@ describe("Provider", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    // Clear only Spark-related environment variables that could interfere with tests
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.SPARK_PROVIDER;
+    delete process.env.SPARK_MODEL;
     vi.clearAllMocks();
   });
 
@@ -105,7 +110,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/your-org/spark",
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
           "X-Title": "Spark Web Automation Tool",
         },
       });
@@ -258,6 +263,88 @@ describe("Provider", () => {
 
       expect(mockCreateOpenAI).toHaveBeenCalledWith({
         apiKey: "sk-test123",
+      });
+    });
+
+    it("should accept provider override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        openai_api_key: "sk-test123",
+        openrouter_api_key: "sk-or-test123",
+      });
+
+      createAIProvider({ provider: "openrouter" });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-test123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
+      });
+    });
+
+    it("should accept model override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        model: "gpt-4.1",
+        openai_api_key: "sk-test123",
+      });
+
+      createAIProvider({ model: "gpt-4-turbo" });
+
+      expect(mockCreateOpenAI).toHaveBeenCalledWith({
+        apiKey: "sk-test123",
+      });
+    });
+
+    it("should accept API key overrides", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+      });
+
+      createAIProvider({ openai_api_key: "sk-override123" });
+
+      expect(mockCreateOpenAI).toHaveBeenCalledWith({
+        apiKey: "sk-override123",
+      });
+    });
+
+    it("should accept OpenRouter API key override", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openrouter",
+      });
+
+      createAIProvider({ openrouter_api_key: "sk-or-override123" });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-override123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
+      });
+    });
+
+    it("should combine multiple overrides", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "openai",
+        model: "gpt-4.1",
+        openai_api_key: "sk-config123",
+      });
+
+      createAIProvider({
+        provider: "openrouter",
+        model: "anthropic/claude-3-sonnet",
+        openrouter_api_key: "sk-or-override123",
+      });
+
+      expect(mockCreateOpenRouter).toHaveBeenCalledWith({
+        apiKey: "sk-or-override123",
+        headers: {
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+          "X-Title": "Spark Web Automation Tool",
+        },
       });
     });
   });
