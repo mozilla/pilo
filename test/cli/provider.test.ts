@@ -31,14 +31,25 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   })),
 }));
 
+vi.mock("@ai-sdk/google-vertex", () => ({
+  createVertex: vi.fn((options) => (model: string) => ({
+    model,
+    provider: "vertex",
+    project: options.project,
+    location: options.location,
+  })),
+}));
+
 import { config } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createVertex } from "@ai-sdk/google-vertex";
 
 const mockConfig = vi.mocked(config);
 const mockOpenai = vi.mocked(openai);
 const mockCreateOpenAI = vi.mocked(createOpenAI);
 const mockCreateOpenRouter = vi.mocked(createOpenRouter);
+const mockCreateVertex = vi.mocked(createVertex);
 
 describe("Provider", () => {
   const originalEnv = process.env;
@@ -133,6 +144,105 @@ describe("Provider", () => {
       });
 
       expect(() => createAIProvider()).toThrow("No OpenRouter API key found. To get started:");
+    });
+
+    it("should create Vertex AI provider with project and location", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        vertex_project: "test-project",
+        vertex_location: "us-west1",
+        model: "gemini-1.5-pro",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "test-project",
+        location: "us-west1",
+      });
+    });
+
+    it("should create Vertex AI provider with default location", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        vertex_project: "test-project",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "test-project",
+        location: "us-central1",
+      });
+    });
+
+    it("should create Vertex AI provider using env vars", () => {
+      process.env.GOOGLE_CLOUD_PROJECT = "env-project";
+      process.env.GOOGLE_CLOUD_REGION = "europe-west1";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "env-project",
+        location: "europe-west1",
+      });
+    });
+
+    it("should prioritize GOOGLE_VERTEX_PROJECT over GOOGLE_CLOUD_PROJECT", () => {
+      process.env.GOOGLE_VERTEX_PROJECT = "vertex-project";
+      process.env.GOOGLE_CLOUD_PROJECT = "cloud-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "vertex-project",
+        location: "us-central1",
+      });
+    });
+
+    it("should use GCP_PROJECT as fallback", () => {
+      process.env.GCP_PROJECT = "gcp-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "gcp-project",
+        location: "us-central1",
+      });
+    });
+
+    it("should throw error when Vertex AI project is missing", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      expect(() => createAIProvider()).toThrow("No Google Cloud project ID found. To get started:");
+    });
+
+    it("should use default gemini model for Vertex AI", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        vertex_project: "test-project",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateVertex).toHaveBeenCalledWith({
+        project: "test-project",
+        location: "us-central1",
+      });
     });
 
     it("should throw error for unsupported provider", () => {
@@ -317,6 +427,109 @@ describe("Provider", () => {
         model: "openai/gpt-4.1",
         hasApiKey: true,
         keySource: "env",
+      });
+    });
+
+    it("should return Vertex AI provider info with project configured", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+        vertex_project: "test-project",
+        vertex_location: "us-west1",
+        model: "gemini-1.5-pro",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-1.5-pro",
+        hasApiKey: true,
+        keySource: "adc",
+      });
+    });
+
+    it("should return Vertex AI provider info with env project", () => {
+      process.env.GOOGLE_CLOUD_PROJECT = "env-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "adc",
+      });
+    });
+
+    it("should return Vertex AI provider info with GOOGLE_VERTEX_PROJECT", () => {
+      process.env.GOOGLE_VERTEX_PROJECT = "vertex-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "adc",
+      });
+    });
+
+    it("should return Vertex AI provider info with GCP_PROJECT fallback", () => {
+      process.env.GCP_PROJECT = "gcp-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "adc",
+      });
+    });
+
+    it("should return Vertex AI provider info without project", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-2.5-flash",
+        hasApiKey: false,
+        keySource: "not_set",
+      });
+    });
+
+    it("should prioritize GOOGLE_VERTEX_PROJECT in provider info", () => {
+      process.env.GOOGLE_VERTEX_PROJECT = "vertex-project";
+      process.env.GOOGLE_CLOUD_PROJECT = "cloud-project";
+      process.env.GCP_PROJECT = "gcp-project";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "vertex",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "vertex",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "adc",
       });
     });
   });
