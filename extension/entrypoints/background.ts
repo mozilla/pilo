@@ -1,51 +1,58 @@
 export default defineBackground(() => {
-  // Handle Chrome sidePanel API - open sidebar when action button is clicked
-  if (browser.action && browser.sidePanel) {
-    browser.action.onClicked.addListener(async (tab) => {
+  console.log('Background script loaded');
+  
+  // Explicitly handle action clicks to open sidePanel
+  browser.action.onClicked.addListener(async (tab) => {
+    console.log('Extension button clicked for tab:', tab.id);
+    
+    if (browser.sidePanel && browser.sidePanel.open) {
       try {
         await browser.sidePanel.open({ tabId: tab.id });
+        console.log('SidePanel opened successfully');
       } catch (error) {
-        console.error('Failed to open sidebar:', error);
+        console.error('Failed to open sidePanel:', error);
       }
-    });
-
-    // Set sidebar to be enabled by default
-    browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  }
+    } else {
+      console.error('sidePanel API not available');
+    }
+  });
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener(async (message, sender) => {
-    switch (message.type) {
-      case 'executeTask':
-        try {
-          // TODO: Integrate with Spark library
-          // For now, just simulate task execution
-          const { task, tabId, url } = message;
-          
-          // Simulate some processing time
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // TODO: Actually execute the task using Spark
-          // const result = await executeSparkTask(task, tabId, url);
-          
-          return {
-            success: true,
-            message: `Task "${task}" executed successfully (placeholder)`,
-            // result: result
-          };
-        } catch (error) {
-          console.error('Error executing task:', error);
-          return {
-            success: false,
-            message: error.message || 'Unknown error occurred'
-          };
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Background received message:', message.type);
+    
+    (async () => {
+      try {
+        let response;
+        
+        switch (message.type) {
+          case 'executeTask':
+            // TODO: Implement Spark task execution here
+            console.log('Task execution not implemented yet');
+            response = {
+              success: false,
+              message: 'Task execution not implemented yet - Spark integration coming soon!'
+            };
+            break;
+            
+          default:
+            response = {
+              success: false,
+              message: 'Unknown message type'
+            };
         }
         
-      default:
-        return {
+        console.log('Sending response:', response);
+        sendResponse(response);
+      } catch (error) {
+        console.error('Error in message handler:', error);
+        sendResponse({
           success: false,
-          message: 'Unknown message type'
-        };
-    }
+          message: error.message || 'Unknown error occurred'
+        });
+      }
+    })();
+    
+    return true; // Required for async response
   });
 });

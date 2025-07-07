@@ -31,7 +31,23 @@ export function createAIProvider(overrides?: {
   // Get API key and model
   const { apiKey, model } = getProviderConfig(provider, configWithOverrides, overrides?.model);
 
-  // Create provider instance
+  return createProviderFromConfig(provider, { apiKey, model, configWithOverrides });
+}
+
+/**
+ * Creates a provider instance from explicit configuration
+ * Can be used by extension and other contexts that don't have file system config
+ */
+export function createProviderFromConfig(
+  provider: string,
+  config: {
+    apiKey?: string;
+    model: string;
+    configWithOverrides?: any;
+  }
+): LanguageModel {
+  const { apiKey, model, configWithOverrides } = config;
+
   switch (provider) {
     case "openai":
       return apiKey !== process.env.OPENAI_API_KEY
@@ -48,7 +64,7 @@ export function createAIProvider(overrides?: {
       })(model);
 
     case "vertex":
-      const { project, location } = getVertexConfig(configWithOverrides);
+      const { project, location } = getVertexConfig(configWithOverrides || {});
       return createVertex({
         project,
         location,

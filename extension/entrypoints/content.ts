@@ -1,14 +1,25 @@
+// Import ariaSnapshot functionality
+import { generateAriaTree, renderAriaTree } from '../src/vendor/ariaSnapshot.js';
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
-    // Content script for Spark Extension
-    // This will be used to interact with page content when executing tasks
-    
+    // Make ARIA tree functions available globally for executeScript
+    declare global {
+      interface Window {
+        generateAriaTree: typeof generateAriaTree;
+        renderAriaTree: typeof renderAriaTree;
+      }
+    }
+
+    window.generateAriaTree = generateAriaTree;
+    window.renderAriaTree = renderAriaTree;
+
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       switch (request.type) {
         case 'getPageInfo':
-          // TODO: Extract page information for Spark automation
+          // Extract page information for Spark automation
           sendResponse({
             title: document.title,
             url: window.location.href,
@@ -16,7 +27,7 @@ export default defineContentScript({
           });
           break;
         case 'executePageAction':
-          // TODO: Execute specific actions on the page
+          // Execute specific actions on the page
           sendResponse({ success: true });
           break;
         default:

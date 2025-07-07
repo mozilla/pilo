@@ -30,7 +30,7 @@ import {
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger, ConsoleLogger } from "./loggers.js";
-import { getAIProviderInfo } from "./cli/provider.js";
+// No longer need to import getAIProviderInfo - provider info is injected via options
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -927,23 +927,17 @@ export class WebAgent {
 
   /**
    * Emits the task setup event with initial task information
+   * TODO: Move telemetry/config logging outside of WebAgent
    */
   private emitTaskSetupEvent(task: string) {
-    const providerInfo = getAIProviderInfo();
-
     this.emit(WebAgentEventType.TASK_SETUP, {
       task,
       browserName: this.browser.browserName,
       url: this.url,
       guardrails: this.guardrails,
       data: this.data,
-      pwEndpoint: (this.browser as any).pwEndpoint,
-      proxy: (this.browser as any).proxyServer,
       vision: this.vision,
-      provider: providerInfo.provider,
-      model: providerInfo.model,
-      hasApiKey: providerInfo.hasApiKey,
-      keySource: providerInfo.keySource,
+      // TODO: Provider info should be logged elsewhere, not WebAgent's responsibility
     });
   }
 
