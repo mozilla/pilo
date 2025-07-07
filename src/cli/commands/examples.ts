@@ -67,9 +67,6 @@ function showAdvancedOptionsExamples(): void {
     `  ${chalk.cyan("spark run")} ${chalk.green('"check my dashboard"')} ${chalk.yellow("--headless --debug")}`,
   );
   console.log(
-    `  ${chalk.cyan("spark run")} ${chalk.green('"mobile test"')} ${chalk.yellow('--device "iPhone 12"')}`,
-  );
-  console.log(
     `  ${chalk.cyan("spark run")} ${chalk.green('"test in Chrome"')} ${chalk.yellow("--browser chrome")}`,
   );
   console.log(
@@ -85,9 +82,7 @@ function showConfigurationExamples(): void {
   console.log(chalk.white.bold("Configuration:"));
   console.log(`  ${chalk.cyan("spark config --show")}`);
   console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("provider=openrouter")}`);
-  console.log(
-    `  ${chalk.cyan("spark config --set")} ${chalk.green("model=anthropic/claude-3-5-sonnet-20241022")}`,
-  );
+  console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("model=openai/gpt-4.1")}`);
   console.log(
     `  ${chalk.cyan("spark config --set")} ${chalk.green("openrouter_api_key=sk-or-...")}`,
   );

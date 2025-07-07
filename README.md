@@ -25,10 +25,10 @@ spark run "find the latest news on Reuters"
 spark run "what's the current price of AAPL stock?"
 
 # With specific starting URL
-spark run "find flight deals to Paris" --url https://kayak.com
+spark run "find flight deals to Paris" --url https://booking.com/
 
 # With structured data
-spark run "book a flight" --url https://airline.com --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
 
 # With safety constraints
 spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
@@ -39,24 +39,12 @@ spark run "search hotels in Tokyo" --guardrails "browse only, don't book anythin
 - 🤖 **Natural Language Control**: Just describe what you want to do in plain English
 - 🎯 **Smart Navigation**: Automatically finds and interacts with the right page elements
 - 🔍 **Intelligent Planning**: Breaks down complex tasks into actionable steps
+- 👁️ **Vision Capabilities**: AI can see full-page screenshots to better understand layouts
 - 🌐 **Multi-Browser Support**: Works with Firefox, Chrome, Safari, and Edge
-- 🛡️ **Safety First**: Built-in guardrails to prevent unintended actions
+- 🛡️ **Safety First**: Provide guardrails to prevent unintended actions
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
 
 ## Installation Options
-
-### Global Installation (Recommended)
-
-```bash
-npm install -g https://github.com/Mozilla-Ocho/spark.git
-spark config --init  # Setup wizard
-```
-
-### Library Installation
-
-```bash
-npm install https://github.com/Mozilla-Ocho/spark.git
-```
 
 ### Development Setup
 
@@ -64,7 +52,7 @@ npm install https://github.com/Mozilla-Ocho/spark.git
 git clone https://github.com/Mozilla-Ocho/spark.git
 cd spark
 pnpm install
-pnpm playwright install firefox
+pnpm playwright install
 pnpm spark config --init
 pnpm spark run "test task"
 ```
@@ -87,6 +75,10 @@ spark run "<task description>" [options]
 - `--browser <name>` - Browser choice (firefox, chrome, safari, edge)
 - `--headless` - Run without visible browser window
 - `--debug` - Show detailed logs and page snapshots
+- `--vision` - Enable vision capabilities with full-page screenshots
+- `--proxy <url>` - Proxy server URL (http://host:port, https://host:port, socks5://host:port)
+- `--proxy-username <username>` - Proxy authentication username
+- `--proxy-password <password>` - Proxy authentication password
 
 **Configuration:**
 
@@ -107,6 +99,7 @@ const provider = openai("gpt-4.1");
 
 const agent = new WebAgent(browser, {
   provider,
+  vision: true, // Enable screenshots for better visual understanding
   guardrails: "Do not make purchases",
 });
 
@@ -170,14 +163,17 @@ spark run "check shipping costs" --guardrails "don't submit any payment forms"
 ### Advanced Options
 
 ```bash
-# Mobile testing
-spark run "test mobile checkout flow" --browser chrome --device "iPhone 12"
+# Chrome browser testing
+spark run "test checkout flow" --browser chrome --headless
 
 # Headless automation
 spark run "get daily stock prices" --headless --browser firefox
 
 # Debug mode
 spark run "complex automation task" --debug
+
+# Vision mode for complex visual layouts
+spark run "fill out complex form" --vision
 
 # Combined options
 spark run "test signup flow" \
@@ -186,6 +182,28 @@ spark run "test signup flow" \
   --headless \
   --data '{"email":"test@example.com"}' \
   --guardrails "don't complete signup, just test the flow"
+```
+
+### Proxy Configuration
+
+```bash
+# Using an HTTP proxy
+spark run "search for products" --proxy http://proxy.company.com:8080
+
+# Using authenticated proxy
+spark run "access internal site" \
+  --proxy http://proxy.company.com:8080 \
+  --proxy-username myuser \
+  --proxy-password mypass
+
+# Using SOCKS5 proxy
+spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+
+# Environment variables (alternative to CLI options)
+export SPARK_PROXY=http://proxy.company.com:8080
+export SPARK_PROXY_USERNAME=myuser
+export SPARK_PROXY_PASSWORD=mypass
+spark run "task with proxy from env vars"
 ```
 
 ## Configuration
@@ -231,39 +249,53 @@ spark config --reset
 
 ## API Reference
 
-### WebAgent Constructor
+### WebAgent
 
 ```javascript
-new WebAgent(browser, {
-  provider: LanguageModel,    // Required: AI model instance
-  debug?: boolean,            // Enable debug logging
-  guardrails?: string         // Safety constraints
-})
+import { WebAgent, PlaywrightBrowser } from "spark";
+import { openai } from "@ai-sdk/openai";
+
+const browser = new PlaywrightBrowser({ headless: false });
+const provider = openai("gpt-4.1");
+
+const agent = new WebAgent(browser, {
+  provider,
+  vision: true, // Enable screenshots for better visual understanding
+  guardrails: "Do not make purchases",
+});
+
+const result = await agent.execute("find flights to Tokyo", "https://airline.com");
 ```
 
-### PlaywrightBrowser Constructor
+### PlaywrightBrowser Options
 
 ```javascript
+// Basic usage
 new PlaywrightBrowser({
-  headless?: boolean,         // Run without GUI
-  blockAds?: boolean,         // Block ads/trackers
-  blockResources?: string[],  // Block resource types
-  device?: string,            // Device emulation
-  browser?: string            // Browser choice
-})
+  browser: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge",
+  headless: boolean,
+  blockAds: boolean,
+  blockResources: ["image", "stylesheet", "font", "media", "manifest"],
+  pwEndpoint: "ws://remote-browser:9222",
+});
+
+// Advanced usage with full Playwright control
+import { devices } from "playwright";
+
+new PlaywrightBrowser({
+  browser: "chrome",
+  headless: true,
+  launchOptions: {
+    args: ["--disable-web-security"],
+    proxy: { server: "http://proxy:8080" },
+  },
+  contextOptions: {
+    ...devices["iPhone 12"],
+    viewport: { width: 1920, height: 1080 },
+    userAgent: "Custom Bot",
+  },
+});
 ```
-
-### WebAgent.execute()
-
-```javascript
-await agent.execute(
-  task: string,               // Natural language task
-  startingUrl?: string,       // Optional starting URL
-  data?: object               // Optional context data
-)
-```
-
-Returns `TaskExecutionResult` with success status and details.
 
 ## Development
 

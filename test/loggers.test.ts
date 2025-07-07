@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ConsoleLogger, Logger } from "../src/loggers.js";
+import { ConsoleLogger, JSONConsoleLogger, Logger } from "../src/loggers.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import type {
   TaskStartEventData,
+  TaskSetupEventData,
   TaskCompleteEventData,
   TaskValidationEventData,
+  AIGenerationEventData,
+  AIGenerationErrorEventData,
   PageNavigationEventData,
   CurrentStepEventData,
   ObservationEventData,
@@ -17,7 +20,8 @@ import type {
   WaitingEventData,
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
-  ThinkingEventData,
+  ProcessingEventData,
+  ScreenshotCapturedEventData,
 } from "../src/events.js";
 
 // Mock console methods
@@ -94,7 +98,7 @@ describe("ConsoleLogger", () => {
   });
 
   describe("Task events", () => {
-    it("should handle TASK_START events", () => {
+    it("should handle TASK_STARTED events", () => {
       const eventData: TaskStartEventData = {
         timestamp: Date.now(),
         task: "Complete a web form",
@@ -119,7 +123,7 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("https://example.com/contact");
     });
 
-    it("should handle TASK_COMPLETE events", () => {
+    it("should handle TASK_COMPLETED events", () => {
       const eventData: TaskCompleteEventData = {
         timestamp: Date.now(),
         finalAnswer: "Form submitted successfully with confirmation ID: 12345",
@@ -489,11 +493,30 @@ describe("ConsoleLogger", () => {
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("Network Timeout");
     });
+
+    it("should handle SCREENSHOT_CAPTURED events", () => {
+      const eventData: ScreenshotCapturedEventData = {
+        timestamp: Date.now(),
+        size: 51200, // 50KB in bytes
+        format: "jpeg",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Screenshot captured");
+      expect(allOutput).toContain("50KB");
+      expect(allOutput).toContain("JPEG");
+    });
   });
 
-  describe("Thinking events", () => {
-    it("should handle THINKING start events", () => {
-      const eventData: ThinkingEventData = {
+  describe("Processing events", () => {
+    it("should handle PROCESSING start events", () => {
+      const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         status: "start",
         operation: "Planning next action",
@@ -508,10 +531,31 @@ describe("ConsoleLogger", () => {
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
       expect(allOutput).toContain("Planning next action");
       expect(allOutput).toContain("🧮");
+      expect(allOutput).not.toContain("👁️");
     });
 
-    it("should not log THINKING end events", () => {
-      const eventData: ThinkingEventData = {
+    it("should handle PROCESSING start events with vision", () => {
+      const eventData: ProcessingEventData = {
+        timestamp: Date.now(),
+        status: "start",
+        operation: "Planning next action",
+        hasScreenshot: true,
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AGENT_PROCESSING,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Planning next action");
+      expect(allOutput).toContain("🧮");
+      expect(allOutput).toContain("👁️");
+    });
+
+    it("should not log PROCESSING end events", () => {
+      const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         status: "end",
         operation: "Planning next action",
@@ -596,6 +640,303 @@ describe("ConsoleLogger", () => {
       expect(mockConsole.log).toHaveBeenCalled();
 
       logger2.dispose();
+    });
+  });
+
+  describe("New event types", () => {
+    it("should handle TASK_SETUP events", () => {
+      const eventData: TaskSetupEventData = {
+        timestamp: Date.now(),
+        task: "Complete a web form",
+        browserName: "playwright:firefox",
+        guardrails: null,
+        data: { key: "value" },
+        pwEndpoint: null,
+        proxy: "http://proxy.example.com:8080",
+        vision: true,
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TASK_SETUP,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalled();
+      const calls = mockConsole.log.mock.calls;
+      const allOutput = calls.flat().join(" ");
+
+      expect(allOutput).toContain("🚀 Spark Automation Starting");
+      expect(allOutput).toContain("Complete a web form");
+      expect(allOutput).toContain("playwright:firefox");
+      expect(allOutput).toContain("proxy.example.com");
+      expect(allOutput).toContain("Vision: enabled");
+    });
+
+    it("should handle AI_GENERATION_ERROR events", () => {
+      const eventData: AIGenerationErrorEventData = {
+        timestamp: Date.now(),
+        prompt: "Generate a response",
+        error: "API rate limit exceeded",
+        schema: { type: "object" },
+        messages: [{ role: "user", content: "test" }],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AI_GENERATION_ERROR,
+        data: eventData,
+      });
+
+      expect(mockConsole.error).toHaveBeenCalled();
+      const allOutput = mockConsole.error.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("❌ AI generation error:");
+      expect(allOutput).toContain("API rate limit exceeded");
+    });
+  });
+});
+
+describe("JSONConsoleLogger", () => {
+  let logger: JSONConsoleLogger;
+  let emitter: WebAgentEventEmitter;
+  let originalConsoleLog: typeof console.log;
+
+  beforeEach(() => {
+    // Capture console.log output
+    originalConsoleLog = console.log;
+    console.log = mockConsole.log;
+    mockConsole.log.mockClear();
+
+    logger = new JSONConsoleLogger();
+    emitter = new WebAgentEventEmitter();
+    logger.initialize(emitter);
+  });
+
+  afterEach(() => {
+    console.log = originalConsoleLog;
+    logger.dispose();
+  });
+
+  describe("Logger interface", () => {
+    it("should implement Logger interface", () => {
+      expect(logger).toBeInstanceOf(JSONConsoleLogger);
+      expect(typeof logger.initialize).toBe("function");
+      expect(typeof logger.dispose).toBe("function");
+    });
+
+    it("should initialize with event emitter", () => {
+      const newLogger = new JSONConsoleLogger();
+      const newEmitter = new WebAgentEventEmitter();
+
+      expect(() => {
+        newLogger.initialize(newEmitter);
+      }).not.toThrow();
+
+      newLogger.dispose();
+    });
+
+    it("should dispose properly", () => {
+      const newLogger = new JSONConsoleLogger();
+      const newEmitter = new WebAgentEventEmitter();
+      newLogger.initialize(newEmitter);
+
+      expect(() => {
+        newLogger.dispose();
+      }).not.toThrow();
+
+      // Should be safe to call dispose multiple times
+      expect(() => {
+        newLogger.dispose();
+      }).not.toThrow();
+    });
+  });
+
+  describe("JSON output", () => {
+    it("should output valid JSON for all events", () => {
+      const eventData: TaskStartEventData = {
+        timestamp: Date.now(),
+        task: "Test task",
+        explanation: "Test explanation",
+        plan: "Test plan",
+        url: "https://example.com",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TASK_STARTED,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+
+      // Should be valid JSON
+      expect(() => JSON.parse(output)).not.toThrow();
+
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.TASK_STARTED);
+      expect(parsed.data.task).toBe("Test task");
+      expect(parsed.data.explanation).toBe("Test explanation");
+      expect(parsed.data.plan).toBe("Test plan");
+      expect(parsed.data.url).toBe("https://example.com");
+    });
+
+    it("should output JSON for TASK_SETUP events", () => {
+      const eventData: TaskSetupEventData = {
+        timestamp: Date.now(),
+        task: "Complete a web form",
+        browserName: "playwright:firefox",
+        guardrails: "test-guardrails",
+        data: { key: "value" },
+        pwEndpoint: "ws://localhost:9222",
+        proxy: "http://proxy.example.com:8080",
+        vision: true,
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TASK_SETUP,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.TASK_SETUP);
+      expect(parsed.data.task).toBe("Complete a web form");
+      expect(parsed.data.browserName).toBe("playwright:firefox");
+      expect(parsed.data.guardrails).toBe("test-guardrails");
+      expect(parsed.data.data).toEqual({ key: "value" });
+      expect(parsed.data.pwEndpoint).toBe("ws://localhost:9222");
+      expect(parsed.data.proxy).toBe("http://proxy.example.com:8080");
+      expect(parsed.data.vision).toBe(true);
+    });
+
+    it("should output JSON for AI_GENERATION events", () => {
+      const eventData: AIGenerationEventData = {
+        timestamp: Date.now(),
+        prompt: "Generate a response",
+        schema: { type: "object", properties: { action: { type: "string" } } },
+        messages: [{ role: "user", content: "test message" }],
+        object: { action: "click", ref: "button1" },
+        finishReason: "stop",
+        usage: {
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+        },
+        temperature: 0.7,
+        warnings: [],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AI_GENERATION,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.AI_GENERATION);
+      expect(parsed.data.prompt).toBe("Generate a response");
+      expect(parsed.data.object).toEqual({ action: "click", ref: "button1" });
+      expect(parsed.data.usage.promptTokens).toBe(100);
+      expect(parsed.data.usage.completionTokens).toBe(50);
+      expect(parsed.data.temperature).toBe(0.7);
+    });
+
+    it("should output JSON for AI_GENERATION_ERROR events", () => {
+      const eventData: AIGenerationErrorEventData = {
+        timestamp: Date.now(),
+        prompt: "Generate a response",
+        error: "API rate limit exceeded",
+        schema: { type: "object" },
+        messages: [{ role: "user", content: "test" }],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AI_GENERATION_ERROR,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.AI_GENERATION_ERROR);
+      expect(parsed.data.prompt).toBe("Generate a response");
+      expect(parsed.data.error).toBe("API rate limit exceeded");
+      expect(parsed.data.schema).toEqual({ type: "object" });
+    });
+
+    it("should handle all event types without errors", () => {
+      // Test a few different event types to ensure universal handling
+      const events = [
+        {
+          type: WebAgentEventType.BROWSER_NAVIGATED,
+          data: { timestamp: Date.now(), title: "Test Page", url: "https://example.com" },
+        },
+        {
+          type: WebAgentEventType.AGENT_OBSERVED,
+          data: { timestamp: Date.now(), observation: "Found form element" },
+        },
+        {
+          type: WebAgentEventType.BROWSER_ACTION_STARTED,
+          data: { timestamp: Date.now(), action: "click", ref: "button1" },
+        },
+      ];
+
+      events.forEach((event) => {
+        emitter.emitEvent(event);
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(3);
+
+      // All outputs should be valid JSON
+      mockConsole.log.mock.calls.forEach((call) => {
+        const output = call[0];
+        expect(() => JSON.parse(output)).not.toThrow();
+        const parsed = JSON.parse(output);
+        expect(parsed).toHaveProperty("event");
+        expect(parsed).toHaveProperty("data");
+      });
+    });
+  });
+
+  describe("Event listener management", () => {
+    it("should register listeners for all event types", () => {
+      // Check that listeners are registered for various event types
+      const eventTypes = [
+        WebAgentEventType.TASK_SETUP,
+        WebAgentEventType.TASK_STARTED,
+        WebAgentEventType.AI_GENERATION,
+        WebAgentEventType.AI_GENERATION_ERROR,
+        WebAgentEventType.BROWSER_NAVIGATED,
+        WebAgentEventType.AGENT_OBSERVED,
+      ];
+
+      eventTypes.forEach((eventType) => {
+        expect(emitter.listenerCount(eventType)).toBeGreaterThan(0);
+      });
+    });
+
+    it("should remove all listeners on dispose", () => {
+      const eventTypes = [
+        WebAgentEventType.TASK_SETUP,
+        WebAgentEventType.TASK_STARTED,
+        WebAgentEventType.AI_GENERATION,
+        WebAgentEventType.AI_GENERATION_ERROR,
+      ];
+
+      // Verify listeners are present
+      eventTypes.forEach((eventType) => {
+        expect(emitter.listenerCount(eventType)).toBeGreaterThan(0);
+      });
+
+      logger.dispose();
+
+      // Verify all listeners are removed
+      eventTypes.forEach((eventType) => {
+        expect(emitter.listenerCount(eventType)).toBe(0);
+      });
     });
   });
 });

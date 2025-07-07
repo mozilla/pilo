@@ -76,7 +76,6 @@ async function showConfiguration(currentConfig: any): Promise<void> {
   console.log(
     `  Headless: ${currentConfig.headless !== undefined ? currentConfig.headless : chalk.gray("false (default)")}`,
   );
-  console.log(`  Device: ${currentConfig.device || chalk.gray("auto-selected")}`);
   console.log(
     `  Block Ads: ${currentConfig.block_ads !== undefined ? currentConfig.block_ads : chalk.gray("true (default)")}`,
   );

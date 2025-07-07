@@ -5,6 +5,7 @@ import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
 import { config } from "../config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
+import { ConsoleLogger, JSONConsoleLogger } from "../../loggers.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -18,17 +19,21 @@ export function createRunCommand(): Command {
     .option("-d, --data <json>", "JSON data to provide context for the task")
     .option("-g, --guardrails <text>", "Safety constraints for the task execution")
     .option(
+      "--provider <provider>",
+      "AI provider to use (openai, openrouter)",
+      config.get("provider") || "openai",
+    )
+    .option("--model <model>", "AI model to use", config.get("model"))
+    .option("--openai-api-key <key>", "OpenAI API key")
+    .option("--openrouter-api-key <key>", "OpenRouter API key")
+    .option(
       "-b, --browser <browser>",
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
       config.get("browser") || "firefox",
     )
     .option("--headless", "Run browser in headless mode", config.get("headless") || false)
     .option("--debug", "Enable debug mode with page snapshots", false)
-    .option(
-      "--device <device>",
-      "Device to emulate (auto-selected based on browser if not specified)",
-      config.get("device"),
-    )
+    .option("--vision", "Enable vision capabilities to include screenshots", false)
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
@@ -36,6 +41,33 @@ export function createRunCommand(): Command {
       config.get("block_resources") || "media,manifest",
     )
     .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp") || false)
+    .option(
+      "--max-iterations <number>",
+      "Maximum total iterations to prevent infinite loops",
+      String(config.get("max_iterations") || 50),
+    )
+    .option(
+      "--max-validation-attempts <number>",
+      "Maximum validation attempts",
+      String(config.get("max_validation_attempts") || 3),
+    )
+    .option(
+      "--proxy <url>",
+      "Proxy server URL (http://host:port, https://host:port, socks5://host:port)",
+      config.get("proxy"),
+    )
+    .option(
+      "--proxy-username <username>",
+      "Proxy authentication username",
+      config.get("proxy_username"),
+    )
+    .option(
+      "--proxy-password <password>",
+      "Proxy authentication password",
+      config.get("proxy_password"),
+    )
+    .option("--logger <logger>", "Logger to use (console, json)", config.get("logger") || "console")
     .action(executeRunCommand);
 }
 
@@ -71,41 +103,49 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       process.exit(1);
     }
 
+    // Create logger
+    const logger = options.logger === "json" ? new JSONConsoleLogger() : new ConsoleLogger();
+
     // Create browser instance
     const browser = new PlaywrightBrowser({
-      headless: options.headless,
-      device: options.device,
       browser: options.browser,
       blockAds: options.blockAds,
       blockResources,
       pwEndpoint: options.pwEndpoint,
+      headless: options.headless,
+      bypassCSP: options.bypassCsp,
+      proxyServer: options.proxy,
+      proxyUsername: options.proxyUsername,
+      proxyPassword: options.proxyPassword,
     });
 
-    // Create AI provider
-    const aiProvider = createAIProvider();
+    // Create AI provider with CLI overrides
+    const providerOverrides: any = {};
+    if (options.provider) providerOverrides.provider = options.provider;
+    if (options.model) providerOverrides.model = options.model;
+    if (options.openaiApiKey) providerOverrides.openai_api_key = options.openaiApiKey;
+    if (options.openrouterApiKey) providerOverrides.openrouter_api_key = options.openrouterApiKey;
+
+    const aiProvider = createAIProvider(providerOverrides);
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: options.debug,
+      vision: options.vision,
       guardrails: options.guardrails,
+      maxIterations: options.maxIterations ? parseInt(options.maxIterations) : undefined,
+      maxValidationAttempts: options.maxValidationAttempts
+        ? parseInt(options.maxValidationAttempts)
+        : undefined,
       provider: aiProvider,
+      logger,
     });
-
-    console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
-    console.log(chalk.gray(`Task: ${task}`));
-    console.log(chalk.gray(`Browser: ${options.browser}`));
-    if (options.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${options.pwEndpoint}`));
-    if (options.url) console.log(chalk.gray(`Starting URL: ${options.url}`));
-    if (data) console.log(chalk.gray(`Data: ${JSON.stringify(data)}`));
-    if (options.guardrails) console.log(chalk.gray(`Guardrails: ${options.guardrails}`));
-    console.log("");
 
     // Execute the task
     await webAgent.execute(task, options.url, data);
 
     // Close the browser
     await webAgent.close();
-    console.log(chalk.green.bold("\n✅ Task completed successfully!"));
   } catch (error) {
     console.error(chalk.red.bold("\n❌ Error:"), chalk.whiteBright(error));
     process.exit(1);

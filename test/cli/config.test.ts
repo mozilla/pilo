@@ -134,5 +134,47 @@ describe("Config Integration", () => {
       expect(typeof result.headless).toBe("boolean");
       expect(typeof result.block_ads).toBe("boolean");
     });
+
+    it("should handle proxy config values", () => {
+      mockConfig.getConfig.mockReturnValue({
+        proxy: "http://proxy.example.com:8080",
+        proxy_username: "testuser",
+        proxy_password: "testpass",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.proxy).toBe("http://proxy.example.com:8080");
+      expect(result.proxy_username).toBe("testuser");
+      expect(result.proxy_password).toBe("testpass");
+    });
+  });
+
+  describe("proxy environment variables", () => {
+    it("should merge proxy environment variables", () => {
+      const mockSparkConfig: SparkConfig = {
+        proxy: "http://env-proxy.example.com:8080",
+        proxy_username: "env-user",
+        proxy_password: "env-pass",
+      };
+
+      mockConfig.getConfig.mockReturnValue(mockSparkConfig);
+
+      const result = mockConfig.getConfig();
+      expect(result.proxy).toBe("http://env-proxy.example.com:8080");
+      expect(result.proxy_username).toBe("env-user");
+      expect(result.proxy_password).toBe("env-pass");
+    });
+
+    it("should handle missing proxy config gracefully", () => {
+      mockConfig.getConfig.mockReturnValue({
+        browser: "firefox",
+        // No proxy config
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.proxy).toBeUndefined();
+      expect(result.proxy_username).toBeUndefined();
+      expect(result.proxy_password).toBeUndefined();
+    });
   });
 });

@@ -14,6 +14,7 @@ export enum PageAction {
   Check = "check",
   Uncheck = "uncheck",
   Select = "select",
+  Enter = "enter",
 
   // Navigation and workflow
   Wait = "wait",
@@ -33,6 +34,9 @@ export enum LoadState {
 }
 
 export interface AriaBrowser {
+  /** The name of the browser being used */
+  browserName: string;
+
   /** Starts the browser instance */
   start(): Promise<void>;
 

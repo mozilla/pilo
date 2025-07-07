@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { WebAgentEventType, WebAgentEventEmitter } from "./events.js";
 import type {
+  WebAgentEvent,
   ActionExecutionEventData,
   ActionResultEventData,
   CompressionDebugEventData,
@@ -13,12 +14,15 @@ import type {
   PageNavigationEventData,
   StatusMessageEventData,
   TaskCompleteEventData,
+  TaskSetupEventData,
   TaskStartEventData,
   ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
-  ThinkingEventData,
+  ProcessingEventData,
+  ScreenshotCapturedEventData,
   ValidationErrorEventData,
+  AIGenerationErrorEventData,
 } from "./events.js";
 
 /**
@@ -84,6 +88,7 @@ export class ConsoleLogger implements Logger {
     this.emitter = emitter;
 
     // Task events
+    emitter.onEvent(WebAgentEventType.TASK_SETUP, this.handleTaskSetup);
     emitter.onEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
     emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
     emitter.onEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
@@ -95,25 +100,30 @@ export class ConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
+    emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
     emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
     emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
     emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
     emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
-    emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+    emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
     emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
     emitter.onEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
     // Debug events
     emitter.onEvent(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, this.handleCompressionDebug);
     emitter.onEvent(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, this.handleMessagesDebug);
+
+    // AI events
+    emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
   }
 
   dispose(): void {
     // Clean up event listeners to prevent memory leaks
     if (this.emitter) {
       // Task events
+      this.emitter.offEvent(WebAgentEventType.TASK_SETUP, this.handleTaskSetup);
       this.emitter.offEvent(WebAgentEventType.TASK_STARTED, this.handleTaskStart);
       this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
       this.emitter.offEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
@@ -125,13 +135,17 @@ export class ConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
+      this.emitter.offEvent(
+        WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+        this.handleScreenshotCaptured,
+      );
 
       // Agent reasoning events
       this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
       this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
       this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
       this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
-      this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleThinking);
+      this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
       this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
       this.emitter.offEvent(WebAgentEventType.AGENT_WAITING, this.handleWaiting);
 
@@ -142,10 +156,27 @@ export class ConsoleLogger implements Logger {
       );
       this.emitter.offEvent(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, this.handleMessagesDebug);
 
+      // AI events
+      this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+
       // Reset emitter reference
       this.emitter = null;
     }
   }
+
+  private handleTaskSetup = (data: TaskSetupEventData): void => {
+    console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
+    console.log(chalk.gray(`Task: ${data.task}`));
+    if (data.provider) console.log(chalk.gray(`Provider: ${data.provider}`));
+    if (data.model) console.log(chalk.gray(`Model: ${data.model}`));
+    console.log(chalk.gray(`Browser: ${data.browserName}`));
+    if (data.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${data.pwEndpoint}`));
+    if (data.proxy) console.log(chalk.gray(`Proxy: ${data.proxy}`));
+    if (data.url) console.log(chalk.gray(`Starting URL: ${data.url}`));
+    if (data.guardrails) console.log(chalk.gray(`Guardrails: ${data.guardrails}`));
+    if (data.vision) console.log(chalk.gray(`Vision: enabled`));
+    console.log("");
+  };
 
   private handleTaskStart = (data: TaskStartEventData): void => {
     console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(data.task));
@@ -273,9 +304,15 @@ export class ConsoleLogger implements Logger {
     console.log(chalk.gray(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`));
   };
 
-  private handleThinking = (data: ThinkingEventData): void => {
+  private handleScreenshotCaptured = (data: ScreenshotCapturedEventData): void => {
+    const sizeKB = Math.round(data.size / 1024);
+    console.log(chalk.gray(`   📸 Screenshot captured (${sizeKB}KB ${data.format.toUpperCase()})`));
+  };
+
+  private handleProcessing = (data: ProcessingEventData): void => {
     if (data.status === "start") {
-      console.log(chalk.cyan.bold(`\n🧮 Agent Processing: ${data.operation}...`));
+      const visionIndicator = data.hasScreenshot ? "👁️ " : "";
+      console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
     }
   };
 
@@ -292,4 +329,43 @@ export class ConsoleLogger implements Logger {
   private handleStatusMessage = (data: StatusMessageEventData): void => {
     console.log(chalk.green.bold("💬 Agent Status:"), chalk.whiteBright(data.message));
   };
+
+  private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
+    console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
+  };
+}
+
+export class JSONConsoleLogger implements Logger {
+  private emitter: WebAgentEventEmitter | null = null;
+  private handlers: [WebAgentEventType, (data: any) => void][] = [];
+
+  initialize(emitter: WebAgentEventEmitter): void {
+    if (this.emitter) {
+      this.dispose();
+    }
+    this.emitter = emitter;
+    this.handlers = [];
+
+    for (const event of Object.values(WebAgentEventType)) {
+      const handler = this.buildEventHandler(event);
+      this.handlers.push([event, handler]);
+      emitter.onEvent(event, handler);
+    }
+  }
+
+  dispose(): void {
+    if (this.emitter) {
+      for (const [event, handler] of this.handlers) {
+        this.emitter.offEvent(event, handler);
+      }
+      this.emitter = null;
+    }
+  }
+
+  private buildEventHandler(type: WebAgentEventType) {
+    return (data: WebAgentEvent["data"]): void => {
+      const json = JSON.stringify({ event: type, data }, null, 0);
+      console.log(json);
+    };
+  }
 }

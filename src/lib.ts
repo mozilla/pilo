@@ -8,7 +8,11 @@
 export { WebAgent } from "./webAgent.js";
 export { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 export type { AriaBrowser, PageAction, LoadState } from "./browser/ariaBrowser.js";
-export type { TaskExecutionResult } from "./webAgent.js";
+export type {
+  PlaywrightBrowserOptions,
+  ExtendedPlaywrightBrowserOptions,
+} from "./browser/playwrightBrowser.js";
+export type { TaskExecutionResult, WebAgentOptions } from "./webAgent.js";
 export { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 export type {
   WebAgentEvent,
@@ -19,7 +23,7 @@ export type {
   ObservationEventData,
   ThoughtEventData,
   ExtractedDataEventData,
-  ThinkingEventData,
+  ProcessingEventData,
   ActionExecutionEventData,
   ActionResultEventData,
   TaskValidationEventData,
@@ -27,8 +31,14 @@ export type {
   WaitingEventData,
   NetworkWaitingEventData,
   NetworkTimeoutEventData,
+  ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
 export { ConsoleLogger, GenericLogger } from "./loggers.js";
 export type { Logger } from "./loggers.js";
 export * from "./schemas.js";
+
+// Configuration and Provider System
+export { config, ConfigManager } from "./config.js";
+export type { SparkConfig } from "./config.js";
+export { createAIProvider, getAIProviderInfo } from "./provider.js";
