@@ -9,6 +9,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "dev": "tsx --watch src/index.ts",
+    "dev:tabs": "../node_modules/.bin/nodemon --watch src --ext ts --exec \"tsc && node dist/index.js\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
