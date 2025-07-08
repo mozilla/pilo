@@ -9,17 +9,23 @@ export default defineBackground(() => {
     browser.action.onClicked.addListener(async (tab) => {
       console.log("Extension button clicked for tab:", tab.id);
 
+      if (tab.id === undefined) {
+        console.error("Tab ID is missing, cannot open panel.");
+        return;
+      }
+      const tabId = tab.id;
+
       // Chrome: Use sidePanel API
       if (browser.sidePanel && browser.sidePanel.open) {
         try {
-          await browser.sidePanel.open({ tabId: tab.id });
+          await browser.sidePanel.open({ windowId: tab.windowId, tabId: tabId });
           console.log("SidePanel opened successfully");
         } catch (error) {
           console.error("Failed to open sidePanel:", error);
         }
       }
       // Firefox: Use sidebarAction API
-      else if (browser.sidebarAction && browser.sidebarAction.open) {
+      else if ("sidebarAction" in browser && browser.sidebarAction.open) {
         try {
           await browser.sidebarAction.open();
           console.log("Sidebar opened successfully");
@@ -37,81 +43,66 @@ export default defineBackground(() => {
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  browser.runtime.onMessage.addListener(async (message, sender) => {
     console.log("Background received message:", message.type);
 
-    (async () => {
-      try {
-        let response;
+    try {
+      switch (message.type) {
+        case "executeTask":
+          console.log("Executing task:", message.task);
 
-        switch (message.type) {
-          case "executeTask":
-            console.log("Executing task:", message.task);
+          const settings = await browser.storage.local.get(["apiKey", "apiEndpoint", "model"]);
 
-            // Get settings from storage
-            const settings = await browser.storage.local.get(["apiKey", "apiEndpoint", "model"]);
-
-            if (!settings.apiKey) {
-              response = {
-                success: false,
-                message: "API key not configured. Please set up your credentials first.",
-              };
-              break;
-            }
-
-            try {
-              // Create event store logger to capture events for React
-              const logger = new EventStoreLogger();
-
-              console.log(
-                `Starting task execution for tab ${message.tabId} with URL: ${message.startUrl}`,
-              );
-
-              // Use AgentAPI to run the task
-              const result = await AgentAPI.runTask(message.task, {
-                apiKey: settings.apiKey,
-                model: settings.model || "gpt-4.1",
-                logger: logger,
-                tabId: message.tabId,
-                startUrl: message.startUrl,
-              });
-
-              console.log(`Task completed successfully:`, result);
-
-              response = {
-                success: true,
-                result: result,
-                events: logger.getEvents(), // Include events for React UI
-              };
-            } catch (error) {
-              console.error("Task execution error:", error);
-
-              response = {
-                success: false,
-                message: `Task execution failed: ${error.message}`,
-                events: logger?.getEvents() || [], // Include events even on error
-              };
-            }
-            break;
-
-          default:
-            response = {
+          if (!settings.apiKey) {
+            return {
               success: false,
-              message: "Unknown message type",
+              message: "API key not configured. Please set up your credentials first.",
             };
-        }
+          }
 
-        console.log("Sending response:", response);
-        sendResponse(response);
-      } catch (error) {
-        console.error("Error in message handler:", error);
-        sendResponse({
-          success: false,
-          message: error.message || "Unknown error occurred",
-        });
+          const logger = new EventStoreLogger();
+          try {
+            console.log(
+              `Starting task execution for tab ${message.tabId} with URL: ${message.startUrl}`,
+            );
+
+            const result = await AgentAPI.runTask(message.task, {
+              apiKey: settings.apiKey,
+              model: settings.model || "gpt-4.1",
+              logger: logger,
+              tabId: message.tabId,
+              startUrl: message.startUrl,
+            });
+
+            console.log(`Task completed successfully:`, result);
+
+            return {
+              success: true,
+              result: result,
+              events: logger.getEvents(),
+            };
+          } catch (error) {
+            console.error("Task execution error:", error);
+
+            return {
+              success: false,
+              message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
+              events: logger.getEvents(),
+            };
+          }
+
+        default:
+          return {
+            success: false,
+            message: "Unknown message type",
+          };
       }
-    })();
-
-    return true; // Required for async response
+    } catch (error) {
+      console.error("Error in message handler:", error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+      };
+    }
   });
 });
