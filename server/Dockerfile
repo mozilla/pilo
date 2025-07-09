@@ -7,13 +7,8 @@ RUN npm install -g pnpm
 # Build argument to control Playwright installation
 ARG INSTALL_PLAYWRIGHT_BROWSERS=false
 
-# Create a non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S spark -u 1001
-
 # Set working directory
 WORKDIR /app
-RUN chown -R spark:nodejs /app
 
 # Copy root package files and build main spark package
 COPY package.json pnpm-lock.yaml ./
@@ -44,8 +39,11 @@ EXPOSE 3000
 # Set environment variables
 ENV NODE_ENV=production
 
-# Switch to non-root user
-USER spark
+# Ensure node user owns the app files
+RUN chown -R node:node /app
+
+# Switch to non-root user (node user is already available in node:22-slim)
+USER node
 
 # Start the server
 CMD ["pnpm", "start"]
