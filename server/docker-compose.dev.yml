@@ -1,0 +1,17 @@
+services:
+  spark-server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      args:
+        INSTALL_PLAYWRIGHT_BROWSERS: "true"
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Mount server source code for hot reloading
+      - ./src:/app/server/src
+    command: ["pnpm", "run", "dev"]
+    restart: unless-stopped
