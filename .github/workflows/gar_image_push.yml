@@ -1,4 +1,4 @@
-name: push image to GAR for TABS
+name: push image server image to GAR for TABS
 
 env:
   IMAGE_NAME: tabs-spark
@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
