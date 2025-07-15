@@ -25,7 +25,6 @@ interface AriaSnapshotWindow {
 export class ExtensionBrowser implements AriaBrowser {
   readonly browserName = "extension:chrome";
   private tabId?: number;
-  private currentSnapshot?: { elements: Map<string, Element>; renderedText: string };
 
   // Match Playwright's timeout - 5 seconds timeout for interactive actions
   private readonly ACTION_TIMEOUT_MS = 5000;
@@ -52,12 +51,16 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async goto(url: string): Promise<void> {
     const tab = await this.getActiveTab();
+    console.log(`ExtensionBrowser: goto() called with URL: ${url}, current tab URL: ${tab.url}`);
     try {
       // Extension equivalent of "commit" - just start the navigation
       await browser.tabs.update(tab.id!, { url });
+      console.log(`ExtensionBrowser: browser.tabs.update completed`);
       // Handle page transition
       await this.handlePageTransition();
+      console.log(`ExtensionBrowser: goto() completed successfully`);
     } catch (error) {
+      console.error(`ExtensionBrowser: goto() failed:`, error);
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -102,11 +105,14 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async getText(): Promise<string> {
     const tab = await this.getActiveTab();
+    console.log(`ExtensionBrowser: getText() called for tab ${tab.id}, URL: ${tab.url}`);
 
     try {
+      console.log(`ExtensionBrowser: checking content script availability...`);
       await this.ensureContentScript();
+      console.log(`ExtensionBrowser: content script is available`);
     } catch (error) {
-      console.warn("Content script not available:", error);
+      console.warn("ExtensionBrowser: content script not available:", error);
       // Return basic fallback when content script unavailable
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nContent script not available on this page.`;
     }
@@ -131,25 +137,29 @@ export class ExtensionBrowser implements AriaBrowser {
             forAI: true,
             refPrefix: "s1",
           });
+
+          // Add aria-ref attributes to DOM elements for fast lookup
+          // This extends the vendored code without modifying it
+          for (const [ref, element] of snapshot.elements.entries()) {
+            element.setAttribute("aria-ref", ref);
+          }
+
           const renderedText = win.renderAriaTree(snapshot, {
             mode: "raw",
             forAI: true,
           });
 
-          // Return both the rendered text and elements map for caching
+          // Return just the rendered text - elements can be looked up via aria-ref attributes
           return {
             renderedText,
-            elements: Array.from(snapshot.elements.entries()), // Convert Map to array for serialization
           };
         },
       });
 
-      // Script succeeded, cache the snapshot
-      const snapshotData = result as { renderedText: string; elements: Array<[string, Element]> };
-      this.currentSnapshot = {
-        elements: new Map(snapshotData.elements), // Convert array back to Map
-        renderedText: snapshotData.renderedText,
-      };
+      // Script succeeded, return the rendered text
+      const snapshotData = result as { renderedText: string };
+      console.log(`ExtensionBrowser: ARIA tree generated and aria-ref attributes set`);
+      console.log(`ExtensionBrowser: getText() completed successfully`);
       return snapshotData.renderedText;
     } catch (error) {
       console.error("ExtensionBrowser getText execution error:", error);
@@ -221,6 +231,9 @@ export class ExtensionBrowser implements AriaBrowser {
   }
 
   async performAction(ref: string, action: string, value?: string): Promise<void> {
+    console.log(
+      `ExtensionBrowser: performAction() called with ref: ${ref}, action: ${action}, value: ${value}`,
+    );
     try {
       // Handle non-element actions first
       switch (action) {
@@ -257,29 +270,24 @@ export class ExtensionBrowser implements AriaBrowser {
       }
 
       // Handle element-based actions
+      console.log(`ExtensionBrowser: handling element action ${action} for ref ${ref}`);
       const tab = await this.getActiveTab();
       await this.ensureContentScript();
 
-      // Check if we have a cached snapshot first
-      if (!this.currentSnapshot) {
-        throw new Error(
-          "No cached snapshot available. Call getText() first to generate page snapshot.",
-        );
-      }
+      console.log(`ExtensionBrowser: attempting to find element with ref: ${ref}`);
 
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: tab.id! },
-        func: (paramsJson: string, elementsArray: Array<[string, any]>) => {
+        func: (paramsJson: string) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
-          // Reconstruct the elements map from the cached snapshot
-          const elements = new Map(elementsArray);
-          const element = elements.get(refParam);
+          // Look up the element using the aria-ref attribute that's now set by ariaSnapshot
+          const element = document.querySelector(`[aria-ref="${refParam}"]`);
 
           if (!element) {
             return {
               success: false,
-              error: `Element with ref ${refParam} not found in cached snapshot`,
+              error: `Element with ref ${refParam} not found in DOM`,
             };
           }
 
@@ -287,9 +295,28 @@ export class ExtensionBrowser implements AriaBrowser {
             switch (actionParam) {
               // Element interactions
               case "click":
+                console.log(`DEBUG: Click case reached for element:`, element);
                 if (element instanceof HTMLElement) {
+                  console.log(`DEBUG: About to click element:`, element);
+                  console.log(
+                    `DEBUG: Element tagName: ${element.tagName}, href: ${element.getAttribute("href")}, onclick: ${element.onclick}`,
+                  );
+                  console.log(
+                    `DEBUG: Element visible: ${element.offsetWidth > 0 && element.offsetHeight > 0}`,
+                  );
+                  console.log(`DEBUG: Element in viewport:`, element.getBoundingClientRect());
+
                   element.click();
+
+                  console.log(`DEBUG: Click executed on element ${refParam}`);
                   return { success: true, message: `Clicked element ${refParam}` };
+                } else {
+                  console.log(
+                    `DEBUG: Element is not HTMLElement, type:`,
+                    typeof element,
+                    element.constructor.name,
+                  );
+                  return { success: false, error: `Element ${refParam} is not an HTMLElement` };
                 }
                 break;
 
@@ -361,14 +388,13 @@ export class ExtensionBrowser implements AriaBrowser {
             };
           }
         },
-        args: [
-          JSON.stringify({ ref, action, value }),
-          Array.from(this.currentSnapshot.elements.entries()),
-        ],
+        args: [JSON.stringify({ ref, action, value })],
       });
 
       const typedResult = result as ActionResult;
+      console.log(`ExtensionBrowser: script execution result:`, typedResult);
       if (!typedResult?.success) {
+        console.error(`ExtensionBrowser: action failed:`, typedResult?.error);
         throw new Error(
           typedResult?.error || `Failed to perform action ${action} on element ${ref}`,
         );
@@ -376,8 +402,10 @@ export class ExtensionBrowser implements AriaBrowser {
 
       // Element interactions that may cause navigation
       if (action === "click") {
+        console.log(`DEBUG: About to handle page transition after click`);
         // Handle potential page transition after click
         await this.handlePageTransition();
+        console.log(`DEBUG: Page transition handling complete`);
       } else if (action === "select") {
         // Handle potential page transition after select
         await this.handlePageTransition();
@@ -416,14 +444,15 @@ export class ExtensionBrowser implements AriaBrowser {
     await new Promise((resolve) => setTimeout(resolve, this.PAGE_SETTLE_TIME_MS));
   }
 
-  // Clear the current page snapshot
-  private clearSnapshot(): void {
-    this.currentSnapshot = undefined;
+  // Clear aria-ref attributes from previous page
+  private clearAriaRefs(): void {
+    // No need to clear anything - new page will have new DOM
+    // aria-ref attributes will be set fresh on next getText() call
   }
 
-  // Handle page transition: clear snapshot and wait for page to be ready
+  // Handle page transition: wait for page to be ready
   private async handlePageTransition(): Promise<void> {
-    this.clearSnapshot();
+    this.clearAriaRefs();
     await this.ensureOptimizedPageLoad();
   }
 
