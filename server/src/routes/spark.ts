@@ -46,6 +46,7 @@ interface SparkTaskRequest {
   blockAds?: boolean;
   blockResources?: string[];
   pwEndpoint?: string;
+  pwCdpEndpoint?: string;
   bypassCSP?: boolean;
 
   // WebAgent behavior overrides
@@ -128,6 +129,7 @@ spark.post("/run", async (c) => {
             | Array<"image" | "stylesheet" | "font" | "media" | "manifest">
             | undefined,
           pwEndpoint: body.pwEndpoint || serverConfig.pw_endpoint,
+          pwCdpEndpoint: body.pwCdpEndpoint || serverConfig.pw_cdp_endpoint,
           bypassCSP: body.bypassCSP !== undefined ? body.bypassCSP : serverConfig.bypass_csp,
           proxyServer: body.proxy || serverConfig.proxy,
           proxyUsername: body.proxyUsername || serverConfig.proxy_username,

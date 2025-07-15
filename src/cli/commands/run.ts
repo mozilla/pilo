@@ -41,6 +41,11 @@ export function createRunCommand(): Command {
       config.get("block_resources") || "media,manifest",
     )
     .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option(
+      "--pw-cdp-endpoint <endpoint>",
+      "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
+      config.get("pw_cdp_endpoint"),
+    )
     .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp") || false)
     .option(
       "--max-iterations <number>",
@@ -112,6 +117,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       blockAds: options.blockAds,
       blockResources,
       pwEndpoint: options.pwEndpoint,
+      pwCdpEndpoint: options.pwCdpEndpoint,
       headless: options.headless,
       bypassCSP: options.bypassCsp,
       proxyServer: options.proxy,
