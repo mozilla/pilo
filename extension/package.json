@@ -21,9 +21,11 @@
   "dependencies": {
     "@ai-sdk/openai": "^1.3.23",
     "@tailwindcss/vite": "^4.1.11",
+    "@types/marked": "^6.0.0",
     "@types/webextension-polyfill": "^0.12.3",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "ai": "^4.3.17",
+    "marked": "^16.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "spark": "file:..",
