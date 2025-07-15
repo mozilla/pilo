@@ -277,6 +277,7 @@ new PlaywrightBrowser({
   blockAds: boolean,
   blockResources: ["image", "stylesheet", "font", "media", "manifest"],
   pwEndpoint: "ws://remote-browser:9222",
+  pwCdpEndpoint: "ws://remote-browser:9222", // CDP endpoint for chromium browsers
 });
 
 // Advanced usage with full Playwright control
