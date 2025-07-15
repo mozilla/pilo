@@ -18,12 +18,6 @@ interface AriaSnapshotWindow {
   renderAriaTree: (snapshot: any, options: { mode: string; forAI: boolean }) => string;
 }
 
-// Constants for timeouts and delays
-const DEFAULT_LOAD_TIMEOUT = 3000;
-const NETWORKIDLE_DELAY = 500;
-const POLL_INTERVAL = 100;
-const FALLBACK_TIMEOUT = 1000;
-
 /**
  * ExtensionBrowser - Implementation of AriaBrowser for web extension context
  * Uses WebExtension APIs instead of Playwright to interact with web pages
@@ -31,6 +25,19 @@ const FALLBACK_TIMEOUT = 1000;
 export class ExtensionBrowser implements AriaBrowser {
   readonly browserName = "extension:chrome";
   private tabId?: number;
+  private currentSnapshot?: { elements: Map<string, Element>; renderedText: string };
+
+  // Match Playwright's timeout - 5 seconds timeout for interactive actions
+  private readonly ACTION_TIMEOUT_MS = 5000;
+  // Page settle time after load events (animations, dynamic content, etc.)
+  private readonly PAGE_SETTLE_TIME_MS = 1000;
+  // Network idle delay for networkidle state
+  private readonly NETWORKIDLE_DELAY_MS = 500;
+  // Max retries for content script availability
+  private readonly CONTENT_SCRIPT_RETRY_COUNT = 3;
+  // Delay between content script checks
+  private readonly CONTENT_SCRIPT_RETRY_DELAY_MS = 500;
+
   constructor(tabId?: number) {
     this.tabId = tabId;
   }
@@ -45,23 +52,42 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async goto(url: string): Promise<void> {
     const tab = await this.getActiveTab();
-    await browser.tabs.update(tab.id!, { url });
+    try {
+      // Extension equivalent of "commit" - just start the navigation
+      await browser.tabs.update(tab.id!, { url });
+      // Handle page transition
+      await this.handlePageTransition();
+    } catch (error) {
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async goBack(): Promise<void> {
     const tab = await this.getActiveTab();
-    await browser.scripting.executeScript({
-      target: { tabId: tab.id! },
-      func: () => history.back(),
-    });
+    try {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: () => history.back(),
+      });
+      // Handle page transition
+      await this.handlePageTransition();
+    } catch (error) {
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async goForward(): Promise<void> {
     const tab = await this.getActiveTab();
-    await browser.scripting.executeScript({
-      target: { tabId: tab.id! },
-      func: () => history.forward(),
-    });
+    try {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: () => history.forward(),
+      });
+      // Handle page transition
+      await this.handlePageTransition();
+    } catch (error) {
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async getUrl(): Promise<string> {
@@ -78,6 +104,14 @@ export class ExtensionBrowser implements AriaBrowser {
     const tab = await this.getActiveTab();
 
     try {
+      await this.ensureContentScript();
+    } catch (error) {
+      console.warn("Content script not available:", error);
+      // Return basic fallback when content script unavailable
+      return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nContent script not available on this page.`;
+    }
+
+    try {
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: tab.id! },
         func: () => {
@@ -87,32 +121,36 @@ export class ExtensionBrowser implements AriaBrowser {
             typeof win.generateAriaTree !== "function" ||
             typeof win.renderAriaTree !== "function"
           ) {
-            return "ERROR: Content script functions not available. Page may not be fully loaded.";
+            throw new Error(
+              "Content script functions not available. Page may not be fully loaded.",
+            );
           }
 
-          try {
-            // Use the globally available functions from content script
-            const snapshot = win.generateAriaTree(document.body, {
-              forAI: true,
-              refPrefix: "s1",
-            });
-            return win.renderAriaTree(snapshot, {
-              mode: "raw",
-              forAI: true,
-            });
-          } catch (error) {
-            return `ERROR: Failed to generate ARIA tree: ${error instanceof Error ? error.message : String(error)}`;
-          }
+          // Use the globally available functions from content script
+          const snapshot = win.generateAriaTree(document.body, {
+            forAI: true,
+            refPrefix: "s1",
+          });
+          const renderedText = win.renderAriaTree(snapshot, {
+            mode: "raw",
+            forAI: true,
+          });
+
+          // Return both the rendered text and elements map for caching
+          return {
+            renderedText,
+            elements: Array.from(snapshot.elements.entries()), // Convert Map to array for serialization
+          };
         },
       });
 
-      if (typeof result === "string" && result.startsWith("ERROR:")) {
-        console.error("ExtensionBrowser getText error:", result);
-        // Return a basic fallback
-        return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nContent analysis failed.`;
-      }
-
-      return result as string;
+      // Script succeeded, cache the snapshot
+      const snapshotData = result as { renderedText: string; elements: Array<[string, Element]> };
+      this.currentSnapshot = {
+        elements: new Map(snapshotData.elements), // Convert array back to Map
+        renderedText: snapshotData.renderedText,
+      };
+      return snapshotData.renderedText;
     } catch (error) {
       console.error("ExtensionBrowser getText execution error:", error);
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to analyze page content.`;
@@ -130,65 +168,124 @@ export class ExtensionBrowser implements AriaBrowser {
     return Buffer.from(base64Data, "base64");
   }
 
-  async performAction(ref: string, action: string, value?: string): Promise<void> {
-    // Handle non-element actions first
-    switch (action) {
-      case "wait":
-        if (!value) throw new Error("Value required for wait action");
-        const seconds = parseInt(value, 10);
-        if (isNaN(seconds) || seconds < 0) {
-          throw new Error(`Invalid wait time: ${value}. Must be a positive number.`);
-        }
-        await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-        return;
-
-      case "goto":
-        if (!value) throw new Error("URL required for goto action");
-        if (!value.trim()) throw new Error("URL cannot be empty");
-        await this.goto(value.trim());
-        return;
-
-      case "back":
-        await this.goBack();
-        return;
-
-      case "forward":
-        await this.goForward();
-        return;
-
-      case "done":
-        // This is a no-op in the browser implementation
-        // It's handled at a higher level in the automation flow
-        return;
-    }
-
-    // Handle element-based actions
+  async waitForLoadState(
+    state: "networkidle" | "domcontentloaded" | "load",
+    options?: { timeout?: number },
+  ): Promise<void> {
     const tab = await this.getActiveTab();
+    const timeout = options?.timeout || this.ACTION_TIMEOUT_MS;
 
     try {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (stateParam: string, timeoutParam: number, networkIdleDelay: number) => {
+          return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error(`Timeout waiting for ${stateParam}`));
+            }, timeoutParam);
+
+            const finish = () => {
+              clearTimeout(timeoutId);
+              resolve(true);
+            };
+
+            if (stateParam === "domcontentloaded") {
+              if (document.readyState === "interactive" || document.readyState === "complete") {
+                finish();
+              } else {
+                document.addEventListener("DOMContentLoaded", finish, { once: true });
+              }
+            } else if (stateParam === "load") {
+              if (document.readyState === "complete") {
+                finish();
+              } else {
+                window.addEventListener("load", finish, { once: true });
+              }
+            } else if (stateParam === "networkidle") {
+              // Simple networkidle: wait for load + NETWORKIDLE_DELAY_MS
+              if (document.readyState === "complete") {
+                setTimeout(finish, networkIdleDelay);
+              } else {
+                window.addEventListener("load", () => setTimeout(finish, networkIdleDelay), {
+                  once: true,
+                });
+              }
+            }
+          });
+        },
+        args: [state, timeout, this.NETWORKIDLE_DELAY_MS],
+      });
+    } catch (error) {
+      throw error; // Re-throw to allow caller to handle
+    }
+  }
+
+  async performAction(ref: string, action: string, value?: string): Promise<void> {
+    try {
+      // Handle non-element actions first
+      switch (action) {
+        case "wait":
+          if (!value) throw new Error("Value required for wait action");
+          const seconds = parseInt(value, 10);
+          if (isNaN(seconds) || seconds < 0) {
+            throw new Error(`Invalid wait time: ${value}. Must be a positive number.`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+          return;
+
+        case "goto":
+          if (!value) throw new Error("URL required for goto action");
+          if (!value.trim()) throw new Error("URL cannot be empty");
+          await this.goto(value.trim());
+          // Note: goto already calls ensureOptimizedPageLoad internally
+          return;
+
+        case "back":
+          await this.goBack();
+          // Note: goBack already calls ensureOptimizedPageLoad internally
+          return;
+
+        case "forward":
+          await this.goForward();
+          // Note: goForward already calls ensureOptimizedPageLoad internally
+          return;
+
+        case "done":
+          // This is a no-op in the browser implementation
+          // It's handled at a higher level in the automation flow
+          return;
+      }
+
+      // Handle element-based actions
+      const tab = await this.getActiveTab();
+      await this.ensureContentScript();
+
+      // Check if we have a cached snapshot first
+      if (!this.currentSnapshot) {
+        throw new Error(
+          "No cached snapshot available. Call getText() first to generate page snapshot.",
+        );
+      }
+
       const [{ result }] = await browser.scripting.executeScript({
         target: { tabId: tab.id! },
-        func: (paramsJson: string) => {
+        func: (paramsJson: string, elementsArray: Array<[string, any]>) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
-          const win = window as Window & AriaSnapshotWindow;
-          // Use the globally available functions from content script
-          if (typeof win.generateAriaTree !== "function") {
-            return { success: false, error: "Content script functions not available" };
+
+          // Reconstruct the elements map from the cached snapshot
+          const elements = new Map(elementsArray);
+          const element = elements.get(refParam);
+
+          if (!element) {
+            return {
+              success: false,
+              error: `Element with ref ${refParam} not found in cached snapshot`,
+            };
           }
 
           try {
-            const snapshot = win.generateAriaTree(document.body, {
-              forAI: true,
-              refPrefix: "s1",
-            });
-
-            const element = snapshot.elements.get(refParam);
-
-            if (!element) {
-              return { success: false, error: `Element with ref ${refParam} not found` };
-            }
-
             switch (actionParam) {
+              // Element interactions
               case "click":
                 if (element instanceof HTMLElement) {
                   element.click();
@@ -205,7 +302,6 @@ export class ExtensionBrowser implements AriaBrowser {
                 break;
 
               case "fill":
-              case "type":
                 if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
                   element.value = valueParam || "";
                   element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -265,7 +361,10 @@ export class ExtensionBrowser implements AriaBrowser {
             };
           }
         },
-        args: [JSON.stringify({ ref, action, value })],
+        args: [
+          JSON.stringify({ ref, action, value }),
+          Array.from(this.currentSnapshot.elements.entries()),
+        ],
       });
 
       const typedResult = result as ActionResult;
@@ -274,102 +373,97 @@ export class ExtensionBrowser implements AriaBrowser {
           typedResult?.error || `Failed to perform action ${action} on element ${ref}`,
         );
       }
+
+      // Element interactions that may cause navigation
+      if (action === "click") {
+        // Handle potential page transition after click
+        await this.handlePageTransition();
+      } else if (action === "select") {
+        // Handle potential page transition after select
+        await this.handlePageTransition();
+      } else if (action === "enter") {
+        // Handle potential page transition after enter
+        await this.handlePageTransition();
+      }
     } catch (error) {
-      console.error(`ExtensionBrowser performAction error:`, error);
       throw new Error(
-        `Failed to perform ${action} on ${ref}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
 
-  async waitForLoadState(
-    state: "networkidle" | "domcontentloaded" | "load",
-    options?: { timeout?: number },
-  ): Promise<void> {
-    const tab = await this.getActiveTab();
-    const timeout = options?.timeout ?? DEFAULT_LOAD_TIMEOUT;
-
+  // Private helper method to ensure page is usable with appropriate timeouts
+  // Matches Playwright's ensureOptimizedPageLoad exactly
+  private async ensureOptimizedPageLoad(): Promise<void> {
     try {
-      await browser.scripting.executeScript({
-        target: { tabId: tab.id! },
-        func: (state: string, timeout: number) => {
-          return new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(
-              () => {
-                reject(new Error(`Timeout waiting for load state: ${state}`));
-              },
-              typeof timeout === "number" ? timeout : 30000,
-            );
+      // 1. Wait for DOM to be ready - this is critical for interactivity
+      await this.waitForLoadState("domcontentloaded");
+    } catch (error) {
+      // Still continue since we might be able to interact with what's loaded
+    }
 
-            const checkState = () => {
-              switch (state) {
-                case "domcontentloaded":
-                  if (document.readyState === "interactive" || document.readyState === "complete") {
-                    clearTimeout(timeoutId);
-                    resolve(true);
-                  }
-                  break;
-                case "load":
-                  if (document.readyState === "complete") {
-                    clearTimeout(timeoutId);
-                    resolve(true);
-                  }
-                  break;
-                case "networkidle":
-                  // Simple networkidle implementation - wait for no new network requests for 500ms
-                  if (document.readyState === "complete") {
-                    setTimeout(() => {
-                      clearTimeout(timeoutId);
-                      resolve(true);
-                    }, NETWORKIDLE_DELAY);
-                  }
-                  break;
-              }
-            };
-
-            // Check immediately
-            checkState();
-
-            // If not ready, poll every 100ms
-            const pollInterval = setInterval(() => {
-              checkState();
-              if (document.readyState === "complete" && state !== "networkidle") {
-                clearInterval(pollInterval);
-              }
-            }, POLL_INTERVAL);
-
-            // Listen for load events
-            if (state === "domcontentloaded" && document.readyState === "loading") {
-              document.addEventListener(
-                "DOMContentLoaded",
-                () => {
-                  clearInterval(pollInterval);
-                  clearTimeout(timeoutId);
-                  resolve(true);
-                },
-                { once: true },
-              );
-            }
-
-            if (state === "load" && document.readyState !== "complete") {
-              window.addEventListener(
-                "load",
-                () => {
-                  clearInterval(pollInterval);
-                  clearTimeout(timeoutId);
-                  resolve(true);
-                },
-                { once: true },
-              );
-            }
-          });
-        },
-        args: [state, timeout],
+    // 2. Try to wait for full load, but cap at ACTION_TIMEOUT_MS
+    // We catch and ignore timeout errors since the page is usable after domcontentloaded
+    try {
+      await this.waitForLoadState("load", {
+        timeout: this.ACTION_TIMEOUT_MS,
       });
     } catch (error) {
-      // Fallback to simple timeout if script execution fails
-      await new Promise((resolve) => setTimeout(resolve, Math.min(timeout, FALLBACK_TIMEOUT)));
+      // Page load timed out - continue anyway
     }
+
+    // 3. Wait 1 second for page to settle (animations, dynamic content, etc.)
+    await new Promise((resolve) => setTimeout(resolve, this.PAGE_SETTLE_TIME_MS));
+  }
+
+  // Clear the current page snapshot
+  private clearSnapshot(): void {
+    this.currentSnapshot = undefined;
+  }
+
+  // Handle page transition: clear snapshot and wait for page to be ready
+  private async handlePageTransition(): Promise<void> {
+    this.clearSnapshot();
+    await this.ensureOptimizedPageLoad();
+  }
+
+  // Ensure content script is available and retry if needed
+  private async ensureContentScript(): Promise<void> {
+    const tab = await this.getActiveTab();
+
+    // Skip content script check for non-web URLs
+    if (!tab.url || (!tab.url.startsWith("http://") && !tab.url.startsWith("https://"))) {
+      throw new Error(`Content script not available on non-web URL: ${tab.url}`);
+    }
+
+    for (let attempt = 0; attempt < this.CONTENT_SCRIPT_RETRY_COUNT; attempt++) {
+      try {
+        const [{ result }] = await browser.scripting.executeScript({
+          target: { tabId: tab.id! },
+          func: () => {
+            const win = window as Window & AriaSnapshotWindow;
+            return (
+              typeof win.generateAriaTree === "function" && typeof win.renderAriaTree === "function"
+            );
+          },
+        });
+
+        if (result) {
+          return; // Content script is available
+        }
+      } catch (error) {
+        // Script execution failed, continue to retry
+      }
+
+      // Wait before retrying
+      if (attempt < this.CONTENT_SCRIPT_RETRY_COUNT - 1) {
+        await new Promise((resolve) => setTimeout(resolve, this.CONTENT_SCRIPT_RETRY_DELAY_MS));
+      }
+    }
+
+    throw new Error(
+      `Content script not available after ${this.CONTENT_SCRIPT_RETRY_COUNT} retries for tab ${tab.id} at ${tab.url}`,
+    );
   }
 
   /**
