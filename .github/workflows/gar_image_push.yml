@@ -1,0 +1,52 @@
+name: push image server image to GAR for TABS
+
+env:
+  IMAGE_NAME: tabs-spark
+  GAR_LOCATION: us
+  GCP_PROJECT_ID: moz-fx-tabs-prod
+  GAR_REPOSITORY: tabs-prod
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      deployments: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get info
+        run: |
+          uname -v
+          docker info
+      - name: Create version.json
+        run: |
+          # create a version.json per
+          # https://github.com/mozilla-services/Dockerflow/blob/master/docs/version_object.md
+          printf '{"commit":"%s","version":"%s","source":"%s","build":"%s"}\n' \
+          "$GITHUB_SHA" \
+          "$GITHUB_REF_NAME" \
+          "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+          "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > version.json
+      - name: Output version.json
+        run: cat version.json
+      - name: Build Docker images
+        uses: mozilla-it/deploy-actions/docker-build@v4.0.1
+        with:
+          gar_location: us
+          image_name: tabs-spark
+          gar_name: tabs-prod
+          project_id: moz-fx-tabs-prod
+          should_tag_latest: true
+      - name: Push the Docker image to GAR
+        uses: mozilla-it/deploy-actions/docker-push@v4.0.1
+        with:
+          gar_location: us
+          workload_identity_pool_project_number: ${{ vars.GCPV2_WORKLOAD_IDENTITY_POOL_PROJECT_NUMBER }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          image_tags: ${{ env.DOCKER_METADATA_OUTPUT_TAGS }}
