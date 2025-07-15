@@ -27,6 +27,8 @@ export interface PlaywrightBrowserOptions {
   blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
   /** Playwright endpoint URL to connect to remote browser */
   pwEndpoint?: string;
+  /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
+  pwCdpEndpoint?: string;
   /** Run browser in headless mode (maps to launchOptions.headless) */
   headless?: boolean;
   /** Bypass Content Security Policy (maps to contextOptions.bypassCSP) */
@@ -58,7 +60,8 @@ export class PlaywrightBrowser implements AriaBrowser {
   private page: Page | null = null;
 
   // Default timeouts
-  private readonly ACTION_TIMEOUT_MS = 3000; // 3 seconds timeout for interactive actions
+  // TODO: Make this configurable
+  private readonly ACTION_TIMEOUT_MS = 5000; // 5 seconds timeout for interactive actions
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
@@ -66,6 +69,10 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   get pwEndpoint(): string | undefined {
     return this.options.pwEndpoint;
+  }
+
+  get pwCdpEndpoint(): string | undefined {
+    return this.options.pwCdpEndpoint;
   }
 
   get proxyServer(): string | undefined {
@@ -85,6 +92,11 @@ export class PlaywrightBrowser implements AriaBrowser {
       headless: false, // Spark default
       ...this.options.launchOptions, // User-provided Playwright options
     };
+
+    // Filter out empty args to avoid Playwright issues
+    if (launchOptions.args) {
+      launchOptions.args = launchOptions.args.filter((arg) => !!arg);
+    }
 
     const contextOptions: BrowserContextOptions = {
       bypassCSP: true, // Spark default
@@ -134,9 +146,13 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       case "chrome":
       case "chromium":
-        this.browser = this.options.pwEndpoint
-          ? await chromium.connect(this.options.pwEndpoint, connectOptions)
-          : await chromium.launch(launchOptions);
+        if (this.options.pwCdpEndpoint) {
+          this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
+        } else if (this.options.pwEndpoint) {
+          this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
+        } else {
+          this.browser = await chromium.launch(launchOptions);
+        }
         break;
 
       case "safari":
@@ -148,9 +164,13 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       case "edge":
         // Edge uses chromium with channel setting
-        this.browser = this.options.pwEndpoint
-          ? await chromium.connect(this.options.pwEndpoint, connectOptions)
-          : await chromium.launch({ ...launchOptions, channel: "msedge" });
+        if (this.options.pwCdpEndpoint) {
+          this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
+        } else if (this.options.pwEndpoint) {
+          this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
+        } else {
+          this.browser = await chromium.launch({ ...launchOptions, channel: "msedge" });
+        }
         break;
 
       default:

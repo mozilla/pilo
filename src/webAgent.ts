@@ -936,6 +936,9 @@ export class WebAgent {
       url: this.url,
       guardrails: this.guardrails,
       data: this.data,
+      pwEndpoint: (this.browser as any).pwEndpoint,
+      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
+      proxy: (this.browser as any).proxyServer,
       vision: this.vision,
       // TODO: Provider info should be logged elsewhere, not WebAgent's responsibility
     });

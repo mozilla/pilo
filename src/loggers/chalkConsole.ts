@@ -123,6 +123,7 @@ export class ChalkConsoleLogger implements Logger {
     if (data.model) console.log(chalk.gray(`Model: ${data.model}`));
     console.log(chalk.gray(`Browser: ${data.browserName}`));
     if (data.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${data.pwEndpoint}`));
+    if (data.pwCdpEndpoint) console.log(chalk.gray(`CDP endpoint: ${data.pwCdpEndpoint}`));
     if (data.proxy) console.log(chalk.gray(`Proxy: ${data.proxy}`));
     if (data.url) console.log(chalk.gray(`Starting URL: ${data.url}`));
     if (data.guardrails) console.log(chalk.gray(`Guardrails: ${data.guardrails}`));

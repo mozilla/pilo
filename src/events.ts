@@ -54,6 +54,7 @@ export interface TaskSetupEventData extends WebAgentEventData {
   guardrails?: string;
   data?: any;
   pwEndpoint?: string;
+  pwCdpEndpoint?: string;
   proxy?: string;
   vision?: boolean;
   provider?: string;

@@ -189,6 +189,88 @@ describe("PlaywrightBrowser", () => {
     });
   });
 
+  describe("launch options args handling", () => {
+    it("should filter out empty args from launch options", () => {
+      const browser = new PlaywrightBrowser({
+        launchOptions: {
+          args: [
+            "--disable-web-security",
+            "",
+            "--no-sandbox",
+            null,
+            "--disable-features=VizDisplayCompositor",
+            undefined,
+          ],
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+
+      // Test that the internal mapping filters out empty args
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.args).toEqual([
+        "--disable-web-security",
+        "--no-sandbox",
+        "--disable-features=VizDisplayCompositor",
+      ]);
+    });
+
+    it("should handle launch options with only empty args", () => {
+      const browser = new PlaywrightBrowser({
+        launchOptions: {
+          args: ["", null, undefined],
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+
+      // Test that all empty args are filtered out
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.args).toEqual([]);
+    });
+
+    it("should handle launch options with no args", () => {
+      const browser = new PlaywrightBrowser({
+        launchOptions: {
+          slowMo: 100,
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+
+      // Test that args property doesn't exist when not provided
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.args).toBeUndefined();
+    });
+
+    it("should preserve valid args while filtering empty ones", () => {
+      const browser = new PlaywrightBrowser({
+        launchOptions: {
+          args: [
+            "--valid-arg",
+            "",
+            "--another-valid",
+            null,
+            "--third-valid",
+            undefined,
+            "--fourth-valid",
+          ],
+        },
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+
+      // Test that only valid args are preserved
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.args).toEqual([
+        "--valid-arg",
+        "--another-valid",
+        "--third-valid",
+        "--fourth-valid",
+      ]);
+    });
+  });
+
   describe("proxy configuration", () => {
     it("should handle proxy options", () => {
       const browser = new PlaywrightBrowser({
