@@ -1,33 +1,39 @@
 import type { ReactElement } from "react";
+import type { Theme } from "./theme";
 
 type AgentEvent = { type: string; data: any; timestamp: number };
 
 interface EventLogProps {
   events: AgentEvent[];
+  theme: Theme;
 }
 
 /**
  * React component to render WebAgent events in a nice format
  */
-export function EventLog({ events }: EventLogProps): ReactElement {
+export function EventLog({ events, theme: t }: EventLogProps): ReactElement {
   const formatEvent = (event: AgentEvent) => {
     const { type, data } = event;
 
     switch (type) {
       case "task:started":
         return (
-          <div>
+          <div className="space-y-2">
             <div>
-              <strong>🎯 Task:</strong> {data.task}
+              <strong className={t.events.task}>🎯 Task:</strong>{" "}
+              <span className={t.text.primary}>{data.task}</span>
             </div>
             <div>
-              <strong>💡 Explanation:</strong> {data.explanation}
+              <strong className={t.events.explanation}>💡 Explanation:</strong>{" "}
+              <span className={t.text.primary}>{data.explanation}</span>
             </div>
             <div>
-              <strong>📋 Plan:</strong> {data.plan}
+              <strong className={t.events.plan}>📋 Plan:</strong>{" "}
+              <span className={t.text.primary}>{data.plan}</span>
             </div>
             <div>
-              <strong>🌐 Starting URL:</strong> <span style={{ color: "#0074d9" }}>{data.url}</span>
+              <strong className={t.events.url}>🌐 Starting URL:</strong>{" "}
+              <span className={t.events.url}>{data.url}</span>
             </div>
           </div>
         );
@@ -35,7 +41,8 @@ export function EventLog({ events }: EventLogProps): ReactElement {
       case "task:completed":
         return data.finalAnswer ? (
           <div>
-            <strong style={{ color: "green" }}>✨ Final Answer:</strong> {data.finalAnswer}
+            <strong className={t.events.completion}>✨ Final Answer:</strong>{" "}
+            <span className={t.text.primary}>{data.finalAnswer}</span>
           </div>
         ) : null;
 
@@ -44,11 +51,10 @@ export function EventLog({ events }: EventLogProps): ReactElement {
           data.title.length > 50 ? data.title.slice(0, 47) + "..." : data.title;
         return (
           <>
-            <div style={{ color: "#aaa", margin: "8px 0 2px 0" }}>
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            </div>
+            <div className={`${t.text.muted} my-2 text-center`}>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
             <div>
-              <strong>📍 Current Page:</strong> {truncatedTitle}
+              <strong className={t.events.page}>📍 Current Page:</strong>{" "}
+              <span className={t.text.primary}>{truncatedTitle}</span>
             </div>
           </>
         );
@@ -56,55 +62,66 @@ export function EventLog({ events }: EventLogProps): ReactElement {
       case "agent:observed":
         return (
           <div>
-            <strong>🔭 Observation:</strong> {data.observation}
+            <strong className={t.events.observation}>🔭 Observation:</strong>{" "}
+            <span className={t.text.primary}>{data.observation}</span>
           </div>
         );
 
       case "agent:reasoned":
         return (
           <div>
-            <strong>💭 Thought:</strong> {data.thought}
+            <strong className={t.events.thought}>💭 Thought:</strong>{" "}
+            <span className={t.text.primary}>{data.thought}</span>
           </div>
         );
 
       case "browser:action_started":
-        let details = `<strong>🎯 Action:</strong> ${data.action.toUpperCase()}`;
-        if (data.ref) details += ` <span style="color:#0074d9">ref: ${data.ref}</span>`;
-        if (data.value) details += ` <span style="color:green">value: "${data.value}"</span>`;
-        return <div dangerouslySetInnerHTML={{ __html: details }} />;
+        return (
+          <div>
+            <strong className={t.events.action}>🎯 Action:</strong>{" "}
+            <span className={`${t.text.primary} uppercase`}>{data.action}</span>
+            {data.ref && <span className={`${t.events.actionRef} ml-2`}>ref: {data.ref}</span>}
+            {data.value && (
+              <span className={`${t.events.actionValue} ml-2`}>value: "{data.value}"</span>
+            )}
+          </div>
+        );
 
       case "browser:action_completed":
         return data.success ? (
-          <div style={{ color: "green" }}>
+          <div className={t.events.success}>
             <strong>✅ Success</strong>
           </div>
         ) : (
-          <div style={{ color: "red" }}>
-            <strong>❌ Failed:</strong> {data.error || "Unknown error"}
+          <div className={t.events.failure}>
+            <strong>❌ Failed:</strong>{" "}
+            <span className={t.text.primary}>{data.error || "Unknown error"}</span>
           </div>
         );
 
       case "agent:waiting":
-        return <div style={{ color: "#b8860b" }}>⏳ Waiting {data.seconds}s...</div>;
+        return <div className={t.events.waiting}>⏳ Waiting {data.seconds}s...</div>;
 
       case "browser:network_waiting":
-        return <div style={{ color: "#888" }}>🌐 Waiting for network...</div>;
+        return <div className={t.events.network}>🌐 Waiting for network...</div>;
 
       case "browser:network_timeout":
-        return <div style={{ color: "#888" }}>⚠️ Network timeout</div>;
+        return <div className={t.events.network}>⚠️ Network timeout</div>;
 
       case "agent:processing":
         return data.status === "start" ? (
-          <div>
-            🧮 {data.hasScreenshot ? "👁️ " : ""}Processing: {data.operation}...
+          <div className={t.events.processing}>
+            🧮 {data.hasScreenshot ? "👁️ " : ""}Processing:{" "}
+            <span className={t.text.primary}>{data.operation}...</span>
           </div>
         ) : null;
 
       default:
         // Generic fallback for any event we haven't specifically handled
         return (
-          <div style={{ color: "#666", fontSize: "0.9em" }}>
-            <strong>{type}:</strong> {JSON.stringify(data, null, 2)}
+          <div className={`${t.events.generic} text-sm`}>
+            <strong>{type}:</strong>{" "}
+            <span className={t.text.secondary}>{JSON.stringify(data, null, 2)}</span>
           </div>
         );
     }
@@ -112,20 +129,10 @@ export function EventLog({ events }: EventLogProps): ReactElement {
 
   return (
     <div
-      style={{
-        height: "400px",
-        overflowY: "auto",
-        padding: "10px",
-        border: "1px solid #ddd",
-        borderRadius: "4px",
-        backgroundColor: "#f9f9f9",
-        fontFamily: "monospace",
-        fontSize: "13px",
-        lineHeight: "1.4",
-      }}
+      className={`h-96 overflow-y-auto p-4 border ${t.border.secondary} rounded-lg ${t.bg.secondary} font-mono text-sm leading-relaxed`}
     >
       {events.length === 0 ? (
-        <div style={{ color: "#999", textAlign: "center", marginTop: "20px" }}>
+        <div className={`${t.text.muted} text-center mt-8`}>
           No events yet. Run a task to see agent activity here.
         </div>
       ) : (
@@ -135,7 +142,7 @@ export function EventLog({ events }: EventLogProps): ReactElement {
           .map((event, index) => (
             <div
               key={events.length - index - 1}
-              style={{ marginBottom: "8px", borderBottom: "1px solid #eee", paddingBottom: "4px" }}
+              className={`mb-3 border-b ${t.border.primary} pb-2 last:border-b-0`}
             >
               {formatEvent(event)}
             </div>
