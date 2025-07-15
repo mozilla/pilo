@@ -57,6 +57,7 @@ Execute a web automation task using natural language.
   "blockAds": "boolean (optional)",
   "blockResources": "array (optional)",
   "pwEndpoint": "string (optional)",
+  "pwCdpEndpoint": "string (optional)",
   "bypassCSP": "boolean (optional)",
 
   // WebAgent behavior overrides

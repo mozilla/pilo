@@ -938,6 +938,7 @@ export class WebAgent {
       guardrails: this.guardrails,
       data: this.data,
       pwEndpoint: (this.browser as any).pwEndpoint,
+      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
       proxy: (this.browser as any).proxyServer,
       vision: this.vision,
       provider: providerInfo.provider,

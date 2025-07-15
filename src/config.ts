@@ -34,6 +34,7 @@ export interface SparkConfig {
 
   // Playwright Configuration
   pw_endpoint?: string;
+  pw_cdp_endpoint?: string;
   bypass_csp?: boolean;
 }
 
@@ -148,6 +149,9 @@ export class ConfigManager {
       // Playwright Configuration
       ...(process.env.SPARK_PW_ENDPOINT && {
         pw_endpoint: process.env.SPARK_PW_ENDPOINT,
+      }),
+      ...(process.env.SPARK_PW_CDP_ENDPOINT && {
+        pw_cdp_endpoint: process.env.SPARK_PW_CDP_ENDPOINT,
       }),
       ...(process.env.SPARK_BYPASS_CSP && {
         bypass_csp: process.env.SPARK_BYPASS_CSP === "true",
@@ -296,6 +300,7 @@ export class ConfigManager {
 
     // Playwright Configuration
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;
+    if (process.env.SPARK_PW_CDP_ENDPOINT) env.pw_cdp_endpoint = process.env.SPARK_PW_CDP_ENDPOINT;
     if (process.env.SPARK_BYPASS_CSP) env.bypass_csp = process.env.SPARK_BYPASS_CSP === "true";
 
     const merged = this.getConfig();
