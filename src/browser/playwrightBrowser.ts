@@ -93,6 +93,11 @@ export class PlaywrightBrowser implements AriaBrowser {
       ...this.options.launchOptions, // User-provided Playwright options
     };
 
+    // Filter out empty args to avoid Playwright issues
+    if (launchOptions.args) {
+      launchOptions.args = launchOptions.args.filter((arg) => !!arg);
+    }
+
     const contextOptions: BrowserContextOptions = {
       bypassCSP: true, // Spark default
       ...this.options.contextOptions, // User-provided Playwright options
