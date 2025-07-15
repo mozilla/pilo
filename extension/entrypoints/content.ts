@@ -1,37 +1,56 @@
 // Import ariaSnapshot functionality
-import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot.js";
+import browser from "webextension-polyfill";
+import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot";
+import type {
+  ExtensionMessage,
+  GetPageInfoResponse,
+  ExecutePageActionResponse,
+} from "../src/types/browser";
+
+// Make ARIA tree functions available globally for executeScript
+declare global {
+  interface Window {
+    generateAriaTree: typeof generateAriaTree;
+    renderAriaTree: typeof renderAriaTree;
+  }
+}
 
 export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
     // Make ARIA tree functions available globally for executeScript
-    declare global {
-      interface Window {
-        generateAriaTree: typeof generateAriaTree;
-        renderAriaTree: typeof renderAriaTree;
-      }
-    }
-
     window.generateAriaTree = generateAriaTree;
     window.renderAriaTree = renderAriaTree;
 
     // Listen for messages from background script
-    browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      switch (request.type) {
+    browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {
+      // Type guard to validate message structure
+      if (!request || typeof request !== "object" || !("type" in request)) {
+        sendResponse({ success: false, message: "Invalid message format" });
+        return true;
+      }
+
+      const typedRequest = request as ExtensionMessage;
+      switch (typedRequest.type) {
         case "getPageInfo":
           // Extract page information for Spark automation
-          sendResponse({
+          const pageInfo: GetPageInfoResponse = {
             title: document.title,
             url: window.location.href,
-            // Add more page analysis here
-          });
+          };
+          sendResponse(pageInfo);
           break;
         case "executePageAction":
           // Execute specific actions on the page
-          sendResponse({ success: true });
+          const actionResponse: ExecutePageActionResponse = { success: true };
+          sendResponse(actionResponse);
           break;
         default:
-          sendResponse({ success: false, message: "Unknown message type" });
+          const errorResponse: ExecutePageActionResponse = {
+            success: false,
+            message: "Unknown message type",
+          };
+          sendResponse(errorResponse);
       }
 
       return true; // Keep message channel open for async response

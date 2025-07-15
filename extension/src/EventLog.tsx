@@ -1,4 +1,4 @@
-import React from "react";
+import type { ReactElement } from "react";
 
 type AgentEvent = { type: string; data: any; timestamp: number };
 
@@ -9,7 +9,7 @@ interface EventLogProps {
 /**
  * React component to render WebAgent events in a nice format
  */
-export function EventLog({ events }: EventLogProps) {
+export function EventLog({ events }: EventLogProps): ReactElement {
   const formatEvent = (event: AgentEvent) => {
     const { type, data } = event;
 

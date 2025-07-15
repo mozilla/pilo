@@ -1,17 +1,27 @@
+import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
+
+interface EventData {
+  type: string;
+  data: unknown;
+  timestamp: number;
+}
+
+interface RealtimeEventMessage {
+  type: "realtimeEvent";
+  event: EventData;
+}
 
 /**
  * EventStoreLogger - Collects all WebAgent events into an array for React consumption
  * Instead of writing HTML, this logger stores structured event data that React can render
  */
 export class EventStoreLogger extends GenericLogger {
-  private events: Array<{ type: string; data: any; timestamp: number }> = [];
-  private subscribers: Set<
-    (events: Array<{ type: string; data: any; timestamp: number }>) => void
-  > = new Set();
+  private events: EventData[] = [];
+  private subscribers: Set<(events: EventData[]) => void> = new Set();
 
   constructor() {
-    super((eventType: string, data: any) => {
+    super((eventType: string, data: unknown) => {
       this.handleEvent(eventType, data);
     });
   }
@@ -19,11 +29,11 @@ export class EventStoreLogger extends GenericLogger {
   /**
    * Generic event handler - stores any event that comes through
    */
-  private handleEvent = (eventType: string, data: any): void => {
-    const event = {
+  private handleEvent = (eventType: string, data: unknown): void => {
+    const event: EventData = {
       type: eventType,
       data,
-      timestamp: data.timestamp || Date.now(),
+      timestamp: this.getTimestamp(data),
     };
 
     this.events.push(event);
@@ -31,14 +41,13 @@ export class EventStoreLogger extends GenericLogger {
     // Send real-time event to SidePanel if in background script context
     if (typeof browser !== "undefined" && browser.runtime) {
       try {
-        browser.runtime
-          .sendMessage({
-            type: "realtimeEvent",
-            event: event,
-          })
-          .catch(() => {
-            // Ignore errors if SidePanel isn't listening
-          });
+        const message: RealtimeEventMessage = {
+          type: "realtimeEvent",
+          event,
+        };
+        browser.runtime.sendMessage(message).catch(() => {
+          // Ignore errors if SidePanel isn't listening
+        });
       } catch (error) {
         // Ignore errors in case we're not in background script context
       }
@@ -49,11 +58,20 @@ export class EventStoreLogger extends GenericLogger {
   };
 
   /**
+   * Extract timestamp from data or use current time
+   */
+  private getTimestamp(data: unknown): number {
+    if (data && typeof data === "object" && "timestamp" in data) {
+      const timestamp = (data as { timestamp: unknown }).timestamp;
+      return typeof timestamp === "number" ? timestamp : Date.now();
+    }
+    return Date.now();
+  }
+
+  /**
    * Subscribe to event updates - React components can use this
    */
-  subscribe(
-    callback: (events: Array<{ type: string; data: any; timestamp: number }>) => void,
-  ): () => void {
+  subscribe(callback: (events: EventData[]) => void): () => void {
     this.subscribers.add(callback);
 
     // Immediately call with current events
@@ -68,7 +86,7 @@ export class EventStoreLogger extends GenericLogger {
   /**
    * Get current events array (for non-reactive access)
    */
-  getEvents(): Array<{ type: string; data: any; timestamp: number }> {
+  getEvents(): EventData[] {
     return [...this.events];
   }
 
@@ -83,7 +101,7 @@ export class EventStoreLogger extends GenericLogger {
   /**
    * Manually add an event (useful for events from background script)
    */
-  addEvent(eventType: string, data: any): void {
+  addEvent(eventType: string, data: unknown): void {
     this.handleEvent(eventType, data);
   }
 

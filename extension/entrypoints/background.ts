@@ -1,30 +1,45 @@
+import browser from "webextension-polyfill";
 import { AgentAPI, EventStoreLogger } from "../src/AgentAPI";
+import type {
+  ChromeBrowser,
+  ExtensionMessage,
+  ExecuteTaskMessage,
+  ExecuteTaskResponse,
+} from "../src/types/browser";
+
+interface StorageSettings {
+  apiKey?: string;
+  apiEndpoint?: string;
+  model?: string;
+}
 
 export default defineBackground(() => {
   console.log("Background script loaded");
 
   // Handle extension button clicks to open panel
-  // Chrome uses browser.action, Firefox uses browser.browserAction (polyfill normalizes to browser.action)
-  if (browser.action && browser.action.onClicked) {
-    browser.action.onClicked.addListener(async (tab) => {
+  // Polyfill should normalize but doesn't seem to work properly
+  const browserAction = browser.action || browser.browserAction;
+  if (browserAction) {
+    browserAction.onClicked.addListener(async (tab) => {
       console.log("Extension button clicked for tab:", tab.id);
 
       // Chrome: Use sidePanel API
-      if (browser.sidePanel && browser.sidePanel.open) {
+      const chromeBrowser = browser as ChromeBrowser;
+      if (chromeBrowser.sidePanel) {
         try {
-          await browser.sidePanel.open({ tabId: tab.id });
+          await chromeBrowser.sidePanel.open({ windowId: tab.windowId });
           console.log("SidePanel opened successfully");
         } catch (error) {
           console.error("Failed to open sidePanel:", error);
         }
       }
       // Firefox: Use sidebarAction API
-      else if (browser.sidebarAction && browser.sidebarAction.open) {
+      else if (browser.sidebarAction) {
         try {
-          await browser.sidebarAction.open();
-          console.log("Sidebar opened successfully");
+          await browser.sidebarAction.toggle();
+          console.log("Sidebar toggled successfully");
         } catch (error) {
-          console.error("Failed to open sidebar:", error);
+          console.error("Failed to toggle sidebar:", error);
         }
       }
       // Fallback: Firefox sidebar should open automatically via manifest
@@ -32,24 +47,34 @@ export default defineBackground(() => {
         console.log("No panel API available - Firefox sidebar should open automatically");
       }
     });
-  } else {
-    console.error("No action API available");
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log("Background received message:", message.type);
+  browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+    // Type guard to validate message structure
+    if (!message || typeof message !== "object" || !("type" in message)) {
+      sendResponse({ success: false, message: "Invalid message format" });
+      return true;
+    }
+
+    const typedMessage = message as ExtensionMessage;
+    console.log("Background received message:", typedMessage.type);
 
     (async () => {
       try {
-        let response;
+        let response: ExecuteTaskResponse;
 
-        switch (message.type) {
+        switch (typedMessage.type) {
           case "executeTask":
-            console.log("Executing task:", message.task);
+            const executeMessage = typedMessage as ExecuteTaskMessage;
+            console.log("Executing task:", executeMessage.task);
 
             // Get settings from storage
-            const settings = await browser.storage.local.get(["apiKey", "apiEndpoint", "model"]);
+            const settings = (await browser.storage.local.get([
+              "apiKey",
+              "apiEndpoint",
+              "model",
+            ])) as StorageSettings;
 
             if (!settings.apiKey) {
               response = {
@@ -59,21 +84,21 @@ export default defineBackground(() => {
               break;
             }
 
-            try {
-              // Create event store logger to capture events for React
-              const logger = new EventStoreLogger();
+            // Create event store logger to capture events for React
+            const logger = new EventStoreLogger();
 
+            try {
               console.log(
-                `Starting task execution for tab ${message.tabId} with URL: ${message.startUrl}`,
+                `Starting task execution for tab ${executeMessage.tabId} with URL: ${executeMessage.startUrl}`,
               );
 
               // Use AgentAPI to run the task
-              const result = await AgentAPI.runTask(message.task, {
+              const result = await AgentAPI.runTask(executeMessage.task, {
                 apiKey: settings.apiKey,
                 model: settings.model || "gpt-4.1",
-                logger: logger,
-                tabId: message.tabId,
-                startUrl: message.startUrl,
+                logger,
+                tabId: executeMessage.tabId,
+                startUrl: executeMessage.startUrl,
               });
 
               console.log(`Task completed successfully:`, result);
@@ -88,8 +113,8 @@ export default defineBackground(() => {
 
               response = {
                 success: false,
-                message: `Task execution failed: ${error.message}`,
-                events: logger?.getEvents() || [], // Include events even on error
+                message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                events: logger.getEvents(), // Include events even on error
               };
             }
             break;
@@ -107,7 +132,7 @@ export default defineBackground(() => {
         console.error("Error in message handler:", error);
         sendResponse({
           success: false,
-          message: error.message || "Unknown error occurred",
+          message: error instanceof Error ? error.message : "Unknown error occurred",
         });
       }
     })();

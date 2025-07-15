@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, type ReactElement } from "react";
+import browser from "webextension-polyfill";
 import "./SidePanel.css";
 import { EventLog } from "../../src/EventLog";
 import { useEventStore } from "../../src/useEventStore";
+import type { ExecuteTaskMessage, ExecuteTaskResponse } from "../../src/types/browser";
 
 interface Settings {
   apiKey: string;
@@ -9,7 +11,28 @@ interface Settings {
   model: string;
 }
 
-export default function SidePanel() {
+interface StoredSettings {
+  apiKey?: string;
+  apiEndpoint?: string;
+  model?: string;
+}
+
+interface RealtimeMessage {
+  type: string;
+  event?: {
+    type: string;
+    data: any;
+  };
+}
+
+interface EventData {
+  type: string;
+  data: any;
+}
+
+const SETTINGS_SAVE_DELAY = 1500;
+
+export default function SidePanel(): ReactElement {
   const [task, setTask] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -22,6 +45,13 @@ export default function SidePanel() {
   const [showSettings, setShowSettings] = useState(false);
   const { events, logger, clearEvents } = useEventStore();
 
+  // Helper function to add events to logger
+  const addEventsToLogger = (eventList: EventData[]) => {
+    eventList.forEach((event) => {
+      logger.addEvent(event.type, event.data);
+    });
+  };
+
   // Load settings on component mount
   useEffect(() => {
     loadSettings();
@@ -29,9 +59,10 @@ export default function SidePanel() {
 
   // Listen for real-time events from background script
   useEffect(() => {
-    const handleMessage = (message: any) => {
-      if (message.type === "realtimeEvent" && message.event) {
-        logger.addEvent(message.event.type, message.event.data);
+    const handleMessage = (message: unknown) => {
+      const typedMessage = message as RealtimeMessage;
+      if (typedMessage.type === "realtimeEvent" && typedMessage.event) {
+        logger.addEvent(typedMessage.event.type, typedMessage.event.data);
       }
     };
 
@@ -45,7 +76,11 @@ export default function SidePanel() {
   const loadSettings = async () => {
     try {
       // Direct storage access - no background worker needed
-      const stored = await browser.storage.local.get(["apiKey", "apiEndpoint", "model"]);
+      const stored = (await browser.storage.local.get([
+        "apiKey",
+        "apiEndpoint",
+        "model",
+      ])) as StoredSettings;
       const newSettings = {
         apiKey: stored.apiKey || "",
         apiEndpoint: stored.apiEndpoint || "https://api.openai.com/v1",
@@ -77,9 +112,9 @@ export default function SidePanel() {
       setTimeout(() => {
         setShowSettings(false);
         setSaveStatus(null);
-      }, 1500);
+      }, SETTINGS_SAVE_DELAY);
     } catch (error) {
-      setSaveStatus(`Error: ${error.message}`);
+      setSaveStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
       console.error("Save settings error:", error);
     }
   };
@@ -101,7 +136,7 @@ export default function SidePanel() {
       const [currentTab] = await browser.tabs.query({ active: true, currentWindow: true });
 
       // Only use background worker for actual Spark task execution
-      const response = await browser.runtime.sendMessage({
+      const message: ExecuteTaskMessage = {
         type: "executeTask",
         task: task.trim(),
         apiKey: settings.apiKey,
@@ -109,7 +144,8 @@ export default function SidePanel() {
         model: settings.model,
         tabId: currentTab?.id,
         startUrl: currentTab?.url,
-      });
+      };
+      const response = (await browser.runtime.sendMessage(message)) as ExecuteTaskResponse;
 
       if (response && response.success) {
         setResult(response.result || "Task completed successfully!");
@@ -117,22 +153,18 @@ export default function SidePanel() {
 
         // Add events from background script to our logger (fallback for any missed real-time events)
         if (response.events && response.events.length > 0) {
-          response.events.forEach((event) => {
-            logger.addEvent(event.type, event.data);
-          });
+          addEventsToLogger(response.events);
         }
       } else {
         setResult(`Error: ${response?.message || "Task execution failed"}`);
 
         // Add events even on error
         if (response?.events && response.events.length > 0) {
-          response.events.forEach((event) => {
-            logger.addEvent(event.type, event.data);
-          });
+          addEventsToLogger(response.events);
         }
       }
     } catch (error) {
-      setResult(`Error: ${error.message}`);
+      setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsExecuting(false);
     }
