@@ -69,6 +69,7 @@
     "dotenv": "^16.6.1",
     "eventemitter3": "^5.0.1",
     "liquidjs": "^10.21.1",
+    "nanoid": "^5.1.5",
     "playwright": "1.53.0",
     "zod": "^3.25.75"
   },

@@ -32,6 +32,7 @@ import {
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
+import { nanoid } from "nanoid";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -167,6 +168,9 @@ export class WebAgent {
   // === State Tracking ===
   /** Current page information for navigation tracking */
   private currentPage: { url: string; title: string } = { url: "", title: "" };
+
+  /** Current iteration ID for linking events within an execution loop */
+  private currentIterationId: string = "";
 
   // === Validation Patterns ===
   // No regex patterns needed - we just check if refs exist in the page snapshot
@@ -569,22 +573,27 @@ export class WebAgent {
   }
 
   /**
-   * Centralized event emission with automatic timestamp injection
+   * Centralized event emission with automatic timestamp and iteration ID injection
    *
    * Design decision: All events flow through this single method to ensure:
    * 1. Consistent timestamp injection for debugging and monitoring
-   * 2. Type safety through WebAgentEventType enum
-   * 3. Error isolation - logging failures don't crash the main task
-   * 4. Single point of control for event filtering/debugging
+   * 2. Automatic iteration ID injection to link events within execution loops
+   * 3. Type safety through WebAgentEventType enum
+   * 4. Error isolation - logging failures don't crash the main task
+   * 5. Single point of control for event filtering/debugging
    *
    * @param type - Event type from WebAgentEventType enum
-   * @param data - Event-specific data (timestamp will be auto-injected)
+   * @param data - Event-specific data (timestamp and iterationId will be auto-injected)
    */
-  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp">) {
+  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp" | "iterationId">) {
     try {
       this.eventEmitter.emitEvent({
         type,
-        data: { timestamp: Date.now(), ...data },
+        data: {
+          timestamp: Date.now(),
+          iterationId: this.currentIterationId,
+          ...data,
+        },
       } as WebAgentEvent);
     } catch (error) {
       // Critical design decision: Never let logging errors crash the main task
@@ -1155,6 +1164,7 @@ export class WebAgent {
     this.data = null;
     this.currentPage = { url: "", title: "" };
     this.currentPageSnapshot = "";
+    this.currentIterationId = "";
   }
 
   private formatConversationHistory(): string {
@@ -1278,6 +1288,9 @@ export class WebAgent {
       if (currentIteration > this.maxIterations) {
         break; // Exit: hit iteration limit
       }
+
+      // Generate new iteration ID for this execution loop
+      this.currentIterationId = nanoid(8);
 
       try {
         // Get current page state and ask AI what to do next
