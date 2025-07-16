@@ -47,3 +47,16 @@ export const taskValidationSchema = z.object({
 
 // Export the type for task validation result
 export type TaskValidationResult = z.infer<typeof taskValidationSchema>;
+
+/**
+ * Get the field order from the action schema for streaming response processing
+ *
+ * This extracts the field names in the order they appear in the schema definition,
+ * ensuring the streaming field order stays in sync with the schema automatically.
+ *
+ * @returns Array of field names in schema order
+ */
+export function getActionSchemaFieldOrder(): (keyof Action)[] {
+  // Extract keys from the schema shape in definition order
+  return Object.keys(actionSchema.shape) as (keyof Action)[];
+}

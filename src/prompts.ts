@@ -1,3 +1,5 @@
+import { buildPromptTemplate } from "./templateUtils.js";
+
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.
 You have deep knowledge of the web and use only the highest quality sources.
@@ -9,8 +11,6 @@ IMPORTANT: You can see the entire page content through the accessibility tree sn
 
 const jsonOnlyInstruction =
   "IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.";
-
-import { buildPromptTemplate } from "./templateUtils.js";
 
 const planPromptTemplate = buildPromptTemplate(
   `
