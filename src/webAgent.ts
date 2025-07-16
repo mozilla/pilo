@@ -172,6 +172,9 @@ export class WebAgent {
   /** Current iteration ID for linking events within an execution loop */
   private currentIterationId: string = "";
 
+  /** AbortSignal for cancelling execution */
+  private abortSignal: AbortSignal | null = null;
+
   // === Validation Patterns ===
   // No regex patterns needed - we just check if refs exist in the page snapshot
 
@@ -716,12 +719,17 @@ export class WebAgent {
     messages: any[],
     retryCount = 0,
   ): Promise<Action> {
-    const config = {
+    const config: any = {
       model: this.provider,
       schema,
       messages,
       temperature: 0,
     };
+
+    // Add AbortSignal if provided
+    if (this.abortSignal) {
+      config.abortSignal = this.abortSignal;
+    }
 
     try {
       const stream = await streamObject(config);
@@ -788,6 +796,11 @@ export class WebAgent {
 
       return final;
     } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI streaming request was cancelled");
+      }
+
       if (error instanceof Error) {
         this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
           error: error.message,
@@ -852,6 +865,11 @@ export class WebAgent {
       temperature: 0,
     };
 
+    // Add AbortSignal if provided
+    if (this.abortSignal) {
+      config.abortSignal = this.abortSignal;
+    }
+
     if (prompt) {
       config.prompt = prompt;
     } else if (messages) {
@@ -873,6 +891,11 @@ export class WebAgent {
       });
       return response.object as T;
     } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI request was cancelled");
+      }
+
       if (error instanceof Error) {
         this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
           error: error.message,
@@ -1165,6 +1188,7 @@ export class WebAgent {
     this.currentPage = { url: "", title: "" };
     this.currentPageSnapshot = "";
     this.currentIterationId = "";
+    this.abortSignal = null;
   }
 
   private formatConversationHistory(): string {
@@ -1223,13 +1247,20 @@ export class WebAgent {
    * - Task is marked as "done" and validation succeeds
    * - Maximum validation attempts are reached
    * - Maximum iteration limit is hit (safety mechanism)
+   * - AbortSignal is triggered (immediate cancellation)
    *
    * @param task - Natural language description of what to accomplish
    * @param startingUrl - Optional URL to begin from (if not provided, AI will choose)
    * @param data - Optional contextual data to reference during task execution
+   * @param abortSignal - Optional AbortSignal to cancel execution
    * @returns Complete execution results including success status and metrics
    */
-  async execute(task: string, startingUrl?: string, data?: any): Promise<TaskExecutionResult> {
+  async execute(
+    task: string,
+    startingUrl?: string,
+    data?: any,
+    abortSignal?: AbortSignal,
+  ): Promise<TaskExecutionResult> {
     if (!task) {
       throw new Error("No task provided.");
     }
@@ -1239,6 +1270,9 @@ export class WebAgent {
 
     // Reset any previous task state to ensure clean execution
     this.resetState();
+
+    // Store AbortSignal for cancellation
+    this.abortSignal = abortSignal || null;
 
     // Store contextual data for use in prompts (optional)
     if (data) {
@@ -1282,6 +1316,7 @@ export class WebAgent {
     // 2. Max validation attempts reached (task marked done but validation keeps failing)
     // 3. Max iterations reached (safety mechanism to prevent infinite loops)
     // 4. Unrecoverable AI generation error
+    // 5. AbortSignal triggered (immediate cancellation)
     while (true) {
       // Safety check: prevent infinite loops
       currentIteration++;
@@ -1335,6 +1370,19 @@ export class WebAgent {
         // Add the action result to conversation history for AI context
         this.recordActionResult(result, actionSuccess);
       } catch (error) {
+        // Handle cancellation errors differently from other errors
+        const isCancellation =
+          error instanceof Error &&
+          (error.name === "AbortError" ||
+            (this.abortSignal?.aborted &&
+              (error.message.includes("cancelled") || error.message.includes("aborted"))));
+
+        if (isCancellation) {
+          console.log("🛑 Task cancelled by user");
+          finalAnswer = "Task cancelled";
+          break; // Exit: task was cancelled
+        }
+
         // Handle unrecoverable AI generation errors
         console.error("❌ Unrecoverable error in main execution loop:", error);
         finalAnswer = `Task failed due to AI generation error: ${error instanceof Error ? error.message : String(error)}`;

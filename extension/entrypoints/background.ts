@@ -5,6 +5,8 @@ import type {
   ExtensionMessage,
   ExecuteTaskMessage,
   ExecuteTaskResponse,
+  CancelTaskMessage,
+  CancelTaskResponse,
 } from "../src/types/browser";
 
 interface StorageSettings {
@@ -15,6 +17,9 @@ interface StorageSettings {
 
 export default defineBackground(() => {
   console.log("Background script loaded");
+
+  // Track running tasks and their abort controllers
+  const runningTasks = new Map<string, AbortController>();
 
   // Handle extension button clicks to open panel
   // Polyfill should normalize but doesn't seem to work properly
@@ -62,7 +67,7 @@ export default defineBackground(() => {
 
     (async () => {
       try {
-        let response: ExecuteTaskResponse;
+        let response: ExecuteTaskResponse | CancelTaskResponse;
 
         switch (typedMessage.type) {
           case "executeTask":
@@ -87,19 +92,25 @@ export default defineBackground(() => {
             // Create event store logger to capture events for React
             const logger = new EventStoreLogger();
 
+            // Create AbortController for this task
+            const abortController = new AbortController();
+            const taskId = `task-${Date.now()}-${Math.random()}`;
+            runningTasks.set(taskId, abortController);
+
             try {
               console.log(
                 `Starting task execution for tab ${executeMessage.tabId} with data:`,
                 executeMessage.data,
               );
 
-              // Use AgentAPI to run the task
+              // Use AgentAPI to run the task with AbortSignal
               const result = await AgentAPI.runTask(executeMessage.task, {
                 apiKey: settings.apiKey,
                 model: settings.model || "gpt-4.1",
                 logger,
                 tabId: executeMessage.tabId,
                 data: executeMessage.data,
+                abortSignal: abortController.signal,
               });
 
               console.log(`Task completed successfully:`, result);
@@ -112,12 +123,52 @@ export default defineBackground(() => {
             } catch (error) {
               console.error("Task execution error:", error);
 
-              response = {
-                success: false,
-                message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
-                events: logger.getEvents(), // Include events even on error
-              };
+              // Check if this was a cancellation
+              const isCancellation =
+                error instanceof Error &&
+                (error.name === "AbortError" ||
+                  (abortController.signal.aborted &&
+                    (error.message.includes("cancelled") || error.message.includes("aborted"))));
+
+              if (isCancellation) {
+                response = {
+                  success: true, // Treat cancellation as success to avoid error styling
+                  result: "Task cancelled",
+                  events: logger.getEvents(),
+                };
+              } else {
+                response = {
+                  success: false,
+                  message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                  events: logger.getEvents(), // Include events even on error
+                };
+              }
+            } finally {
+              // Clean up the task tracking
+              runningTasks.delete(taskId);
             }
+            break;
+
+          case "cancelTask":
+            const cancelMessage = typedMessage as CancelTaskMessage;
+            console.log("Cancelling all running tasks");
+
+            // Cancel all running tasks
+            let cancelledCount = 0;
+            for (const [taskId, controller] of runningTasks.entries()) {
+              controller.abort();
+              cancelledCount++;
+            }
+            // Don't clear the map here - let individual tasks clean up in finally blocks
+            // runningTasks.clear();
+
+            response = {
+              success: true,
+              message:
+                cancelledCount > 0
+                  ? `Cancelled ${cancelledCount} running task(s)`
+                  : "No running tasks to cancel",
+            };
             break;
 
           default:

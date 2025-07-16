@@ -21,6 +21,7 @@ export class AgentAPI {
       logger?: Logger;
       tabId?: number;
       data?: any;
+      abortSignal?: AbortSignal;
     },
   ): Promise<string> {
     const browser = new ExtensionBrowser(options.tabId);
@@ -39,7 +40,7 @@ export class AgentAPI {
     });
 
     try {
-      const result = await agent.execute(task, undefined, options.data);
+      const result = await agent.execute(task, undefined, options.data, options.abortSignal);
       return result.finalAnswer || "Task completed successfully";
     } finally {
       await agent.close();

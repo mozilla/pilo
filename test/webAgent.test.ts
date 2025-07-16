@@ -1797,4 +1797,627 @@ describe("WebAgent", () => {
       });
     });
   });
+
+  describe("AbortSignal functionality", () => {
+    let abortController: AbortController;
+
+    beforeEach(() => {
+      abortController = new AbortController();
+    });
+
+    afterEach(() => {
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    });
+
+    describe("execute method AbortSignal integration", () => {
+      it("should accept AbortSignal parameter", async () => {
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock plan generation and validation
+        mockGenerateObject
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        // Mock action generation
+        mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        const result = await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          abortController.signal,
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.finalAnswer).toBe("Task completed successfully");
+      });
+
+      it("should pass AbortSignal to generatePlan", async () => {
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock plan generation and validation
+        mockGenerateObject
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        // Mock action generation
+        mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          abortController.signal,
+        );
+
+        // Verify AbortSignal was passed to generateObject
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+
+      it("should pass AbortSignal to generatePlanWithUrl", async () => {
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock plan generation and validation
+        mockGenerateObject
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+              url: "https://example.com",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        // Mock action generation
+        mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        await webAgent.execute(
+          "test task",
+          undefined, // No starting URL to trigger generatePlanWithUrl
+          undefined,
+          abortController.signal,
+        );
+
+        // Verify AbortSignal was passed to generateObject
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+
+      it("should work without AbortSignal", async () => {
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock plan generation and validation
+        mockGenerateObject
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        // Mock action generation
+        mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        const result = await webAgent.execute("test task", "https://example.com");
+
+        expect(result.success).toBe(true);
+        expect(result.finalAnswer).toBe("Task completed successfully");
+
+        // Verify no AbortSignal was passed when not provided
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            abortSignal: expect.anything(),
+          }),
+        );
+      });
+    });
+
+    describe("AI generation AbortSignal integration", () => {
+      it("should pass AbortSignal to generateObject", async () => {
+        mockGenerateObject.mockResolvedValue({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await webAgent.generatePlan("test task", "https://example.com");
+
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+
+      it("should pass AbortSignal to streamObject", async () => {
+        const mockResponse = {
+          currentStep: "Working on step",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          extractedData: "Page content analyzed",
+          thought: "Deciding next action",
+          action: {
+            action: PageAction.Click,
+            ref: "s1e23",
+          },
+          actionStatusMessage: "Performing action",
+        };
+
+        mockStreamObject.mockResolvedValue(createMockStreamingResponse(mockResponse));
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        await webAgent.generateNextAction("button [ref=s1e23]");
+
+        expect(mockStreamObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+
+      it("should not pass AbortSignal when not provided", async () => {
+        mockGenerateObject.mockResolvedValue({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // No AbortSignal set
+        (webAgent as any).abortSignal = null;
+
+        await webAgent.generatePlan("test task", "https://example.com");
+
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            abortSignal: expect.anything(),
+          }),
+        );
+      });
+    });
+
+    describe("AbortError handling", () => {
+      it("should handle AbortError in generateObject", async () => {
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        mockGenerateObject.mockRejectedValue(abortError);
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await expect(webAgent.generatePlan("test task", "https://example.com")).rejects.toThrow(
+          "AI request was cancelled",
+        );
+      });
+
+      it("should handle AbortError in streamObject", async () => {
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        mockStreamObject.mockRejectedValue(abortError);
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+          "AI streaming request was cancelled",
+        );
+      });
+
+      it("should handle AbortError in execute method", async () => {
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        // Mock plan generation to succeed
+        mockGenerateObject.mockResolvedValueOnce({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // Mock action generation to fail with AbortError
+        mockStreamObject.mockRejectedValue(abortError);
+
+        const result = await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          abortController.signal,
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.finalAnswer).toContain("AI streaming request was cancelled");
+      });
+
+      it("should distinguish AbortError from other errors", async () => {
+        const regularError = new Error("Regular error");
+        regularError.name = "Error";
+
+        mockGenerateObject.mockRejectedValue(regularError);
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await expect(webAgent.generatePlan("test task", "https://example.com")).rejects.toThrow(
+          "Regular error",
+        );
+      });
+    });
+
+    describe("AbortSignal state management", () => {
+      it("should store AbortSignal in execute method", async () => {
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock plan generation and validation
+        mockGenerateObject
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        // Mock action generation
+        mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          abortController.signal,
+        );
+
+        // Verify AbortSignal was stored
+        expect((webAgent as any).abortSignal).toBe(abortController.signal);
+      });
+
+      it("should reset AbortSignal in resetState", () => {
+        // Set AbortSignal
+        (webAgent as any).abortSignal = abortController.signal;
+
+        // Reset state
+        webAgent.resetState();
+
+        // Verify AbortSignal was reset
+        expect((webAgent as any).abortSignal).toBe(null);
+      });
+
+      it("should handle null AbortSignal", async () => {
+        mockGenerateObject.mockResolvedValue({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // Explicitly set to null
+        (webAgent as any).abortSignal = null;
+
+        await webAgent.generatePlan("test task", "https://example.com");
+
+        // Should not include abortSignal in config
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            abortSignal: expect.anything(),
+          }),
+        );
+      });
+    });
+
+    describe("AbortSignal integration with task validation", () => {
+      it("should pass AbortSignal to validateTaskCompletion", async () => {
+        mockGenerateObject.mockResolvedValue({
+          object: {
+            observation: "Task completed successfully",
+            completionQuality: "complete",
+            feedback: "Task completed correctly",
+          },
+        });
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await webAgent["validateTaskCompletion"]("test task", "Task completed");
+
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+
+      it("should handle AbortError in task validation", async () => {
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        mockGenerateObject.mockRejectedValue(abortError);
+
+        // Store AbortSignal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await expect(
+          webAgent["validateTaskCompletion"]("test task", "Task completed"),
+        ).rejects.toThrow("AI request was cancelled");
+      });
+    });
+
+    describe("AbortSignal edge cases", () => {
+      it("should handle already aborted signal", async () => {
+        // Abort the signal before using it
+        abortController.abort();
+
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        mockGenerateObject.mockRejectedValue(abortError);
+
+        // Store aborted signal in webAgent
+        (webAgent as any).abortSignal = abortController.signal;
+
+        await expect(webAgent.generatePlan("test task", "https://example.com")).rejects.toThrow(
+          "AI request was cancelled",
+        );
+      });
+
+      it("should handle AbortSignal without execute method", async () => {
+        mockGenerateObject.mockResolvedValue({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // Manually set AbortSignal without going through execute
+        (webAgent as any).abortSignal = abortController.signal;
+
+        const result = await webAgent.generatePlan("test task", "https://example.com");
+
+        expect(result.plan).toBe("test plan");
+        expect(mockGenerateObject).toHaveBeenCalledWith(
+          expect.objectContaining({
+            abortSignal: abortController.signal,
+          }),
+        );
+      });
+    });
+
+    describe("Integration: Realistic cancellation scenarios", () => {
+      it("should handle cancellation during different phases of execution", async () => {
+        // Create a controller for this test
+        const controller = new AbortController();
+
+        // Mock plan generation to succeed
+        mockGenerateObject.mockResolvedValueOnce({
+          object: {
+            explanation: "test explanation",
+            plan: "test plan",
+          },
+        });
+
+        // Mock first action generation to succeed
+        const firstActionResponse = {
+          currentStep: "Working on step 1",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          extractedData: "Page content analyzed",
+          thought: "Clicking button",
+          action: {
+            action: PageAction.Click,
+            ref: "s1e23",
+          },
+          actionStatusMessage: "Clicking button",
+        };
+
+        // Mock second action generation to fail with AbortError (simulating cancellation)
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        mockStreamObject
+          .mockResolvedValueOnce(createMockStreamingResponse(firstActionResponse))
+          .mockRejectedValueOnce(abortError);
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        // Start execution
+        const result = await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          controller.signal,
+        );
+
+        // Should handle the cancellation gracefully
+        expect(result.success).toBe(false);
+        expect(result.finalAnswer).toContain("AI streaming request was cancelled");
+        expect(result.iterations).toBe(2); // First action succeeded, second failed
+      });
+
+      it("should demonstrate proper AbortSignal propagation through the entire execution chain", async () => {
+        // Create a controller for this test
+        const controller = new AbortController();
+
+        // Track all calls to verify AbortSignal is passed everywhere
+        const generateObjectSpy = mockGenerateObject;
+        const streamObjectSpy = mockStreamObject;
+
+        const doneResponse = {
+          currentStep: "Completing task",
+          observation: "Task finished",
+          observationStatusMessage: "Task finished",
+          extractedData: "Final data",
+          thought: "Task is done",
+          action: {
+            action: PageAction.Done,
+            value: "Task completed successfully",
+          },
+          actionStatusMessage: "Task completing",
+        };
+
+        // Mock all necessary calls
+        generateObjectSpy
+          .mockResolvedValueOnce({
+            object: {
+              explanation: "test explanation",
+              plan: "test plan",
+            },
+          })
+          .mockResolvedValueOnce({
+            object: {
+              observation: "Task completed successfully",
+              completionQuality: "complete",
+              feedback: "Task completed correctly",
+            },
+          });
+
+        streamObjectSpy.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
+
+        // Execute with AbortSignal
+        const result = await webAgent.execute(
+          "test task",
+          "https://example.com",
+          undefined,
+          controller.signal,
+        );
+
+        expect(result.success).toBe(true);
+
+        // Verify AbortSignal was passed to all AI generation calls
+        const generateObjectCalls = generateObjectSpy.mock.calls;
+        const streamObjectCalls = streamObjectSpy.mock.calls;
+
+        // Plan generation should have AbortSignal
+        expect(generateObjectCalls[0][0]).toMatchObject({
+          abortSignal: controller.signal,
+        });
+
+        // Action generation should have AbortSignal
+        expect(streamObjectCalls[0][0]).toMatchObject({
+          abortSignal: controller.signal,
+        });
+
+        // Task validation should have AbortSignal
+        expect(generateObjectCalls[1][0]).toMatchObject({
+          abortSignal: controller.signal,
+        });
+      });
+    });
+  });
 });

@@ -48,4 +48,17 @@ export interface ExecutePageActionResponse {
   message?: string;
 }
 
-export type ExtensionMessage = ExecuteTaskMessage | GetPageInfoMessage | ExecutePageActionMessage;
+export interface CancelTaskMessage {
+  type: "cancelTask";
+}
+
+export interface CancelTaskResponse {
+  success: boolean;
+  message?: string;
+}
+
+export type ExtensionMessage =
+  | ExecuteTaskMessage
+  | GetPageInfoMessage
+  | ExecutePageActionMessage
+  | CancelTaskMessage;

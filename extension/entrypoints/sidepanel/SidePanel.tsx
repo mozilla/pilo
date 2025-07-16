@@ -7,7 +7,12 @@ import { useChat, type ChatMessage as ChatMessageType } from "../../src/useChat"
 import { useEventLogger } from "../../src/useEventLogger";
 import { useSystemTheme } from "../../src/useSystemTheme";
 import type { Theme } from "../../src/theme";
-import type { ExecuteTaskMessage, ExecuteTaskResponse } from "../../src/types/browser";
+import type {
+  ExecuteTaskMessage,
+  ExecuteTaskResponse,
+  CancelTaskMessage,
+  CancelTaskResponse,
+} from "../../src/types/browser";
 
 interface Settings {
   apiKey: string;
@@ -410,6 +415,40 @@ export default function SidePanel(): ReactElement {
     }
   };
 
+  const handleCancel = async () => {
+    try {
+      const message: CancelTaskMessage = {
+        type: "cancelTask",
+      };
+      const response = (await browser.runtime.sendMessage(message)) as CancelTaskResponse;
+
+      if (response && response.success) {
+        // Don't add cancellation message here - it will come from the background script response
+        setIsExecuting(false);
+        endTask();
+      } else {
+        // Handle cancellation request failure
+        if (currentTaskId) {
+          addMessage(
+            "error",
+            `Failed to cancel task: ${response?.message || "Unknown error"}`,
+            currentTaskId,
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to cancel task:", error);
+      // Handle cancellation request failure
+      if (currentTaskId) {
+        addMessage(
+          "error",
+          `Cancellation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          currentTaskId,
+        );
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -577,13 +616,22 @@ export default function SidePanel(): ReactElement {
             disabled={isExecuting}
             className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
           />
-          <button
-            onClick={handleExecute}
-            disabled={isExecuting || !task.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {isExecuting ? "..." : "Send"}
-          </button>
+          {isExecuting ? (
+            <button
+              onClick={handleCancel}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={handleExecute}
+              disabled={!task.trim()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              Send
+            </button>
+          )}
         </div>
         <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
           Press Enter to send • Shift+Enter for new line
