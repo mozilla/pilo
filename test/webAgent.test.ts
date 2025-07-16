@@ -1712,6 +1712,37 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("Friendly action messages", () => {
+    it("should return friendly messages for common actions", () => {
+      const testCases = [
+        { action: { action: "click" }, expected: "Clicking on element" },
+        { action: { action: "fill" }, expected: "Filling in text field" },
+        { action: { action: "wait", value: "5" }, expected: "Waiting 5 seconds" },
+        { action: { action: "wait", value: "1" }, expected: "Waiting 1 seconds" },
+        { action: { action: "wait" }, expected: "Waiting 1 seconds" },
+        {
+          action: { action: "goto", value: "https://example.com" },
+          expected: "Navigating to https://example.com",
+        },
+        { action: { action: "back" }, expected: "Going back to previous page" },
+        { action: { action: "forward" }, expected: "Going forward to next page" },
+        { action: { action: "hover" }, expected: "Hovering over element" },
+        { action: { action: "focus" }, expected: "Focusing on element" },
+        { action: { action: "check" }, expected: "Checking checkbox" },
+        { action: { action: "uncheck" }, expected: "Unchecking checkbox" },
+        { action: { action: "select" }, expected: "Selecting option" },
+        { action: { action: "enter" }, expected: "Pressing Enter key" },
+        { action: { action: "done" }, expected: "Completing task" },
+        { action: { action: "unknown_action" }, expected: "Performing unknown_action action" },
+      ];
+
+      testCases.forEach(({ action, expected }) => {
+        const result = webAgent["getFriendlyActionMessage"](action);
+        expect(result).toBe(expected);
+      });
+    });
+  });
+
   describe("Streaming functionality", () => {
     describe("Field emission during streaming", () => {
       it("should emit events for each field as they complete", async () => {

@@ -208,6 +208,9 @@ export class WebAgent {
    * @returns The generated plan and starting URL
    */
   async generatePlanWithUrl(task: string) {
+    this.emit(WebAgentEventType.AGENT_STATUS, {
+      message: "Making a plan and finding the best starting URL",
+    });
     const response = await this.generateAIResponse<{
       explanation: string;
       plan: string;
@@ -233,6 +236,7 @@ export class WebAgent {
    * @returns The generated plan
    */
   async generatePlan(task: string, startingUrl?: string) {
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
     const response = await this.generateAIResponse<{
       explanation: string;
       plan: string;
@@ -1009,7 +1013,33 @@ export class WebAgent {
     );
   }
 
+  /**
+   * Generates a friendly, human-readable message for an action
+   */
+  private getFriendlyActionMessage(action: any): string {
+    const actionMessages: { [key: string]: string } = {
+      wait: `Waiting ${action.value || "1"} seconds`,
+      goto: `Navigating to ${action.value}`,
+      back: "Going back to previous page",
+      forward: "Going forward to next page",
+      click: "Clicking on element",
+      hover: "Hovering over element",
+      fill: "Filling in text field",
+      focus: "Focusing on element",
+      check: "Checking checkbox",
+      uncheck: "Unchecking checkbox",
+      select: "Selecting option",
+      enter: "Pressing Enter key",
+      done: "Completing task",
+    };
+
+    return actionMessages[action.action] || `Performing ${action.action} action`;
+  }
+
   protected async executeAction(result: any): Promise<boolean> {
+    const friendlyMessage = this.getFriendlyActionMessage(result.action);
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: friendlyMessage });
+
     try {
       switch (result.action.action) {
         case "wait":
@@ -1151,6 +1181,7 @@ export class WebAgent {
   ): Promise<TaskValidationResult> {
     const conversationHistory = this.formatConversationHistory();
 
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Reviewing the answer" });
     const response = await this.withProcessingEvents("Validating task completion", () =>
       this.generateAIResponse<TaskValidationResult>(
         taskValidationSchema,
@@ -1209,9 +1240,11 @@ export class WebAgent {
     if (startingUrl) {
       this.url = startingUrl;
       // Run browser launch and plan creation in parallel for efficiency
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
       await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
     } else {
       // Let AI choose the best starting URL based on the task
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
       await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
     }
 
@@ -1220,6 +1253,7 @@ export class WebAgent {
     this.emitTaskStartEvent(task);
 
     // Navigate to the determined starting URL
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Navigating to starting page" });
     await this.browser.goto(this.url);
 
     // Record initial page load for tracking
@@ -1271,6 +1305,9 @@ export class WebAgent {
             }
 
             // Give AI feedback about what went wrong and try again
+            this.emit(WebAgentEventType.AGENT_STATUS, {
+              message: "Task needs improvement, continuing work",
+            });
             this.addTaskRetryFeedback(result, validationResult);
             finalAnswer = null; // Reset for next attempt
             continue; // Continue loop for retry
