@@ -89,7 +89,8 @@ export default defineBackground(() => {
 
             try {
               console.log(
-                `Starting task execution for tab ${executeMessage.tabId} with URL: ${executeMessage.startUrl}`,
+                `Starting task execution for tab ${executeMessage.tabId} with data:`,
+                executeMessage.data,
               );
 
               // Use AgentAPI to run the task
@@ -98,7 +99,7 @@ export default defineBackground(() => {
                 model: settings.model || "gpt-4.1",
                 logger,
                 tabId: executeMessage.tabId,
-                startUrl: executeMessage.startUrl,
+                data: executeMessage.data,
               });
 
               console.log(`Task completed successfully:`, result);

@@ -20,7 +20,7 @@ export interface ExecuteTaskMessage {
   apiEndpoint: string;
   model: string;
   tabId?: number;
-  startUrl?: string;
+  data?: any;
 }
 
 export interface ExecuteTaskResponse {

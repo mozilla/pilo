@@ -176,7 +176,7 @@ const TaskBubble = ({
           <div className="flex items-center gap-2 text-sm">
             <LoadingSpinner />
             <span className={t.text.muted}>
-              {latestStatus ? latestStatus.content : "Working on your request..."}
+              {latestStatus ? latestStatus.content : "Starting task..."}
             </span>
           </div>
         )}
@@ -352,9 +352,6 @@ export default function SidePanel(): ReactElement {
     addMessage("user", taskText);
     const taskId = startTask();
 
-    // Immediately show Spark message bubble with initial status
-    addMessage("status", "Making a plan...", taskId);
-
     // Clear input immediately after sending
     setTask("");
 
@@ -373,7 +370,7 @@ export default function SidePanel(): ReactElement {
         apiEndpoint: settings.apiEndpoint,
         model: settings.model,
         tabId: currentTab?.id,
-        startUrl: currentTab?.url,
+        data: { currentUrl: currentTab?.url },
       };
       const response = (await browser.runtime.sendMessage(message)) as ExecuteTaskResponse;
 
