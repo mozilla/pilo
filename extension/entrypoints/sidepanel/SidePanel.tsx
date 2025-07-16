@@ -281,6 +281,16 @@ export default function SidePanel(): ReactElement {
           const errorMessages = typedMessage.event.data.errors.join(", ");
           addMessage("error", `Validation Error: ${errorMessages}`, currentTaskId);
         }
+
+        // Handle browser action result failures
+        if (
+          typedMessage.event.type === "browser:action:completed" &&
+          typedMessage.event.data?.success === false &&
+          currentTaskId
+        ) {
+          const errorText = typedMessage.event.data.error || "Browser action failed";
+          addMessage("error", `Action Failed: ${errorText}`, currentTaskId);
+        }
       }
     };
 

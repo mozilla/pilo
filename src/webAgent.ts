@@ -1294,6 +1294,7 @@ export class WebAgent {
 
       try {
         // Get current page state and ask AI what to do next
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
         const pageSnapshot = await this.browser.getText();
         const result = await this.generateNextAction(pageSnapshot);
 
