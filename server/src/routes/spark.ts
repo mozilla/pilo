@@ -101,6 +101,8 @@ spark.post("/run", async (c) => {
         abortController.abort();
       });
 
+      let agent: WebAgent | null = null;
+
       try {
         await stream.writeSSE({
           event: "start",
@@ -158,7 +160,7 @@ spark.post("/run", async (c) => {
           openrouter_api_key: body.openrouterApiKey,
         });
 
-        const agent = new WebAgent(browser, {
+        agent = new WebAgent(browser, {
           ...webAgentConfig,
           provider,
           logger,
@@ -177,18 +179,16 @@ spark.post("/run", async (c) => {
           data: JSON.stringify({ success: true, result }),
         });
 
-        // Close the browser
-        await agent.close();
+        // Emit done event only on successful completion
+        await stream.writeSSE({
+          event: "done",
+          data: JSON.stringify({}),
+        });
       } catch (error) {
         // Check if the error is due to request termination
         if (abortController.signal.aborted) {
           console.log("🛑 Task execution aborted due to client disconnection");
-          await stream.writeSSE({
-            event: "error",
-            data: JSON.stringify(
-              createErrorResponse("Task execution was cancelled", "TASK_CANCELLED"),
-            ),
-          });
+          // Don't try to write to stream - client is gone
         } else {
           console.error("Spark task execution failed:", error);
           await stream.writeSSE({
@@ -202,10 +202,14 @@ spark.post("/run", async (c) => {
           });
         }
       } finally {
-        await stream.writeSSE({
-          event: "done",
-          data: JSON.stringify({}),
-        });
+        // Always clean up browser resources
+        if (agent) {
+          try {
+            await agent.close();
+          } catch (closeError) {
+            console.error("Error closing agent:", closeError);
+          }
+        }
       }
     });
   } catch (error) {
