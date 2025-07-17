@@ -1814,6 +1814,558 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("Helper methods for generateStreamingActionResponse", () => {
+    describe("processStreamingResponse", () => {
+      it("should process streaming response and emit field events", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+
+        // Listen for field events
+        emitter.onEvent(WebAgentEventType.AGENT_STEP, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_REASONED, eventSpy);
+        emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_STATUS, eventSpy);
+
+        const mockStream = {
+          partialObjectStream: {
+            async *[Symbol.asyncIterator]() {
+              yield { currentStep: "Working on step" };
+              yield { currentStep: "Working on step", extractedData: "Page content analyzed" };
+              yield {
+                currentStep: "Working on step",
+                extractedData: "Page content analyzed",
+                observation: "Page analyzed",
+              };
+              yield {
+                currentStep: "Working on step",
+                extractedData: "Page content analyzed",
+                observation: "Page analyzed",
+                observationStatusMessage: "Page analyzed",
+              };
+              yield {
+                currentStep: "Working on step",
+                extractedData: "Page content analyzed",
+                observation: "Page analyzed",
+                observationStatusMessage: "Page analyzed",
+                thought: "Deciding action",
+              };
+              yield {
+                currentStep: "Working on step",
+                extractedData: "Page content analyzed",
+                observation: "Page analyzed",
+                observationStatusMessage: "Page analyzed",
+                thought: "Deciding action",
+                action: { action: PageAction.Click, ref: "s1e23" },
+              };
+            },
+          },
+        };
+
+        const fieldOrder = [
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ];
+
+        const result = await webAgent["processStreamingResponse"](mockStream, fieldOrder);
+
+        expect(result.chunkCount).toBe(6);
+        expect(result.emittedFields.size).toBe(5); // 5 fields emitted during streaming (last field handled separately)
+        expect(eventSpy).toHaveBeenCalledTimes(5);
+      });
+
+      it("should return zero chunks for empty stream", async () => {
+        const mockStream = {
+          partialObjectStream: {
+            async *[Symbol.asyncIterator]() {
+              // Empty stream
+            },
+          },
+        };
+
+        const fieldOrder = [
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ];
+
+        const result = await webAgent["processStreamingResponse"](mockStream, fieldOrder);
+
+        expect(result.chunkCount).toBe(0);
+        expect(result.emittedFields.size).toBe(0);
+      });
+
+      it("should handle streaming with missing fields", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.AGENT_STEP, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, eventSpy);
+
+        const mockStream = {
+          partialObjectStream: {
+            async *[Symbol.asyncIterator]() {
+              yield { currentStep: "Working on step" };
+              yield { currentStep: "Working on step", observation: "Page analyzed" }; // Skip extractedData
+              yield {
+                currentStep: "Working on step",
+                observation: "Page analyzed",
+                extractedData: "Page content analyzed",
+              };
+            },
+          },
+        };
+
+        const fieldOrder = ["currentStep", "extractedData", "observation"];
+
+        const result = await webAgent["processStreamingResponse"](mockStream, fieldOrder);
+
+        expect(result.chunkCount).toBe(3);
+        expect(result.emittedFields.size).toBe(2); // currentStep and observation emitted
+        expect(eventSpy).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("emitRemainingFieldEvents", () => {
+      it("should emit remaining fields not emitted during streaming", () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+
+        emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_STATUS, eventSpy);
+
+        const finalResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        const fieldOrder = [
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ];
+        const emittedFields = new Set([
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+        ]); // Missing action and actionStatusMessage
+        const chunkCount = 5;
+
+        webAgent["emitRemainingFieldEvents"](finalResponse, fieldOrder, emittedFields, chunkCount);
+
+        expect(eventSpy).toHaveBeenCalledTimes(2); // action and actionStatusMessage events
+        expect(emittedFields.size).toBe(7); // All fields now emitted
+      });
+
+      it("should emit all events as fallback when chunk count is zero", () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+
+        emitter.onEvent(WebAgentEventType.AGENT_STEP, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_STATUS, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_REASONED, eventSpy);
+        emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, eventSpy);
+
+        const finalResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Observation status message",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Action status message",
+        };
+
+        const fieldOrder = [
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ];
+        const emittedFields = new Set(); // No fields emitted
+        const chunkCount = 0; // Streaming failed
+
+        webAgent["emitRemainingFieldEvents"](finalResponse, fieldOrder, emittedFields, chunkCount);
+
+        expect(eventSpy).toHaveBeenCalledTimes(7); // All fields emitted as fallback
+      });
+
+      it("should not emit events for missing fields", () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+
+        emitter.onEvent(WebAgentEventType.AGENT_STEP, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, eventSpy);
+
+        const finalResponse = {
+          currentStep: "Working on step",
+          // Missing extractedData
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        const fieldOrder = [
+          "currentStep",
+          "extractedData",
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ];
+        const emittedFields = new Set([
+          "observation",
+          "observationStatusMessage",
+          "thought",
+          "action",
+          "actionStatusMessage",
+        ]);
+        const chunkCount = 5;
+
+        webAgent["emitRemainingFieldEvents"](finalResponse, fieldOrder, emittedFields, chunkCount);
+
+        expect(eventSpy).toHaveBeenCalledTimes(1); // Only currentStep event (extractedData is missing)
+      });
+    });
+
+    describe("handleStreamingError", () => {
+      it("should handle AbortError specifically", async () => {
+        const abortError = new Error("This operation was aborted");
+        abortError.name = "AbortError";
+
+        await expect(webAgent["handleStreamingError"](abortError, {}, [], 0)).rejects.toThrow(
+          "AI streaming request was cancelled",
+        );
+      });
+
+      it("should emit error event for general errors", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, eventSpy);
+
+        const testError = new Error("Test error");
+        const schema = { test: "schema" };
+        const messages = [{ role: "user", content: "test" }];
+
+        await expect(
+          webAgent["handleStreamingError"](testError, schema, messages, 0),
+        ).rejects.toThrow("Test error");
+
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: "Test error",
+            prompt: undefined,
+            schema,
+            messages,
+          }),
+        );
+      });
+
+      it("should retry on schema mismatch errors", async () => {
+        const schemaError = new Error("response did not match schema");
+        const schema = { test: "schema" };
+        const messages = [{ role: "user", content: "test" }];
+
+        // Mock the recursive call to return a valid response
+        const mockResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        // Mock console.log and console.error to avoid noise
+        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        // Mock setTimeout to make it instant
+        vi.useFakeTimers();
+
+        // Mock the generateStreamingActionResponse method to avoid the delay
+        const generateStreamingActionSpy = vi
+          .spyOn(webAgent as any, "generateStreamingActionResponse")
+          .mockResolvedValueOnce(mockResponse);
+
+        const resultPromise = webAgent["handleStreamingError"](schemaError, schema, messages, 0);
+
+        // Fast-forward the timer to skip the delay
+        vi.advanceTimersByTime(1000);
+
+        const result = await resultPromise;
+
+        expect(result).toEqual(mockResponse);
+        expect(generateStreamingActionSpy).toHaveBeenCalledWith(schema, messages, 1);
+
+        generateStreamingActionSpy.mockRestore();
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        vi.useRealTimers();
+      });
+
+      it("should fail after maximum retry attempts", async () => {
+        const schemaError = new Error("response did not match schema");
+        const schema = { test: "schema" };
+        const messages = [{ role: "user", content: "test" }];
+
+        await expect(
+          webAgent["handleStreamingError"](schemaError, schema, messages, 2), // Max retries reached
+        ).rejects.toThrow("AI generation failed after 3 attempts");
+      });
+
+      it("should handle different types of AI generation errors", async () => {
+        const testCases = [
+          "AI_NoObjectGeneratedError",
+          "No object generated",
+          "Invalid JSON response",
+          "AI_APICallError",
+        ];
+
+        // Mock setTimeout to make it instant
+        vi.useFakeTimers();
+
+        // Mock console.log and console.error to avoid noise
+        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+        const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        for (const errorMessage of testCases) {
+          const error = new Error(errorMessage);
+          if (errorMessage === "AI_APICallError") {
+            error.name = "AI_APICallError";
+          }
+
+          const mockResponse = {
+            currentStep: "Working on step",
+            extractedData: "Page content analyzed",
+            observation: "Page analyzed",
+            observationStatusMessage: "Page analyzed",
+            thought: "Deciding action",
+            action: { action: PageAction.Click, ref: "s1e23" },
+            actionStatusMessage: "Performing action",
+          };
+
+          // Mock the generateStreamingActionResponse method to avoid the delay
+          const generateStreamingActionSpy = vi
+            .spyOn(webAgent as any, "generateStreamingActionResponse")
+            .mockResolvedValueOnce(mockResponse);
+
+          const resultPromise = webAgent["handleStreamingError"](error, {}, [], 0);
+
+          // Fast-forward the timer to skip the delay
+          vi.advanceTimersByTime(1000);
+
+          const result = await resultPromise;
+          expect(result).toEqual(mockResponse);
+
+          generateStreamingActionSpy.mockRestore();
+        }
+
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+        vi.useRealTimers();
+      });
+
+      it("should re-throw non-retryable errors", async () => {
+        const networkError = new Error("Network timeout");
+
+        await expect(webAgent["handleStreamingError"](networkError, {}, [], 0)).rejects.toThrow(
+          "Network timeout",
+        );
+      });
+    });
+
+    describe("emitAIGenerationMetadata", () => {
+      it("should emit AI generation metadata with correct structure", () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.AI_GENERATION, eventSpy);
+
+        const mockStream = {
+          finishReason: "stop",
+          usage: { totalTokens: 100, promptTokens: 50, completionTokens: 50 },
+          warnings: [],
+          providerMetadata: { provider: "test" },
+        };
+
+        const schema = { test: "schema" };
+        const messages = [{ role: "user", content: "test" }];
+        const finalResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        webAgent["emitAIGenerationMetadata"](mockStream, schema, messages, finalResponse);
+
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            prompt: undefined,
+            schema,
+            messages,
+            temperature: 0,
+            object: finalResponse,
+            finishReason: "stop",
+            usage: { totalTokens: 100, promptTokens: 50, completionTokens: 50 },
+            warnings: [],
+            providerMetadata: { provider: "test" },
+          }),
+        );
+      });
+
+      it("should handle missing metadata gracefully", () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.AI_GENERATION, eventSpy);
+
+        const mockStream = {}; // Missing metadata
+        const schema = { test: "schema" };
+        const messages = [{ role: "user", content: "test" }];
+        const finalResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        webAgent["emitAIGenerationMetadata"](mockStream, schema, messages, finalResponse);
+
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            prompt: undefined,
+            schema,
+            messages,
+            temperature: 0,
+            object: finalResponse,
+            finishReason: undefined,
+            usage: undefined,
+            warnings: undefined,
+            providerMetadata: undefined,
+          }),
+        );
+      });
+    });
+
+    describe("generateStreamingActionResponse integration", () => {
+      it("should orchestrate all helper methods correctly", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+
+        // Listen for all event types
+        emitter.onEvent(WebAgentEventType.AGENT_STEP, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_STATUS, eventSpy);
+        emitter.onEvent(WebAgentEventType.AGENT_REASONED, eventSpy);
+        emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, eventSpy);
+        emitter.onEvent(WebAgentEventType.AI_GENERATION, eventSpy);
+
+        const finalResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        mockStreamObject.mockResolvedValue(createMockStreamingResponse(finalResponse));
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+        expect(result).toEqual(finalResponse);
+
+        // Should have emitted field events + AI generation metadata event
+        expect(eventSpy).toHaveBeenCalledTimes(8); // 7 field events + 1 AI generation event
+
+        // Verify AI generation event was emitted
+        const aiGenerationCall = eventSpy.mock.calls.find(
+          (call) => call[0].hasOwnProperty("object") && call[0].hasOwnProperty("finishReason"),
+        );
+        expect(aiGenerationCall).toBeDefined();
+        expect(aiGenerationCall[0].object).toEqual(finalResponse);
+      });
+
+      it("should handle streaming errors through error handler", async () => {
+        const eventSpy = vi.fn();
+        const emitter = (webAgent as any).eventEmitter as WebAgentEventEmitter;
+        emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, eventSpy);
+
+        const schemaError = new Error("response did not match schema");
+        const validResponse = {
+          currentStep: "Working on step",
+          extractedData: "Page content analyzed",
+          observation: "Page analyzed",
+          observationStatusMessage: "Page analyzed",
+          thought: "Deciding action",
+          action: { action: PageAction.Click, ref: "s1e23" },
+          actionStatusMessage: "Performing action",
+        };
+
+        mockStreamObject
+          .mockRejectedValueOnce(schemaError)
+          .mockResolvedValueOnce(createMockStreamingResponse(validResponse));
+
+        mockBrowser.setCurrentText("button [ref=s1e23]");
+
+        // Mock setTimeout to make retry delays instant
+        const setTimeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation((callback: any) => {
+          callback();
+          return 0 as any;
+        });
+
+        const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+        expect(result).toEqual(validResponse);
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: "response did not match schema",
+          }),
+        );
+
+        setTimeoutSpy.mockRestore();
+      });
+    });
+  });
+
   describe("AbortSignal functionality", () => {
     let abortController: AbortController;
 

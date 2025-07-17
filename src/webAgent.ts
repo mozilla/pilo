@@ -712,6 +712,166 @@ export class WebAgent {
   }
 
   /**
+   * Emits AI generation metadata after successful streaming completion
+   *
+   * @param stream - The completed stream object
+   * @param schema - Zod schema for response validation
+   * @param messages - Conversation history for context
+   * @param final - The final action response
+   */
+  private emitAIGenerationMetadata(stream: any, schema: any, messages: any[], final: Action): void {
+    this.emit(WebAgentEventType.AI_GENERATION, {
+      prompt: undefined,
+      schema,
+      messages,
+      temperature: 0,
+      object: final,
+      finishReason: (stream as any).finishReason,
+      usage: (stream as any).usage,
+      warnings: (stream as any).warnings,
+      providerMetadata: (stream as any).providerMetadata,
+    });
+  }
+
+  /**
+   * Handles errors during streaming AI generation with retry logic
+   *
+   * @param error - The error that occurred
+   * @param schema - Zod schema for response validation
+   * @param messages - Conversation history for context
+   * @param retryCount - Current retry attempt number
+   * @returns Promise that resolves to Action or throws error
+   */
+  private async handleStreamingError(
+    error: unknown,
+    schema: any,
+    messages: any[],
+    retryCount: number,
+  ): Promise<Action> {
+    // Handle AbortError specifically
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("AI streaming request was cancelled");
+    }
+
+    if (error instanceof Error) {
+      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+        error: error.message,
+        prompt: undefined,
+        schema,
+        messages,
+      });
+    }
+
+    // Handle AI generation failures with retry logic
+    if (
+      error instanceof Error &&
+      (error.message.includes("response did not match schema") ||
+        error.message.includes("AI_NoObjectGeneratedError") ||
+        error.message.includes("No object generated") ||
+        error.message.includes("Invalid JSON response") ||
+        error.message.includes("AI_APICallError") ||
+        error.name === "AI_APICallError")
+    ) {
+      console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
+
+      // Log some debugging info on the first failure
+      if (retryCount === 0 && this.DEBUG) {
+        console.error("Debug info - Last few messages:");
+        const lastMessages = messages ? messages.slice(-2) : [];
+        console.error(JSON.stringify(lastMessages, null, 2));
+      }
+
+      if (retryCount < 2) {
+        console.log("🔄 Retrying AI generation...");
+        // Add a small delay before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return this.generateStreamingActionResponse(schema, messages, retryCount + 1);
+      } else {
+        const errorMessage =
+          `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
+          `1. The AI response not matching the expected schema format\n` +
+          `2. Network issues or AI service problems\n` +
+          `3. Complex page content that confused the AI\n` +
+          `Original error: ${error.message}`;
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
+
+  /**
+   * Emits remaining field events after streaming completes
+   *
+   * @param final - The complete action response
+   * @param fieldOrder - Array of field names in expected order
+   * @param emittedFields - Set of fields already emitted during streaming
+   * @param chunkCount - Number of chunks processed during streaming
+   */
+  private emitRemainingFieldEvents(
+    final: Action,
+    fieldOrder: string[],
+    emittedFields: Set<string>,
+    chunkCount: number,
+  ): void {
+    // Fallback: emit all events if streaming failed
+    if (chunkCount === 0) {
+      for (const field of fieldOrder) {
+        if (final[field as keyof Action]) {
+          this.emitFieldEvent(field, final[field as keyof Action]);
+        }
+      }
+    } else {
+      // Emit any remaining fields (typically the last field)
+      for (const field of fieldOrder) {
+        if (final[field as keyof Action] && !emittedFields.has(field)) {
+          this.emitFieldEvent(field, final[field as keyof Action]);
+          emittedFields.add(field);
+        }
+      }
+    }
+  }
+
+  /**
+   * Processes streaming partial objects and emits field events as they complete
+   *
+   * @param stream - The streaming response object
+   * @param fieldOrder - Array of field names in expected order
+   * @returns Number of chunks processed and set of emitted fields
+   */
+  private async processStreamingResponse(
+    stream: any,
+    fieldOrder: string[],
+  ): Promise<{ chunkCount: number; emittedFields: Set<string> }> {
+    const emittedFields = new Set<string>();
+    let chunkCount = 0;
+
+    // Process streaming partial objects
+    for await (const partialObject of stream.partialObjectStream) {
+      chunkCount++;
+      const partial = partialObject as Partial<Action>;
+
+      // Emit fields when we detect the next field has appeared (indicating current field is complete)
+      for (let i = 0; i < fieldOrder.length; i++) {
+        const currentField = fieldOrder[i] as keyof Action;
+        const nextField = fieldOrder[i + 1] as keyof Action;
+
+        if (partial[currentField] && !emittedFields.has(currentField)) {
+          // Only emit if next field exists and has appeared (current field is complete)
+          if (nextField && partial[nextField]) {
+            this.emitFieldEvent(currentField, partial[currentField]);
+            emittedFields.add(currentField);
+          }
+          // Note: Last field is handled after stream completes
+        }
+      }
+    }
+
+    return { chunkCount, emittedFields };
+  }
+
+  /**
    * Generates AI action responses with real-time streaming event emission
    *
    * This method uses the AI SDK's streamObject to get incremental responses and emits
@@ -750,117 +910,23 @@ export class WebAgent {
 
       // Get field order dynamically from schema to ensure sync
       const fieldOrder = getActionSchemaFieldOrder();
-      const emittedFields = new Set<string>();
-      let chunkCount = 0;
 
-      // Process streaming partial objects
-      for await (const partialObject of stream.partialObjectStream) {
-        chunkCount++;
-        const partial = partialObject as Partial<Action>;
-
-        // Emit fields when we detect the next field has appeared (indicating current field is complete)
-        for (let i = 0; i < fieldOrder.length; i++) {
-          const currentField = fieldOrder[i];
-          const nextField = fieldOrder[i + 1];
-
-          if (partial[currentField] && !emittedFields.has(currentField)) {
-            // Only emit if next field exists and has appeared (current field is complete)
-            if (nextField && partial[nextField]) {
-              this.emitFieldEvent(currentField, partial[currentField]);
-              emittedFields.add(currentField);
-            }
-            // Note: Last field is handled after stream completes
-          }
-        }
-      }
+      // Process streaming partial objects and emit field events
+      const { chunkCount, emittedFields } = await this.processStreamingResponse(stream, fieldOrder);
 
       // Get final complete response
       const finalResponse = await stream.object;
       const final = finalResponse as Action;
 
-      // Emit any remaining fields (typically the last field)
-      for (const field of fieldOrder) {
-        if (final[field as keyof Action] && !emittedFields.has(field)) {
-          this.emitFieldEvent(field, final[field as keyof Action]);
-          emittedFields.add(field);
-        }
-      }
-
-      // Fallback: emit all events if streaming failed
-      if (chunkCount === 0) {
-        for (const field of fieldOrder) {
-          if (final[field as keyof Action]) {
-            this.emitFieldEvent(field, final[field as keyof Action]);
-          }
-        }
-      }
+      // Emit any remaining fields and handle fallback for failed streaming
+      this.emitRemainingFieldEvents(final, fieldOrder, emittedFields, chunkCount);
 
       // Emit AI generation metadata
-      this.emit(WebAgentEventType.AI_GENERATION, {
-        prompt: undefined,
-        schema,
-        messages,
-        temperature: config.temperature,
-        object: final,
-        finishReason: (stream as any).finishReason,
-        usage: (stream as any).usage,
-        warnings: (stream as any).warnings,
-        providerMetadata: (stream as any).providerMetadata,
-      });
+      this.emitAIGenerationMetadata(stream, schema, messages, final);
 
       return final;
     } catch (error) {
-      // Handle AbortError specifically
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI streaming request was cancelled");
-      }
-
-      if (error instanceof Error) {
-        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-          error: error.message,
-          prompt: undefined,
-          schema,
-          messages,
-        });
-      }
-
-      // Handle AI generation failures with retry logic
-      if (
-        error instanceof Error &&
-        (error.message.includes("response did not match schema") ||
-          error.message.includes("AI_NoObjectGeneratedError") ||
-          error.message.includes("No object generated") ||
-          error.message.includes("Invalid JSON response") ||
-          error.message.includes("AI_APICallError") ||
-          error.name === "AI_APICallError")
-      ) {
-        console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
-
-        // Log some debugging info on the first failure
-        if (retryCount === 0 && this.DEBUG) {
-          console.error("Debug info - Last few messages:");
-          const lastMessages = messages ? messages.slice(-2) : [];
-          console.error(JSON.stringify(lastMessages, null, 2));
-        }
-
-        if (retryCount < 2) {
-          console.log("🔄 Retrying AI generation...");
-          // Add a small delay before retry
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          return this.generateStreamingActionResponse(schema, messages, retryCount + 1);
-        } else {
-          const errorMessage =
-            `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
-            `1. The AI response not matching the expected schema format\n` +
-            `2. Network issues or AI service problems\n` +
-            `3. Complex page content that confused the AI\n` +
-            `Original error: ${error.message}`;
-          throw new Error(errorMessage);
-        }
-      }
-
-      // Re-throw other errors
-      throw error;
+      return this.handleStreamingError(error, schema, messages, retryCount);
     }
   }
 
