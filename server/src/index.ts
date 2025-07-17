@@ -1,8 +1,14 @@
 import "dotenv/config";
+import { initializeSentry } from "./sentry.js";
+
+// Initialize Sentry as early as possible
+initializeSentry();
+
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import sparkRoutes from "./routes/spark.js";
+import { Sentry } from "./sentry.js";
 
 const app = new Hono();
 
@@ -22,6 +28,24 @@ app.use(
     credentials: false,
   }),
 );
+
+// Error handling middleware for Sentry
+app.onError((err, c) => {
+  // Capture the error with Sentry if it's initialized
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
+  
+  console.error("Server error:", err);
+  
+  return c.json(
+    {
+      error: "Internal Server Error",
+      message: process.env.NODE_ENV === "development" ? err.message : undefined,
+    },
+    500
+  );
+});
 
 // Health check endpoint
 app.get("/health", (c) => {
