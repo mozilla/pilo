@@ -172,6 +172,9 @@ export class WebAgent {
     [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'], // Convert headings to h1, h2, etc.
   ];
 
+  /** Cached field order for action schema to avoid repeated Object.keys calls */
+  private readonly actionSchemaFieldOrder: string[] = getActionSchemaFieldOrder();
+
   // === Event System ===
   /** Event emitter for logging and monitoring */
   private eventEmitter: WebAgentEventEmitter;
@@ -908,8 +911,8 @@ export class WebAgent {
     try {
       const stream = await streamObject(config);
 
-      // Get field order dynamically from schema to ensure sync
-      const fieldOrder = getActionSchemaFieldOrder();
+      // Use cached field order to avoid repeated Object.keys calls
+      const fieldOrder = this.actionSchemaFieldOrder;
 
       // Process streaming partial objects and emit field events
       const { chunkCount, emittedFields } = await this.processStreamingResponse(stream, fieldOrder);
