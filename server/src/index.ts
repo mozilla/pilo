@@ -2,9 +2,18 @@ import "dotenv/config";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
+import { sentry } from "@hono/sentry";
 import sparkRoutes from "./routes/spark.js";
 
 const app = new Hono();
+
+// Add Sentry middleware
+app.use(
+  "*",
+  sentry({
+    dsn: process.env.SENTRY_DSN,
+  }),
+);
 
 // Add CORS middleware
 app.use(
