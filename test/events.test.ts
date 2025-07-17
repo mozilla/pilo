@@ -34,6 +34,7 @@ describe("WebAgentEventEmitter", () => {
       const listener = vi.fn();
       const eventData: TaskStartEventData = {
         timestamp: Date.now(),
+        iterationId: "test-id",
         task: "Test task",
         explanation: "Test explanation",
         plan: "Test plan",

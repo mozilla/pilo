@@ -104,7 +104,9 @@ const agent = new WebAgent(browser, {
 });
 
 try {
-  const result = await agent.execute("find flights to Tokyo", "https://airline.com");
+  const result = await agent.execute("find flights to Tokyo", {
+    startingUrl: "https://airline.com",
+  });
   console.log("Success:", result.success);
 } finally {
   await agent.close();
@@ -264,7 +266,7 @@ const agent = new WebAgent(browser, {
   guardrails: "Do not make purchases",
 });
 
-const result = await agent.execute("find flights to Tokyo", "https://airline.com");
+const result = await agent.execute("find flights to Tokyo", { startingUrl: "https://airline.com" });
 ```
 
 ### PlaywrightBrowser Options

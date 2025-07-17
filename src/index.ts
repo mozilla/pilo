@@ -5,4 +5,18 @@
  * Import this module to use Spark programmatically in your applications.
  */
 
-export * from "./lib.js";
+// Re-export everything from core (platform-agnostic)
+export * from "./core.js";
+
+// Add Node.js-specific exports
+export { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
+export type {
+  PlaywrightBrowserOptions,
+  ExtendedPlaywrightBrowserOptions,
+} from "./browser/playwrightBrowser.js";
+export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
+
+// Configuration and Provider System
+export { config, ConfigManager } from "./config.js";
+export type { SparkConfig } from "./config.js";
+export { createAIProvider, getAIProviderInfo } from "./provider.js";
