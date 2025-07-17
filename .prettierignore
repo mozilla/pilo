@@ -9,3 +9,7 @@ build/
 
 # Dependencies
 node_modules/
+
+# Subprojects
+extension/
+server/
