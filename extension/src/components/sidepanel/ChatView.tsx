@@ -1,30 +1,19 @@
 import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import { marked } from "marked";
-import "./SidePanel.css";
-import { ChatMessage } from "../../src/ChatMessage";
-import { useChat, type ChatMessage as ChatMessageType } from "../../src/useChat";
-import { useEventLogger } from "../../src/useEventLogger";
-import { useSystemTheme } from "../../src/useSystemTheme";
-import type { Theme } from "../../src/theme";
+import { ChatMessage } from "../../ChatMessage";
+import { useChat } from "../../useChat";
+import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
+import { useEvents } from "../../stores/eventStore";
+import { useSettings } from "../../stores/settingsStore";
+import { useSystemTheme } from "../../useSystemTheme";
+import type { Theme } from "../../theme";
 import type {
   ExecuteTaskMessage,
   ExecuteTaskResponse,
   CancelTaskMessage,
   CancelTaskResponse,
-} from "../../src/types/browser";
-
-interface Settings {
-  apiKey: string;
-  apiEndpoint: string;
-  model: string;
-}
-
-interface StoredSettings {
-  apiKey?: string;
-  apiEndpoint?: string;
-  model?: string;
-}
+} from "../../types/browser";
 
 interface RealtimeMessage {
   type: string;
@@ -39,7 +28,10 @@ interface EventData {
   data: any;
 }
 
-const SETTINGS_SAVE_DELAY = 1500;
+interface ChatViewProps {
+  currentTab: browser.Tabs.Tab | null;
+  onOpenSettings: () => void;
+}
 
 // Markdown rendering utilities
 const renderMarkdown = (content: string): string => {
@@ -197,18 +189,20 @@ const TaskBubble = ({
   );
 };
 
-export default function SidePanel(): ReactElement {
+export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps): ReactElement {
   const [task, setTask] = useState("");
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [settings, setSettings] = useState<Settings>({
-    apiKey: "",
-    apiEndpoint: "https://api.openai.com/v1",
-    model: "gpt-4.1",
-  });
-  const [showSettings, setShowSettings] = useState(false);
-  const { logger, clearEvents } = useEventLogger();
-  const { isDark, theme: t } = useSystemTheme();
+  const [stableTabId, setStableTabId] = useState<number | undefined>(currentTab?.id);
+  const { addEvent, clearEvents } = useEvents();
+  const { settings } = useSettings();
+  const { theme: t } = useSystemTheme();
+
+  // Update stable tab ID only when current tab actually changes
+  useEffect(() => {
+    if (currentTab?.id !== stableTabId) {
+      setStableTabId(currentTab?.id);
+    }
+  }, [currentTab?.id, stableTabId]);
+
   const {
     messages,
     addMessage,
@@ -218,28 +212,25 @@ export default function SidePanel(): ReactElement {
     scrollContainerRef,
     handleScroll,
     currentTaskId,
-  } = useChat();
+    isExecuting,
+    setExecutionState,
+  } = useChat(stableTabId);
 
   const focusRing = "focus:ring-2 focus:ring-blue-500 focus:border-transparent";
 
   // Helper function to add events to logger
   const addEventsToLogger = (eventList: EventData[]) => {
     eventList.forEach((event) => {
-      logger.addEvent(event.type as any, event.data);
+      addEvent(event.type, event.data);
     });
   };
-
-  // Load settings on component mount
-  useEffect(() => {
-    loadSettings();
-  }, []);
 
   // Listen for real-time events from background script
   useEffect(() => {
     const handleMessage = (message: unknown) => {
       const typedMessage = message as RealtimeMessage;
       if (typedMessage.type === "realtimeEvent" && typedMessage.event) {
-        logger.addEvent(typedMessage.event.type as any, typedMessage.event.data);
+        addEvent(typedMessage.event.type, typedMessage.event.data);
 
         // Handle task started event to show plan
         if (
@@ -304,59 +295,13 @@ export default function SidePanel(): ReactElement {
     return () => {
       browser.runtime.onMessage.removeListener(handleMessage);
     };
-  }, [logger, addMessage, currentTaskId]);
-
-  const loadSettings = async () => {
-    try {
-      // Direct storage access - no background worker needed
-      const stored = (await browser.storage.local.get([
-        "apiKey",
-        "apiEndpoint",
-        "model",
-      ])) as StoredSettings;
-      const newSettings = {
-        apiKey: stored.apiKey || "",
-        apiEndpoint: stored.apiEndpoint || "https://api.openai.com/v1",
-        model: stored.model || "gpt-4.1",
-      };
-      setSettings(newSettings);
-
-      // Show settings if no API key is configured
-      if (!newSettings.apiKey) {
-        setShowSettings(true);
-      }
-    } catch (error) {
-      console.error("Failed to load settings:", error);
-    }
-  };
-
-  const saveSettings = async () => {
-    setSaveStatus("Saving...");
-
-    try {
-      // Direct storage access - much simpler!
-      await browser.storage.local.set({
-        apiKey: settings.apiKey,
-        apiEndpoint: settings.apiEndpoint,
-        model: settings.model,
-      });
-
-      setSaveStatus("Settings saved successfully!");
-      setTimeout(() => {
-        setShowSettings(false);
-        setSaveStatus(null);
-      }, SETTINGS_SAVE_DELAY);
-    } catch (error) {
-      setSaveStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
-      console.error("Save settings error:", error);
-    }
-  };
+  }, [addEvent, addMessage, currentTaskId]);
 
   const handleExecute = async () => {
     if (!task.trim()) return;
     if (!settings.apiKey) {
       addMessage("system", "Please configure your API key in settings first");
-      setShowSettings(true);
+      onOpenSettings();
       return;
     }
 
@@ -370,12 +315,15 @@ export default function SidePanel(): ReactElement {
     // Clear input immediately after sending
     setTask("");
 
-    setIsExecuting(true);
+    setExecutionState(true);
     clearEvents(); // Clear previous events
 
     try {
-      // Get current tab ID and URL for the background script
-      const [currentTab] = await browser.tabs.query({ active: true, currentWindow: true });
+      // Use current tab from state instead of querying
+      if (!currentTab?.id) {
+        addMessage("error", "No active tab found", taskId);
+        return;
+      }
 
       // Only use background worker for actual Spark task execution
       const message: ExecuteTaskMessage = {
@@ -384,10 +332,26 @@ export default function SidePanel(): ReactElement {
         apiKey: settings.apiKey,
         apiEndpoint: settings.apiEndpoint,
         model: settings.model,
-        tabId: currentTab?.id,
-        data: { currentUrl: currentTab?.url },
+        tabId: currentTab.id,
+        data: { currentUrl: currentTab.url },
       };
-      const response = (await browser.runtime.sendMessage(message)) as ExecuteTaskResponse;
+
+      console.log("Sending message to background script:", message);
+
+      // Add timeout to prevent hanging in Firefox
+      const messagePromise = browser.runtime.sendMessage(message);
+      const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 60000), // 60 second timeout
+      );
+
+      let response: ExecuteTaskResponse;
+      try {
+        response = (await Promise.race([messagePromise, timeoutPromise])) as ExecuteTaskResponse;
+        console.log("✅ Received response from background script:", response);
+      } catch (messageError) {
+        console.error("❌ Failed to receive response from background script:", messageError);
+        throw messageError;
+      }
 
       if (response && response.success) {
         const resultText = response.result || "Task completed successfully!";
@@ -410,7 +374,7 @@ export default function SidePanel(): ReactElement {
       const errorText = `Error: ${error instanceof Error ? error.message : String(error)}`;
       addMessage("result", errorText, taskId);
     } finally {
-      setIsExecuting(false);
+      setExecutionState(false);
       endTask();
     }
   };
@@ -419,12 +383,13 @@ export default function SidePanel(): ReactElement {
     try {
       const message: CancelTaskMessage = {
         type: "cancelTask",
+        tabId: currentTab?.id,
       };
       const response = (await browser.runtime.sendMessage(message)) as CancelTaskResponse;
 
       if (response && response.success) {
         // Don't add cancellation message here - it will come from the background script response
-        setIsExecuting(false);
+        setExecutionState(false);
         endTask();
       } else {
         // Handle cancellation request failure
@@ -456,86 +421,6 @@ export default function SidePanel(): ReactElement {
     }
   };
 
-  if (showSettings) {
-    return (
-      <div className={`h-screen ${t.bg.primary} ${t.text.primary} flex flex-col`}>
-        <div className={`${t.bg.secondary} border-b ${t.border.primary} p-6`}>
-          <h1 className={`text-2xl font-bold ${t.text.primary} mb-2`}>⚡ Spark Settings</h1>
-          <p className={`${t.text.muted} text-sm`}>Configure your AI provider</p>
-        </div>
-
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>API Key</label>
-              <input
-                type="password"
-                value={settings.apiKey}
-                onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                placeholder="sk-..."
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>
-                API Endpoint
-              </label>
-              <input
-                type="text"
-                value={settings.apiEndpoint}
-                onChange={(e) => setSettings({ ...settings, apiEndpoint: e.target.value })}
-                placeholder="https://api.openai.com/v1"
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>Model</label>
-              <input
-                type="text"
-                value={settings.model}
-                onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                placeholder="gpt-4.1"
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
-              />
-            </div>
-
-            {saveStatus && (
-              <div
-                className={`p-3 rounded-lg text-sm font-medium ${
-                  saveStatus.startsWith("Error")
-                    ? `${t.bg.error} ${t.text.error} border ${t.border.error}`
-                    : `${t.bg.success} ${t.text.success} border ${t.border.success}`
-                }`}
-              >
-                {saveStatus}
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={saveSettings}
-                disabled={!!saveStatus}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Save Settings
-              </button>
-              {settings.apiKey && (
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className={`flex-1 px-4 py-2 ${isDark ? "bg-gray-600 hover:bg-gray-700" : "bg-gray-500 hover:bg-gray-600"} text-white rounded-lg transition-colors font-medium`}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`h-screen ${t.bg.primary} ${t.text.primary} flex flex-col`}>
       {/* Header */}
@@ -546,11 +431,13 @@ export default function SidePanel(): ReactElement {
           <span className="text-2xl">⚡</span>
           <div>
             <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
-            <p className={`${t.text.muted} text-xs`}>AI-powered web automation</p>
+            <p className={`${t.text.muted} text-xs`}>
+              {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
+            </p>
           </div>
         </div>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={onOpenSettings}
           className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
           title="Settings"
         >

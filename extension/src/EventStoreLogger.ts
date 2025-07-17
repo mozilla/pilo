@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
+import { createLogger } from "./utils/logger";
 
 interface EventData {
   type: string;
@@ -19,6 +20,7 @@ interface RealtimeEventMessage {
 export class EventStoreLogger extends GenericLogger {
   private events: EventData[] = [];
   private subscribers: Set<(events: EventData[]) => void> = new Set();
+  private logger = createLogger("EventStoreLogger");
 
   constructor() {
     super((eventType: string, data: unknown) => {
@@ -38,15 +40,17 @@ export class EventStoreLogger extends GenericLogger {
 
     this.events.push(event);
 
-    // Send real-time event to SidePanel if in background script context
+    // Send real-time event to SidePanel
+    // Note: When in background script, we broadcast to all extension contexts
     if (typeof browser !== "undefined" && browser.runtime) {
       try {
         const message: RealtimeEventMessage = {
           type: "realtimeEvent",
           event,
         };
+        // Use runtime.sendMessage to broadcast to all contexts (including sidepanel)
         browser.runtime.sendMessage(message).catch(() => {
-          // Ignore errors if SidePanel isn't listening
+          // Ignore errors if no listeners or sidepanel isn't open
         });
       } catch (error) {
         // Ignore errors in case we're not in background script context
@@ -111,7 +115,7 @@ export class EventStoreLogger extends GenericLogger {
       try {
         callback(eventsCopy);
       } catch (error) {
-        console.error("Error in event subscriber:", error);
+        this.logger.error("Error in event subscriber", {}, error);
       }
     });
   }

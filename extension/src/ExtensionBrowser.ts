@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import type { AriaBrowser } from "spark/core";
 import type { Tabs } from "webextension-polyfill";
+import { createLogger } from "./utils/logger";
 
 interface ActionResult {
   success: boolean;
@@ -25,6 +26,7 @@ interface AriaSnapshotWindow {
 export class ExtensionBrowser implements AriaBrowser {
   readonly browserName = "extension:chrome";
   private tabId?: number;
+  private logger = createLogger("ExtensionBrowser");
 
   // Match Playwright's timeout - 5 seconds timeout for interactive actions
   private readonly ACTION_TIMEOUT_MS = 5000;
@@ -51,16 +53,16 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async goto(url: string): Promise<void> {
     const tab = await this.getActiveTab();
-    console.log(`ExtensionBrowser: goto() called with URL: ${url}, current tab URL: ${tab.url}`);
+    this.logger.info("goto() called", { url, currentUrl: tab.url, tabId: tab.id });
     try {
       // Extension equivalent of "commit" - just start the navigation
       await browser.tabs.update(tab.id!, { url });
-      console.log(`ExtensionBrowser: browser.tabs.update completed`);
+      this.logger.debug("browser.tabs.update completed", { tabId: tab.id });
       // Handle page transition
       await this.handlePageTransition();
-      console.log(`ExtensionBrowser: goto() completed successfully`);
+      this.logger.info("goto() completed successfully", { url, tabId: tab.id });
     } catch (error) {
-      console.error(`ExtensionBrowser: goto() failed:`, error);
+      this.logger.error("goto() failed", { url, tabId: tab.id }, error);
       throw error; // Re-throw to allow caller to handle
     }
   }
@@ -105,14 +107,14 @@ export class ExtensionBrowser implements AriaBrowser {
 
   async getText(): Promise<string> {
     const tab = await this.getActiveTab();
-    console.log(`ExtensionBrowser: getText() called for tab ${tab.id}, URL: ${tab.url}`);
+    this.logger.info("getText() called", { tabId: tab.id, url: tab.url });
 
     try {
-      console.log(`ExtensionBrowser: checking content script availability...`);
+      this.logger.debug("checking content script availability...", { tabId: tab.id });
       await this.ensureContentScript();
-      console.log(`ExtensionBrowser: content script is available`);
+      this.logger.debug("content script is available", { tabId: tab.id });
     } catch (error) {
-      console.warn("ExtensionBrowser: content script not available:", error);
+      this.logger.warn("content script not available", { tabId: tab.id }, error);
       // Return basic fallback when content script unavailable
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nContent script not available on this page.`;
     }
@@ -158,11 +160,11 @@ export class ExtensionBrowser implements AriaBrowser {
 
       // Script succeeded, return the rendered text
       const snapshotData = result as { renderedText: string };
-      console.log(`ExtensionBrowser: ARIA tree generated and aria-ref attributes set`);
-      console.log(`ExtensionBrowser: getText() completed successfully`);
+      this.logger.debug("ARIA tree generated and aria-ref attributes set", { tabId: tab.id });
+      this.logger.info("getText() completed successfully", { tabId: tab.id });
       return snapshotData.renderedText;
     } catch (error) {
-      console.error("ExtensionBrowser getText execution error:", error);
+      this.logger.error("getText execution error", { tabId: tab.id }, error);
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to analyze page content.`;
     }
   }

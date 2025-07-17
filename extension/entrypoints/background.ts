@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
-import { AgentAPI, EventStoreLogger } from "../src/AgentAPI";
+import { AgentManager, EventStoreLogger } from "../src/AgentManager";
+import { useConversationStore } from "../src/stores/conversationStore";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -18,8 +19,8 @@ interface StorageSettings {
 export default defineBackground(() => {
   console.log("Background script loaded");
 
-  // Track running tasks and their abort controllers
-  const runningTasks = new Map<string, AbortController>();
+  // Track running tasks by tab ID and their abort controllers
+  const runningTasks = new Map<number, AbortController>();
 
   // Handle extension button clicks to open panel
   // Polyfill should normalize but doesn't seem to work properly
@@ -55,17 +56,25 @@ export default defineBackground(() => {
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message: unknown, _sender: any) => {
     // Type guard to validate message structure
     if (!message || typeof message !== "object" || !("type" in message)) {
-      sendResponse({ success: false, message: "Invalid message format" });
-      return true;
+      return Promise.resolve({ success: false, message: "Invalid message format" });
+    }
+
+    // Handle realtimeEvent messages immediately - just ignore them
+    if ((message as any).type === "realtimeEvent") {
+      // These are meant for sidepanel consumption, not background handling
+      console.log("Background received message: realtimeEvent");
+      // Return undefined to indicate no response
+      return;
     }
 
     const typedMessage = message as ExtensionMessage;
     console.log("Background received message:", typedMessage.type);
 
-    (async () => {
+    // Return a Promise for async processing
+    return (async () => {
       try {
         let response: ExecuteTaskResponse | CancelTaskResponse;
 
@@ -94,8 +103,22 @@ export default defineBackground(() => {
 
             // Create AbortController for this task
             const abortController = new AbortController();
-            const taskId = `task-${Date.now()}-${Math.random()}`;
-            runningTasks.set(taskId, abortController);
+            const tabId = executeMessage.tabId;
+
+            if (!tabId) {
+              response = {
+                success: false,
+                message: "No tab ID provided for task execution",
+              };
+              break;
+            }
+
+            // Cancel any existing task for this tab
+            if (runningTasks.has(tabId)) {
+              runningTasks.get(tabId)?.abort();
+            }
+
+            runningTasks.set(tabId, abortController);
 
             try {
               console.log(
@@ -103,9 +126,10 @@ export default defineBackground(() => {
                 executeMessage.data,
               );
 
-              // Use AgentAPI to run the task with AbortSignal
-              const result = await AgentAPI.runTask(executeMessage.task, {
+              // Use AgentManager to run the task with AbortSignal
+              const result = await AgentManager.runTask(executeMessage.task, {
                 apiKey: settings.apiKey,
+                apiEndpoint: settings.apiEndpoint,
                 model: settings.model || "gpt-4.1",
                 logger,
                 tabId: executeMessage.tabId,
@@ -118,7 +142,6 @@ export default defineBackground(() => {
               response = {
                 success: true,
                 result: result,
-                events: logger.getEvents(), // Include events for React UI
               };
             } catch (error) {
               console.error("Task execution error:", error);
@@ -134,33 +157,39 @@ export default defineBackground(() => {
                 response = {
                   success: true, // Treat cancellation as success to avoid error styling
                   result: "Task cancelled",
-                  events: logger.getEvents(),
                 };
               } else {
                 response = {
                   success: false,
                   message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
-                  events: logger.getEvents(), // Include events even on error
                 };
               }
             } finally {
               // Clean up the task tracking
-              runningTasks.delete(taskId);
+              runningTasks.delete(tabId);
             }
             break;
 
           case "cancelTask":
             const cancelMessage = typedMessage as CancelTaskMessage;
-            console.log("Cancelling all running tasks");
+            console.log("Cancelling running tasks");
 
-            // Cancel all running tasks
+            // Cancel all running tasks (or specific tab if provided)
             let cancelledCount = 0;
-            for (const [taskId, controller] of runningTasks.entries()) {
-              controller.abort();
-              cancelledCount++;
+            if (cancelMessage.tabId) {
+              // Cancel task for specific tab
+              const controller = runningTasks.get(cancelMessage.tabId);
+              if (controller) {
+                controller.abort();
+                cancelledCount = 1;
+              }
+            } else {
+              // Cancel all running tasks
+              for (const [, controller] of runningTasks.entries()) {
+                controller.abort();
+                cancelledCount++;
+              }
             }
-            // Don't clear the map here - let individual tasks clean up in finally blocks
-            // runningTasks.clear();
 
             response = {
               success: true,
@@ -179,16 +208,37 @@ export default defineBackground(() => {
         }
 
         console.log("Sending response:", response);
-        sendResponse(response);
+        return response;
       } catch (error) {
         console.error("Error in message handler:", error);
-        sendResponse({
+        return {
           success: false,
           message: error instanceof Error ? error.message : "Unknown error occurred",
-        });
+        };
       }
     })();
-
-    return true; // Required for async response
   });
+
+  // Handle tab removal to cancel running tasks
+  browser.tabs.onRemoved.addListener((tabId) => {
+    console.log(`Tab ${tabId} removed, cancelling any running tasks`);
+    const controller = runningTasks.get(tabId);
+    if (controller) {
+      controller.abort();
+      runningTasks.delete(tabId);
+    }
+  });
+
+  // Start cleanup timer for conversations
+  setInterval(async () => {
+    try {
+      const activeTabs = await browser.tabs.query({});
+      const activeTabIds = activeTabs
+        .map((tab) => tab.id)
+        .filter((id) => id !== undefined) as number[];
+      useConversationStore.getState().cleanupClosedTabs(activeTabIds);
+    } catch (error) {
+      console.error("Failed to cleanup closed tabs:", error);
+    }
+  }, 60000); // 1 minute
 });

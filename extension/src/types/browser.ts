@@ -50,6 +50,7 @@ export interface ExecutePageActionResponse {
 
 export interface CancelTaskMessage {
   type: "cancelTask";
+  tabId?: number;
 }
 
 export interface CancelTaskResponse {

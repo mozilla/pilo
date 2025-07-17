@@ -1,8 +1,10 @@
 import type { ReactElement } from "react";
 import type { Theme } from "./theme";
 
+import type { ChatMessage } from "./hooks/useConversation";
+
 interface ChatMessageProps {
-  type: "user" | "assistant" | "system";
+  type: ChatMessage["type"];
   content: string;
   timestamp?: Date;
   theme: Theme;

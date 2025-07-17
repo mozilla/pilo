@@ -6,10 +6,10 @@ import { WebAgent, Logger } from "spark/core";
 import { createOpenAI } from "@ai-sdk/openai";
 
 /**
- * AgentAPI - Main entry point for running Spark tasks in the extension
+ * AgentManager - Main entry point for running Spark tasks in the extension
  * Uses the same shared provider system as CLI and server
  */
-export class AgentAPI {
+export class AgentManager {
   /**
    * Run a web automation task using Spark
    */
@@ -17,6 +17,7 @@ export class AgentAPI {
     task: string,
     options: {
       apiKey: string;
+      apiEndpoint?: string;
       model?: string;
       logger?: Logger;
       tabId?: number;
@@ -27,10 +28,14 @@ export class AgentAPI {
     const browser = new ExtensionBrowser(options.tabId);
 
     // Create OpenAI provider directly for browser extension
+    const apiEndpoint = options.apiEndpoint || "https://api.openai.com/v1";
+    const model = options.model || "gpt-4.1-mini";
+
     const openai = createOpenAI({
       apiKey: options.apiKey,
+      baseURL: apiEndpoint,
     });
-    const provider = openai(options.model || "gpt-4.1");
+    const provider = openai(model);
 
     // Create WebAgent - same as CLI and server
     const agent = new WebAgent(browser, {

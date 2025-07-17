@@ -1,84 +1,58 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback } from "react";
+import { useConversation } from "./hooks/useConversation";
+import { useAutoScroll } from "./hooks/useAutoScroll";
+import type { ChatMessage } from "./hooks/useConversation";
 
-export interface ChatMessage {
-  id: string;
-  type: "user" | "assistant" | "system" | "reasoning" | "result" | "status" | "plan" | "error";
-  content: string;
-  timestamp: Date;
-  taskId?: string; // Group messages by task
-}
+// Re-export ChatMessage type for backwards compatibility
+export type { ChatMessage };
 
-export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+/**
+ * @deprecated Use useConversation and useAutoScroll hooks directly instead
+ *
+ * Legacy hook that combines conversation data and scroll behavior
+ * Kept for backwards compatibility, but prefer the separate hooks
+ */
+export function useChat(tabId?: number) {
+  const conversation = useConversation(tabId);
+  const autoScroll = useAutoScroll(conversation.messages, tabId);
 
-  const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current && isAtBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [isAtBottom]);
-
-  const handleScroll = useCallback(() => {
-    if (scrollContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
-      setIsAtBottom(isNearBottom);
-    }
-  }, []);
-
+  // Enhanced addMessage that includes auto-scroll
   const addMessage = useCallback(
-    (type: ChatMessage["type"], content: string, taskId?: string) => {
-      const newMessage: ChatMessage = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        type,
-        content,
-        timestamp: new Date(),
-        taskId,
-      };
-      setMessages((prev) => [...prev, newMessage]);
-
-      // Auto-scroll to bottom for new messages
-      setTimeout(() => {
-        if (isAtBottom && messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
+    (type: Parameters<typeof conversation.addMessage>[0], content: string, taskId?: string) => {
+      conversation.addMessage(type, content, taskId);
+      autoScroll.scrollToBottomOnNewMessage();
     },
-    [isAtBottom],
+    [conversation, autoScroll],
   );
 
-  const startTask = useCallback(() => {
-    const taskId = Date.now().toString();
-    setCurrentTaskId(taskId);
-    return taskId;
+  // Legacy switchToTab (now a no-op since tab switching is handled by parent)
+  const switchToTab = useCallback((_newTabId: number) => {
+    // This is now handled by the parent component passing a new tabId
+    // The conversation will be automatically created/loaded by useTabConversation
   }, []);
-
-  const endTask = useCallback(() => {
-    setCurrentTaskId(null);
-  }, []);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    setCurrentTaskId(null);
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
 
   return {
-    messages,
+    // Conversation data
+    messages: conversation.messages,
+    currentTaskId: conversation.currentTaskId,
+    currentTabId: conversation.currentTabId,
+    isExecuting: conversation.isExecuting,
+    conversation: conversation.conversation,
+
+    // Conversation actions
     addMessage,
-    startTask,
-    endTask,
-    clearMessages,
-    messagesEndRef,
-    scrollContainerRef,
-    handleScroll,
-    isAtBottom,
-    currentTaskId,
+    startTask: conversation.startTask,
+    endTask: conversation.endTask,
+    clearMessages: conversation.clearMessages,
+    setExecutionState: conversation.setExecutionState,
+
+    // Auto-scroll
+    messagesEndRef: autoScroll.messagesEndRef,
+    scrollContainerRef: autoScroll.scrollContainerRef,
+    handleScroll: autoScroll.handleScroll,
+    isAtBottom: autoScroll.isAtBottom,
+
+    // Legacy
+    switchToTab,
   };
 }
