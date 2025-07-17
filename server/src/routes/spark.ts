@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { WebAgent, PlaywrightBrowser } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
@@ -89,28 +90,22 @@ spark.post("/run", async (c) => {
       );
     }
 
-    // Set up Server-Sent Events headers
-    const sseHeaders = {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    };
-    Object.entries(sseHeaders).forEach(([key, value]) => c.header(key, value));
+    // Use Hono's streamSSE for proper Server-Sent Events handling
+    return streamSSE(c, async (stream) => {
+      // Create AbortController to handle request termination
+      const abortController = new AbortController();
 
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
+      // Handle client disconnection
+      stream.onAbort(() => {
+        console.log("🛑 Client disconnected, aborting task execution");
+        abortController.abort();
+      });
 
-    // Helper to send SSE events
-    const sendEvent = async (event: string, data: any) => {
-      const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-      await writer.write(encoder.encode(message));
-    };
-
-    // Start task execution asynchronously
-    (async () => {
       try {
-        await sendEvent("start", { task: body.task, url: body.url });
+        await stream.writeSSE({
+          event: "start",
+          data: JSON.stringify({ task: body.task, url: body.url }),
+        });
 
         // Merge server config with request overrides
         const browserConfig = {
@@ -146,7 +141,14 @@ spark.post("/run", async (c) => {
 
         // Create browser and agent instances
         const browser = new PlaywrightBrowser(browserConfig);
-        const logger = new StreamLogger(sendEvent);
+
+        // Create StreamLogger that uses Hono's stream
+        const logger = new StreamLogger(async (event: string, data: any) => {
+          await stream.writeSSE({
+            event,
+            data: JSON.stringify(data),
+          });
+        });
 
         // Create AI provider with potential overrides
         const provider = createAIProvider({
@@ -162,33 +164,50 @@ spark.post("/run", async (c) => {
           logger,
         });
 
-        // Execute the task
+        // Execute the task with AbortSignal
         const result: TaskExecutionResult = await agent.execute(body.task, {
           startingUrl: body.url,
           data: body.data,
+          abortSignal: abortController.signal,
         });
 
         // Send final result
-        await sendEvent("complete", { success: true, result });
+        await stream.writeSSE({
+          event: "complete",
+          data: JSON.stringify({ success: true, result }),
+        });
 
         // Close the browser
         await agent.close();
       } catch (error) {
-        console.error("Spark task execution failed:", error);
-        await sendEvent(
-          "error",
-          createErrorResponse(
-            error instanceof Error ? error.message : "Unknown error",
-            "TASK_EXECUTION_FAILED",
-          ),
-        );
+        // Check if the error is due to request termination
+        if (abortController.signal.aborted) {
+          console.log("🛑 Task execution aborted due to client disconnection");
+          await stream.writeSSE({
+            event: "error",
+            data: JSON.stringify(
+              createErrorResponse("Task execution was cancelled", "TASK_CANCELLED"),
+            ),
+          });
+        } else {
+          console.error("Spark task execution failed:", error);
+          await stream.writeSSE({
+            event: "error",
+            data: JSON.stringify(
+              createErrorResponse(
+                error instanceof Error ? error.message : "Unknown error",
+                "TASK_EXECUTION_FAILED",
+              ),
+            ),
+          });
+        }
       } finally {
-        await sendEvent("done", {});
-        await writer.close();
+        await stream.writeSSE({
+          event: "done",
+          data: JSON.stringify({}),
+        });
       }
-    })();
-
-    return new Response(readable, { headers: sseHeaders });
+    });
   } catch (error) {
     console.error("Spark task setup failed:", error);
     return c.json(
