@@ -14,6 +14,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.16.0
         version: 1.16.0(hono@4.8.5)
+      '@hono/sentry':
+        specifier: ^1.2.2
+        version: 1.2.2(hono@4.8.5)
       ai:
         specifier: ^4.3.19
         version: 4.3.19(react@19.1.0)(zod@3.25.76)
@@ -412,6 +415,11 @@ packages:
     peerDependencies:
       hono: ^4
 
+  '@hono/sentry@1.2.2':
+    resolution: {integrity: sha512-027grZBrRGDPor8mRd+QOBcSpUlF07YrTp/WFDXZhbvWZ+1LrZdERUqcdg1gBGDUTanHhd9ucblpNNN6+V1bxg==}
+    peerDependencies:
+      hono: '>=3.*'
+
   '@jest/schemas@29.6.3':
     resolution: {integrity: sha512-mo5j5X+jIZmJQveBKeS/clAueipV7KgiX1vMgCxam1RNYiqE1w62n0/tJJnHtjW8ZHcQco5gY85jA3mi0L+nSA==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
@@ -547,6 +555,18 @@ packages:
     resolution: {integrity: sha512-M/fKi4sasCdM8i0aWJjCSFm2qEnYRR8AMLG2kxp6wD13+tMGA4Z1tVAuHkNRjud5SW2EM3naLuK35w9twvf6aA==}
     cpu: [x64]
     os: [win32]
+
+  '@sentry/core@8.9.2':
+    resolution: {integrity: sha512-ixm8NISFlPlEo3FjSaqmq4nnd13BRHoafwJ5MG+okCz6BKGZ1SexEggP42/QpGvDprUUHnfncG6WUMgcarr1zA==}
+    engines: {node: '>=14.18'}
+
+  '@sentry/types@8.9.2':
+    resolution: {integrity: sha512-+LFOyQGl+zk5SZRGZD2MEURf7i5RHgP/mt3s85Rza+vz8M211WJ0YsjkIGUJFSY842nged5QLx4JysLaBlLymg==}
+    engines: {node: '>=14.18'}
+
+  '@sentry/utils@8.9.2':
+    resolution: {integrity: sha512-A4srR9mEBFdVXwSEKjQ94msUbVkMr8JeFiEj9ouOFORw/Y/ux/WV2bWVD/ZI9wq0TcTNK8L1wBgU8UMS5lIq3A==}
+    engines: {node: '>=14.18'}
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -972,6 +992,9 @@ packages:
   tldts-experimental@7.0.10:
     resolution: {integrity: sha512-5qrQCSbJwrSlO4Rg/KFLnyMhkv5ngTeFh0pRYxEr5q+8eh0gguXqCO+RvzOEMEKqasR9XPYkSPTaoPUx0UBv8w==}
 
+  toucan-js@4.1.1:
+    resolution: {integrity: sha512-GTPwEaCRN8IbYe5/VeGiwxYvMO0dKaC16fTeLbF+QGswjkLZ9JUqAfDhLMyH2SWukYhmetH+uxWa1Bhluv/evQ==}
+
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
 
@@ -1331,6 +1354,11 @@ snapshots:
     dependencies:
       hono: 4.8.5
 
+  '@hono/sentry@1.2.2(hono@4.8.5)':
+    dependencies:
+      hono: 4.8.5
+      toucan-js: 4.1.1
+
   '@jest/schemas@29.6.3':
     dependencies:
       '@sinclair/typebox': 0.27.8
@@ -1422,6 +1450,17 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.45.1':
     optional: true
+
+  '@sentry/core@8.9.2':
+    dependencies:
+      '@sentry/types': 8.9.2
+      '@sentry/utils': 8.9.2
+
+  '@sentry/types@8.9.2': {}
+
+  '@sentry/utils@8.9.2':
+    dependencies:
+      '@sentry/types': 8.9.2
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -1909,6 +1948,12 @@ snapshots:
   tldts-experimental@7.0.10:
     dependencies:
       tldts-core: 7.0.10
+
+  toucan-js@4.1.1:
+    dependencies:
+      '@sentry/core': 8.9.2
+      '@sentry/types': 8.9.2
+      '@sentry/utils': 8.9.2
 
   tr46@0.0.3: {}
 
