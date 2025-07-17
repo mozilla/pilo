@@ -1,17 +1,11 @@
 /**
- * Spark - AI-powered web automation library
+ * Spark - Core exports
  *
- * This module exports the main classes and types for programmatic use of Spark.
- * Use this when you want to integrate Spark into your own applications.
+ * Platform-agnostic core functionality.
  */
 
 export { WebAgent } from "./webAgent.js";
-export { PlaywrightBrowser } from "./browser/playwrightBrowser.js";
 export type { AriaBrowser, PageAction, LoadState } from "./browser/ariaBrowser.js";
-export type {
-  PlaywrightBrowserOptions,
-  ExtendedPlaywrightBrowserOptions,
-} from "./browser/playwrightBrowser.js";
 export type { TaskExecutionResult, WebAgentOptions } from "./webAgent.js";
 export { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 export type {
@@ -34,11 +28,14 @@ export type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";
-export { ConsoleLogger, GenericLogger } from "./loggers.js";
-export type { Logger } from "./loggers.js";
-export * from "./schemas.js";
+export { GenericLogger } from "./loggers/generic.js";
+export { ConsoleLogger } from "./loggers/console.js";
+export { JSONConsoleLogger } from "./loggers/json.js";
+export type { Logger } from "./loggers/types.js";
 
-// Configuration and Provider System
-export { config, ConfigManager } from "./config.js";
-export type { SparkConfig } from "./config.js";
-export { createAIProvider, getAIProviderInfo } from "./provider.js";
+// Schema types (public API for type safety)
+export type { Plan, PlanAndUrl, Action, TaskValidationResult } from "./schemas.js";
+
+// Note: createProvider not exported in core to avoid Node.js dependencies in browser
+// Use provider libraries directly in browser environments
+export * from "./schemas.js";

@@ -9,7 +9,7 @@
  * 3. Validates task completion and retries if needed
  */
 
-import { generateObject, LanguageModel } from "ai";
+import { generateObject, streamObject, LanguageModel } from "ai";
 import {
   buildActionLoopPrompt,
   buildPlanPrompt,
@@ -27,10 +27,12 @@ import {
   Action,
   taskValidationSchema,
   TaskValidationResult,
+  getActionSchemaFieldOrder,
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
-import { Logger, ConsoleLogger } from "./loggers.js";
-import { getAIProviderInfo } from "./cli/provider.js";
+import { Logger } from "./loggers/types.js";
+import { ConsoleLogger } from "./loggers/console.js";
+import { nanoid } from "nanoid";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -42,6 +44,20 @@ const COMPLETION_QUALITY = {
 
 // Quality levels that indicate successful task completion
 const SUCCESS_QUALITIES = [COMPLETION_QUALITY.COMPLETE, COMPLETION_QUALITY.EXCELLENT] as const;
+
+/**
+ * Options for WebAgent.execute()
+ */
+export interface ExecuteOptions {
+  /** Optional URL to begin from (if not provided, AI will choose) */
+  startingUrl?: string;
+
+  /** Optional contextual data to reference during task execution */
+  data?: any;
+
+  /** Optional AbortSignal to cancel execution */
+  abortSignal?: AbortSignal;
+}
 
 /**
  * Result returned by WebAgent.execute()
@@ -156,6 +172,9 @@ export class WebAgent {
     [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'], // Convert headings to h1, h2, etc.
   ];
 
+  /** Cached field order for action schema to avoid repeated Object.keys calls */
+  private readonly actionSchemaFieldOrder: string[] = getActionSchemaFieldOrder();
+
   // === Event System ===
   /** Event emitter for logging and monitoring */
   private eventEmitter: WebAgentEventEmitter;
@@ -166,6 +185,12 @@ export class WebAgent {
   // === State Tracking ===
   /** Current page information for navigation tracking */
   private currentPage: { url: string; title: string } = { url: "", title: "" };
+
+  /** Current iteration ID for linking events within an execution loop */
+  private currentIterationId: string = "";
+
+  /** AbortSignal for cancelling execution */
+  private abortSignal: AbortSignal | null = null;
 
   // === Validation Patterns ===
   // No regex patterns needed - we just check if refs exist in the page snapshot
@@ -207,6 +232,9 @@ export class WebAgent {
    * @returns The generated plan and starting URL
    */
   async generatePlanWithUrl(task: string) {
+    this.emit(WebAgentEventType.AGENT_STATUS, {
+      message: "Making a plan and finding the best starting URL",
+    });
     const response = await this.generateAIResponse<{
       explanation: string;
       plan: string;
@@ -232,6 +260,7 @@ export class WebAgent {
    * @returns The generated plan
    */
   async generatePlan(task: string, startingUrl?: string) {
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
     const response = await this.generateAIResponse<{
       explanation: string;
       plan: string;
@@ -533,7 +562,7 @@ export class WebAgent {
     // Ask the LLM to analyze the page and decide on the next action
     const response = await this.withProcessingEvents(
       "Planning next action",
-      () => this.generateAIResponse<Action>(actionSchema, undefined, this.messages),
+      () => this.generateStreamingActionResponse(actionSchema, this.messages),
       this.vision,
     );
 
@@ -564,22 +593,27 @@ export class WebAgent {
   }
 
   /**
-   * Centralized event emission with automatic timestamp injection
+   * Centralized event emission with automatic timestamp and iteration ID injection
    *
    * Design decision: All events flow through this single method to ensure:
    * 1. Consistent timestamp injection for debugging and monitoring
-   * 2. Type safety through WebAgentEventType enum
-   * 3. Error isolation - logging failures don't crash the main task
-   * 4. Single point of control for event filtering/debugging
+   * 2. Automatic iteration ID injection to link events within execution loops
+   * 3. Type safety through WebAgentEventType enum
+   * 4. Error isolation - logging failures don't crash the main task
+   * 5. Single point of control for event filtering/debugging
    *
    * @param type - Event type from WebAgentEventType enum
-   * @param data - Event-specific data (timestamp will be auto-injected)
+   * @param data - Event-specific data (timestamp and iterationId will be auto-injected)
    */
-  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp">) {
+  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp" | "iterationId">) {
     try {
       this.eventEmitter.emitEvent({
         type,
-        data: { timestamp: Date.now(), ...data },
+        data: {
+          timestamp: Date.now(),
+          iterationId: this.currentIterationId,
+          ...data,
+        },
       } as WebAgentEvent);
     } catch (error) {
       // Critical design decision: Never let logging errors crash the main task
@@ -639,6 +673,267 @@ export class WebAgent {
   }
 
   /**
+   * Maps action response fields to their corresponding WebAgent events
+   *
+   * This centralized mapping ensures consistent event emission for each field type
+   * and provides a single place to manage field-to-event relationships.
+   *
+   * @param fieldName - The field name from the action response schema
+   * @param value - The field value to emit
+   */
+  private emitFieldEvent(fieldName: string, value: any): void {
+    switch (fieldName) {
+      case "currentStep":
+        this.emit(WebAgentEventType.AGENT_STEP, { currentStep: value });
+        break;
+      case "extractedData":
+        this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: value });
+        break;
+      case "observation":
+        this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: value });
+        break;
+      case "observationStatusMessage":
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: value });
+        break;
+      case "thought":
+        this.emit(WebAgentEventType.AGENT_REASONED, { thought: value });
+        break;
+      case "action":
+        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+          action: value.action,
+          ref: value.ref || undefined,
+          value: value.value || undefined,
+        });
+        break;
+      case "actionStatusMessage":
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: value });
+        break;
+      default:
+        // Unknown field type - no event emission
+        break;
+    }
+  }
+
+  /**
+   * Emits AI generation metadata after successful streaming completion
+   *
+   * @param stream - The completed stream object
+   * @param schema - Zod schema for response validation
+   * @param messages - Conversation history for context
+   * @param final - The final action response
+   */
+  private emitAIGenerationMetadata(stream: any, schema: any, messages: any[], final: Action): void {
+    this.emit(WebAgentEventType.AI_GENERATION, {
+      prompt: undefined,
+      schema,
+      messages,
+      temperature: 0,
+      object: final,
+      finishReason: (stream as any).finishReason,
+      usage: (stream as any).usage,
+      warnings: (stream as any).warnings,
+      providerMetadata: (stream as any).providerMetadata,
+    });
+  }
+
+  /**
+   * Handles errors during streaming AI generation with retry logic
+   *
+   * @param error - The error that occurred
+   * @param schema - Zod schema for response validation
+   * @param messages - Conversation history for context
+   * @param retryCount - Current retry attempt number
+   * @returns Promise that resolves to Action or throws error
+   */
+  private async handleStreamingError(
+    error: unknown,
+    schema: any,
+    messages: any[],
+    retryCount: number,
+  ): Promise<Action> {
+    // Handle AbortError specifically
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("AI streaming request was cancelled");
+    }
+
+    if (error instanceof Error) {
+      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+        error: error.message,
+        prompt: undefined,
+        schema,
+        messages,
+      });
+    }
+
+    // Handle AI generation failures with retry logic
+    if (
+      error instanceof Error &&
+      (error.message.includes("response did not match schema") ||
+        error.message.includes("AI_NoObjectGeneratedError") ||
+        error.message.includes("No object generated") ||
+        error.message.includes("Invalid JSON response") ||
+        error.message.includes("AI_APICallError") ||
+        error.name === "AI_APICallError")
+    ) {
+      console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
+
+      // Log some debugging info on the first failure
+      if (retryCount === 0 && this.DEBUG) {
+        console.error("Debug info - Last few messages:");
+        const lastMessages = messages ? messages.slice(-2) : [];
+        console.error(JSON.stringify(lastMessages, null, 2));
+      }
+
+      if (retryCount < 2) {
+        console.log("🔄 Retrying AI generation...");
+        // Add a small delay before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return this.generateStreamingActionResponse(schema, messages, retryCount + 1);
+      } else {
+        const errorMessage =
+          `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
+          `1. The AI response not matching the expected schema format\n` +
+          `2. Network issues or AI service problems\n` +
+          `3. Complex page content that confused the AI\n` +
+          `Original error: ${error.message}`;
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
+
+  /**
+   * Emits remaining field events after streaming completes
+   *
+   * @param final - The complete action response
+   * @param fieldOrder - Array of field names in expected order
+   * @param emittedFields - Set of fields already emitted during streaming
+   * @param chunkCount - Number of chunks processed during streaming
+   */
+  private emitRemainingFieldEvents(
+    final: Action,
+    fieldOrder: string[],
+    emittedFields: Set<string>,
+    chunkCount: number,
+  ): void {
+    // Fallback: emit all events if streaming failed
+    if (chunkCount === 0) {
+      for (const field of fieldOrder) {
+        if (final[field as keyof Action]) {
+          this.emitFieldEvent(field, final[field as keyof Action]);
+        }
+      }
+    } else {
+      // Emit any remaining fields (typically the last field)
+      for (const field of fieldOrder) {
+        if (final[field as keyof Action] && !emittedFields.has(field)) {
+          this.emitFieldEvent(field, final[field as keyof Action]);
+          emittedFields.add(field);
+        }
+      }
+    }
+  }
+
+  /**
+   * Processes streaming partial objects and emits field events as they complete
+   *
+   * @param stream - The streaming response object
+   * @param fieldOrder - Array of field names in expected order
+   * @returns Number of chunks processed and set of emitted fields
+   */
+  private async processStreamingResponse(
+    stream: any,
+    fieldOrder: string[],
+  ): Promise<{ chunkCount: number; emittedFields: Set<string> }> {
+    const emittedFields = new Set<string>();
+    let chunkCount = 0;
+
+    // Process streaming partial objects
+    for await (const partialObject of stream.partialObjectStream) {
+      chunkCount++;
+      const partial = partialObject as Partial<Action>;
+
+      // Emit fields when we detect the next field has appeared (indicating current field is complete)
+      for (let i = 0; i < fieldOrder.length; i++) {
+        const currentField = fieldOrder[i] as keyof Action;
+        const nextField = fieldOrder[i + 1] as keyof Action;
+
+        if (partial[currentField] && !emittedFields.has(currentField)) {
+          // Only emit if next field exists and has appeared (current field is complete)
+          if (nextField && partial[nextField]) {
+            this.emitFieldEvent(currentField, partial[currentField]);
+            emittedFields.add(currentField);
+          }
+          // Note: Last field is handled after stream completes
+        }
+      }
+    }
+
+    return { chunkCount, emittedFields };
+  }
+
+  /**
+   * Generates AI action responses with real-time streaming event emission
+   *
+   * This method uses the AI SDK's streamObject to get incremental responses and emits
+   * WebAgent events as soon as each field is complete, providing real-time UI updates.
+   *
+   * Key features:
+   * - Emits events as fields complete (not just at the end)
+   * - Uses field transition detection to determine completion
+   * - Handles the last field specially since it has no "next field" to detect
+   * - Includes fallback for non-streaming responses
+   *
+   * @param schema - Zod schema for response validation
+   * @param messages - Conversation history for context
+   * @param retryCount - Current retry attempt (for error handling)
+   * @returns Complete validated Action object
+   */
+  protected async generateStreamingActionResponse(
+    schema: any,
+    messages: any[],
+    retryCount = 0,
+  ): Promise<Action> {
+    const config: any = {
+      model: this.provider,
+      schema,
+      messages,
+      temperature: 0,
+    };
+
+    // Add AbortSignal if provided
+    if (this.abortSignal) {
+      config.abortSignal = this.abortSignal;
+    }
+
+    try {
+      const stream = await streamObject(config);
+
+      // Use cached field order to avoid repeated Object.keys calls
+      const fieldOrder = this.actionSchemaFieldOrder;
+
+      // Process streaming partial objects and emit field events
+      const { chunkCount, emittedFields } = await this.processStreamingResponse(stream, fieldOrder);
+
+      // Get final complete response
+      const finalResponse = await stream.object;
+      const final = finalResponse as Action;
+
+      // Emit any remaining fields and handle fallback for failed streaming
+      this.emitRemainingFieldEvents(final, fieldOrder, emittedFields, chunkCount);
+
+      // Emit AI generation metadata
+      this.emitAIGenerationMetadata(stream, schema, messages, final);
+
+      return final;
+    } catch (error) {
+      return this.handleStreamingError(error, schema, messages, retryCount);
+    }
+  }
+
+  /**
    * Centralized AI generation with consistent configuration
    */
   protected async generateAIResponse<T>(
@@ -652,6 +947,11 @@ export class WebAgent {
       schema,
       temperature: 0,
     };
+
+    // Add AbortSignal if provided
+    if (this.abortSignal) {
+      config.abortSignal = this.abortSignal;
+    }
 
     if (prompt) {
       config.prompt = prompt;
@@ -674,6 +974,11 @@ export class WebAgent {
       });
       return response.object as T;
     } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI request was cancelled");
+      }
+
       if (error instanceof Error) {
         this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
           error: error.message,
@@ -816,31 +1121,6 @@ export class WebAgent {
     this.addUserMessage(buildStepValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
   }
 
-  /**
-   * Broadcasts all details of the current action for logging/display
-   */
-  protected broadcastActionDetails(result: any) {
-    this.emit(WebAgentEventType.AGENT_STEP, { currentStep: result.currentStep });
-
-    // Emit extracted data first (now required)
-    this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
-
-    // Then emit observation
-    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: result.observation });
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.observationStatusMessage });
-
-    // Then reasoning
-    this.emit(WebAgentEventType.AGENT_REASONED, { thought: result.thought });
-
-    // Finally the planned action
-    this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-      action: result.action.action,
-      ref: result.action.ref || undefined,
-      value: result.action.value || undefined,
-    });
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: result.actionStatusMessage });
-  }
-
   private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
     this.addAssistantMessage(result);
     this.addUserMessage(
@@ -848,7 +1128,33 @@ export class WebAgent {
     );
   }
 
+  /**
+   * Generates a friendly, human-readable message for an action
+   */
+  private getFriendlyActionMessage(action: any): string {
+    const actionMessages: { [key: string]: string } = {
+      wait: `Waiting ${action.value || "1"} seconds`,
+      goto: `Navigating to ${action.value}`,
+      back: "Going back to previous page",
+      forward: "Going forward to next page",
+      click: "Clicking on element",
+      hover: "Hovering over element",
+      fill: "Filling in text field",
+      focus: "Focusing on element",
+      check: "Checking checkbox",
+      uncheck: "Unchecking checkbox",
+      select: "Selecting option",
+      enter: "Pressing Enter key",
+      done: "Completing task",
+    };
+
+    return actionMessages[action.action] || `Performing ${action.action} action`;
+  }
+
   protected async executeAction(result: any): Promise<boolean> {
+    const friendlyMessage = this.getFriendlyActionMessage(result.action);
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: friendlyMessage });
+
     try {
       switch (result.action.action) {
         case "wait":
@@ -927,10 +1233,9 @@ export class WebAgent {
 
   /**
    * Emits the task setup event with initial task information
+   * TODO: Move telemetry/config logging outside of WebAgent
    */
   private emitTaskSetupEvent(task: string) {
-    const providerInfo = getAIProviderInfo();
-
     this.emit(WebAgentEventType.TASK_SETUP, {
       task,
       browserName: this.browser.browserName,
@@ -941,10 +1246,7 @@ export class WebAgent {
       pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
       proxy: (this.browser as any).proxyServer,
       vision: this.vision,
-      provider: providerInfo.provider,
-      model: providerInfo.model,
-      hasApiKey: providerInfo.hasApiKey,
-      keySource: providerInfo.keySource,
+      // TODO: Provider info should be logged elsewhere, not WebAgent's responsibility
     });
   }
 
@@ -968,6 +1270,8 @@ export class WebAgent {
     this.data = null;
     this.currentPage = { url: "", title: "" };
     this.currentPageSnapshot = "";
+    this.currentIterationId = "";
+    this.abortSignal = null;
   }
 
   private formatConversationHistory(): string {
@@ -994,6 +1298,7 @@ export class WebAgent {
   ): Promise<TaskValidationResult> {
     const conversationHistory = this.formatConversationHistory();
 
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Reviewing the answer" });
     const response = await this.withProcessingEvents("Validating task completion", () =>
       this.generateAIResponse<TaskValidationResult>(
         taskValidationSchema,
@@ -1025,22 +1330,27 @@ export class WebAgent {
    * - Task is marked as "done" and validation succeeds
    * - Maximum validation attempts are reached
    * - Maximum iteration limit is hit (safety mechanism)
+   * - AbortSignal is triggered (immediate cancellation)
    *
    * @param task - Natural language description of what to accomplish
-   * @param startingUrl - Optional URL to begin from (if not provided, AI will choose)
-   * @param data - Optional contextual data to reference during task execution
+   * @param options - Optional configuration for task execution
    * @returns Complete execution results including success status and metrics
    */
-  async execute(task: string, startingUrl?: string, data?: any): Promise<TaskExecutionResult> {
+  async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
     if (!task) {
       throw new Error("No task provided.");
     }
+
+    const { startingUrl, data, abortSignal } = options;
 
     // === SETUP PHASE ===
     this.emitTaskSetupEvent(task);
 
     // Reset any previous task state to ensure clean execution
     this.resetState();
+
+    // Store AbortSignal for cancellation
+    this.abortSignal = abortSignal || null;
 
     // Store contextual data for use in prompts (optional)
     if (data) {
@@ -1052,9 +1362,11 @@ export class WebAgent {
     if (startingUrl) {
       this.url = startingUrl;
       // Run browser launch and plan creation in parallel for efficiency
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
       await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
     } else {
       // Let AI choose the best starting URL based on the task
+      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
       await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
     }
 
@@ -1063,6 +1375,7 @@ export class WebAgent {
     this.emitTaskStartEvent(task);
 
     // Navigate to the determined starting URL
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Navigating to starting page" });
     await this.browser.goto(this.url);
 
     // Record initial page load for tracking
@@ -1081,6 +1394,7 @@ export class WebAgent {
     // 2. Max validation attempts reached (task marked done but validation keeps failing)
     // 3. Max iterations reached (safety mechanism to prevent infinite loops)
     // 4. Unrecoverable AI generation error
+    // 5. AbortSignal triggered (immediate cancellation)
     while (true) {
       // Safety check: prevent infinite loops
       currentIteration++;
@@ -1088,13 +1402,16 @@ export class WebAgent {
         break; // Exit: hit iteration limit
       }
 
+      // Generate new iteration ID for this execution loop
+      this.currentIterationId = nanoid(8);
+
       try {
         // Get current page state and ask AI what to do next
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
         const pageSnapshot = await this.browser.getText();
         const result = await this.generateNextAction(pageSnapshot);
 
-        // Broadcast the AI's reasoning and planned action for logging
-        this.broadcastActionDetails(result);
+        // Events are now emitted during streaming, no need to broadcast here
 
         // === TASK COMPLETION HANDLING ===
         // If AI says task is done, validate the completion quality
@@ -1115,6 +1432,9 @@ export class WebAgent {
             }
 
             // Give AI feedback about what went wrong and try again
+            this.emit(WebAgentEventType.AGENT_STATUS, {
+              message: "Task needs improvement, continuing work",
+            });
             this.addTaskRetryFeedback(result, validationResult);
             finalAnswer = null; // Reset for next attempt
             continue; // Continue loop for retry
@@ -1128,6 +1448,19 @@ export class WebAgent {
         // Add the action result to conversation history for AI context
         this.recordActionResult(result, actionSuccess);
       } catch (error) {
+        // Handle cancellation errors differently from other errors
+        const isCancellation =
+          error instanceof Error &&
+          (error.name === "AbortError" ||
+            (this.abortSignal?.aborted &&
+              (error.message.includes("cancelled") || error.message.includes("aborted"))));
+
+        if (isCancellation) {
+          console.log("🛑 Task cancelled by user");
+          finalAnswer = "Task cancelled";
+          break; // Exit: task was cancelled
+        }
+
         // Handle unrecoverable AI generation errors
         console.error("❌ Unrecoverable error in main execution loop:", error);
         finalAnswer = `Task failed due to AI generation error: ${error instanceof Error ? error.message : String(error)}`;

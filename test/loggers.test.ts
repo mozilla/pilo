@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ConsoleLogger, JSONConsoleLogger, Logger } from "../src/loggers.js";
+import { ConsoleLogger } from "../src/loggers/console.js";
+import { JSONConsoleLogger } from "../src/loggers/json.js";
+import type { Logger } from "../src/loggers/types.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import type {
   TaskStartEventData,

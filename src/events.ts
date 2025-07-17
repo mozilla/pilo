@@ -42,6 +42,7 @@ export enum WebAgentEventType {
  */
 export interface WebAgentEventData {
   timestamp: number;
+  iterationId: string;
 }
 
 /**
