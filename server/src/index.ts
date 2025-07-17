@@ -8,9 +8,12 @@ import sparkRoutes from "./routes/spark.js";
 const app = new Hono();
 
 // Add Sentry middleware
-app.use("*", sentry({
-  dsn: process.env.SENTRY_DSN,
-}));
+app.use(
+  "*",
+  sentry({
+    dsn: process.env.SENTRY_DSN,
+  }),
+);
 
 // Add CORS middleware
 app.use(
