@@ -35,15 +35,15 @@ app.onError((err, c) => {
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);
   }
-  
+
   console.error("Server error:", err);
-  
+
   return c.json(
     {
       error: "Internal Server Error",
       message: process.env.NODE_ENV === "development" ? err.message : undefined,
     },
-    500
+    500,
   );
 });
 
