@@ -1042,7 +1042,7 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
       // This should not throw, even though the action fails
-      const result = await webAgent.execute("test task", "https://example.com");
+      const result = await webAgent.execute("test task", { startingUrl: "https://example.com" });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed with errors");
     });
@@ -1101,7 +1101,7 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(createMockStreamingResponse(actionResponse))
         .mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-      await webAgent.execute("test task", "https://example.com");
+      await webAgent.execute("test task", { startingUrl: "https://example.com" });
 
       // Should have initial navigation and goto navigation
       expect(eventSpy).toHaveBeenCalledTimes(2);
@@ -1148,7 +1148,10 @@ describe("WebAgent", () => {
         date: "2024-12-25",
       };
 
-      const result = await webAgent.execute("test task", "https://example.com", testData);
+      const result = await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        data: testData,
+      });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed with data");
     });
@@ -1191,7 +1194,10 @@ describe("WebAgent", () => {
       // Mock action generation (uses streamObject)
       mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-      const result = await webAgent.execute("test task", "https://example.com", testData);
+      const result = await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        data: testData,
+      });
 
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed with data included");
@@ -1244,7 +1250,10 @@ describe("WebAgent", () => {
       // Mock action generation (uses streamObject)
       mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-      const result = await webAgent.execute("test task", "https://example.com", null);
+      const result = await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        data: null,
+      });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed without data");
     });
@@ -1282,7 +1291,7 @@ describe("WebAgent", () => {
       // Mock action generation (uses streamObject)
       mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-      const result = await webAgent.execute("test task", "https://example.com");
+      const result = await webAgent.execute("test task", { startingUrl: "https://example.com" });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed without data");
     });
@@ -1333,7 +1342,10 @@ describe("WebAgent", () => {
         ],
       };
 
-      const result = await webAgent.execute("test task", "https://example.com", complexData);
+      const result = await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        data: complexData,
+      });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Complex data task completed");
     });
@@ -1373,7 +1385,7 @@ describe("WebAgent", () => {
       // Mock action generation (uses streamObject)
       mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-      const result = await webAgent.execute("test task", "https://example.com");
+      const result = await webAgent.execute("test task", { startingUrl: "https://example.com" });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed successfully");
     });
@@ -1441,7 +1453,9 @@ describe("WebAgent", () => {
         .mockResolvedValueOnce(createMockStreamingResponse(firstDoneResponse))
         .mockResolvedValueOnce(createMockStreamingResponse(secondDoneResponse));
 
-      const result = await retryWebAgent.execute("test task", "https://example.com");
+      const result = await retryWebAgent.execute("test task", {
+        startingUrl: "https://example.com",
+      });
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Complete task result");
     });
@@ -1501,7 +1515,9 @@ describe("WebAgent", () => {
       // Mock action generation (uses streamObject)
       mockStreamObject.mockResolvedValue(createMockStreamingResponse(doneResponse));
 
-      const result = await failWebAgent.execute("test task", "https://example.com");
+      const result = await failWebAgent.execute("test task", {
+        startingUrl: "https://example.com",
+      });
       expect(result.success).toBe(false);
       expect(result.validationAttempts).toBe(3);
       expect(result.finalAnswer).toBe("Incomplete task result");
@@ -1845,12 +1861,10 @@ describe("WebAgent", () => {
         // Mock action generation
         mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-        const result = await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          abortController.signal,
-        );
+        const result = await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: abortController.signal,
+        });
 
         expect(result.success).toBe(true);
         expect(result.finalAnswer).toBe("Task completed successfully");
@@ -1889,12 +1903,10 @@ describe("WebAgent", () => {
         // Mock action generation
         mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-        await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          abortController.signal,
-        );
+        await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: abortController.signal,
+        });
 
         // Verify AbortSignal was passed to generateObject
         expect(mockGenerateObject).toHaveBeenCalledWith(
@@ -1938,12 +1950,9 @@ describe("WebAgent", () => {
         // Mock action generation
         mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-        await webAgent.execute(
-          "test task",
-          undefined, // No starting URL to trigger generatePlanWithUrl
-          undefined,
-          abortController.signal,
-        );
+        await webAgent.execute("test task", {
+          abortSignal: abortController.signal,
+        });
 
         // Verify AbortSignal was passed to generateObject
         expect(mockGenerateObject).toHaveBeenCalledWith(
@@ -1986,7 +1995,7 @@ describe("WebAgent", () => {
         // Mock action generation
         mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-        const result = await webAgent.execute("test task", "https://example.com");
+        const result = await webAgent.execute("test task", { startingUrl: "https://example.com" });
 
         expect(result.success).toBe(true);
         expect(result.finalAnswer).toBe("Task completed successfully");
@@ -2118,12 +2127,10 @@ describe("WebAgent", () => {
         // Mock action generation to fail with AbortError
         mockStreamObject.mockRejectedValue(abortError);
 
-        const result = await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          abortController.signal,
-        );
+        const result = await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: abortController.signal,
+        });
 
         expect(result.success).toBe(false);
         expect(result.finalAnswer).toContain("AI streaming request was cancelled");
@@ -2178,12 +2185,10 @@ describe("WebAgent", () => {
         // Mock action generation
         mockStreamObject.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
-        await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          abortController.signal,
-        );
+        await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: abortController.signal,
+        });
 
         // Verify AbortSignal was stored
         expect((webAgent as any).abortSignal).toBe(abortController.signal);
@@ -2337,12 +2342,10 @@ describe("WebAgent", () => {
         mockBrowser.setCurrentText("button [ref=s1e23]");
 
         // Start execution
-        const result = await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          controller.signal,
-        );
+        const result = await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: controller.signal,
+        });
 
         // Should handle the cancellation gracefully
         expect(result.success).toBe(false);
@@ -2390,12 +2393,10 @@ describe("WebAgent", () => {
         streamObjectSpy.mockResolvedValueOnce(createMockStreamingResponse(doneResponse));
 
         // Execute with AbortSignal
-        const result = await webAgent.execute(
-          "test task",
-          "https://example.com",
-          undefined,
-          controller.signal,
-        );
+        const result = await webAgent.execute("test task", {
+          startingUrl: "https://example.com",
+          abortSignal: controller.signal,
+        });
 
         expect(result.success).toBe(true);
 

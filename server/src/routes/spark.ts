@@ -163,7 +163,10 @@ spark.post("/run", async (c) => {
         });
 
         // Execute the task
-        const result: TaskExecutionResult = await agent.execute(body.task, body.url, body.data);
+        const result: TaskExecutionResult = await agent.execute(body.task, {
+          startingUrl: body.url,
+          data: body.data,
+        });
 
         // Send final result
         await sendEvent("complete", { success: true, result });

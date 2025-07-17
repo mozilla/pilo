@@ -319,8 +319,11 @@ describe("CLI Run Command", () => {
       await command.parseAsync(args, { from: "user" });
 
       const webAgentInstance = mockWebAgent.mock.results[0].value;
-      expect(webAgentInstance.execute).toHaveBeenCalledWith("test task", "https://example.com", {
-        key: "value",
+      expect(webAgentInstance.execute).toHaveBeenCalledWith("test task", {
+        startingUrl: "https://example.com",
+        data: {
+          key: "value",
+        },
       });
     });
 

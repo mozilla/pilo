@@ -149,7 +149,10 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     });
 
     // Execute the task
-    await webAgent.execute(task, options.url, data);
+    await webAgent.execute(task, {
+      startingUrl: options.url,
+      data,
+    });
 
     // Close the browser
     await webAgent.close();

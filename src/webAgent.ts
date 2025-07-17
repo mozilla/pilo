@@ -46,6 +46,20 @@ const COMPLETION_QUALITY = {
 const SUCCESS_QUALITIES = [COMPLETION_QUALITY.COMPLETE, COMPLETION_QUALITY.EXCELLENT] as const;
 
 /**
+ * Options for WebAgent.execute()
+ */
+export interface ExecuteOptions {
+  /** Optional URL to begin from (if not provided, AI will choose) */
+  startingUrl?: string;
+
+  /** Optional contextual data to reference during task execution */
+  data?: any;
+
+  /** Optional AbortSignal to cancel execution */
+  abortSignal?: AbortSignal;
+}
+
+/**
  * Result returned by WebAgent.execute()
  */
 export interface TaskExecutionResult {
@@ -1250,20 +1264,15 @@ export class WebAgent {
    * - AbortSignal is triggered (immediate cancellation)
    *
    * @param task - Natural language description of what to accomplish
-   * @param startingUrl - Optional URL to begin from (if not provided, AI will choose)
-   * @param data - Optional contextual data to reference during task execution
-   * @param abortSignal - Optional AbortSignal to cancel execution
+   * @param options - Optional configuration for task execution
    * @returns Complete execution results including success status and metrics
    */
-  async execute(
-    task: string,
-    startingUrl?: string,
-    data?: any,
-    abortSignal?: AbortSignal,
-  ): Promise<TaskExecutionResult> {
+  async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
     if (!task) {
       throw new Error("No task provided.");
     }
+
+    const { startingUrl, data, abortSignal } = options;
 
     // === SETUP PHASE ===
     this.emitTaskSetupEvent(task);

@@ -45,7 +45,10 @@ export class AgentManager {
     });
 
     try {
-      const result = await agent.execute(task, undefined, options.data, options.abortSignal);
+      const result = await agent.execute(task, {
+        data: options.data,
+        abortSignal: options.abortSignal,
+      });
       return result.finalAnswer || "Task completed successfully";
     } finally {
       await agent.close();
