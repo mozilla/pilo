@@ -21,4 +21,8 @@ pnpm build:chrome   # Chrome
 # Create distribution packages
 pnpm zip:firefox    # Firefox
 pnpm zip:chrome     # Chrome
+
+# Testing
+pnpm test           # Run tests
+pnpm test:watch     # Watch mode
 ```
