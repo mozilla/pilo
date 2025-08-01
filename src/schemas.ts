@@ -16,11 +16,8 @@ export const planAndUrlSchema = z.object({
 
 // Schema for the action loop responses
 export const actionSchema = z.object({
-  currentStep: z.string().describe("Current progress status in the plan"),
-  extractedData: z.string().describe("Data extracted from the current page"),
-  observation: z.string().describe("Assessment of previous step outcome"),
+  observation: z.string().describe("Assessment of previous step outcome and reasoning for next action"),
   observationStatusMessage: z.string().describe("Short friendly message about observation"),
-  thought: z.string().describe("Reasoning for next action"),
   action: z
     .object({
       action: z.nativeEnum(PageAction).describe("Action to perform"),
@@ -38,11 +35,13 @@ export type Action = z.infer<typeof actionSchema>;
 
 // Schema for task validation results
 export const taskValidationSchema = z.object({
-  observation: z.string().describe("Analysis of agent's approach and actions"),
+  taskAssessment: z
+    .string()
+    .describe("Assessment of whether the result accomplishes the requested task"),
   completionQuality: z
     .enum(["failed", "partial", "complete", "excellent"])
     .describe("Quality level of task completion"),
-  feedback: z.string().optional().describe("Actionable guidance for improvement"),
+  feedback: z.string().optional().describe("What is missing to complete the task"),
 });
 
 // Export the type for task validation result

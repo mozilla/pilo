@@ -18,6 +18,7 @@ import {
   buildPageSnapshotPrompt,
   buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
+  buildExtractionPrompt,
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
@@ -33,6 +34,7 @@ import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -239,7 +241,9 @@ export class WebAgent {
       explanation: string;
       plan: string;
       url: string;
-    }>(planAndUrlSchema, buildPlanAndUrlPrompt(task, this.guardrails));
+    }>(planAndUrlSchema, {
+      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
+    });
 
     // Store the plan details for later use in conversation
     this.taskExplanation = response.explanation;
@@ -264,7 +268,9 @@ export class WebAgent {
     const response = await this.generateAIResponse<{
       explanation: string;
       plan: string;
-    }>(planSchema, buildPlanPrompt(task, startingUrl, this.guardrails));
+    }>(planSchema, {
+      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
+    });
 
     // Store the plan details for later use in conversation
     this.taskExplanation = response.explanation;
@@ -344,11 +350,8 @@ export class WebAgent {
     const errors: string[] = [];
 
     // Validate required top-level fields
-    this.validateRequiredStringField(response, "currentStep", errors);
-    this.validateRequiredStringField(response, "extractedData", errors);
     this.validateRequiredStringField(response, "observation", errors);
     this.validateRequiredStringField(response, "observationStatusMessage", errors);
-    this.validateRequiredStringField(response, "thought", errors);
     this.validateRequiredStringField(response, "actionStatusMessage", errors);
 
     // Validate action object exists
@@ -415,6 +418,7 @@ export class WebAgent {
       PageAction.Wait,
       PageAction.Done,
       PageAction.Goto,
+      PageAction.Extract,
     ];
     const actionsProhibitingRefAndValue = [PageAction.Back, PageAction.Forward];
 
@@ -683,20 +687,11 @@ export class WebAgent {
    */
   private emitFieldEvent(fieldName: string, value: any): void {
     switch (fieldName) {
-      case "currentStep":
-        this.emit(WebAgentEventType.AGENT_STEP, { currentStep: value });
-        break;
-      case "extractedData":
-        this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: value });
-        break;
       case "observation":
         this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: value });
         break;
       case "observationStatusMessage":
         this.emit(WebAgentEventType.AGENT_STATUS, { message: value });
-        break;
-      case "thought":
-        this.emit(WebAgentEventType.AGENT_REASONED, { thought: value });
         break;
       case "action":
         this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
@@ -866,7 +861,12 @@ export class WebAgent {
             this.emitFieldEvent(currentField, partial[currentField]);
             emittedFields.add(currentField);
           }
-          // Note: Last field is handled after stream completes
+          // Special case: if this is the last field and all fields are present, emit it
+          else if (!nextField && Object.keys(partial).length === fieldOrder.length) {
+            this.emitFieldEvent(currentField, partial[currentField]);
+            emittedFields.add(currentField);
+          }
+          // Note: Last field is normally handled after stream completes
         }
       }
     }
@@ -879,12 +879,6 @@ export class WebAgent {
    *
    * This method uses the AI SDK's streamObject to get incremental responses and emits
    * WebAgent events as soon as each field is complete, providing real-time UI updates.
-   *
-   * Key features:
-   * - Emits events as fields complete (not just at the end)
-   * - Uses field transition detection to determine completion
-   * - Handles the last field specially since it has no "next field" to detect
-   * - Includes fallback for non-streaming responses
    *
    * @param schema - Zod schema for response validation
    * @param messages - Conversation history for context
@@ -938,15 +932,25 @@ export class WebAgent {
    */
   protected async generateAIResponse<T>(
     schema: any,
-    prompt?: string,
-    messages?: any[],
-    retryCount = 0,
+    options: {
+      prompt?: string;
+      messages?: any[];
+      maxTokens?: number;
+      retryCount?: number;
+    } = {},
   ): Promise<T> {
+    const { prompt, messages, maxTokens, retryCount = 0 } = options;
+
     const config: any = {
       model: this.provider,
       schema,
       temperature: 0,
     };
+
+    // Add token limit if specified
+    if (maxTokens) {
+      config.maxTokens = maxTokens;
+    }
 
     // Add AbortSignal if provided
     if (this.abortSignal) {
@@ -974,6 +978,10 @@ export class WebAgent {
       });
       return response.object as T;
     } catch (error) {
+      // Log raw response for debugging when parsing fails
+      if (error instanceof Error && error.message.includes("could not parse the response")) {
+        console.error("❌ Raw AI response that failed to parse:", (error as any).response);
+      }
       // Handle AbortError specifically
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("AI request was cancelled");
@@ -1011,7 +1019,12 @@ export class WebAgent {
           console.log("🔄 Retrying AI generation...");
           // Add a small delay before retry
           await new Promise((resolve) => setTimeout(resolve, 1000));
-          return this.generateAIResponse<T>(schema, prompt, messages, retryCount + 1);
+          return this.generateAIResponse<T>(schema, {
+            prompt,
+            messages,
+            maxTokens,
+            retryCount: retryCount + 1,
+          });
         } else {
           const errorMessage =
             `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
@@ -1128,33 +1141,8 @@ export class WebAgent {
     );
   }
 
-  /**
-   * Generates a friendly, human-readable message for an action
-   */
-  private getFriendlyActionMessage(action: any): string {
-    const actionMessages: { [key: string]: string } = {
-      wait: `Waiting ${action.value || "1"} seconds`,
-      goto: `Navigating to ${action.value}`,
-      back: "Going back to previous page",
-      forward: "Going forward to next page",
-      click: "Clicking on element",
-      hover: "Hovering over element",
-      fill: "Filling in text field",
-      focus: "Focusing on element",
-      check: "Checking checkbox",
-      uncheck: "Unchecking checkbox",
-      select: "Selecting option",
-      enter: "Pressing Enter key",
-      done: "Completing task",
-    };
-
-    return actionMessages[action.action] || `Performing ${action.action} action`;
-  }
 
   protected async executeAction(result: any): Promise<boolean> {
-    const friendlyMessage = this.getFriendlyActionMessage(result.action);
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: friendlyMessage });
-
     try {
       switch (result.action.action) {
         case "wait":
@@ -1179,6 +1167,16 @@ export class WebAgent {
         case "forward":
           await this.browser.goForward();
           await this.refreshAndRecordNavigation();
+          break;
+
+        case "extract":
+          if (!result.action.value) {
+            throw new Error("Missing extraction description for extract action");
+          }
+          const extractedData = await this.extractDataFromPage(result.action.value);
+          
+          // Store the extracted data so we can add it to conversation history
+          (result as any).extractedData = extractedData;
           break;
 
         case "done":
@@ -1218,6 +1216,12 @@ export class WebAgent {
   private recordActionResult(result: any, actionSuccess: boolean) {
     if (actionSuccess) {
       this.addAssistantMessage(result);
+      
+      // For extract actions, also add the extracted data to conversation history
+      if (result.action.action === "extract" && result.extractedData) {
+        this.addUserMessage(`Extraction result: ${result.extractedData}`);
+      }
+      
       this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, { success: true });
     } else {
       this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
@@ -1229,6 +1233,40 @@ export class WebAgent {
     this.emit(WebAgentEventType.AGENT_WAITING, { seconds });
 
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  }
+
+  /**
+   * Extracts data from the current page using clean markdown representation
+   * 
+   * @param extractionDescription - Description of what data to extract
+   * @returns The extracted data
+   */
+  private async extractDataFromPage(extractionDescription: string): Promise<string> {
+    if (!this.browser) throw new Error("Browser not started");
+    
+    try {
+      // Get the page content as clean markdown
+      const markdown = await this.browser.getMarkdown();
+      
+      // Create extraction prompt using the template
+      const extractionPrompt = buildExtractionPrompt(extractionDescription, markdown);
+
+      // Use AI to extract the data
+      const result = await this.generateAIResponse<{ extractedData: string }>(
+        z.object({
+          extractedData: z.string().describe("The extracted data in a clear, structured format")
+        }),
+        { prompt: extractionPrompt, maxTokens: 1000 }
+      );
+      
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
+      
+      return result.extractedData;
+    } catch (error) {
+      const errorMsg = `Failed to extract data: ${error instanceof Error ? error.message : String(error)}`;
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: errorMsg });
+      return errorMsg;
+    }
   }
 
   /**
@@ -1299,15 +1337,21 @@ export class WebAgent {
     const conversationHistory = this.formatConversationHistory();
 
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Reviewing the answer" });
+
+    const validationPrompt = buildTaskValidationPrompt(task, finalAnswer, conversationHistory);
+    if (this.DEBUG) {
+      console.log("🔍 Task validation prompt:", validationPrompt);
+    }
+
     const response = await this.withProcessingEvents("Validating task completion", () =>
-      this.generateAIResponse<TaskValidationResult>(
-        taskValidationSchema,
-        buildTaskValidationPrompt(task, finalAnswer, conversationHistory),
-      ),
+      this.generateAIResponse<TaskValidationResult>(taskValidationSchema, {
+        prompt: validationPrompt,
+        maxTokens: 1000, // Limit task validation responses to 1000 tokens
+      }),
     );
 
     this.emit(WebAgentEventType.TASK_VALIDATED, {
-      observation: response.observation,
+      taskAssessment: response.taskAssessment,
       completionQuality: response.completionQuality,
       feedback: response.feedback,
       finalAnswer,
@@ -1408,7 +1452,7 @@ export class WebAgent {
       try {
         // Get current page state and ask AI what to do next
         this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
-        const pageSnapshot = await this.browser.getText();
+        const pageSnapshot = await this.browser.getTreeWithRefs();
         const result = await this.generateNextAction(pageSnapshot);
 
         // Events are now emitted during streaming, no need to broadcast here
@@ -1456,13 +1500,11 @@ export class WebAgent {
               (error.message.includes("cancelled") || error.message.includes("aborted"))));
 
         if (isCancellation) {
-          console.log("🛑 Task cancelled by user");
           finalAnswer = "Task cancelled";
           break; // Exit: task was cancelled
         }
 
         // Handle unrecoverable AI generation errors
-        console.error("❌ Unrecoverable error in main execution loop:", error);
         finalAnswer = `Task failed due to AI generation error: ${error instanceof Error ? error.message : String(error)}`;
         break; // Exit: unrecoverable error
       }

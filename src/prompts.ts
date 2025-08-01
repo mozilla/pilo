@@ -62,17 +62,14 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
   });
 
 const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
-  "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
-  "extractedData": "REQUIRED: Extract any data that helps with your task. For navigation/action tasks: navigation options, form fields, error messages, loading states, menu items, search suggestions, requirements, restrictions. For research tasks: capture detailed information like facts, figures, quotes, sources, dates, prices, specifications, comparisons, pros/cons - enough detail to provide a comprehensive final answer. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items for navigation tasks, more detail for research tasks. If no task-related data is available, use: 'No task related data.'",
-  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Comment on any important data that should be extracted from the current page state.",
+  "observation": "Brief assessment of previous step's outcome and reasoning for your next action. Was it a success or failure? Comment on any important data that should be extracted from the current page state. Focus on what you can see on the current page and what you need to accomplish. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final result. Completing one step or visiting one source is NOT the end of the task.{% if hasGuardrails %} Your actions MUST COMPLY with the provided guardrails.{% endif %} If the previous action failed, retry once then try an alternative approach. If you see modals, popups, or overlays blocking your view, close them first. IMPORTANT: If a planned step isn't possible (e.g., filters don't exist), adapt and work with what's available on the page instead of repeatedly trying the same approach.",
   "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
-  "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{% if hasGuardrails %} Your actions MUST COMPLY with the provided guardrails.{% endif %} If the previous action failed, retry once then try an alternative approach.",
   "action": {
-    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, done",
-    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
-    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, plain text final answer for done"
+    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, extract, done",
+    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/extract/done)",
+    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, plain text task result for done. For extract, describe what data you want to extract from the page."
   },
-  "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
+  "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option', 'Extracting recipe data'"
 }`);
 
 const actionLoopPromptTemplate = buildPromptTemplate(
@@ -96,7 +93,8 @@ Actions:
 - "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
 - "back": Go to previous page
 - "forward": Go to next page
-- "done": The ENTIRE task is complete - ONLY use when you have fully completed the task and are ready to provide a comprehensive final answer that synthesizes ALL the data you extracted during this session. This is NOT for marking individual steps complete.
+- "extract": Extract specific data from the current page (value=description of what to extract)
+- "done": The ENTIRE task is complete - ONLY use when you have fully completed the task and are ready to provide a comprehensive task result that synthesizes ALL the data you extracted during this session. This is NOT for marking individual steps complete.
 
 Rules:
 1. Use refs from page snapshot (e.g., [ref=s1e33])
@@ -117,15 +115,15 @@ Best Practices:
 - Focus on direct interaction with elements needed for your task
 {% if hasGuardrails %}- Before taking any action, verify it does not violate the guardrails{% endif %}
 
-**FINAL ANSWER REQUIREMENTS (for "done" action):**
-When you use the "done" action, your value field MUST contain a comprehensive final answer that:
+**TASK RESULT REQUIREMENTS (for "done" action):**
+When you use the "done" action, your value field MUST contain a comprehensive task result that:
 - Is written in plain text format
 - Synthesizes ALL data you extracted during this session
 - Uses ONLY information you actually found and recorded on the pages you visited
 - Provides clear results based on the data you collected
 - Includes relevant details from your web interactions and observations
 - Does NOT include external knowledge or assumptions beyond what you found during the task
-- Should be written as if responding directly to the user's original task request
+- Should be written as if delivering the completed task to the user
 
 ${jsonOnlyInstruction}
 
@@ -198,7 +196,7 @@ The snapshot above contains the entire page content - you can see everything wit
 Assess the current state and choose your next action.
 Focus on the most relevant elements that help complete your task.
 If content appears dynamic or paginated, consider waiting or exploring navigation options.
-If an action has failed twice, try something else or move on.
+If an action has failed or a planned step isn't possible, adapt your approach and work with what's actually available on the page. Do not keep trying the same action repeatedly - be flexible and find alternative ways to accomplish your goal.
 {% if hasScreenshot %}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
 `.trim(),
 );
@@ -230,11 +228,11 @@ Please correct your response to match this exact format:
 Remember:
 - "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
 - "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "extractedData" is REQUIRED - extract actionable information from every page. For navigation tasks: UI elements, options, requirements. For research tasks: detailed facts, figures, quotes, sources, specifications - capture enough detail for a comprehensive final answer. If no task-related data is available, use: 'No task related data.'
 - For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
-- For "fill", "select", "goto" actions, you MUST provide a "value"
+- For "fill", "select", "goto", "extract" actions, you MUST provide a "value"
 - For "wait" action, you MUST provide a "value" with the number of seconds
-- For "done" action, you MUST provide a "value" with a plain text final answer following the FINAL ANSWER REQUIREMENTS
+- For "extract" action, you MUST provide a "value" describing what data to extract
+- For "done" action, you MUST provide a "value" with a plain text task result following the TASK RESULT REQUIREMENTS
 - For "back" and "forward" actions, you must NOT provide a "ref" or "value"
 {% if hasGuardrails %}
 - ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
@@ -254,35 +252,26 @@ export const buildStepValidationFeedbackPrompt = (
 
 const taskValidationTemplate = buildPromptTemplate(
   `
-Review the task completion and determine if it was successful by analyzing both the final answer and the conversation that led to it.
+Evaluate how well the task result accomplishes what the user requested. Focus on task completion, not process.
+Be concise in your response.
 
 Task: {{ task }}
-Final Answer: {{ finalAnswer }}
-
-Conversation History:
-{{ conversationHistory }}
-
-Analyze the task completion using these quality levels:
-- **failed**: Task not completed or completed incorrectly
-- **partial**: Some objectives met but task incomplete or has significant issues  
-- **complete**: Task fully completed as requested with acceptable approach
-- **excellent**: Task completed efficiently with optimal approach and high quality result
+Result: {{ finalAnswer }}
 
 Evaluation criteria:
-1. Does the final answer directly address the task?
-2. Is the answer complete and specific enough?
-3. Did the agent perform the requested action or provide the requested information?
-4. Was the approach reasonable and efficient?
-5. Are there any significant errors or omissions?
+- **failed**: Task not completed or result doesn't accomplish what was requested
+- **partial**: Task partially completed but result is missing key elements  
+- **complete**: Task fully completed and result accomplishes what was requested
+- **excellent**: Task completed exceptionally well with valuable additional elements
+
+Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
 
 ${jsonOnlyInstruction}
-
-Respond with a JSON object matching this exact structure:
 \`\`\`json
 {
-  "observation": "Analyze how the agent approached the task: sequence of actions taken, appropriateness of actions, reasoning quality, and whether the agent worked efficiently toward the goal or got sidetracked.",
+  "taskAssessment": "Does the result accomplish what the user requested? Focus on task completion, not how it was done.",
   "completionQuality": "failed|partial|complete|excellent",
-  "feedback": "If quality is not 'complete' or 'excellent', provide specific, actionable guidance on what the agent should do to fix or improve the current task. Give concrete steps, strategies, or approaches the agent should take right now to complete the task successfully. Focus on actionable improvements for the current situation, not just what could have been better. If quality is 'complete' or 'excellent', this field is optional."
+  "feedback": "Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done."
 }
 \`\`\`
 `.trim(),
@@ -297,6 +286,24 @@ export const buildTaskValidationPrompt = (
     task,
     finalAnswer,
     conversationHistory,
+  });
+
+const extractionPromptTemplate = buildPromptTemplate(
+  `
+Extract this data from this page content:
+{{ extractionDescription }}
+
+Page Content (Markdown):
+{{ markdown }}
+
+Extract only the requested data in simple, compact json.
+`.trim(),
+);
+
+export const buildExtractionPrompt = (extractionDescription: string, markdown: string): string =>
+  extractionPromptTemplate({
+    extractionDescription,
+    markdown,
   });
 
 function getCurrentFormattedDate() {
