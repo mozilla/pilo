@@ -16,7 +16,9 @@ export const planAndUrlSchema = z.object({
 
 // Schema for the action loop responses
 export const actionSchema = z.object({
-  observation: z.string().describe("Assessment of previous step outcome and reasoning for next action"),
+  observation: z
+    .string()
+    .describe("Assessment of previous step outcome and reasoning for next action"),
   observationStatusMessage: z.string().describe("Short friendly message about observation"),
   action: z
     .object({
@@ -59,3 +61,132 @@ export function getActionSchemaFieldOrder(): (keyof Action)[] {
   // Extract keys from the schema shape in definition order
   return Object.keys(actionSchema.shape) as (keyof Action)[];
 }
+
+// Function call schemas for web actions
+export const webActionFunctions = {
+  click: {
+    name: "click",
+    description: "Click on an element on the page",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  fill: {
+    name: "fill",
+    description: "Fill text into an input field",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+      value: z.string().describe("Text to enter into the field"),
+    }),
+  },
+
+  select: {
+    name: "select",
+    description: "Select an option from a dropdown",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+      value: z.string().describe("Option to select"),
+    }),
+  },
+
+  hover: {
+    name: "hover",
+    description: "Hover over an element",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  check: {
+    name: "check",
+    description: "Check a checkbox",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  uncheck: {
+    name: "uncheck",
+    description: "Uncheck a checkbox",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  focus: {
+    name: "focus",
+    description: "Focus on an element",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  enter: {
+    name: "enter",
+    description: "Press Enter key on an element (useful for form submission)",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+    }),
+  },
+
+  wait: {
+    name: "wait",
+    description: "Wait for a specified number of seconds",
+    parameters: z.object({
+      seconds: z.number().describe("Number of seconds to wait"),
+    }),
+  },
+
+  goto: {
+    name: "goto",
+    description: "Navigate to a URL that was previously seen in the conversation",
+    parameters: z.object({
+      url: z.string().describe("URL to navigate to (must be previously seen)"),
+    }),
+  },
+
+  back: {
+    name: "back",
+    description: "Go back to the previous page",
+    parameters: z.object({}),
+  },
+
+  forward: {
+    name: "forward",
+    description: "Go forward to the next page",
+    parameters: z.object({}),
+  },
+
+  extract: {
+    name: "extract",
+    description: "Extract specific data from the current page",
+    parameters: z.object({
+      description: z.string().describe("Description of what data to extract"),
+    }),
+  },
+
+  done: {
+    name: "done",
+    description:
+      "Mark the entire task as complete with final results that directly address ALL parts of the original task",
+    parameters: z.object({
+      result: z
+        .string()
+        .describe(
+          "A summary of the steps you took to complete the task and the final results that directly address ALL parts of the original task",
+        ),
+    }),
+  },
+};
+
+// Convert function definitions to tools format for AI SDK
+export const webActionTools = Object.fromEntries(
+  Object.entries(webActionFunctions).map(([key, func]) => [
+    key,
+    {
+      description: func.description,
+      parameters: func.parameters,
+    },
+  ]),
+);

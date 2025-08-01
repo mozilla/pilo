@@ -9,7 +9,8 @@
  * 3. Validates task completion and retries if needed
  */
 
-import { generateObject, streamObject, LanguageModel } from "ai";
+import { generateObject, streamObject, generateText, LanguageModel } from "ai";
+import { writeFileSync } from "fs";
 import {
   buildActionLoopPrompt,
   buildPlanPrompt,
@@ -24,17 +25,16 @@ import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
   planSchema,
   planAndUrlSchema,
-  actionSchema,
   Action,
   taskValidationSchema,
   TaskValidationResult,
   getActionSchemaFieldOrder,
+  webActionTools,
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import { nanoid } from "nanoid";
-import { z } from "zod";
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -521,13 +521,13 @@ export class WebAgent {
   }
 
   /**
-   * Generate the next action to take based on current page state
+   * Generate the next action using function calling based on current page state
    *
    * This is the core decision-making method that:
    * 1. Compresses the page snapshot to reduce token usage
    * 2. Updates the conversation with current page state
-   * 3. Asks the LLM to decide what action to take next
-   * 4. Validates the response and retries if needed
+   * 3. Uses function calling to let the LLM decide what action to take
+   * 4. Converts function calls back to Action format for compatibility
    *
    * @param pageSnapshot - Raw aria tree snapshot of the current page
    * @param retryCount - Number of validation retry attempts (for error handling)
@@ -563,15 +563,18 @@ export class WebAgent {
       this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
     }
 
-    // Ask the LLM to analyze the page and decide on the next action
+    // Use function calling to get the next action
     const response = await this.withProcessingEvents(
       "Planning next action",
-      () => this.generateStreamingActionResponse(actionSchema, this.messages),
+      () => this.generateFunctionCallResponse(this.messages),
       this.vision,
     );
 
-    // Validate the LLM response to ensure it's properly formatted and actionable
-    const { isValid, errors } = this.validateActionResponse(response);
+    // Convert function call to Action format for compatibility
+    const action = this.convertFunctionCallToAction(response);
+
+    // Validate the converted action
+    const { isValid, errors } = this.validateFunctionCallAction(action);
 
     if (!isValid) {
       // Emit validation error event for logging
@@ -593,7 +596,7 @@ export class WebAgent {
       return this.generateNextAction(pageSnapshot, retryCount + 1);
     }
 
-    return response;
+    return action;
   }
 
   /**
@@ -664,6 +667,7 @@ export class WebAgent {
       role: "assistant",
       content: JSON.stringify(response),
     });
+    this.logConversation();
   }
 
   /**
@@ -674,6 +678,33 @@ export class WebAgent {
       role: "user",
       content,
     });
+    this.logConversation();
+  }
+
+  /**
+   * Log the full conversation to a timestamped file for debugging
+   */
+  private logConversation(): void {
+    if (!this.DEBUG) return;
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const filename = `conversation-${timestamp}.json`;
+
+      const conversationData = {
+        timestamp: new Date().toISOString(),
+        currentIteration: this.currentIterationId,
+        messageCount: this.messages.length,
+        messages: this.messages
+      };
+
+      writeFileSync(filename, JSON.stringify(conversationData, null, 2));
+      console.log(`📝 Conversation logged to: ${filename}`);
+      console.log(`📁 Current working directory: ${process.cwd()}`);
+    } catch (error) {
+      console.warn("Failed to log conversation:", error);
+      console.warn("Error details:", error);
+    }
   }
 
   /**
@@ -928,6 +959,219 @@ export class WebAgent {
   }
 
   /**
+   * Generate function call response using AI SDK (but treat it like structured JSON)
+   * We use function calling purely for better response conformity, not for actual function calling conversation
+   */
+  protected async generateFunctionCallResponse(messages: any[]): Promise<any> {
+    // Create a clean messages array without any function call artifacts that might confuse the AI
+    const cleanMessages = messages.map((msg) => {
+      if (msg.role === "assistant" && msg.tool_calls) {
+        // Remove tool_calls from assistant messages to keep conversation clean
+        return {
+          role: msg.role,
+          content: msg.content || "Action taken",
+        };
+      }
+      return msg;
+    });
+
+    const config = {
+      model: this.provider,
+      messages: cleanMessages,
+      tools: webActionTools,
+      toolChoice: "required" as const,
+      temperature: 0,
+      maxToolRoundtrips: 0, // Prevent multiple function calls in one response
+      providerOptions: {
+        openrouter: {
+          reasoning: {
+            max_tokens: 500,
+            exclude: false,
+          },
+        },
+      },
+    };
+
+    // Add AbortSignal if provided
+    const finalConfig = this.abortSignal 
+      ? { ...config, abortSignal: this.abortSignal }  
+      : config;
+
+    try {
+      const response = await generateText(finalConfig);
+
+
+      // Emit events for the function call
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        const toolCall = response.toolCalls[0];
+        // Properly handle union types based on function name
+        let ref: string | undefined;
+        let value: string | number | undefined;
+        
+        switch (toolCall.toolName) {
+          case 'click':
+          case 'hover':
+          case 'check':
+          case 'uncheck':
+          case 'focus':
+          case 'enter':
+            ref = (toolCall.args as { ref: string }).ref;
+            break;
+          case 'fill':
+          case 'select':
+            ref = (toolCall.args as { ref: string; value: string }).ref;
+            value = (toolCall.args as { ref: string; value: string }).value;
+            break;
+          case 'wait':
+            value = (toolCall.args as { seconds: number }).seconds;
+            break;
+          case 'goto':
+            value = (toolCall.args as { url: string }).url;
+            break;
+          case 'extract':
+            value = (toolCall.args as { description: string }).description;
+            break;
+          case 'done':
+            value = (toolCall.args as { result: string }).result;
+            break;
+        }
+        
+        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+          action: toolCall.toolName,
+          ref,
+          value,
+        });
+      }
+
+      this.emit(WebAgentEventType.AI_GENERATION, {
+        prompt: undefined,
+        schema: undefined,
+        messages: cleanMessages,
+        temperature: 0,
+        object: response.toolCalls?.[0] || null,
+        finishReason: response.finishReason,
+        usage: response.usage,
+        warnings: (response as any).warnings,
+        providerMetadata: (response as any).providerMetadata,
+      });
+
+      return response;
+    } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI function call request was cancelled");
+      }
+
+      if (error instanceof Error) {
+        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+          error: error.message,
+          prompt: undefined,
+          schema: undefined,
+          messages: cleanMessages,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Convert function call response to Action format for compatibility
+   */
+  protected convertFunctionCallToAction(response: any): Action {
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      throw new Error("No function call found in response");
+    }
+
+    if (response.toolCalls.length > 1) {
+      console.warn(`⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`);
+    }
+
+    const toolCall = response.toolCalls[0];
+    const functionName = toolCall.toolName;
+
+    // Function names now match PageAction enum exactly - no mapping needed
+    const action = functionName as PageAction;
+
+    // Convert arguments to the expected format based on function type
+    let ref: string | undefined;
+    let value: string | undefined;
+
+    switch (functionName) {
+      case 'click':
+      case 'hover':
+      case 'check':
+      case 'uncheck':
+      case 'focus':
+      case 'enter':
+        ref = (toolCall.args as { ref: string }).ref;
+        break;
+      case 'fill':
+      case 'select':
+        ref = (toolCall.args as { ref: string; value: string }).ref;
+        value = (toolCall.args as { ref: string; value: string }).value;
+        break;
+      case 'wait':
+        value = String((toolCall.args as { seconds: number }).seconds);
+        break;
+      case 'goto':
+        value = (toolCall.args as { url: string }).url;
+        break;
+      case 'extract':
+        value = (toolCall.args as { description: string }).description;
+        break;
+      case 'done':
+        value = (toolCall.args as { result: string }).result;
+        break;
+      case 'back':
+      case 'forward':
+        // No args needed
+        break;
+      default:
+        throw new Error(`Unhandled function: ${functionName}`);
+    }
+
+    // Use the reasoning text if available, otherwise fall back to regular text
+    const thinkingText = response.reasoning || response.text || "Function call executed";
+    
+    // Emit the observation event for logging
+    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
+    
+    return {
+      observation: thinkingText,
+      observationStatusMessage: "Action planned", 
+      action: {
+        action,
+        ref,
+        value,
+      },
+      actionStatusMessage: "Executing action",
+    };
+  }
+
+
+  /**
+   * Validate function call action for basic requirements
+   */
+  protected validateFunctionCallAction(action: Action): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Validate that we have an action
+    if (!action.action?.action) {
+      errors.push("Missing action");
+      return { isValid: false, errors };
+    }
+
+    // Use existing validation logic for the action object
+    const actionErrors = this.validateActionObject(action.action);
+    errors.push(...actionErrors);
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
    * Centralized AI generation with consistent configuration
    */
   protected async generateAIResponse<T>(
@@ -1126,21 +1370,25 @@ export class WebAgent {
         content: textContent,
       });
     }
+
+    // Log conversation after adding page snapshot
+    this.logConversation();
   }
 
   private addValidationErrorFeedback(errors: string[], response: any) {
     const hasGuardrails = !!this.guardrails;
+    // Add the attempted response to conversation, then the error feedback
     this.addAssistantMessage(response);
     this.addUserMessage(buildStepValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
   }
 
   private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
+    // Add the task completion attempt, then feedback about quality
     this.addAssistantMessage(result);
     this.addUserMessage(
       `Task completion quality: ${validationResult.completionQuality}. ${validationResult.feedback} Please continue working on the task.`,
     );
   }
-
 
   protected async executeAction(result: any): Promise<boolean> {
     try {
@@ -1174,7 +1422,7 @@ export class WebAgent {
             throw new Error("Missing extraction description for extract action");
           }
           const extractedData = await this.extractDataFromPage(result.action.value);
-          
+
           // Store the extracted data so we can add it to conversation history
           (result as any).extractedData = extractedData;
           break;
@@ -1215,13 +1463,15 @@ export class WebAgent {
 
   private recordActionResult(result: any, actionSuccess: boolean) {
     if (actionSuccess) {
+      // Add the action result to conversation history in our normal format
+      // This maintains our existing conversation flow while using function calls for format
       this.addAssistantMessage(result);
-      
+
       // For extract actions, also add the extracted data to conversation history
       if (result.action.action === "extract" && result.extractedData) {
         this.addUserMessage(`Extraction result: ${result.extractedData}`);
       }
-      
+
       this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, { success: true });
     } else {
       this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
@@ -1237,31 +1487,31 @@ export class WebAgent {
 
   /**
    * Extracts data from the current page using clean markdown representation
-   * 
+   *
    * @param extractionDescription - Description of what data to extract
    * @returns The extracted data
    */
   private async extractDataFromPage(extractionDescription: string): Promise<string> {
     if (!this.browser) throw new Error("Browser not started");
-    
+
     try {
       // Get the page content as clean markdown
       const markdown = await this.browser.getMarkdown();
-      
+
       // Create extraction prompt using the template
       const extractionPrompt = buildExtractionPrompt(extractionDescription, markdown);
 
-      // Use AI to extract the data
-      const result = await this.generateAIResponse<{ extractedData: string }>(
-        z.object({
-          extractedData: z.string().describe("The extracted data in a clear, structured format")
-        }),
-        { prompt: extractionPrompt, maxTokens: 1000 }
-      );
-      
-      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: result.extractedData });
-      
-      return result.extractedData;
+      // Use simple text generation for extraction (more reliable for smaller models)
+      const response = await generateText({
+        model: this.provider,
+        prompt: extractionPrompt,
+        maxTokens: 1000,
+        temperature: 0,
+      });
+
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: response.text });
+
+      return response.text;
     } catch (error) {
       const errorMsg = `Failed to extract data: ${error instanceof Error ? error.message : String(error)}`;
       this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: errorMsg });

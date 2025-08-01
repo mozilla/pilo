@@ -61,83 +61,66 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
     guardrails,
   });
 
-const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
-  "observation": "Brief assessment of previous step's outcome and reasoning for your next action. Was it a success or failure? Comment on any important data that should be extracted from the current page state. Focus on what you can see on the current page and what you need to accomplish. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final result. Completing one step or visiting one source is NOT the end of the task.{% if hasGuardrails %} Your actions MUST COMPLY with the provided guardrails.{% endif %} If the previous action failed, retry once then try an alternative approach. If you see modals, popups, or overlays blocking your view, close them first. IMPORTANT: If a planned step isn't possible (e.g., filters don't exist), adapt and work with what's available on the page instead of repeatedly trying the same approach.",
-  "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
-  "action": {
-    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, extract, done",
-    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/extract/done)",
-    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, plain text task result for done. For extract, describe what data you want to extract from the page."
-  },
-  "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option', 'Extracting recipe data'"
-}`);
+// Function calling approach - no longer need response format template
 
 const actionLoopPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
-For each step, assess the current state and decide on the next action to take.
-Consider the outcome of previous actions and explain your reasoning.
+
+Think through the current page state and decide what action to take next. Consider the outcome of previous actions and your reasoning for the next step.
+
+Remember: When you complete the task with done(), ensure your result fully accomplishes what the user requested.
 {% if hasGuardrails %}
 🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
 {% endif %}
 
-Actions:
-- "select": Select option from dropdown (ref=element reference, value=option)
-- "fill": Enter text into field (ref=element reference, value=text)
-- "click": Click element (ref=element reference)
-- "hover": Hover over element (ref=element reference)
-- "check": Check checkbox (ref=element reference)
-- "uncheck": Uncheck checkbox (ref=element reference)
-- "enter": Press Enter key on element (ref=element reference) - useful for submitting forms
-- "wait": Wait for specified time (value=seconds)
-- "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
-- "back": Go to previous page
-- "forward": Go to next page
-- "extract": Extract specific data from the current page (value=description of what to extract)
-- "done": The ENTIRE task is complete - ONLY use when you have fully completed the task and are ready to provide a comprehensive task result that synthesizes ALL the data you extracted during this session. This is NOT for marking individual steps complete.
+Available Functions:
+- click(ref): Click on an element
+- fill(ref, value): Enter text into a field
+- select(ref, value): Select option from dropdown
+- hover(ref): Hover over an element
+- check(ref): Check a checkbox
+- uncheck(ref): Uncheck a checkbox  
+- focus(ref): Focus on an element
+- enter(ref): Press Enter key (useful for form submission)
+- wait(seconds): Wait for specified time
+- goto(url): Navigate to a PREVIOUSLY SEEN URL only
+- back(): Go to previous page
+- forward(): Go to next page
+- extract(description): Extract specific data from current page
+- done(result): Mark task as complete with comprehensive results
 
 Rules:
-1. Use refs from page snapshot (e.g., [ref=s1e33])
-2. Perform only one action per step
-3. After each action, you'll receive an updated page snapshot
-4. You MUST complete ALL steps in your plan before using "done" - continue working through each step
-5. "done" means the ENTIRE task is finished - see FINAL ANSWER REQUIREMENTS below
-6. Use "wait" for page loads, animations, or dynamic content
-7. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
-{% if hasGuardrails %}8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION{% endif %}
+1. Use element refs from page snapshot (e.g., s1e33)
+2. Call EXACTLY ONE function per turn - never call multiple functions or repeat the same function
+3. You MUST complete ALL steps in your plan before using done()
+4. done() means the ENTIRE task is finished with comprehensive results
+5. goto() can ONLY use URLs that appeared earlier in this conversation
+6. Use wait() for page loads, animations, or dynamic content
+{% if hasGuardrails %}7. ALL ACTIONS MUST COMPLY with the provided guardrails{% endif %}
+
+IMPORTANT: Call one function only, then stop. Do not repeat or duplicate function calls.
 
 Best Practices:
-- You can see the entire page content - do not scroll or click links just to navigate within the page
-- Always close any open modals, popups, or overlays that might obstruct your view or task completion
-- Use click instead of goto whenever possible, especially for navigation elements on the page
-- For forms, click the submit button after filling all fields
-- If an element isn't found, try looking for alternative elements
-- Focus on direct interaction with elements needed for your task
-{% if hasGuardrails %}- Before taking any action, verify it does not violate the guardrails{% endif %}
+- You can see the entire page content - no need to scroll or navigate within the page
+- Close any modals, popups, or overlays that obstruct your view
+- Use click() instead of goto() for navigation elements on the page
+- For forms, use enter() or click the submit button after filling fields
+- If an element isn't found, look for alternative elements
+- Adapt if planned steps aren't possible - work with what's available
+{% if hasGuardrails %}- Verify each action complies with guardrails before calling the function{% endif %}
 
-**TASK RESULT REQUIREMENTS (for "done" action):**
-When you use the "done" action, your value field MUST contain a comprehensive task result that:
-- Is written in plain text format
-- Synthesizes ALL data you extracted during this session
-- Uses ONLY information you actually found and recorded on the pages you visited
-- Provides clear results based on the data you collected
-- Includes relevant details from your web interactions and observations
-- Does NOT include external knowledge or assumptions beyond what you found during the task
-- Should be written as if delivering the completed task to the user
-
-${jsonOnlyInstruction}
-
-Respond with a JSON object matching this exact structure:
-\`\`\`json
-{{ actionLoopResponseFormat }}
-\`\`\`
+When using done():
+- The result should be a summary of the steps you took to complete the task
+- The result should reassure the user that you carefully followed their request
+- The result should be thorough and include all the information requested in the task
+- If the task included criteria, you should mention specific details of how you met those criteria
 `.trim(),
 );
 
 const buildActionLoopPrompt = (hasGuardrails: boolean) =>
   actionLoopPromptTemplate({
     hasGuardrails,
-    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
   });
 
 export const actionLoopPrompt = buildActionLoopPrompt(false);
@@ -216,26 +199,18 @@ export const buildPageSnapshotPrompt = (
 
 const stepValidationFeedbackTemplate = buildPromptTemplate(
   `
-Your previous response did not match the required format. Here are the validation errors:
+Your previous function call had validation errors:
 
 {{ validationErrors }}
 
-Please correct your response to match this exact format:
-\`\`\`json
-{{ actionLoopResponseFormat }}
-\`\`\`
-
-Remember:
-- "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
-- For "fill", "select", "goto", "extract" actions, you MUST provide a "value"
-- For "wait" action, you MUST provide a "value" with the number of seconds
-- For "extract" action, you MUST provide a "value" describing what data to extract
-- For "done" action, you MUST provide a "value" with a plain text task result following the TASK RESULT REQUIREMENTS
-- For "back" and "forward" actions, you must NOT provide a "ref" or "value"
+Please call the correct function with valid parameters. Remember:
+- Use element refs from the page snapshot (format: s1e23)
+- Functions requiring refs: click, fill, select, hover, check, uncheck, focus, enter
+- Functions requiring values: fill, select, wait, goto, extract, done
+- goto() can only use URLs that appeared earlier in the conversation
+- wait() requires a numeric value
 {% if hasGuardrails %}
-- ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+- ALL FUNCTION CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 `.trim(),
 );
@@ -246,7 +221,6 @@ export const buildStepValidationFeedbackPrompt = (
 ) =>
   stepValidationFeedbackTemplate({
     validationErrors,
-    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
     hasGuardrails,
   });
 
