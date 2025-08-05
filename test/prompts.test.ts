@@ -134,7 +134,7 @@ describe("prompts", () => {
         "You are an expert at completing tasks using a web browser",
       );
       // Verify function call instruction is included
-      expect(actionLoopPrompt).toContain("Call one function only");
+      expect(actionLoopPrompt).toContain("Call exactly one function with the required parameters");
     });
 
     it("should list all available actions", () => {
@@ -158,8 +158,8 @@ describe("prompts", () => {
     });
 
     it("should include function call format instructions", () => {
-      expect(actionLoopPrompt).toContain("Call one function only");
-      expect(actionLoopPrompt).toContain("Do not repeat or duplicate function calls");
+      expect(actionLoopPrompt).toContain("Call exactly one function with the required parameters");
+      expect(actionLoopPrompt).toContain("Use valid JSON format for all arguments");
       expect(actionLoopPrompt).toContain("Call EXACTLY ONE function per turn");
     });
 
@@ -169,7 +169,7 @@ describe("prompts", () => {
     });
 
     it("should include goto restrictions", () => {
-      expect(actionLoopPrompt).toContain("PREVIOUSLY SEEN URL");
+      expect(actionLoopPrompt).toContain("only previously seen URLs");
       expect(actionLoopPrompt).toContain("goto() can ONLY use URLs");
     });
   });

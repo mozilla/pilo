@@ -19,6 +19,7 @@ import {
   buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
   buildExtractionPrompt,
+  buildFunctionCallErrorPrompt,
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
@@ -467,7 +468,33 @@ export class WebAgent {
     );
 
     // Convert function call to Action format for compatibility
-    const action = this.convertFunctionCallToAction(response);
+    let action: Action;
+    try {
+      action = this.convertFunctionCallToAction(response);
+    } catch (error) {
+      // Handle "No function call found" as a validation error that can be retried
+      if (error instanceof Error && error.message.includes("No function call found")) {
+        // Emit validation error event for logging
+        this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+          errors: [error.message],
+          retryCount,
+          rawResponse: response,
+        });
+
+        if (retryCount >= MAX_RETRY_ATTEMPTS) {
+          throw new Error(
+            `Failed to get valid response after ${
+              retryCount + 1
+            } attempts. Error: ${error.message}`,
+          );
+        }
+
+        // The feedback message was already added in convertFunctionCallToAction
+        return this.generateNextAction(pageSnapshot, retryCount + 1);
+      }
+      // Re-throw other errors
+      throw error;
+    }
 
     // Validate the converted action
     const { isValid, errors } = this.validateFunctionCallAction(action);
@@ -975,6 +1002,11 @@ export class WebAgent {
    */
   protected convertFunctionCallToAction(response: ToolCallResponse): Action {
     if (!response.toolCalls || response.toolCalls.length === 0) {
+      // Extract the reasoning text from the response to provide context
+      const reasoningText = response.text || response.reasoning || "No reasoning provided";
+
+      // Add structured feedback using the dedicated prompt template
+      this.addUserMessage(buildFunctionCallErrorPrompt(reasoningText));
       throw new Error("No function call found in response");
     }
 
@@ -1687,6 +1719,11 @@ export class WebAgent {
       // Safety check: prevent infinite loops
       state.currentIteration++;
       if (state.currentIteration > this.maxIterations) {
+        this.emit(WebAgentEventType.TASK_COMPLETED, {
+          finalAnswer: `Task stopped after reaching maximum iterations (${this.maxIterations})`,
+          success: false,
+        });
+        state.finalAnswer = `Task stopped after reaching maximum iterations (${this.maxIterations})`;
         break;
       }
 
@@ -1698,6 +1735,13 @@ export class WebAgent {
           return loopResult;
         }
       } catch (error) {
+        // Emit error details before handling
+        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+          error: `Main loop iteration failed: ${error instanceof Error ? error.message : String(error)}`,
+          iterationId: this.currentIterationId,
+          currentIteration: state.currentIteration,
+        });
+
         const errorResult = this.handleMainLoopError(error);
         if (errorResult.shouldExit) {
           state.finalAnswer = errorResult.finalAnswer ?? null;
@@ -1781,14 +1825,31 @@ export class WebAgent {
           (error.message.includes("cancelled") || error.message.includes("aborted"))));
 
     if (isCancellation) {
+      this.emit(WebAgentEventType.TASK_COMPLETED, {
+        finalAnswer: "Task cancelled",
+        success: false,
+      });
       return { shouldExit: true, finalAnswer: "Task cancelled" };
     }
 
+    // Log the full error details for debugging
+    console.error("❌ Main loop error:", error);
+    if (error instanceof Error) {
+      console.error("Error stack:", error.stack);
+    }
+
+    const errorMessage = `Task failed due to AI generation error: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+
+    this.emit(WebAgentEventType.TASK_COMPLETED, {
+      finalAnswer: errorMessage,
+      success: false,
+    });
+
     return {
       shouldExit: true,
-      finalAnswer: `Task failed due to AI generation error: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      finalAnswer: errorMessage,
     };
   }
 

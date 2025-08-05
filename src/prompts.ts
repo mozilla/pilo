@@ -9,8 +9,27 @@ You adapt to situations and find creative ways to complete tasks without getting
 IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
 `.trim();
 
+// Shared function examples with proper JSON syntax
+const functionExamples = `
+- click({"ref": "s1e33"}) - Click on an element
+- fill({"ref": "s1e33", "value": "text"}) - Enter text into a field  
+- fill_and_enter({"ref": "s1e33", "value": "text"}) - Fill and press Enter
+- select({"ref": "s1e33", "value": "option"}) - Select from dropdown
+- hover({"ref": "s1e33"}) - Hover over element
+- check({"ref": "s1e33"}) - Check checkbox
+- uncheck({"ref": "s1e33"}) - Uncheck checkbox
+- focus({"ref": "s1e33"}) - Focus on element  
+- enter({"ref": "s1e33"}) - Press Enter key
+- wait({"seconds": 3}) - Wait for specified time
+- goto({"url": "https://example.com"}) - Navigate to URL (only previously seen URLs)
+- back() - Go to previous page
+- forward() - Go to next page
+- extract({"description": "data to extract"}) - Extract data from current page
+- done({"result": "your final answer"}) - Complete the task
+`.trim();
+
 const functionCallInstruction =
-  "IMPORTANT: Call exactly one function with the required parameters. Use valid JSON format for all arguments. Do not repeat or duplicate JSON objects or function calls.";
+  "Call exactly one function with the required parameters. Use valid JSON format for all arguments.";
 
 /**
  * Planning Prompt Template
@@ -52,8 +71,6 @@ Best Practices:
 {% if startingUrl %}- Use the provided starting URL as your starting point for the task.{% endif %}
 {% if guardrails %}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{% endif %}
 
-${functionCallInstruction}
-
 {% if includeUrl %}
 Call create_plan_with_url() with:
 - explanation: Restate the task concisely in your own words, focusing on the core objective
@@ -64,6 +81,8 @@ Call create_plan() with:
 - explanation: Restate the task concisely in your own words, focusing on the core objective  
 - plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
 {% endif %}
+
+${functionCallInstruction}
 `.trim(),
 );
 
@@ -122,21 +141,7 @@ Remember: When you complete the task with done(), ensure your result fully accom
 {% endif %}
 
 Available Functions:
-- click(ref): Click on an element
-- fill(ref, value): Enter text into a field
-- fill_and_enter(ref, value): Fill text and press Enter (useful for search boxes)
-- select(ref, value): Select option from dropdown
-- hover(ref): Hover over an element
-- check(ref): Check a checkbox
-- uncheck(ref): Uncheck a checkbox  
-- focus(ref): Focus on an element
-- enter(ref): Press Enter key (useful for form submission)
-- wait(seconds): Wait for specified time
-- goto(url): Navigate to a PREVIOUSLY SEEN URL only
-- back(): Go to previous page
-- forward(): Go to next page
-- extract(description): Extract specific data from current page
-- done(result): Mark task as complete with comprehensive results
+{{ functionExamples }}
 
 Rules:
 1. Use element refs from page snapshot (e.g., s1e33)
@@ -147,7 +152,10 @@ Rules:
 6. Use wait() for page loads, animations, or dynamic content
 {% if hasGuardrails %}7. ALL ACTIONS MUST COMPLY with the provided guardrails{% endif %}
 
-IMPORTANT: Call one function only with valid JSON arguments, then stop. Do not repeat or duplicate function calls or JSON objects.
+**CRITICAL: You MUST call exactly ONE function with valid arguments on EVERY turn. Never provide text-only responses.**
+- If you think the task is complete, you must call done(result)
+- If you need to take an action, call the appropriate function
+- If you're unsure, call extract() to gather more information
 
 Best Practices:
 - You can see the entire page content - no need to scroll or navigate within the page
@@ -156,6 +164,7 @@ Best Practices:
 - For forms, use enter() or click the submit button after filling fields
 - If an element isn't found, look for alternative elements
 - Adapt if planned steps isn't possible - work with what's available
+- For research tasks: Use extract() to capture data from relevant pages as you discover it - don't wait until the end
 {% if hasGuardrails %}- Verify each action complies with guardrails before calling the function{% endif %}
 
 When using done():
@@ -163,12 +172,17 @@ When using done():
 - The result should reassure the user that you carefully followed their request
 - The result should be thorough and include all the information requested in the task
 - If the task included criteria, you should mention specific details of how you met those criteria
+
+
+Think carefully, then call exactly one appropriate function. Failure to do so will result in an error.
+${functionCallInstruction}
 `.trim(),
 );
 
 const buildActionLoopPrompt = (hasGuardrails: boolean) =>
   actionLoopPromptTemplate({
     hasGuardrails,
+    functionExamples,
   });
 
 export const actionLoopPrompt = buildActionLoopPrompt(false);
@@ -339,6 +353,47 @@ export const buildStepValidationFeedbackPrompt = (
   });
 
 /**
+ * Function Call Error Correction Template
+ *
+ * Used by WebAgent when AI provides reasoning but fails to call any function.
+ * Called from convertFunctionCallToAction() when no function calls are detected.
+ *
+ * Purpose:
+ * - Shows the AI what they said vs what they should do
+ * - Lists all available functions with proper JSON syntax
+ * - Provides specific guidance based on their reasoning text
+ * - Reinforces the requirement to call exactly one function per turn
+ *
+ * Usage in WebAgent:
+ * - Triggered when response.toolCalls is empty
+ * - Includes the AI's reasoning text for context
+ * - Followed by retry attempt in generateNextAction()
+ * - Used in the retry loop before fatal error
+ */
+const functionCallErrorTemplate = buildPromptTemplate(
+  `
+⚠️ FUNCTION CALL ERROR: You provided reasoning but no function call.
+
+Your reasoning: {{ reasoningText }}
+
+You MUST call exactly one function on every turn. Based on your reasoning, choose the appropriate function:
+
+Available Functions:
+{{ functionExamples }}
+
+Call the function that best matches your reasoning.
+
+${functionCallInstruction}
+`.trim(),
+);
+
+export const buildFunctionCallErrorPrompt = (reasoningText: string) =>
+  functionCallErrorTemplate({
+    reasoningText,
+    functionExamples,
+  });
+
+/**
  * Task Validation Template
  *
  * Used by WebAgent to validate task completion quality after AI calls done().
@@ -379,12 +434,12 @@ Evaluation criteria:
 
 Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
 
-${functionCallInstruction}
-
 Call validate_task() with:
 - taskAssessment: Does the result accomplish what the user requested? Focus on task completion, not how it was done
 - completionQuality: Choose from "failed", "partial", "complete", or "excellent" based on evaluation criteria above
 - feedback: Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done
+
+${functionCallInstruction}
 `.trim(),
 );
 
