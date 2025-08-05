@@ -12,6 +12,27 @@ IMPORTANT: You can see the entire page content through the accessibility tree sn
 const functionCallInstruction =
   "IMPORTANT: Call exactly one function with the required parameters. Use valid JSON format for all arguments. Do not repeat or duplicate JSON objects or function calls.";
 
+/**
+ * Planning Prompt Template
+ *
+ * Used by WebAgent during the PLANNING PHASE to generate task execution plans.
+ * Called from generatePlanWithUrl() and generatePlan() methods.
+ *
+ * Purpose:
+ * - Converts natural language tasks into structured step-by-step plans
+ * - Determines optimal starting URLs when not provided by user
+ * - Incorporates guardrails and contextual data into planning
+ *
+ * Usage in WebAgent:
+ * 1. generatePlanWithUrl() - When no starting URL provided, AI chooses best site
+ * 2. generatePlan() - When starting URL is provided, plan is tailored to that site
+ *
+ * Function calls generated:
+ * - create_plan_with_url(): Returns explanation, plan, and starting URL
+ * - create_plan(): Returns explanation and plan (URL already known)
+ *
+ * The plan and explanation are stored in WebAgent state for use throughout execution.
+ */
 const planPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
@@ -65,6 +86,30 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 
 // Function calling approach - no longer need response format template
 
+/**
+ * Action Loop Prompt Template
+ *
+ * Used by WebAgent during the EXECUTION PHASE as the system prompt for action generation.
+ * Called from initializeConversation() to set up the conversation context.
+ *
+ * Purpose:
+ * - Provides the AI with instructions on how to interact with web pages
+ * - Lists all available browser actions (click, fill, navigate, etc.)
+ * - Establishes rules for function calling and task completion
+ * - Integrates guardrails when provided to constrain AI behavior
+ *
+ * Usage in WebAgent:
+ * - Set as the system message in initializeConversation()
+ * - Remains constant throughout the action execution loop
+ * - Works with generateNextAction() to produce appropriate browser actions
+ *
+ * Function calls generated:
+ * - All web action functions: click, fill, select, hover, check, uncheck, focus, enter,
+ *   fill_and_enter, wait, goto, back, forward, extract, done
+ *
+ * This prompt is the core instruction set that guides the AI's decision-making
+ * throughout the entire task execution process.
+ */
 const actionLoopPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
@@ -110,7 +155,7 @@ Best Practices:
 - Use click() instead of goto() for navigation elements on the page
 - For forms, use enter() or click the submit button after filling fields
 - If an element isn't found, look for alternative elements
-- Adapt if planned steps aren't possible - work with what's available
+- Adapt if planned steps isn't possible - work with what's available
 {% if hasGuardrails %}- Verify each action complies with guardrails before calling the function{% endif %}
 
 When using done():
@@ -129,6 +174,26 @@ const buildActionLoopPrompt = (hasGuardrails: boolean) =>
 export const actionLoopPrompt = buildActionLoopPrompt(false);
 export { buildActionLoopPrompt };
 
+/**
+ * Task and Plan Context Template
+ *
+ * Used by WebAgent to provide task context to the AI during action execution.
+ * Called from initializeConversation() as the initial user message.
+ *
+ * Purpose:
+ * - Gives the AI the original task description and generated plan
+ * - Provides current date context for time-sensitive tasks
+ * - Includes any input data provided by the user (JSON format)
+ * - Reinforces guardrails as mandatory requirements
+ *
+ * Usage in WebAgent:
+ * - Added as the first user message in initializeConversation()
+ * - Contains the plan generated during the planning phase
+ * - Includes taskExplanation, plan, data, and guardrails from WebAgent state
+ *
+ * This template connects the planning phase to the execution phase by providing
+ * the AI with all the context it needs to execute the planned actions.
+ */
 const taskAndPlanTemplate = buildPromptTemplate(
   `
 Task: {{ task }}
@@ -167,6 +232,27 @@ export const buildTaskAndPlanPrompt = (
     guardrails,
   });
 
+/**
+ * Page Snapshot Context Template
+ *
+ * Used by WebAgent to provide current page state to the AI for action decisions.
+ * Called from updateMessagesWithSnapshot() during each iteration.
+ *
+ * Purpose:
+ * - Shows the AI the current page content via accessibility tree snapshot
+ * - Provides page title and URL for context
+ * - Includes screenshot when vision mode is enabled
+ * - Guides the AI to focus on actionable elements
+ *
+ * Usage in WebAgent:
+ * - Added as user message before each generateNextAction() call
+ * - Contains compressed page snapshot from compressSnapshot()
+ * - Page snapshots from previous iterations are truncated to save tokens
+ * - Screenshot is included when vision=true in WebAgent options
+ *
+ * This is the primary way the AI "sees" the current state of the web page
+ * and determines what action to take next based on available elements.
+ */
 const pageSnapshotTemplate = buildPromptTemplate(
   `
 This is a complete accessibility tree snapshot of the current page in the browser showing ALL page content.{% if hasScreenshot %} A screenshot is also provided to help you understand the visual layout.{% endif %}
@@ -200,6 +286,30 @@ export const buildPageSnapshotPrompt = (
     hasScreenshot,
   });
 
+/**
+ * Step Validation Feedback Template
+ *
+ * Used by WebAgent to provide error feedback when AI generates invalid actions.
+ * Called from addValidationErrorFeedback() when action validation fails.
+ *
+ * Purpose:
+ * - Informs the AI about specific validation errors in its function calls
+ * - Provides reminders about correct function call formats and requirements
+ * - Guides the AI to retry with corrected parameters
+ * - Reinforces guardrails compliance when applicable
+ *
+ * Usage in WebAgent:
+ * - Triggered when validateFunctionCallAction() detects errors
+ * - Added as user message after the failed assistant response
+ * - Followed by retry attempt with generateNextAction()
+ * - Used in the retry loop (up to MAX_RETRY_ATTEMPTS)
+ *
+ * Function calls expected after this prompt:
+ * - Corrected version of the previously failed function call
+ *
+ * This prompt is critical for the AI's learning loop - it helps the AI
+ * understand what went wrong and how to fix it on subsequent attempts.
+ */
 const stepValidationFeedbackTemplate = buildPromptTemplate(
   `
 Your previous function call had validation errors:
@@ -228,6 +338,31 @@ export const buildStepValidationFeedbackPrompt = (
     hasGuardrails,
   });
 
+/**
+ * Task Validation Template
+ *
+ * Used by WebAgent to validate task completion quality after AI calls done().
+ * Called from validateTaskCompletion() during the VALIDATION PHASE.
+ *
+ * Purpose:
+ * - Evaluates whether the AI's final result actually accomplishes the user's task
+ * - Provides objective assessment of completion quality (failed/partial/complete/excellent)
+ * - Generates feedback for improvement when task is incomplete
+ * - Prevents premature task completion when work remains
+ *
+ * Usage in WebAgent:
+ * - Triggered when AI calls done() function
+ * - Uses conversation history and final answer for evaluation context
+ * - Result determines if task execution should continue or complete
+ * - Up to maxValidationAttempts retries allowed for improvement
+ *
+ * Function calls generated:
+ * - validate_task(): Returns taskAssessment, completionQuality, and feedback
+ *
+ * Validation results guide the main execution loop:
+ * - "complete"/"excellent": Task execution completes successfully
+ * - "failed"/"partial": AI receives feedback and continues working
+ */
 const taskValidationTemplate = buildPromptTemplate(
   `
 Evaluate how well the task result accomplishes what the user requested. Focus on task completion, not process.
@@ -264,6 +399,27 @@ export const buildTaskValidationPrompt = (
     conversationHistory,
   });
 
+/**
+ * Data Extraction Template
+ *
+ * Used by WebAgent to extract specific data from web pages when extract() action is called.
+ * Called from extractDataFromPage() during action execution.
+ *
+ * Purpose:
+ * - Extracts specific information from page content based on AI's request
+ * - Uses clean markdown representation instead of raw HTML for better accuracy
+ * - Provides focused data extraction without navigating away from current page
+ * - Returns extracted data in simple, compact format for easy consumption
+ *
+ * Usage in WebAgent:
+ * - Triggered when AI calls extract(description) function
+ * - Uses browser.getMarkdown() for clean page content representation
+ * - Uses simple text generation (not function calling) for extraction
+ * - Result is added to conversation history for AI context
+ *
+ * This prompt enables the AI to gather information from the current page
+ * without changing the page state, useful for collecting data mid-task.
+ */
 const extractionPromptTemplate = buildPromptTemplate(
   `
 Extract this data from this page content:
