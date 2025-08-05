@@ -130,6 +130,15 @@ export const webActionFunctions = {
     }),
   },
 
+  fill_and_enter: {
+    name: "fill_and_enter",
+    description: "Fill text into an input field and press Enter (useful for search boxes)",
+    parameters: z.object({
+      ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+      value: z.string().describe("Text to enter into the field"),
+    }),
+  },
+
   wait: {
     name: "wait",
     description: "Wait for a specified number of seconds",
@@ -180,9 +189,85 @@ export const webActionFunctions = {
   },
 };
 
+// Function calling schemas for planning
+export const planningFunctions = {
+  create_plan: {
+    name: "create_plan",
+    description: "Create a step-by-step plan for completing the task",
+    parameters: z.object({
+      explanation: z.string().describe("Task explanation in agent's own words"),
+      plan: z.string().describe("Step-by-step plan for the task"),
+    }),
+  },
+
+  create_plan_with_url: {
+    name: "create_plan_with_url", 
+    description: "Create a step-by-step plan and determine the best starting URL",
+    parameters: z.object({
+      explanation: z.string().describe("Task explanation in agent's own words"),
+      plan: z.string().describe("Step-by-step plan for the task"),
+      url: z.string().describe("Starting URL for the task"),
+    }),
+  },
+};
+
+// Function calling schemas for task validation
+export const validationFunctions = {
+  validate_task: {
+    name: "validate_task",
+    description: "Evaluate how well the task result accomplishes what the user requested",
+    parameters: z.object({
+      taskAssessment: z.string().describe("Assessment of whether the result accomplishes the requested task"),
+      completionQuality: z.enum(["failed", "partial", "complete", "excellent"]).describe("Quality level of task completion"),
+      feedback: z.string().optional().describe("What is missing to complete the task"),
+    }),
+  },
+};
+
+// Function calling schemas for data extraction  
+export const extractionFunctions = {
+  extract_data: {
+    name: "extract_data",
+    description: "Extract the requested data from the page content",
+    parameters: z.object({
+      extractedData: z.string().describe("The extracted data in simple, compact format"),
+    }),
+  },
+};
+
 // Convert function definitions to tools format for AI SDK
 export const webActionTools = Object.fromEntries(
   Object.entries(webActionFunctions).map(([key, func]) => [
+    key,
+    {
+      description: func.description,
+      parameters: func.parameters,
+    },
+  ]),
+);
+
+export const planningTools = Object.fromEntries(
+  Object.entries(planningFunctions).map(([key, func]) => [
+    key,
+    {
+      description: func.description,
+      parameters: func.parameters,
+    },
+  ]),
+);
+
+export const validationTools = Object.fromEntries(
+  Object.entries(validationFunctions).map(([key, func]) => [
+    key,
+    {
+      description: func.description,
+      parameters: func.parameters,
+    },
+  ]),
+);
+
+export const extractionTools = Object.fromEntries(
+  Object.entries(extractionFunctions).map(([key, func]) => [
     key,
     {
       description: func.description,

@@ -23,18 +23,38 @@ import {
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
-  planSchema,
-  planAndUrlSchema,
   Action,
-  taskValidationSchema,
   TaskValidationResult,
   getActionSchemaFieldOrder,
   webActionTools,
+  planningTools,
+  validationTools,
 } from "./schemas.js";
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import { nanoid } from "nanoid";
+
+// Type definitions for better type safety
+
+type ToolCallResponse = {
+  toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
+  text?: string;
+  reasoning?: string;
+  finishReason?: string;
+  usage?: any;
+  warnings?: any;
+  providerMetadata?: any;
+};
+
+type ActionExecutionResult = {
+  action: {
+    action: string;
+    ref?: string;
+    value?: string;
+  };
+  extractedData?: string;
+};
 
 // Task completion quality constants used for validation
 const COMPLETION_QUALITY = {
@@ -46,6 +66,17 @@ const COMPLETION_QUALITY = {
 
 // Quality levels that indicate successful task completion
 const SUCCESS_QUALITIES = [COMPLETION_QUALITY.COMPLETE, COMPLETION_QUALITY.EXCELLENT] as const;
+
+// Configuration constants
+const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
+const DEFAULT_MAX_ITERATIONS = 50;
+const DEFAULT_GENERATION_MAX_TOKENS = 3000;
+const DEFAULT_EXTRACTION_MAX_TOKENS = 5000;
+const DEFAULT_PLANNING_MAX_TOKENS = 1500;
+const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
+const MAX_RETRY_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1000;
+const MAX_CONVERSATION_MESSAGES = 100; // Prevent memory bloat
 
 /**
  * Options for WebAgent.execute()
@@ -211,16 +242,16 @@ export class WebAgent {
     options: WebAgentOptions,
   ) {
     // Initialize configuration from options with sensible defaults
-    this.DEBUG = options.debug || false;
-    this.vision = options.vision || false;
+    this.DEBUG = options.debug ?? false;
+    this.vision = options.vision ?? false;
     this.provider = options.provider;
-    this.guardrails = options.guardrails || null;
-    this.maxValidationAttempts = options.maxValidationAttempts || 3;
-    this.maxIterations = options.maxIterations || 50;
+    this.guardrails = options.guardrails ?? null;
+    this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
+    this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
 
     // Set up event system for logging and monitoring
     this.eventEmitter = new WebAgentEventEmitter();
-    this.logger = options.logger || new ConsoleLogger();
+    this.logger = options.logger ?? new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
   }
 
@@ -237,18 +268,26 @@ export class WebAgent {
     this.emit(WebAgentEventType.AGENT_STATUS, {
       message: "Making a plan and finding the best starting URL",
     });
-    const response = await this.generateAIResponse<{
-      explanation: string;
-      plan: string;
-      url: string;
-    }>(planAndUrlSchema, {
-      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
-    });
+    
+    const response = await this.generateGenericFunctionCall(
+      planningTools,
+      buildPlanAndUrlPrompt(task, this.guardrails),
+      undefined,
+      "create_plan_with_url",
+      DEFAULT_PLANNING_MAX_TOKENS
+    );
+
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      throw new Error("No function call found in planning response");
+    }
+
+    const toolCall = response.toolCalls[0];
+    const args = toolCall.args as { explanation: string; plan: string; url: string };
 
     // Store the plan details for later use in conversation
-    this.taskExplanation = response.explanation;
-    this.plan = response.plan;
-    this.url = response.url;
+    this.taskExplanation = args.explanation;
+    this.plan = args.plan;
+    this.url = args.url;
 
     return { plan: this.plan, url: this.url };
   }
@@ -265,16 +304,25 @@ export class WebAgent {
    */
   async generatePlan(task: string, startingUrl?: string) {
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
-    const response = await this.generateAIResponse<{
-      explanation: string;
-      plan: string;
-    }>(planSchema, {
-      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
-    });
+    
+    const response = await this.generateGenericFunctionCall(
+      planningTools,
+      buildPlanPrompt(task, startingUrl, this.guardrails),
+      undefined,
+      "create_plan",
+      DEFAULT_PLANNING_MAX_TOKENS
+    );
+
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      throw new Error("No function call found in planning response");
+    }
+
+    const toolCall = response.toolCalls[0];
+    const args = toolCall.args as { explanation: string; plan: string };
 
     // Store the plan details for later use in conversation
-    this.taskExplanation = response.explanation;
-    this.plan = response.plan;
+    this.taskExplanation = args.explanation;
+    this.plan = args.plan;
 
     return { plan: this.plan };
   }
@@ -411,9 +459,11 @@ export class WebAgent {
       PageAction.Uncheck,
       PageAction.Select,
       PageAction.Enter,
+      PageAction.FillAndEnter,
     ];
     const actionsRequiringValue = [
       PageAction.Fill,
+      PageAction.FillAndEnter,
       PageAction.Select,
       PageAction.Wait,
       PageAction.Done,
@@ -584,7 +634,7 @@ export class WebAgent {
         rawResponse: response,
       });
 
-      if (retryCount >= 2) {
+      if (retryCount >= MAX_RETRY_ATTEMPTS) {
         throw new Error(
           `Failed to get valid response after ${
             retryCount + 1
@@ -678,6 +728,18 @@ export class WebAgent {
       role: "user",
       content,
     });
+    
+    // Prevent memory bloat by limiting conversation history
+    if (this.messages.length > MAX_CONVERSATION_MESSAGES) {
+      // Keep system message and remove oldest user/assistant messages
+      const systemMessages = this.messages.filter(msg => msg.role === "system");
+      const otherMessages = this.messages.filter(msg => msg.role !== "system");
+      
+      // Keep the most recent messages up to the limit
+      const messagesToKeep = otherMessages.slice(-(MAX_CONVERSATION_MESSAGES - systemMessages.length));
+      this.messages = [...systemMessages, ...messagesToKeep];
+    }
+    
     this.logConversation();
   }
 
@@ -727,8 +789,8 @@ export class WebAgent {
       case "action":
         this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
           action: value.action,
-          ref: value.ref || undefined,
-          value: value.value || undefined,
+          ref: value.ref ?? undefined,
+          value: value.value ?? undefined,
         });
         break;
       case "actionStatusMessage":
@@ -777,56 +839,20 @@ export class WebAgent {
     messages: any[],
     retryCount: number,
   ): Promise<Action> {
-    // Handle AbortError specifically
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("AI streaming request was cancelled");
-    }
-
-    if (error instanceof Error) {
-      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-        error: error.message,
-        prompt: undefined,
-        schema,
+    try {
+      await this.handleAIGenerationError(error, {
+        retryCount,
         messages,
+        schema,
       });
-    }
-
-    // Handle AI generation failures with retry logic
-    if (
-      error instanceof Error &&
-      (error.message.includes("response did not match schema") ||
-        error.message.includes("AI_NoObjectGeneratedError") ||
-        error.message.includes("No object generated") ||
-        error.message.includes("Invalid JSON response") ||
-        error.message.includes("AI_APICallError") ||
-        error.name === "AI_APICallError")
-    ) {
-      console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
-
-      // Log some debugging info on the first failure
-      if (retryCount === 0 && this.DEBUG) {
-        console.error("Debug info - Last few messages:");
-        const lastMessages = messages ? messages.slice(-2) : [];
-        console.error(JSON.stringify(lastMessages, null, 2));
-      }
-
-      if (retryCount < 2) {
-        console.log("🔄 Retrying AI generation...");
-        // Add a small delay before retry
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+    } catch (err) {
+      if (err instanceof Error && err.message === "RETRY_NEEDED") {
         return this.generateStreamingActionResponse(schema, messages, retryCount + 1);
-      } else {
-        const errorMessage =
-          `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
-          `1. The AI response not matching the expected schema format\n` +
-          `2. Network issues or AI service problems\n` +
-          `3. Complex page content that confused the AI\n` +
-          `Original error: ${error.message}`;
-        throw new Error(errorMessage);
       }
+      throw err;
     }
-
-    // Re-throw other errors
+    
+    // This should never be reached due to the Promise<never> return type
     throw error;
   }
 
@@ -959,17 +985,59 @@ export class WebAgent {
   }
 
   /**
+   * Generic function calling method for any set of tools
+   */
+  protected async generateGenericFunctionCall(tools: any, prompt?: string, messages?: any[], specificFunction?: string, maxTokens?: number): Promise<ToolCallResponse> {
+    const config: any = {
+      model: this.provider,
+      tools,
+      toolChoice: specificFunction 
+        ? { type: "tool", toolName: specificFunction } as const
+        : "required" as const,
+      temperature: 0,
+      maxToolRoundtrips: 0,
+    };
+
+    // Add max tokens if specified
+    if (maxTokens) {
+      config.maxTokens = maxTokens;
+    }
+
+    // Add prompt or messages
+    if (prompt) {
+      config.prompt = prompt;
+    } else if (messages) {
+      config.messages = messages;
+    }
+
+    // Add AbortSignal if provided
+    const finalConfig = this.abortSignal 
+      ? { ...config, abortSignal: this.abortSignal }  
+      : config;
+
+    try {
+      const response = await generateText(finalConfig);
+      return response;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI function call request was cancelled");
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Generate function call response using AI SDK (but treat it like structured JSON)
    * We use function calling purely for better response conformity, not for actual function calling conversation
    */
-  protected async generateFunctionCallResponse(messages: any[]): Promise<any> {
+  protected async generateFunctionCallResponse(messages: any[]): Promise<ToolCallResponse> {
     // Create a clean messages array without any function call artifacts that might confuse the AI
     const cleanMessages = messages.map((msg) => {
       if (msg.role === "assistant" && msg.tool_calls) {
         // Remove tool_calls from assistant messages to keep conversation clean
         return {
           role: msg.role,
-          content: msg.content || "Action taken",
+          content: msg.content ?? "Action taken",
         };
       }
       return msg;
@@ -981,6 +1049,7 @@ export class WebAgent {
       tools: webActionTools,
       toolChoice: "required" as const,
       temperature: 0,
+      maxTokens: DEFAULT_GENERATION_MAX_TOKENS, // Generous limit to prevent infinite loops, especially for "done" actions
       maxToolRoundtrips: 0, // Prevent multiple function calls in one response
       providerOptions: {
         openrouter: {
@@ -1001,7 +1070,11 @@ export class WebAgent {
       const response = await generateText(finalConfig);
 
 
-      // Emit events for the function call
+      // Emit observation first (the AI's reasoning/thinking)
+      const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
+      this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
+
+      // Then emit events for the function call
       if (response.toolCalls && response.toolCalls.length > 0) {
         const toolCall = response.toolCalls[0];
         // Properly handle union types based on function name
@@ -1018,6 +1091,7 @@ export class WebAgent {
             ref = (toolCall.args as { ref: string }).ref;
             break;
           case 'fill':
+          case 'fill_and_enter':
           case 'select':
             ref = (toolCall.args as { ref: string; value: string }).ref;
             value = (toolCall.args as { ref: string; value: string }).value;
@@ -1048,7 +1122,7 @@ export class WebAgent {
         schema: undefined,
         messages: cleanMessages,
         temperature: 0,
-        object: response.toolCalls?.[0] || null,
+        object: response.toolCalls?.[0] ?? null,
         finishReason: response.finishReason,
         usage: response.usage,
         warnings: (response as any).warnings,
@@ -1077,7 +1151,7 @@ export class WebAgent {
   /**
    * Convert function call response to Action format for compatibility
    */
-  protected convertFunctionCallToAction(response: any): Action {
+  protected convertFunctionCallToAction(response: ToolCallResponse): Action {
     if (!response.toolCalls || response.toolCalls.length === 0) {
       throw new Error("No function call found in response");
     }
@@ -1106,6 +1180,7 @@ export class WebAgent {
         ref = (toolCall.args as { ref: string }).ref;
         break;
       case 'fill':
+      case 'fill_and_enter':
       case 'select':
         ref = (toolCall.args as { ref: string; value: string }).ref;
         value = (toolCall.args as { ref: string; value: string }).value;
@@ -1131,10 +1206,7 @@ export class WebAgent {
     }
 
     // Use the reasoning text if available, otherwise fall back to regular text
-    const thinkingText = response.reasoning || response.text || "Function call executed";
-    
-    // Emit the observation event for logging
-    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
+    const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
     
     return {
       observation: thinkingText,
@@ -1169,6 +1241,73 @@ export class WebAgent {
       isValid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Centralized error handling for AI generation failures
+   */
+  private async handleAIGenerationError(
+    error: unknown,
+    context: {
+      retryCount: number;
+      messages?: any[];
+      prompt?: string;
+      schema?: any;
+    }
+  ): Promise<never> {
+    const { retryCount, messages, prompt, schema } = context;
+
+    // Handle AbortError specifically
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("AI request was cancelled");
+    }
+
+    if (error instanceof Error) {
+      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+        error: error.message,
+        prompt,
+        schema,
+        messages,
+      });
+    }
+
+    // Check if this is a recoverable AI generation error
+    const isRecoverableError = error instanceof Error && (
+      error.message.includes("response did not match schema") ||
+      error.message.includes("AI_NoObjectGeneratedError") ||
+      error.message.includes("No object generated") ||
+      error.message.includes("Invalid JSON response") ||
+      error.message.includes("AI_APICallError") ||
+      error.name === "AI_APICallError"
+    );
+
+    if (isRecoverableError) {
+      console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, (error as Error).message);
+
+      // Log debugging info on the first failure
+      if (retryCount === 0 && this.DEBUG && messages) {
+        console.error("Debug info - Last few messages:");
+        const lastMessages = messages.slice(-2);
+        console.error(JSON.stringify(lastMessages, null, 2));
+      }
+
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        console.log("🔄 Retrying AI generation...");
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        return Promise.reject(new Error("RETRY_NEEDED")); // Special error to indicate retry is needed
+      } else {
+        const errorMessage =
+          `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
+          `1. The AI response not matching the expected schema format\n` +
+          `2. Network issues or AI service problems\n` +
+          `3. Complex page content that confused the AI\n` +
+          `Original error: ${(error as Error).message}`;
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Re-throw non-recoverable errors
+    throw error;
   }
 
   /**
@@ -1226,61 +1365,27 @@ export class WebAgent {
       if (error instanceof Error && error.message.includes("could not parse the response")) {
         console.error("❌ Raw AI response that failed to parse:", (error as any).response);
       }
-      // Handle AbortError specifically
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI request was cancelled");
-      }
 
-      if (error instanceof Error) {
-        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-          error: error.message,
+      try {
+        await this.handleAIGenerationError(error, {
+          retryCount,
+          messages,
           prompt,
           schema,
-          messages,
         });
-      }
-
-      // Handle AI generation failures with retry logic
-      if (
-        error instanceof Error &&
-        (error.message.includes("response did not match schema") ||
-          error.message.includes("AI_NoObjectGeneratedError") ||
-          error.message.includes("No object generated") ||
-          error.message.includes("Invalid JSON response") ||
-          error.message.includes("AI_APICallError") ||
-          error.name === "AI_APICallError")
-      ) {
-        console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, error.message);
-
-        // Log some debugging info on the first failure
-        if (retryCount === 0 && this.DEBUG) {
-          console.error("Debug info - Last few messages:");
-          const lastMessages = messages ? messages.slice(-2) : [];
-          console.error(JSON.stringify(lastMessages, null, 2));
-        }
-
-        if (retryCount < 2) {
-          console.log("🔄 Retrying AI generation...");
-          // Add a small delay before retry
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (err) {
+        if (err instanceof Error && err.message === "RETRY_NEEDED") {
           return this.generateAIResponse<T>(schema, {
             prompt,
             messages,
             maxTokens,
             retryCount: retryCount + 1,
           });
-        } else {
-          const errorMessage =
-            `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
-            `1. The AI response not matching the expected schema format\n` +
-            `2. Network issues or AI service problems\n` +
-            `3. Complex page content that confused the AI\n` +
-            `Original error: ${error.message}`;
-          throw new Error(errorMessage);
         }
+        throw err;
       }
 
-      // Re-throw other errors
+      // This should never be reached due to the Promise<never> return type
       throw error;
     }
   }
@@ -1390,11 +1495,11 @@ export class WebAgent {
     );
   }
 
-  protected async executeAction(result: any): Promise<boolean> {
+  protected async executeAction(result: ActionExecutionResult): Promise<boolean> {
     try {
       switch (result.action.action) {
         case "wait":
-          const seconds = parseInt(result.action.value || "1", 10);
+          const seconds = parseInt(result.action.value ?? "1", 10);
           await this.wait(seconds);
           break;
 
@@ -1427,6 +1532,29 @@ export class WebAgent {
           (result as any).extractedData = extractedData;
           break;
 
+        case "fill_and_enter":
+          if (!result.action.ref) {
+            throw new Error("Missing ref for fill_and_enter action");
+          }
+          if (!result.action.value) {
+            throw new Error("Missing value for fill_and_enter action");
+          }
+
+          // Fill the element first
+          await this.browser.performAction(
+            result.action.ref,
+            PageAction.Fill,
+            result.action.value,
+          );
+          
+          // Then press enter on the same element
+          await this.browser.performAction(
+            result.action.ref,
+            PageAction.Enter,
+            undefined,
+          );
+          break;
+
         case "done":
           // "done" actions are handled in the main loop, not here
           break;
@@ -1438,12 +1566,12 @@ export class WebAgent {
 
           await this.browser.performAction(
             result.action.ref,
-            result.action.action,
+            result.action.action as PageAction,
             result.action.value,
           );
 
           // Check if navigation occurred for actions that might navigate
-          if (["click", "select"].includes(result.action.action)) {
+          if (["click", "select", "fill_and_enter"].includes(result.action.action)) {
             const { title: actionTitle, url: actionUrl } = await this.refreshPageState();
 
             if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
@@ -1461,7 +1589,7 @@ export class WebAgent {
     }
   }
 
-  private recordActionResult(result: any, actionSuccess: boolean) {
+  private recordActionResult(result: ActionExecutionResult, actionSuccess: boolean) {
     if (actionSuccess) {
       // Add the action result to conversation history in our normal format
       // This maintains our existing conversation flow while using function calls for format
@@ -1501,17 +1629,26 @@ export class WebAgent {
       // Create extraction prompt using the template
       const extractionPrompt = buildExtractionPrompt(extractionDescription, markdown);
 
-      // Use simple text generation for extraction (more reliable for smaller models)
+      // Use simple text generation for extraction - no need for function calling with plain text
       const response = await generateText({
         model: this.provider,
         prompt: extractionPrompt,
-        maxTokens: 1000,
+        maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
         temperature: 0,
+        abortSignal: this.abortSignal ?? undefined,
       });
 
-      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: response.text });
+      let extractedData = response.text;
 
-      return response.text;
+      // Check if response was truncated due to token limit
+      if (response.finishReason === "length") {
+        console.warn("⚠️  Data extraction was truncated due to token limit - response may be incomplete");
+        extractedData += "\n\n[Response truncated due to length limit]";
+      }
+
+      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData });
+
+      return extractedData;
     } catch (error) {
       const errorMsg = `Failed to extract data: ${error instanceof Error ? error.message : String(error)}`;
       this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: errorMsg });
@@ -1520,8 +1657,19 @@ export class WebAgent {
   }
 
   /**
+   * Validates if a string is a valid URL
+   */
+  private isValidUrl(urlString: string): boolean {
+    try {
+      const url = new URL(urlString);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Emits the task setup event with initial task information
-   * TODO: Move telemetry/config logging outside of WebAgent
    */
   private emitTaskSetupEvent(task: string) {
     this.emit(WebAgentEventType.TASK_SETUP, {
@@ -1534,7 +1682,6 @@ export class WebAgent {
       pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
       proxy: (this.browser as any).proxyServer,
       vision: this.vision,
-      // TODO: Provider info should be logged elsewhere, not WebAgent's responsibility
     });
   }
 
@@ -1593,12 +1740,16 @@ export class WebAgent {
       console.log("🔍 Task validation prompt:", validationPrompt);
     }
 
-    const response = await this.withProcessingEvents("Validating task completion", () =>
-      this.generateAIResponse<TaskValidationResult>(taskValidationSchema, {
-        prompt: validationPrompt,
-        maxTokens: 1000, // Limit task validation responses to 1000 tokens
-      }),
-    );
+    const response = await this.withProcessingEvents("Validating task completion", async () => {
+      const result = await this.generateGenericFunctionCall(validationTools, validationPrompt, undefined, "validate_task", DEFAULT_VALIDATION_MAX_TOKENS);
+      
+      if (!result.toolCalls || result.toolCalls.length === 0) {
+        throw new Error("No function call found in validation response");
+      }
+
+      const toolCall = result.toolCalls[0];
+      return toolCall.args as TaskValidationResult;
+    });
 
     this.emit(WebAgentEventType.TASK_VALIDATED, {
       taskAssessment: response.taskAssessment,
@@ -1631,8 +1782,18 @@ export class WebAgent {
    * @returns Complete execution results including success status and metrics
    */
   async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
-    if (!task) {
-      throw new Error("No task provided.");
+    // Input validation
+    if (!task?.trim()) {
+      throw new Error("Task cannot be empty or whitespace-only.");
+    }
+
+    if (task.length > 10000) {
+      throw new Error("Task description is too long (maximum 10,000 characters).");
+    }
+
+    // Validate options
+    if (options.startingUrl && !this.isValidUrl(options.startingUrl)) {
+      throw new Error("Invalid starting URL provided.");
     }
 
     const { startingUrl, data, abortSignal } = options;
@@ -1644,7 +1805,7 @@ export class WebAgent {
     this.resetState();
 
     // Store AbortSignal for cancellation
-    this.abortSignal = abortSignal || null;
+    this.abortSignal = abortSignal ?? null;
 
     // Store contextual data for use in prompts (optional)
     if (data) {
@@ -1653,15 +1814,25 @@ export class WebAgent {
 
     // === PLANNING PHASE ===
     // Generate task plan and determine starting URL
-    if (startingUrl) {
-      this.url = startingUrl;
-      // Run browser launch and plan creation in parallel for efficiency
-      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
-      await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
-    } else {
-      // Let AI choose the best starting URL based on the task
-      this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
-      await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
+    try {
+      if (startingUrl) {
+        this.url = startingUrl;
+        // Run browser launch and plan creation in parallel for efficiency
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
+        await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
+      } else {
+        // Let AI choose the best starting URL based on the task
+        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
+        await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
+      }
+    } catch (error) {
+      // Critical error during setup - clean up and re-throw
+      try {
+        await this.browser.shutdown();
+      } catch (shutdownError) {
+        console.warn("Failed to shutdown browser during error cleanup:", shutdownError);
+      }
+      throw new Error(`Failed to initialize task: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // === NAVIGATION PHASE ===
@@ -1767,7 +1938,7 @@ export class WebAgent {
 
     return {
       success,
-      finalAnswer: finalAnswer || "Task did not complete",
+      finalAnswer: finalAnswer ?? "Task did not complete",
       plan: this.plan,
       taskExplanation: this.taskExplanation,
       validationResult: lastValidationResult,

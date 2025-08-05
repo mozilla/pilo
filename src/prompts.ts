@@ -9,8 +9,8 @@ You adapt to situations and find creative ways to complete tasks without getting
 IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
 `.trim();
 
-const jsonOnlyInstruction =
-  "IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.";
+const functionCallInstruction =
+  "IMPORTANT: Call exactly one function with the required parameters. Follow the format precisely and be careful not to repeat yourself.";
 
 const planPromptTemplate = buildPromptTemplate(
   `
@@ -31,16 +31,18 @@ Best Practices:
 {% if startingUrl %}- Use the provided starting URL as your starting point for the task.{% endif %}
 {% if guardrails %}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{% endif %}
 
-${jsonOnlyInstruction}
+${functionCallInstruction}
 
-Respond with a JSON object matching this exact structure:
-\`\`\`json
-{
-  "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
-  "plan": "Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features."{% if includeUrl %},
-  "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"{% endif %}
-}
-\`\`\`
+{% if includeUrl %}
+Call create_plan_with_url() with:
+- explanation: Restate the task concisely in your own words, focusing on the core objective
+- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
+- url: Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query
+{% else %}
+Call create_plan() with:
+- explanation: Restate the task concisely in your own words, focusing on the core objective  
+- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
+{% endif %}
 `.trim(),
 );
 
@@ -77,6 +79,7 @@ Remember: When you complete the task with done(), ensure your result fully accom
 Available Functions:
 - click(ref): Click on an element
 - fill(ref, value): Enter text into a field
+- fill_and_enter(ref, value): Fill text and press Enter (useful for search boxes)
 - select(ref, value): Select option from dropdown
 - hover(ref): Hover over an element
 - check(ref): Check a checkbox
@@ -212,6 +215,7 @@ Please call the correct function with valid parameters. Remember:
 {% if hasGuardrails %}
 - ALL FUNCTION CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
+
 `.trim(),
 );
 
@@ -240,14 +244,12 @@ Evaluation criteria:
 
 Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
 
-${jsonOnlyInstruction}
-\`\`\`json
-{
-  "taskAssessment": "Does the result accomplish what the user requested? Focus on task completion, not how it was done.",
-  "completionQuality": "failed|partial|complete|excellent",
-  "feedback": "Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done."
-}
-\`\`\`
+${functionCallInstruction}
+
+Call validate_task() with:
+- taskAssessment: Does the result accomplish what the user requested? Focus on task completion, not how it was done
+- completionQuality: Choose from "failed", "partial", "complete", or "excellent" based on evaluation criteria above
+- feedback: Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done
 `.trim(),
 );
 
@@ -270,7 +272,7 @@ Extract this data from this page content:
 Page Content (Markdown):
 {{ markdown }}
 
-Extract only the requested data in simple, compact json.
+Extract only the requested data in simple, compact format.
 `.trim(),
 );
 
