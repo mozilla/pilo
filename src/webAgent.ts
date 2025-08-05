@@ -32,6 +32,22 @@ import {
 import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
+import { ActionValidator } from "./validation/ActionValidator.js";
+import { EventEmissionHelper } from "./events/EventEmissionHelper.js";
+import {
+  SUCCESS_QUALITIES,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_GENERATION_MAX_TOKENS,
+  DEFAULT_EXTRACTION_MAX_TOKENS,
+  DEFAULT_PLANNING_MAX_TOKENS,
+  DEFAULT_VALIDATION_MAX_TOKENS,
+  MAX_RETRY_ATTEMPTS,
+  RETRY_DELAY_MS,
+  MAX_CONVERSATION_MESSAGES,
+  FILTERED_PREFIXES,
+  ARIA_TRANSFORMATIONS,
+} from "./config/WebAgentConfig.js";
 import { nanoid } from "nanoid";
 
 // Type definitions for better type safety
@@ -54,28 +70,6 @@ type ActionExecutionResult = {
   };
   extractedData?: string;
 };
-
-// Task completion quality constants used for validation
-const COMPLETION_QUALITY = {
-  FAILED: "failed",
-  PARTIAL: "partial",
-  COMPLETE: "complete",
-  EXCELLENT: "excellent",
-} as const;
-
-// Quality levels that indicate successful task completion
-const SUCCESS_QUALITIES = [COMPLETION_QUALITY.COMPLETE, COMPLETION_QUALITY.EXCELLENT] as const;
-
-// Configuration constants
-const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
-const DEFAULT_MAX_ITERATIONS = 50;
-const DEFAULT_GENERATION_MAX_TOKENS = 3000;
-const DEFAULT_EXTRACTION_MAX_TOKENS = 5000;
-const DEFAULT_PLANNING_MAX_TOKENS = 1500;
-const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
-const MAX_RETRY_ATTEMPTS = 2;
-const RETRY_DELAY_MS = 1000;
-const MAX_CONVERSATION_MESSAGES = 100; // Prevent memory bloat
 
 /**
  * Options for WebAgent.execute()
@@ -191,19 +185,6 @@ export class WebAgent {
   /** Maximum total iterations to prevent infinite loops */
   private maxIterations: number;
 
-  // === Page Processing ===
-  /** Prefixes to filter out from page snapshots to reduce noise */
-  private readonly FILTERED_PREFIXES = ["/url:"];
-
-  /** Transformations to compress aria tree snapshots for better LLM processing */
-  private readonly ARIA_TRANSFORMATIONS: Array<[RegExp, string]> = [
-    [/^listitem/g, "li"], // Shorten 'listitem' to 'li'
-    [/(?<=\[)ref=/g, ""], // Remove 'ref=' prefix from references
-    [/^link/g, "a"], // Shorten 'link' to 'a'
-    [/^text: (.*?)$/g, '"$1"'], // Convert 'text: content' to '"content"'
-    [/^heading "([^"]+)" \[level=(\d+)\]/g, 'h$2 "$1"'], // Convert headings to h1, h2, etc.
-  ];
-
   /** Cached field order for action schema to avoid repeated Object.keys calls */
   private readonly actionSchemaFieldOrder: string[] = getActionSchemaFieldOrder();
 
@@ -213,6 +194,12 @@ export class WebAgent {
 
   /** Logger for console output and debugging */
   private logger: Logger;
+
+  /** Action validator for validating actions and refs */
+  private actionValidator: ActionValidator;
+
+  /** Event emission helper for common event patterns */
+  private eventHelper: EventEmissionHelper;
 
   // === State Tracking ===
   /** Current page information for navigation tracking */
@@ -226,9 +213,6 @@ export class WebAgent {
 
   // === Validation Patterns ===
   // No regex patterns needed - we just check if refs exist in the page snapshot
-
-  /** Current page snapshot for ref validation */
-  private currentPageSnapshot: string = "";
 
   /**
    * Initialize WebAgent with browser interface and configuration options
@@ -252,6 +236,8 @@ export class WebAgent {
     this.eventEmitter = new WebAgentEventEmitter();
     this.logger = options.logger ?? new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
+    this.actionValidator = new ActionValidator();
+    this.eventHelper = new EventEmissionHelper((type, data) => this.emit(type, data));
   }
 
   /**
@@ -366,153 +352,14 @@ export class WebAgent {
     isValid: boolean;
     error?: string;
   } {
-    if (!ref?.trim()) {
-      return { isValid: false, error: "Aria ref cannot be empty" };
-    }
-
-    const trimmedRef = ref.trim();
-
-    // We must have a page snapshot to validate refs
-    if (!this.currentPageSnapshot) {
-      return { isValid: false, error: "Cannot validate ref: no page snapshot available" };
-    }
-
-    // Check if the ref exists in the page snapshot (new format only)
-    const refExists = this.currentPageSnapshot.includes(`[ref=${trimmedRef}]`);
-
-    if (refExists) {
-      return { isValid: true };
-    }
-
-    return {
-      isValid: false,
-      error: `Reference "${trimmedRef}" not found on current page. Please use a valid ref from the page snapshot.`,
-    };
+    return this.actionValidator.validateAriaRef(ref);
   }
 
   protected validateActionResponse(response: any): {
     isValid: boolean;
     errors: string[];
   } {
-    const errors: string[] = [];
-
-    // Validate required top-level fields
-    this.validateRequiredStringField(response, "observation", errors);
-    this.validateRequiredStringField(response, "observationStatusMessage", errors);
-    this.validateRequiredStringField(response, "actionStatusMessage", errors);
-
-    // Validate action object exists
-    if (!response.action || typeof response.action !== "object") {
-      errors.push('Missing or invalid "action" field - must be an object');
-      return { isValid: false, errors };
-    }
-
-    // Validate action object structure
-    const actionErrors = this.validateActionObject(response.action);
-    errors.push(...actionErrors);
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Validates that a required string field exists and is non-empty
-   */
-  private validateRequiredStringField(obj: any, fieldName: string, errors: string[]): void {
-    const value = obj?.[fieldName];
-    if (typeof value !== "string" || !value.trim()) {
-      errors.push(`Missing or empty required field "${fieldName}"`);
-    }
-  }
-
-  /**
-   * Validates the action object structure and requirements
-   */
-  private validateActionObject(action: any): string[] {
-    const errors: string[] = [];
-
-    // Validate action type
-    if (!action.action?.trim()) {
-      errors.push('Missing or empty "action.action" field');
-      return errors; // Can't validate further without action type
-    }
-
-    const actionType = action.action;
-
-    // Check if action type is valid
-    const validActions = Object.values(PageAction);
-    if (!validActions.includes(actionType)) {
-      errors.push(`Invalid action type "${actionType}". Valid actions: ${validActions.join(", ")}`);
-      return errors;
-    }
-
-    // Define action requirements
-    const actionsRequiringRef = [
-      PageAction.Click,
-      PageAction.Hover,
-      PageAction.Fill,
-      PageAction.Focus,
-      PageAction.Check,
-      PageAction.Uncheck,
-      PageAction.Select,
-      PageAction.Enter,
-      PageAction.FillAndEnter,
-    ];
-    const actionsRequiringValue = [
-      PageAction.Fill,
-      PageAction.FillAndEnter,
-      PageAction.Select,
-      PageAction.Wait,
-      PageAction.Done,
-      PageAction.Goto,
-      PageAction.Extract,
-    ];
-    const actionsProhibitingRefAndValue = [PageAction.Back, PageAction.Forward];
-
-    // Validate ref requirement
-    if (actionsRequiringRef.includes(actionType)) {
-      if (!action.ref || typeof action.ref !== "string") {
-        errors.push(`Action "${actionType}" requires a "ref" field`);
-      } else {
-        const { isValid, error } = this.validateAriaRef(action.ref);
-        if (!isValid && error) {
-          errors.push(`Invalid ref for "${actionType}" action: ${error}`);
-        }
-      }
-    }
-
-    // Validate value requirement
-    if (actionsRequiringValue.includes(actionType)) {
-      if (actionType === PageAction.Wait) {
-        // Special validation for wait action - must be a valid number (including 0)
-        if (
-          action.value === undefined ||
-          action.value === null ||
-          action.value === "" ||
-          isNaN(Number(action.value))
-        ) {
-          errors.push('Action "wait" requires a numeric "value" field (seconds to wait)');
-        }
-      } else {
-        // Regular string value validation
-        if (!action.value?.trim()) {
-          errors.push(`Action "${actionType}" requires a non-empty "value" field`);
-        }
-      }
-    }
-
-    // Validate that certain actions don't have ref or value
-    if (actionsProhibitingRefAndValue.includes(actionType)) {
-      const hasRef = action.ref !== undefined && action.ref !== null && action.ref !== "";
-      const hasValue = action.value !== undefined && action.value !== null && action.value !== "";
-      if (hasRef || hasValue) {
-        errors.push(`Action "${actionType}" should not have "ref" or "value" fields`);
-      }
-    }
-
-    return errors;
+    return this.actionValidator.validateActionResponse(response);
   }
 
   // === PAGE STATE MANAGEMENT ===
@@ -584,7 +431,7 @@ export class WebAgent {
    */
   async generateNextAction(pageSnapshot: string, retryCount = 0): Promise<Action> {
     // Store the current page snapshot for ref validation
-    this.currentPageSnapshot = pageSnapshot;
+    this.actionValidator.updatePageSnapshot(pageSnapshot);
 
     // Compress the page snapshot to reduce token usage while preserving essential information
     const compressedSnapshot = this.compressSnapshot(pageSnapshot);
@@ -696,16 +543,7 @@ export class WebAgent {
     task: () => Promise<T>,
     hasScreenshot?: boolean,
   ): Promise<T> {
-    this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "start", operation, hasScreenshot });
-    try {
-      const result = await task();
-      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation, hasScreenshot });
-      return result;
-    } catch (error) {
-      // Critical: Always emit 'end' even on errors to prevent UI getting stuck in 'processing' state
-      this.emit(WebAgentEventType.AGENT_PROCESSING, { status: "end", operation, hasScreenshot });
-      throw error;
-    }
+    return this.eventHelper.withProcessingEvents(operation, task, hasScreenshot);
   }
 
   /**
@@ -1210,22 +1048,7 @@ export class WebAgent {
    * Validate function call action for basic requirements
    */
   protected validateFunctionCallAction(action: Action): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    // Validate that we have an action
-    if (!action.action?.action) {
-      errors.push("Missing action");
-      return { isValid: false, errors };
-    }
-
-    // Use existing validation logic for the action object
-    const actionErrors = this.validateActionObject(action.action);
-    errors.push(...actionErrors);
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
+    return this.actionValidator.validateFunctionCallAction(action);
   }
 
   /**
@@ -1683,7 +1506,6 @@ export class WebAgent {
     this.messages = [];
     this.data = null;
     this.currentPage = { url: "", title: "" };
-    this.currentPageSnapshot = "";
     this.currentIterationId = "";
     this.abortSignal = null;
   }
@@ -1767,7 +1589,21 @@ export class WebAgent {
    * @returns Complete execution results including success status and metrics
    */
   async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
-    // Input validation
+    this.validateTaskInput(task, options);
+    await this.setupTaskExecution(task, options);
+    await this.initializeBrowserAndPlan(task, options.startingUrl);
+    await this.navigateToStartingPage(task);
+
+    const executionState = this.createExecutionState();
+    const loopResult = await this.runMainExecutionLoop(task, executionState);
+
+    return this.buildExecutionResult(loopResult, executionState);
+  }
+
+  /**
+   * Validates task input and options before execution begins
+   */
+  private validateTaskInput(task: string, options: ExecuteOptions): void {
     if (!task?.trim()) {
       throw new Error("Task cannot be empty or whitespace-only.");
     }
@@ -1776,166 +1612,213 @@ export class WebAgent {
       throw new Error("Task description is too long (maximum 10,000 characters).");
     }
 
-    // Validate options
     if (options.startingUrl && !this.isValidUrl(options.startingUrl)) {
       throw new Error("Invalid starting URL provided.");
     }
+  }
 
-    const { startingUrl, data, abortSignal } = options;
-
-    // === SETUP PHASE ===
+  /**
+   * Sets up the task execution environment
+   */
+  private async setupTaskExecution(task: string, options: ExecuteOptions): Promise<void> {
     this.emitTaskSetupEvent(task);
-
-    // Reset any previous task state to ensure clean execution
     this.resetState();
+    this.abortSignal = options.abortSignal ?? null;
 
-    // Store AbortSignal for cancellation
-    this.abortSignal = abortSignal ?? null;
-
-    // Store contextual data for use in prompts (optional)
-    if (data) {
-      this.data = data;
+    if (options.data) {
+      this.data = options.data;
     }
+  }
 
-    // === PLANNING PHASE ===
-    // Generate task plan and determine starting URL
+  /**
+   * Initializes browser and creates task plan in parallel for efficiency
+   */
+  private async initializeBrowserAndPlan(task: string, startingUrl?: string): Promise<void> {
     try {
+      this.emit(WebAgentEventType.AGENT_STATUS, {
+        message: "Starting browser and creating plan",
+      });
+
       if (startingUrl) {
         this.url = startingUrl;
-        // Run browser launch and plan creation in parallel for efficiency
-        this.emit(WebAgentEventType.AGENT_STATUS, {
-          message: "Starting browser and creating plan",
-        });
         await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
       } else {
-        // Let AI choose the best starting URL based on the task
-        this.emit(WebAgentEventType.AGENT_STATUS, {
-          message: "Starting browser and creating plan",
-        });
         await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
       }
     } catch (error) {
-      // Critical error during setup - clean up and re-throw
-      try {
-        await this.browser.shutdown();
-      } catch (shutdownError) {
-        console.warn("Failed to shutdown browser during error cleanup:", shutdownError);
-      }
+      await this.cleanupOnInitializationError();
       throw new Error(
         `Failed to initialize task: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
 
-    // === NAVIGATION PHASE ===
-    // Emit task start event for logging
+  /**
+   * Navigates to the starting page and records the navigation
+   */
+  private async navigateToStartingPage(task: string): Promise<void> {
     this.emitTaskStartEvent(task);
-
-    // Navigate to the determined starting URL
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Navigating to starting page" });
     await this.browser.goto(this.url);
-
-    // Record initial page load for tracking
     await this.refreshAndRecordNavigation();
-
-    // Setup messages
     this.initializeConversation(task);
-    let finalAnswer = null;
-    let validationAttempts = 0;
-    let currentIteration = 0;
-    let lastValidationResult: TaskValidationResult | undefined;
+  }
 
-    // === EXECUTION PHASE ===
-    // Main execution loop - continues until one of these exit conditions:
-    // 1. Task successfully completed ("done" action + successful validation)
-    // 2. Max validation attempts reached (task marked done but validation keeps failing)
-    // 3. Max iterations reached (safety mechanism to prevent infinite loops)
-    // 4. Unrecoverable AI generation error
-    // 5. AbortSignal triggered (immediate cancellation)
+  /**
+   * Creates the initial execution state for the main loop
+   */
+  private createExecutionState() {
+    return {
+      finalAnswer: null as string | null,
+      validationAttempts: 0,
+      currentIteration: 0,
+      lastValidationResult: undefined as TaskValidationResult | undefined,
+    };
+  }
+
+  /**
+   * Runs the main execution loop until completion or termination
+   */
+  private async runMainExecutionLoop(
+    task: string,
+    state: ReturnType<typeof this.createExecutionState>,
+  ): Promise<{ success: boolean; finalAnswer: string | null }> {
     while (true) {
       // Safety check: prevent infinite loops
-      currentIteration++;
-      if (currentIteration > this.maxIterations) {
-        break; // Exit: hit iteration limit
+      state.currentIteration++;
+      if (state.currentIteration > this.maxIterations) {
+        break;
       }
 
-      // Generate new iteration ID for this execution loop
       this.currentIterationId = nanoid(8);
 
       try {
-        // Get current page state and ask AI what to do next
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
-        const pageSnapshot = await this.browser.getTreeWithRefs();
-        const result = await this.generateNextAction(pageSnapshot);
-
-        // Events are now emitted during streaming, no need to broadcast here
-
-        // === TASK COMPLETION HANDLING ===
-        // If AI says task is done, validate the completion quality
-        if (result.action.action === "done") {
-          finalAnswer = result.action.value!; // validateActionResponse ensures this exists
-          const validationResult = await this.validateTaskCompletion(task, finalAnswer);
-          lastValidationResult = validationResult;
-          validationAttempts++;
-
-          // Check if validation shows successful completion
-          if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-            this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer });
-            break; // Exit: task completed successfully
-          } else {
-            // Task marked as done but validation failed
-            if (validationAttempts >= this.maxValidationAttempts) {
-              break; // Exit: max validation attempts reached, give up
-            }
-
-            // Give AI feedback about what went wrong and try again
-            this.emit(WebAgentEventType.AGENT_STATUS, {
-              message: "Task needs improvement, continuing work",
-            });
-            this.addTaskRetryFeedback(result, validationResult);
-            finalAnswer = null; // Reset for next attempt
-            continue; // Continue loop for retry
-          }
+        const loopResult = await this.executeMainLoopIteration(task, state);
+        if (loopResult.shouldExit) {
+          return loopResult;
         }
-
-        // === ACTION EXECUTION ===
-        // Execute the action on the browser (click, fill, navigate, etc.)
-        const actionSuccess = await this.executeAction(result);
-
-        // Add the action result to conversation history for AI context
-        this.recordActionResult(result, actionSuccess);
       } catch (error) {
-        // Handle cancellation errors differently from other errors
-        const isCancellation =
-          error instanceof Error &&
-          (error.name === "AbortError" ||
-            (this.abortSignal?.aborted &&
-              (error.message.includes("cancelled") || error.message.includes("aborted"))));
-
-        if (isCancellation) {
-          finalAnswer = "Task cancelled";
-          break; // Exit: task was cancelled
+        const errorResult = this.handleMainLoopError(error);
+        if (errorResult.shouldExit) {
+          state.finalAnswer = errorResult.finalAnswer ?? null;
+          break;
         }
-
-        // Handle unrecoverable AI generation errors
-        finalAnswer = `Task failed due to AI generation error: ${error instanceof Error ? error.message : String(error)}`;
-        break; // Exit: unrecoverable error
       }
     }
 
-    // Determine success: task completed and validation result shows success
-    const success = lastValidationResult
-      ? SUCCESS_QUALITIES.includes(lastValidationResult.completionQuality as any)
+    const success = state.lastValidationResult
+      ? SUCCESS_QUALITIES.includes(state.lastValidationResult.completionQuality as any)
       : false;
 
+    return { success, finalAnswer: state.finalAnswer };
+  }
+
+  /**
+   * Executes a single iteration of the main loop
+   */
+  private async executeMainLoopIteration(
+    task: string,
+    state: ReturnType<typeof this.createExecutionState>,
+  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
+    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
+    const pageSnapshot = await this.browser.getTreeWithRefs();
+    const result = await this.generateNextAction(pageSnapshot);
+
+    // Handle task completion
+    if (result.action.action === "done") {
+      return await this.handleTaskCompletion(task, result, state);
+    }
+
+    // Execute regular action
+    const actionSuccess = await this.executeAction(result);
+    this.recordActionResult(result, actionSuccess);
+
+    return { shouldExit: false, success: false, finalAnswer: null };
+  }
+
+  /**
+   * Handles task completion validation and retry logic
+   */
+  private async handleTaskCompletion(
+    task: string,
+    result: ActionExecutionResult,
+    state: ReturnType<typeof this.createExecutionState>,
+  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
+    state.finalAnswer = result.action.value!;
+    const validationResult = await this.validateTaskCompletion(task, state.finalAnswer);
+    state.lastValidationResult = validationResult;
+    state.validationAttempts++;
+
+    if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
+      this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer: state.finalAnswer });
+      return { shouldExit: true, success: true, finalAnswer: state.finalAnswer! };
+    }
+
+    if (state.validationAttempts >= this.maxValidationAttempts) {
+      return { shouldExit: true, success: false, finalAnswer: state.finalAnswer! };
+    }
+
+    this.emit(WebAgentEventType.AGENT_STATUS, {
+      message: "Task needs improvement, continuing work",
+    });
+    this.addTaskRetryFeedback(result, validationResult);
+    state.finalAnswer = null;
+
+    return { shouldExit: false, success: false, finalAnswer: null };
+  }
+
+  /**
+   * Handles errors that occur during the main execution loop
+   */
+  private handleMainLoopError(error: unknown): {
+    shouldExit: boolean;
+    finalAnswer?: string;
+  } {
+    const isCancellation =
+      error instanceof Error &&
+      (error.name === "AbortError" ||
+        (this.abortSignal?.aborted &&
+          (error.message.includes("cancelled") || error.message.includes("aborted"))));
+
+    if (isCancellation) {
+      return { shouldExit: true, finalAnswer: "Task cancelled" };
+    }
+
     return {
-      success,
-      finalAnswer: finalAnswer ?? "Task did not complete",
+      shouldExit: true,
+      finalAnswer: `Task failed due to AI generation error: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  /**
+   * Builds the final execution result
+   */
+  private buildExecutionResult(
+    loopResult: { success: boolean; finalAnswer: string | null },
+    state: ReturnType<typeof this.createExecutionState>,
+  ): TaskExecutionResult {
+    return {
+      success: loopResult.success,
+      finalAnswer: loopResult.finalAnswer ?? "Task did not complete",
       plan: this.plan,
       taskExplanation: this.taskExplanation,
-      validationResult: lastValidationResult,
-      iterations: currentIteration,
-      validationAttempts,
+      validationResult: state.lastValidationResult,
+      iterations: state.currentIteration,
+      validationAttempts: state.validationAttempts,
     };
+  }
+
+  /**
+   * Cleans up resources when initialization fails
+   */
+  private async cleanupOnInitializationError(): Promise<void> {
+    try {
+      await this.browser.shutdown();
+    } catch (shutdownError) {
+      console.warn("Failed to shutdown browser during error cleanup:", shutdownError);
+    }
   }
 
   async close() {
@@ -1967,11 +1850,11 @@ export class WebAgent {
       .split("\n")
       .map((line) => line.trim()) // Remove leading/trailing whitespace
       .map((line) => line.replace(/^- /, "")) // Remove bullet point prefixes
-      .filter((line) => !this.FILTERED_PREFIXES.some((start) => line.startsWith(start))) // Remove noise
+      .filter((line) => !FILTERED_PREFIXES.some((start) => line.startsWith(start))) // Remove noise
       .map((line) => {
         // === STEP 2: Apply semantic transformations ===
         // Convert verbose aria descriptions to concise equivalents for better LLM understanding
-        return this.ARIA_TRANSFORMATIONS.reduce(
+        return ARIA_TRANSFORMATIONS.reduce(
           (processed, [pattern, replacement]) => processed.replace(pattern, replacement),
           line,
         );
