@@ -154,9 +154,11 @@ export const webActionFunctions = {
 
   extract: {
     name: "extract",
-    description: "Extract specific data from the current page",
+    description: "Extract data from the current page",
     parameters: z.object({
-      description: z.string().describe("Description of what data to extract"),
+      description: z
+        .string()
+        .describe("Precise description of the data to extract. DO NOT use `ref` values."),
     }),
   },
 

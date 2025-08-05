@@ -422,13 +422,18 @@ export const buildTaskValidationPrompt = (
  */
 const extractionPromptTemplate = buildPromptTemplate(
   `
-Extract this data from this page content:
+Extract this data from the page content:
 {{ extractionDescription }}
 
 Page Content (Markdown):
 {{ markdown }}
 
-Extract only the requested data in simple, compact format.
+Instructions:
+- Extract the requested information accurately from the markdown content above
+- Present the results in a compact, clear, well-structured json format
+- Include all relevant details that match the extraction request
+
+Provide the extracted data:
 `.trim(),
 );
 
