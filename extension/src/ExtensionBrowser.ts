@@ -28,8 +28,8 @@ export class ExtensionBrowser implements AriaBrowser {
   private tabId?: number;
   private logger = createLogger("ExtensionBrowser");
 
-  // Match Playwright's timeout - 5 seconds timeout for interactive actions
-  private readonly ACTION_TIMEOUT_MS = 5000;
+  // Match Playwright's timeout - 20 seconds timeout for interactive actions
+  private readonly ACTION_TIMEOUT_MS = 20000;
   // Page settle time after load events (animations, dynamic content, etc.)
   private readonly PAGE_SETTLE_TIME_MS = 1000;
   // Network idle delay for networkidle state
