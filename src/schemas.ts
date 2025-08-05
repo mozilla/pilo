@@ -1,19 +1,6 @@
 import { z } from "zod";
 import { PageAction } from "./browser/ariaBrowser.js";
 
-// Schema for plan creation (without URL)
-export const planSchema = z.object({
-  explanation: z.string().describe("Task explanation in agent's own words"),
-  plan: z.string().describe("Step-by-step plan for the task"),
-});
-
-// Schema for plan creation with URL
-export const planAndUrlSchema = z.object({
-  explanation: z.string().describe("Task explanation in agent's own words"),
-  plan: z.string().describe("Step-by-step plan for the task"),
-  url: z.string().describe("Starting URL for the task"),
-});
-
 // Schema for the action loop responses
 export const actionSchema = z.object({
   observation: z
@@ -31,8 +18,6 @@ export const actionSchema = z.object({
 });
 
 // Export the types
-export type Plan = z.infer<typeof planSchema>;
-export type PlanAndUrl = z.infer<typeof planAndUrlSchema>;
 export type Action = z.infer<typeof actionSchema>;
 
 // Schema for task validation results
@@ -201,7 +186,7 @@ export const planningFunctions = {
   },
 
   create_plan_with_url: {
-    name: "create_plan_with_url", 
+    name: "create_plan_with_url",
     description: "Create a step-by-step plan and determine the best starting URL",
     parameters: z.object({
       explanation: z.string().describe("Task explanation in agent's own words"),
@@ -217,14 +202,18 @@ export const validationFunctions = {
     name: "validate_task",
     description: "Evaluate how well the task result accomplishes what the user requested",
     parameters: z.object({
-      taskAssessment: z.string().describe("Assessment of whether the result accomplishes the requested task"),
-      completionQuality: z.enum(["failed", "partial", "complete", "excellent"]).describe("Quality level of task completion"),
+      taskAssessment: z
+        .string()
+        .describe("Assessment of whether the result accomplishes the requested task"),
+      completionQuality: z
+        .enum(["failed", "partial", "complete", "excellent"])
+        .describe("Quality level of task completion"),
       feedback: z.string().optional().describe("What is missing to complete the task"),
     }),
   },
 };
 
-// Function calling schemas for data extraction  
+// Function calling schemas for data extraction
 export const extractionFunctions = {
   extract_data: {
     name: "extract_data",

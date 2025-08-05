@@ -30,7 +30,7 @@ describe("prompts", () => {
       expect(prompt).toContain("Create a plan for this web navigation task");
       expect(prompt).toContain("Book a flight from NYC to Paris");
       expect(prompt).toContain("Jan 15, 2024");
-      expect(prompt).toContain('"url"');
+      expect(prompt).toContain("create_plan_with_url()");
       expect(prompt).toContain("step-by-step plan, and starting URL");
     });
 
@@ -40,8 +40,8 @@ describe("prompts", () => {
 
       // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
-      // Verify JSON-only instruction is included
-      expect(prompt).toContain("You must respond with valid JSON only");
+      // Verify function call instruction is included
+      expect(prompt).toContain("Call exactly one function with the required parameters");
     });
 
     it("should include current date in prompt", () => {
@@ -88,8 +88,8 @@ describe("prompts", () => {
 
       // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
-      // Verify JSON-only instruction is included
-      expect(prompt).toContain("You must respond with valid JSON only");
+      // Verify function call instruction is included
+      expect(prompt).toContain("Call exactly one function with the required parameters");
     });
 
     it("should include starting URL when provided", () => {
@@ -116,14 +116,14 @@ describe("prompts", () => {
 
       expect(prompt).toContain("explanation");
       expect(prompt).toContain("plan");
-      expect(prompt).not.toContain('"url"');
+      expect(prompt).toContain("create_plan()");
     });
   });
 
   describe("actionLoopPrompt", () => {
     it("should contain action loop instructions", () => {
-      expect(actionLoopPrompt).toContain("For each step, assess the current state");
-      expect(actionLoopPrompt).toContain("Actions:");
+      expect(actionLoopPrompt).toContain("Think through the current page state");
+      expect(actionLoopPrompt).toContain("Available Functions:");
       expect(actionLoopPrompt).toContain("Rules:");
       expect(actionLoopPrompt).toContain("Best Practices:");
     });
@@ -133,8 +133,8 @@ describe("prompts", () => {
       expect(actionLoopPrompt).toContain(
         "You are an expert at completing tasks using a web browser",
       );
-      // Verify JSON-only instruction is included
-      expect(actionLoopPrompt).toContain("You must respond with valid JSON only");
+      // Verify function call instruction is included
+      expect(actionLoopPrompt).toContain("Call one function only");
     });
 
     it("should list all available actions", () => {
@@ -153,26 +153,24 @@ describe("prompts", () => {
       ];
 
       expectedActions.forEach((action) => {
-        expect(actionLoopPrompt).toContain(`"${action}"`);
+        expect(actionLoopPrompt).toContain(`${action}(`);
       });
     });
 
-    it("should include response format example", () => {
-      expect(actionLoopPrompt).toContain("currentStep");
-      expect(actionLoopPrompt).toContain("observation");
-      expect(actionLoopPrompt).toContain("extractedData");
-      expect(actionLoopPrompt).toContain("thought");
-      expect(actionLoopPrompt).toContain("action");
+    it("should include function call format instructions", () => {
+      expect(actionLoopPrompt).toContain("Call one function only");
+      expect(actionLoopPrompt).toContain("Do not repeat or duplicate function calls");
+      expect(actionLoopPrompt).toContain("Call EXACTLY ONE function per turn");
     });
 
     it("should include ref format examples", () => {
       expect(actionLoopPrompt).toContain("s1e33");
-      expect(actionLoopPrompt).toContain("[ref=s1e33]");
+      expect(actionLoopPrompt).toContain("element refs from page snapshot");
     });
 
     it("should include goto restrictions", () => {
       expect(actionLoopPrompt).toContain("PREVIOUSLY SEEN URL");
-      expect(actionLoopPrompt).toContain("Do NOT invent new URLs");
+      expect(actionLoopPrompt).toContain("goto() can ONLY use URLs");
     });
   });
 
@@ -351,7 +349,7 @@ describe("prompts", () => {
       );
       expect(prompt).toContain("Assess the current state");
       expect(prompt).toContain("most relevant elements");
-      expect(prompt).toContain("If an action has failed twice");
+      expect(prompt).toContain("If an action has failed or a planned step isn't possible");
     });
 
     it("should handle empty snapshot", () => {
@@ -379,7 +377,7 @@ describe("prompts", () => {
       const errors = "Missing ref field\nInvalid action type\nValue is required";
       const prompt = buildStepValidationFeedbackPrompt(errors);
 
-      expect(prompt).toContain("did not match the required format");
+      expect(prompt).toContain("had validation errors");
       expect(prompt).toContain("Missing ref field");
       expect(prompt).toContain("Invalid action type");
       expect(prompt).toContain("Value is required");
@@ -389,21 +387,19 @@ describe("prompts", () => {
       const errors = "Some error";
       const prompt = buildStepValidationFeedbackPrompt(errors);
 
-      expect(prompt).toContain("correct your response");
-      expect(prompt).toContain("exact format");
-      expect(prompt).toContain("currentStep");
-      expect(prompt).toContain("observation");
-      expect(prompt).toContain("thought");
-      expect(prompt).toContain("action");
+      expect(prompt).toContain("call the correct function with valid parameters");
+      expect(prompt).toContain("Use element refs from the page snapshot");
+      expect(prompt).toContain("Functions requiring refs");
+      expect(prompt).toContain("Functions requiring values");
     });
 
     it("should include field requirements", () => {
       const errors = "Test error";
       const prompt = buildStepValidationFeedbackPrompt(errors);
 
-      expect(prompt).toContain('you MUST provide a "ref"');
-      expect(prompt).toContain('you MUST provide a "value"');
-      expect(prompt).toContain('you must NOT provide a "ref" or "value"');
+      expect(prompt).toContain("Functions requiring refs: click, fill, select");
+      expect(prompt).toContain("Functions requiring values: fill, select, wait");
+      expect(prompt).toContain("goto() can only use URLs that appeared earlier");
     });
 
     it("should handle empty errors", () => {
@@ -421,38 +417,38 @@ describe("prompts", () => {
 
       const prompt = buildTaskValidationPrompt(task, finalAnswer);
 
-      expect(prompt).toContain("Review the task completion");
+      expect(prompt).toContain("Evaluate how well the task result accomplishes");
       expect(prompt).toContain("Task: Submit contact form");
-      expect(prompt).toContain("Final Answer: Form submitted successfully with ID: 12345");
+      expect(prompt).toContain("Result: Form submitted successfully with ID: 12345");
     });
 
     it("should include validation criteria", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("Does the final answer directly address the task");
-      expect(prompt).toContain("Is the answer complete and specific enough");
-      expect(prompt).toContain("perform the requested action or provide the requested information");
+      expect(prompt).toContain("Does the result accomplish what the user requested");
+      expect(prompt).toContain("Task partially completed but result is missing key elements");
+      expect(prompt).toContain("Task fully completed and result accomplishes what was requested");
     });
 
     it("should contain required instructions", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      // Verify JSON-only instruction is included (task validation doesn't include youArePrompt)
-      expect(prompt).toContain("You must respond with valid JSON only");
+      // Verify function call instruction is included
+      expect(prompt).toContain("Call exactly one function with the required parameters");
     });
 
     it("should include feedback instruction", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("If quality is not 'complete' or 'excellent'");
-      expect(prompt).toContain("specific, actionable guidance");
+      expect(prompt).toContain("Only for 'failed' or 'partial'");
+      expect(prompt).toContain("What is still missing to complete the task");
     });
 
     it("should handle empty inputs", () => {
       const prompt = buildTaskValidationPrompt("", "", "");
 
       expect(prompt).toContain("Task: ");
-      expect(prompt).toContain("Final Answer: ");
+      expect(prompt).toContain("Result: ");
     });
 
     it("should handle special characters", () => {
@@ -515,18 +511,22 @@ describe("prompts", () => {
       });
     });
 
-    it("should maintain JSON format consistency", () => {
-      const jsonPrompts = [
+    it("should maintain function call format consistency", () => {
+      const functionCallPrompts = [
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopPrompt,
         buildStepValidationFeedbackPrompt("errors"),
       ];
 
-      jsonPrompts.forEach((prompt) => {
-        expect(prompt).toContain("```json");
-        expect(prompt).toContain("```");
-      });
+      // Check that most prompts contain function call instructions
+      const promptsWithCallInstructions = functionCallPrompts.filter(
+        (prompt) =>
+          prompt.includes("Call") ||
+          prompt.includes("function") ||
+          prompt.includes("call the correct function"),
+      );
+      expect(promptsWithCallInstructions.length).toBeGreaterThan(functionCallPrompts.length / 2);
     });
   });
 });

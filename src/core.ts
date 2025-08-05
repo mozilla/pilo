@@ -34,7 +34,7 @@ export { JSONConsoleLogger } from "./loggers/json.js";
 export type { Logger } from "./loggers/types.js";
 
 // Schema types (public API for type safety)
-export type { Plan, PlanAndUrl, Action, TaskValidationResult } from "./schemas.js";
+export type { Action, TaskValidationResult } from "./schemas.js";
 
 // Note: createProvider not exported in core to avoid Node.js dependencies in browser
 // Use provider libraries directly in browser environments

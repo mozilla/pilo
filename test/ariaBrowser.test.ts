@@ -13,10 +13,12 @@ describe("AriaBrowser interface", () => {
         "uncheck",
         "select",
         "enter",
+        "fill_and_enter",
         "wait",
         "goto",
         "back",
         "forward",
+        "extract",
         "done",
       ];
 
@@ -38,10 +40,12 @@ describe("AriaBrowser interface", () => {
       expect(PageAction.Uncheck).toBe("uncheck");
       expect(PageAction.Select).toBe("select");
       expect(PageAction.Enter).toBe("enter");
+      expect(PageAction.FillAndEnter).toBe("fill_and_enter");
       expect(PageAction.Wait).toBe("wait");
       expect(PageAction.Goto).toBe("goto");
       expect(PageAction.Back).toBe("back");
       expect(PageAction.Forward).toBe("forward");
+      expect(PageAction.Extract).toBe("extract");
       expect(PageAction.Done).toBe("done");
     });
 
@@ -56,13 +60,14 @@ describe("AriaBrowser interface", () => {
         PageAction.Uncheck,
         PageAction.Select,
         PageAction.Enter,
+        PageAction.FillAndEnter,
       ];
 
       // Navigation actions
       const navigationActions = [PageAction.Goto, PageAction.Back, PageAction.Forward];
 
       // Control actions
-      const controlActions = [PageAction.Wait, PageAction.Done];
+      const controlActions = [PageAction.Wait, PageAction.Extract, PageAction.Done];
 
       const allActions = [...elementActions, ...navigationActions, ...controlActions];
       const enumValues = Object.values(PageAction);
@@ -186,12 +191,12 @@ describe("AriaBrowser interface", () => {
     });
 
     it("should have consistent naming convention", () => {
-      // PageAction values should be lowercase
+      // PageAction values should be lowercase with underscores allowed for compound actions
       Object.values(PageAction).forEach((action) => {
         expect(action).toBe(action.toLowerCase());
         expect(action).not.toContain(" ");
         expect(action).not.toContain("-");
-        expect(action).not.toContain("_");
+        // Underscores are allowed for compound actions like fill_and_enter
       });
 
       // LoadState values should be lowercase

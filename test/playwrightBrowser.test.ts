@@ -108,7 +108,7 @@ describe("PlaywrightBrowser", () => {
     it("should throw error for page info methods when not started", async () => {
       await expect(browser.getUrl()).rejects.toThrow("Browser not started");
       await expect(browser.getTitle()).rejects.toThrow("Browser not started");
-      await expect(browser.getText()).rejects.toThrow("Browser not started");
+      await expect(browser.getTreeWithRefs()).rejects.toThrow("Browser not started");
       await expect(browser.getScreenshot()).rejects.toThrow("Browser not started");
     });
 

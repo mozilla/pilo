@@ -10,7 +10,6 @@
  */
 
 import { generateObject, streamObject, generateText, LanguageModel } from "ai";
-import { writeFileSync } from "fs";
 import {
   buildActionLoopPrompt,
   buildPlanPrompt,
@@ -268,13 +267,13 @@ export class WebAgent {
     this.emit(WebAgentEventType.AGENT_STATUS, {
       message: "Making a plan and finding the best starting URL",
     });
-    
+
     const response = await this.generateGenericFunctionCall(
       planningTools,
       buildPlanAndUrlPrompt(task, this.guardrails),
       undefined,
       "create_plan_with_url",
-      DEFAULT_PLANNING_MAX_TOKENS
+      DEFAULT_PLANNING_MAX_TOKENS,
     );
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
@@ -304,13 +303,13 @@ export class WebAgent {
    */
   async generatePlan(task: string, startingUrl?: string) {
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
-    
+
     const response = await this.generateGenericFunctionCall(
       planningTools,
       buildPlanPrompt(task, startingUrl, this.guardrails),
       undefined,
       "create_plan",
-      DEFAULT_PLANNING_MAX_TOKENS
+      DEFAULT_PLANNING_MAX_TOKENS,
     );
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
@@ -717,7 +716,6 @@ export class WebAgent {
       role: "assistant",
       content: JSON.stringify(response),
     });
-    this.logConversation();
   }
 
   /**
@@ -728,44 +726,18 @@ export class WebAgent {
       role: "user",
       content,
     });
-    
+
     // Prevent memory bloat by limiting conversation history
     if (this.messages.length > MAX_CONVERSATION_MESSAGES) {
       // Keep system message and remove oldest user/assistant messages
-      const systemMessages = this.messages.filter(msg => msg.role === "system");
-      const otherMessages = this.messages.filter(msg => msg.role !== "system");
-      
+      const systemMessages = this.messages.filter((msg) => msg.role === "system");
+      const otherMessages = this.messages.filter((msg) => msg.role !== "system");
+
       // Keep the most recent messages up to the limit
-      const messagesToKeep = otherMessages.slice(-(MAX_CONVERSATION_MESSAGES - systemMessages.length));
+      const messagesToKeep = otherMessages.slice(
+        -(MAX_CONVERSATION_MESSAGES - systemMessages.length),
+      );
       this.messages = [...systemMessages, ...messagesToKeep];
-    }
-    
-    this.logConversation();
-  }
-
-  /**
-   * Log the full conversation to a timestamped file for debugging
-   */
-  private logConversation(): void {
-    if (!this.DEBUG) return;
-
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const filename = `conversation-${timestamp}.json`;
-
-      const conversationData = {
-        timestamp: new Date().toISOString(),
-        currentIteration: this.currentIterationId,
-        messageCount: this.messages.length,
-        messages: this.messages
-      };
-
-      writeFileSync(filename, JSON.stringify(conversationData, null, 2));
-      console.log(`📝 Conversation logged to: ${filename}`);
-      console.log(`📁 Current working directory: ${process.cwd()}`);
-    } catch (error) {
-      console.warn("Failed to log conversation:", error);
-      console.warn("Error details:", error);
     }
   }
 
@@ -851,7 +823,7 @@ export class WebAgent {
       }
       throw err;
     }
-    
+
     // This should never be reached due to the Promise<never> return type
     throw error;
   }
@@ -987,13 +959,19 @@ export class WebAgent {
   /**
    * Generic function calling method for any set of tools
    */
-  protected async generateGenericFunctionCall(tools: any, prompt?: string, messages?: any[], specificFunction?: string, maxTokens?: number): Promise<ToolCallResponse> {
+  protected async generateGenericFunctionCall(
+    tools: any,
+    prompt?: string,
+    messages?: any[],
+    specificFunction?: string,
+    maxTokens?: number,
+  ): Promise<ToolCallResponse> {
     const config: any = {
       model: this.provider,
       tools,
-      toolChoice: specificFunction 
-        ? { type: "tool", toolName: specificFunction } as const
-        : "required" as const,
+      toolChoice: specificFunction
+        ? ({ type: "tool", toolName: specificFunction } as const)
+        : ("required" as const),
       temperature: 0,
       maxToolRoundtrips: 0,
     };
@@ -1011,9 +989,7 @@ export class WebAgent {
     }
 
     // Add AbortSignal if provided
-    const finalConfig = this.abortSignal 
-      ? { ...config, abortSignal: this.abortSignal }  
-      : config;
+    const finalConfig = this.abortSignal ? { ...config, abortSignal: this.abortSignal } : config;
 
     try {
       const response = await generateText(finalConfig);
@@ -1062,13 +1038,10 @@ export class WebAgent {
     };
 
     // Add AbortSignal if provided
-    const finalConfig = this.abortSignal 
-      ? { ...config, abortSignal: this.abortSignal }  
-      : config;
+    const finalConfig = this.abortSignal ? { ...config, abortSignal: this.abortSignal } : config;
 
     try {
       const response = await generateText(finalConfig);
-
 
       // Emit observation first (the AI's reasoning/thinking)
       const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
@@ -1080,36 +1053,36 @@ export class WebAgent {
         // Properly handle union types based on function name
         let ref: string | undefined;
         let value: string | number | undefined;
-        
+
         switch (toolCall.toolName) {
-          case 'click':
-          case 'hover':
-          case 'check':
-          case 'uncheck':
-          case 'focus':
-          case 'enter':
+          case "click":
+          case "hover":
+          case "check":
+          case "uncheck":
+          case "focus":
+          case "enter":
             ref = (toolCall.args as { ref: string }).ref;
             break;
-          case 'fill':
-          case 'fill_and_enter':
-          case 'select':
+          case "fill":
+          case "fill_and_enter":
+          case "select":
             ref = (toolCall.args as { ref: string; value: string }).ref;
             value = (toolCall.args as { ref: string; value: string }).value;
             break;
-          case 'wait':
+          case "wait":
             value = (toolCall.args as { seconds: number }).seconds;
             break;
-          case 'goto':
+          case "goto":
             value = (toolCall.args as { url: string }).url;
             break;
-          case 'extract':
+          case "extract":
             value = (toolCall.args as { description: string }).description;
             break;
-          case 'done':
+          case "done":
             value = (toolCall.args as { result: string }).result;
             break;
         }
-        
+
         this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
           action: toolCall.toolName,
           ref,
@@ -1157,7 +1130,9 @@ export class WebAgent {
     }
 
     if (response.toolCalls.length > 1) {
-      console.warn(`⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`);
+      console.warn(
+        `⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`,
+      );
     }
 
     const toolCall = response.toolCalls[0];
@@ -1171,34 +1146,34 @@ export class WebAgent {
     let value: string | undefined;
 
     switch (functionName) {
-      case 'click':
-      case 'hover':
-      case 'check':
-      case 'uncheck':
-      case 'focus':
-      case 'enter':
+      case "click":
+      case "hover":
+      case "check":
+      case "uncheck":
+      case "focus":
+      case "enter":
         ref = (toolCall.args as { ref: string }).ref;
         break;
-      case 'fill':
-      case 'fill_and_enter':
-      case 'select':
+      case "fill":
+      case "fill_and_enter":
+      case "select":
         ref = (toolCall.args as { ref: string; value: string }).ref;
         value = (toolCall.args as { ref: string; value: string }).value;
         break;
-      case 'wait':
+      case "wait":
         value = String((toolCall.args as { seconds: number }).seconds);
         break;
-      case 'goto':
+      case "goto":
         value = (toolCall.args as { url: string }).url;
         break;
-      case 'extract':
+      case "extract":
         value = (toolCall.args as { description: string }).description;
         break;
-      case 'done':
+      case "done":
         value = (toolCall.args as { result: string }).result;
         break;
-      case 'back':
-      case 'forward':
+      case "back":
+      case "forward":
         // No args needed
         break;
       default:
@@ -1207,10 +1182,10 @@ export class WebAgent {
 
     // Use the reasoning text if available, otherwise fall back to regular text
     const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
-    
+
     return {
       observation: thinkingText,
-      observationStatusMessage: "Action planned", 
+      observationStatusMessage: "Action planned",
       action: {
         action,
         ref,
@@ -1219,7 +1194,6 @@ export class WebAgent {
       actionStatusMessage: "Executing action",
     };
   }
-
 
   /**
    * Validate function call action for basic requirements
@@ -1253,7 +1227,7 @@ export class WebAgent {
       messages?: any[];
       prompt?: string;
       schema?: any;
-    }
+    },
   ): Promise<never> {
     const { retryCount, messages, prompt, schema } = context;
 
@@ -1272,17 +1246,20 @@ export class WebAgent {
     }
 
     // Check if this is a recoverable AI generation error
-    const isRecoverableError = error instanceof Error && (
-      error.message.includes("response did not match schema") ||
-      error.message.includes("AI_NoObjectGeneratedError") ||
-      error.message.includes("No object generated") ||
-      error.message.includes("Invalid JSON response") ||
-      error.message.includes("AI_APICallError") ||
-      error.name === "AI_APICallError"
-    );
+    const isRecoverableError =
+      error instanceof Error &&
+      (error.message.includes("response did not match schema") ||
+        error.message.includes("AI_NoObjectGeneratedError") ||
+        error.message.includes("No object generated") ||
+        error.message.includes("Invalid JSON response") ||
+        error.message.includes("AI_APICallError") ||
+        error.name === "AI_APICallError");
 
     if (isRecoverableError) {
-      console.error(`AI response schema mismatch (attempt ${retryCount + 1}):`, (error as Error).message);
+      console.error(
+        `AI response schema mismatch (attempt ${retryCount + 1}):`,
+        (error as Error).message,
+      );
 
       // Log debugging info on the first failure
       if (retryCount === 0 && this.DEBUG && messages) {
@@ -1475,9 +1452,6 @@ export class WebAgent {
         content: textContent,
       });
     }
-
-    // Log conversation after adding page snapshot
-    this.logConversation();
   }
 
   private addValidationErrorFeedback(errors: string[], response: any) {
@@ -1541,18 +1515,10 @@ export class WebAgent {
           }
 
           // Fill the element first
-          await this.browser.performAction(
-            result.action.ref,
-            PageAction.Fill,
-            result.action.value,
-          );
-          
+          await this.browser.performAction(result.action.ref, PageAction.Fill, result.action.value);
+
           // Then press enter on the same element
-          await this.browser.performAction(
-            result.action.ref,
-            PageAction.Enter,
-            undefined,
-          );
+          await this.browser.performAction(result.action.ref, PageAction.Enter, undefined);
           break;
 
         case "done":
@@ -1642,7 +1608,9 @@ export class WebAgent {
 
       // Check if response was truncated due to token limit
       if (response.finishReason === "length") {
-        console.warn("⚠️  Data extraction was truncated due to token limit - response may be incomplete");
+        console.warn(
+          "⚠️  Data extraction was truncated due to token limit - response may be incomplete",
+        );
         extractedData += "\n\n[Response truncated due to length limit]";
       }
 
@@ -1662,7 +1630,7 @@ export class WebAgent {
   private isValidUrl(urlString: string): boolean {
     try {
       const url = new URL(urlString);
-      return url.protocol === 'http:' || url.protocol === 'https:';
+      return url.protocol === "http:" || url.protocol === "https:";
     } catch {
       return false;
     }
@@ -1741,8 +1709,14 @@ export class WebAgent {
     }
 
     const response = await this.withProcessingEvents("Validating task completion", async () => {
-      const result = await this.generateGenericFunctionCall(validationTools, validationPrompt, undefined, "validate_task", DEFAULT_VALIDATION_MAX_TOKENS);
-      
+      const result = await this.generateGenericFunctionCall(
+        validationTools,
+        validationPrompt,
+        undefined,
+        "validate_task",
+        DEFAULT_VALIDATION_MAX_TOKENS,
+      );
+
       if (!result.toolCalls || result.toolCalls.length === 0) {
         throw new Error("No function call found in validation response");
       }
@@ -1818,11 +1792,15 @@ export class WebAgent {
       if (startingUrl) {
         this.url = startingUrl;
         // Run browser launch and plan creation in parallel for efficiency
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
+        this.emit(WebAgentEventType.AGENT_STATUS, {
+          message: "Starting browser and creating plan",
+        });
         await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
       } else {
         // Let AI choose the best starting URL based on the task
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: "Starting browser and creating plan" });
+        this.emit(WebAgentEventType.AGENT_STATUS, {
+          message: "Starting browser and creating plan",
+        });
         await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
       }
     } catch (error) {
@@ -1832,7 +1810,9 @@ export class WebAgent {
       } catch (shutdownError) {
         console.warn("Failed to shutdown browser during error cleanup:", shutdownError);
       }
-      throw new Error(`Failed to initialize task: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to initialize task: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // === NAVIGATION PHASE ===
