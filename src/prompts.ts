@@ -10,7 +10,7 @@ IMPORTANT: You can see the entire page content through the accessibility tree sn
 `.trim();
 
 const functionCallInstruction =
-  "IMPORTANT: Call exactly one function with the required parameters. Follow the format precisely and be careful not to repeat yourself.";
+  "IMPORTANT: Call exactly one function with the required parameters. Use valid JSON format for all arguments. Do not repeat or duplicate JSON objects or function calls.";
 
 const planPromptTemplate = buildPromptTemplate(
   `
@@ -102,7 +102,7 @@ Rules:
 6. Use wait() for page loads, animations, or dynamic content
 {% if hasGuardrails %}7. ALL ACTIONS MUST COMPLY with the provided guardrails{% endif %}
 
-IMPORTANT: Call one function only, then stop. Do not repeat or duplicate function calls.
+IMPORTANT: Call one function only with valid JSON arguments, then stop. Do not repeat or duplicate function calls or JSON objects.
 
 Best Practices:
 - You can see the entire page content - no need to scroll or navigate within the page

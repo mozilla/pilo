@@ -128,7 +128,7 @@ export const webActionFunctions = {
     name: "wait",
     description: "Wait for a specified number of seconds",
     parameters: z.object({
-      seconds: z.number().describe("Number of seconds to wait"),
+      seconds: z.number().min(0).max(30).describe("Number of seconds to wait (0-30)"),
     }),
   },
 
@@ -136,7 +136,7 @@ export const webActionFunctions = {
     name: "goto",
     description: "Navigate to a URL that was previously seen in the conversation",
     parameters: z.object({
-      url: z.string().describe("URL to navigate to (must be previously seen)"),
+      url: z.string().url().describe("URL to navigate to (must be previously seen)"),
     }),
   },
 

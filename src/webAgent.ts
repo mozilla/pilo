@@ -1110,12 +1110,23 @@ export class WebAgent {
       }
 
       if (error instanceof Error) {
+        // Add generic error feedback to conversation without showing the raw error details
+        this.addUserMessage(
+          `⚠️ Error: ${error.message}. ` +
+            `Please follow the function calling instructions carefully and try again. ` +
+            `Call exactly one function with valid parameters.`,
+        );
+
+        // Emit error event for logging
         this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-          error: error.message,
+          error: `AI generation error - attempting retry: ${error.message}`,
           prompt: undefined,
           schema: undefined,
           messages: cleanMessages,
         });
+
+        // Retry the function call once
+        return this.generateFunctionCallResponse(cleanMessages);
       }
       throw error;
     }
