@@ -26,6 +26,7 @@ export const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
 export const MAX_RETRY_ATTEMPTS = 2;
 export const RETRY_DELAY_MS = 1000;
 export const MAX_CONVERSATION_MESSAGES = 100; // Prevent memory bloat
+export const MAX_ACTION_FAILURES = 5; // Maximum consecutive action failures before stopping
 
 // Page processing constants
 export const FILTERED_PREFIXES = ["/url:"];

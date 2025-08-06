@@ -46,6 +46,7 @@ import {
   MAX_CONVERSATION_MESSAGES,
   FILTERED_PREFIXES,
   ARIA_TRANSFORMATIONS,
+  MAX_ACTION_FAILURES,
 } from "./config/WebAgentConfig.js";
 import { nanoid } from "nanoid";
 
@@ -204,6 +205,10 @@ export class WebAgent {
   /** AbortSignal for cancelling execution */
   private abortSignal: AbortSignal | null = null;
 
+  // === Action Failure Tracking ===
+  /** Count of consecutive action failures for circuit breaker logic */
+  private consecutiveActionFailures = 0;
+
   // === Validation Patterns ===
   // No regex patterns needed - we just check if refs exist in the page snapshot
 
@@ -231,6 +236,29 @@ export class WebAgent {
     this.logger.initialize(this.eventEmitter);
     this.actionValidator = new ActionValidator();
     this.eventHelper = new EventEmissionHelper((type, data) => this.emit(type, data));
+  }
+
+  // === Action Failure Management ===
+
+  /**
+   * Increment action failure counter and check if we should stop
+   */
+  private checkActionFailureLimit(failureType: string): void {
+    this.consecutiveActionFailures++;
+
+    if (this.consecutiveActionFailures >= MAX_ACTION_FAILURES) {
+      throw new Error(
+        `Action failed ${this.consecutiveActionFailures} consecutive times (${failureType}). ` +
+          `Stopping to prevent infinite retry loop.`,
+      );
+    }
+  }
+
+  /**
+   * Reset action failure counter on successful action
+   */
+  private resetActionFailures(): void {
+    this.consecutiveActionFailures = 0;
   }
 
   /**
@@ -412,10 +440,9 @@ export class WebAgent {
    * 4. Converts tool calls back to Action format for compatibility
    *
    * @param pageSnapshot - Raw aria tree snapshot of the current page
-   * @param retryCount - Number of validation retry attempts (for error handling)
    * @returns The validated action to execute
    */
-  async generateNextAction(pageSnapshot: string, retryCount = 0): Promise<Action> {
+  async generateNextAction(pageSnapshot: string): Promise<Action> {
     // Store the current page snapshot for ref validation
     this.actionValidator.updatePageSnapshot(pageSnapshot);
 
@@ -456,20 +483,15 @@ export class WebAgent {
     const validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
 
     if (!validationResult.isValid) {
+      // Check action failure limit
+      this.checkActionFailureLimit("Tool call validation failed");
+
       // Emit validation error event for logging
       this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
         errors: validationResult.errors,
-        retryCount,
+        retryCount: this.consecutiveActionFailures - 1, // For logging purposes
         rawResponse: response,
       });
-
-      if (retryCount >= MAX_RETRY_ATTEMPTS) {
-        throw new Error(
-          `Failed to get valid response after ${
-            retryCount + 1
-          } attempts. Errors: ${validationResult.errors.join(", ")}`,
-        );
-      }
 
       // Add feedback message if provided by the validator
       if (validationResult.feedbackMessage) {
@@ -479,8 +501,11 @@ export class WebAgent {
         this.addValidationErrorFeedback(validationResult.errors, response);
       }
 
-      return this.generateNextAction(pageSnapshot, retryCount + 1);
+      return this.generateNextAction(pageSnapshot);
     }
+
+    // Success! Reset failure counter since we got a valid action
+    this.resetActionFailures();
 
     // Return the validated and parsed action
     return validationResult.action!;
@@ -726,6 +751,9 @@ export class WebAgent {
       }
 
       if (error instanceof Error) {
+        // Check action failure limit before retrying
+        this.checkActionFailureLimit("Tool call generation failed");
+
         // Add generic error feedback to conversation without showing the raw error details
         this.addUserMessage(
           `⚠️ Error: ${error.message}. ` +
@@ -741,7 +769,7 @@ export class WebAgent {
           messages: cleanMessages,
         });
 
-        // Retry the tool call once
+        // Retry the tool call (now bounded by failure counter)
         return this.generateToolCallResponse(cleanMessages);
       }
       throw error;
@@ -1207,6 +1235,7 @@ export class WebAgent {
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.abortSignal = null;
+    this.consecutiveActionFailures = 0;
   }
 
   private formatConversationHistory(): string {

@@ -432,4 +432,210 @@ describe("WebAgent", () => {
       expect(messages[1].content).toContain("second task");
     });
   });
+
+  describe("Action failure counter", () => {
+    it("should track consecutive action failures", async () => {
+      // Set up invalid tool call responses that will fail validation
+      mockGenerateText
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_1" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_2" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_3" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_4" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_5" }));
+
+      mockBrowser.setCurrentText("button [ref=s1e23]"); // Only s1e23 exists
+
+      // Should throw after 5 consecutive failures
+      await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+        "Action failed 5 consecutive times (Tool call validation failed). Stopping to prevent infinite retry loop.",
+      );
+
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+
+    it("should reset failure counter on successful action", async () => {
+      // First 4 failures, then success, then 4 more failures (should not exceed limit)
+      mockGenerateText
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_1" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_2" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_3" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_4" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" })) // Success - resets counter
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_6" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_7" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_8" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_9" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" })); // Success again
+
+      mockBrowser.setCurrentText("button [ref=s1e23]"); // Only s1e23 exists
+
+      // First call should succeed after 5 attempts (4 failures + 1 success)
+      const result1 = await webAgent.generateNextAction("button [ref=s1e23]");
+      expect(result1.action.ref).toBe("s1e23");
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+
+      // Second call should succeed after 5 more attempts (4 failures + 1 success)
+      const result2 = await webAgent.generateNextAction("button [ref=s1e23]");
+      expect(result2.action.ref).toBe("s1e23");
+      expect(mockGenerateText).toHaveBeenCalledTimes(10);
+    });
+
+    it("should track failures across different validation types", async () => {
+      // Mix of different failure types
+      mockGenerateText
+        .mockResolvedValueOnce({ toolCalls: [], text: "no tool call" }) // Missing tool call
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref" })) // Invalid ref
+        .mockRejectedValueOnce(new Error("Network error")) // Tool call generation error
+        .mockResolvedValueOnce(createMockActionResponse("fill", { ref: "s1e23" })) // Missing value
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref" })); // Invalid ref again
+
+      mockBrowser.setCurrentText("button [ref=s1e23]"); // Only s1e23 exists
+
+      // Should throw after 5 consecutive failures of different types
+      await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+        "Action failed 5 consecutive times",
+      );
+
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+
+    it("should reset failure counter when resetState is called", async () => {
+      // First, accumulate some failures to set the counter
+      mockGenerateText
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_1" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_2" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" })); // Success
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      // Generate action to set up some failure history
+      await webAgent.generateNextAction("button [ref=s1e23]");
+
+      // Reset state should clear failure counter
+      webAgent.resetState();
+
+      // Now try 5 failures again - should still take 5 attempts to fail
+      mockGenerateText.mockClear();
+      mockGenerateText
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_1" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_2" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_3" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_4" }))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref_5" }));
+
+      await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+        "Action failed 5 consecutive times",
+      );
+
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe("Repetition scenario fix", () => {
+    it("should stop after MAX_ACTION_FAILURES when AI generates malformed tool names", async () => {
+      // Simulate the original infinite retry loop scenario where AI generates malformed tool names
+      // like 'extractdoneextractdoneextractdone...' repeatedly
+      mockGenerateText
+        .mockResolvedValueOnce({
+          toolCalls: [{ toolName: "extractdoneextractdone", args: {} }],
+          text: "Malformed tool call",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [{ toolName: "clickfillclick", args: {} }],
+          text: "Another malformed tool call",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [{ toolName: "donedonedonedonedone", args: {} }],
+          text: "Yet another malformed tool call",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [{ toolName: "invalidtoolname", args: {} }],
+          text: "Invalid tool name",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [{ toolName: "anotherbadtool", args: {} }],
+          text: "Another bad tool name",
+          finishReason: "stop",
+        });
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      // Should throw after MAX_ACTION_FAILURES (5) attempts with malformed tool names
+      await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+        "Action failed 5 consecutive times (Tool call validation failed). Stopping to prevent infinite retry loop.",
+      );
+
+      // Verify it tried exactly 5 times then stopped
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+
+    it("should handle repeated JSON in tool call arguments and still respect failure limit", async () => {
+      // Test the RepetitionValidator integration with failure counter
+      mockGenerateText
+        .mockResolvedValueOnce({
+          toolCalls: [
+            {
+              toolName: "click",
+              args: '{"ref":"invalid"}{"ref":"invalid"}{"ref":"invalid"}', // Repeated JSON
+            },
+          ],
+          text: "Repeated JSON args",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [
+            {
+              toolName: "fill",
+              args: '{"ref":"invalid","value":"test"}{"ref":"invalid","value":"test"}', // Repeated JSON
+            },
+          ],
+          text: "Another repeated JSON",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [
+            {
+              toolName: "click",
+              args: '{"ref":"bad"}{"ref":"bad"}{"ref":"bad"}{"ref":"bad"}', // More repetition
+            },
+          ],
+          text: "More repetition",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [
+            {
+              toolName: "hover",
+              args: '{"ref":"wrong"}{"ref":"wrong"}', // Still repeated and invalid
+            },
+          ],
+          text: "Still failing",
+          finishReason: "stop",
+        })
+        .mockResolvedValueOnce({
+          toolCalls: [
+            {
+              toolName: "select",
+              args: '{"ref":"nope"}{"ref":"nope"}{"ref":"nope"}', // Fifth failure
+            },
+          ],
+          text: "Fifth failure",
+          finishReason: "stop",
+        });
+
+      mockBrowser.setCurrentText("button [ref=s1e23]"); // Only s1e23 exists
+
+      // Should clean up the repeated JSON but still fail validation due to invalid refs
+      // and should stop after 5 failures
+      await expect(webAgent.generateNextAction("button [ref=s1e23]")).rejects.toThrow(
+        "Action failed 5 consecutive times (Tool call validation failed). Stopping to prevent infinite retry loop.",
+      );
+
+      expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+  });
 });
