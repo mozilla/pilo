@@ -6,19 +6,22 @@ You have deep knowledge of the web and use only the highest quality sources.
 You focus on the task at hand and complete one step at a time.
 You adapt to situations and find creative ways to complete tasks without getting stuck.
 
-IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
+IMPORTANT:
+- You can see the entire page content through the accessibility tree snapshot.
+- You do not need to scroll or click links to navigate within a page - all content is visible to you.
+- Focus on the elements you need to interact with directly.
 `.trim();
 
-// Shared function examples with proper JSON syntax
-const functionExamples = `
+// Available tools with proper JSON syntax
+const toolExamples = `
 - click({"ref": "s1e33"}) - Click on an element
-- fill({"ref": "s1e33", "value": "text"}) - Enter text into a field  
+- fill({"ref": "s1e33", "value": "text"}) - Enter text into a field
 - fill_and_enter({"ref": "s1e33", "value": "text"}) - Fill and press Enter
 - select({"ref": "s1e33", "value": "option"}) - Select from dropdown
 - hover({"ref": "s1e33"}) - Hover over element
 - check({"ref": "s1e33"}) - Check checkbox
 - uncheck({"ref": "s1e33"}) - Uncheck checkbox
-- focus({"ref": "s1e33"}) - Focus on element  
+- focus({"ref": "s1e33"}) - Focus on element
 - enter({"ref": "s1e33"}) - Press Enter key
 - wait({"seconds": 3}) - Wait for specified time
 - goto({"url": "https://example.com"}) - Navigate to URL (only previously seen URLs)
@@ -28,8 +31,11 @@ const functionExamples = `
 - done({"result": "your final answer"}) - Complete the task
 `.trim();
 
-const functionCallInstruction =
-  "Call exactly one function with the required parameters. Use valid JSON format for all arguments. CRITICAL: Output each function call exactly ONCE. Do not repeat or duplicate the same function call multiple times.";
+const toolCallInstruction = `
+You MUST use exactly one tool with the required parameters.
+Use valid JSON format for all arguments.
+CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool call multiple times.
+`.trim();
 
 /**
  * Planning Prompt Template
@@ -46,7 +52,7 @@ const functionCallInstruction =
  * 1. generatePlanWithUrl() - When no starting URL provided, AI chooses best site
  * 2. generatePlan() - When starting URL is provided, plan is tailored to that site
  *
- * Function calls generated:
+ * Tool calls generated:
  * - create_plan_with_url(): Returns explanation, plan, and starting URL
  * - create_plan(): Returns explanation and plan (URL already known)
  *
@@ -78,11 +84,11 @@ Call create_plan_with_url() with:
 - url: Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query
 {% else %}
 Call create_plan() with:
-- explanation: Restate the task concisely in your own words, focusing on the core objective  
+- explanation: Restate the task concisely in your own words, focusing on the core objective
 - plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
 {% endif %}
 
-${functionCallInstruction}
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -103,7 +109,7 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
     guardrails,
   });
 
-// Function calling approach - no longer need response format template
+// Tool calling approach - no longer need response format template
 
 /**
  * Action Loop Prompt Template
@@ -114,7 +120,7 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
  * Purpose:
  * - Provides the AI with instructions on how to interact with web pages
  * - Lists all available browser actions (click, fill, navigate, etc.)
- * - Establishes rules for function calling and task completion
+ * - Establishes rules for tool calling and task completion
  * - Integrates guardrails when provided to constrain AI behavior
  *
  * Usage in WebAgent:
@@ -122,8 +128,8 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
  * - Remains constant throughout the action execution loop
  * - Works with generateNextAction() to produce appropriate browser actions
  *
- * Function calls generated:
- * - All web action functions: click, fill, select, hover, check, uncheck, focus, enter,
+ * Tool calls generated:
+ * - All web action tools: click, fill, select, hover, check, uncheck, focus, enter,
  *   fill_and_enter, wait, goto, back, forward, extract, done
  *
  * This prompt is the core instruction set that guides the AI's decision-making
@@ -140,22 +146,22 @@ Remember: When you complete the task with done(), ensure your result fully accom
 🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
 {% endif %}
 
-Available Functions:
-{{ functionExamples }}
+Available Tools:
+{{ toolExamples }}
 
 Rules:
 1. Use element refs from page snapshot (e.g., s1e33)
-2. Call EXACTLY ONE function per turn - never call multiple functions or repeat the same function
+2. Use EXACTLY ONE tool per turn - never use multiple tools or repeat the same tool
 3. You MUST complete ALL steps in your plan before using done()
 4. done() means the ENTIRE task is finished with comprehensive results
 5. goto() can ONLY use URLs that appeared earlier in this conversation
 6. Use wait() for page loads, animations, or dynamic content
 {% if hasGuardrails %}7. ALL ACTIONS MUST COMPLY with the provided guardrails{% endif %}
 
-**CRITICAL: You MUST call exactly ONE function with valid arguments on EVERY turn. Never provide text-only responses.**
-- If you think the task is complete, you must call done(result)
-- If you need to take an action, call the appropriate function
-- If you're unsure, call extract() to gather more information
+**CRITICAL: You MUST use exactly ONE tool with valid arguments on EVERY turn. Never provide text-only responses.**
+- If you think the task is complete, you must use done(result)
+- If you need to take an action, use the appropriate tool
+- If you're unsure, use extract() to gather more information
 
 Best Practices:
 - You can see the entire page content - no need to scroll or navigate within the page
@@ -165,7 +171,7 @@ Best Practices:
 - If an element isn't found, look for alternative elements
 - Adapt if planned steps isn't possible - work with what's available
 - For research tasks: Use extract() to capture data from relevant pages as you discover it - don't wait until the end
-{% if hasGuardrails %}- Verify each action complies with guardrails before calling the function{% endif %}
+{% if hasGuardrails %}- Verify each action complies with guardrails before using the tool{% endif %}
 
 When using done():
 - The result should be a summary of the steps you took to complete the task
@@ -173,16 +179,15 @@ When using done():
 - The result should be thorough and include all the information requested in the task
 - If the task included criteria, you should mention specific details of how you met those criteria
 
-
-Think carefully, then call exactly one appropriate function. Failure to do so will result in an error.
-${functionCallInstruction}
+Think carefully, then use exactly one appropriate tool. Failure to do so will result in an error.
+${toolCallInstruction}
 `.trim(),
 );
 
 const buildActionLoopPrompt = (hasGuardrails: boolean) =>
   actionLoopPromptTemplate({
     hasGuardrails,
-    functionExamples,
+    toolExamples,
   });
 
 export const actionLoopPrompt = buildActionLoopPrompt(false);
@@ -307,37 +312,37 @@ export const buildPageSnapshotPrompt = (
  * Called from addValidationErrorFeedback() when action validation fails.
  *
  * Purpose:
- * - Informs the AI about specific validation errors in its function calls
- * - Provides reminders about correct function call formats and requirements
+ * - Informs the AI about specific validation errors in its tool calls
+ * - Provides reminders about correct tool call formats and requirements
  * - Guides the AI to retry with corrected parameters
  * - Reinforces guardrails compliance when applicable
  *
  * Usage in WebAgent:
- * - Triggered when validateFunctionCallAction() detects errors
+ * - Triggered when validateToolCallAction() detects errors
  * - Added as user message after the failed assistant response
  * - Followed by retry attempt with generateNextAction()
  * - Used in the retry loop (up to MAX_RETRY_ATTEMPTS)
  *
- * Function calls expected after this prompt:
- * - Corrected version of the previously failed function call
+ * Tool calls expected after this prompt:
+ * - Corrected version of the previously failed tool call
  *
  * This prompt is critical for the AI's learning loop - it helps the AI
  * understand what went wrong and how to fix it on subsequent attempts.
  */
 const stepValidationFeedbackTemplate = buildPromptTemplate(
   `
-Your previous function call had validation errors:
+Your previous tool call had validation errors:
 
 {{ validationErrors }}
 
-Please call the correct function with valid parameters. Remember:
+Please use the correct tool with valid parameters. Remember:
 - Use element refs from the page snapshot (format: s1e23)
-- Functions requiring refs: click, fill, select, hover, check, uncheck, focus, enter
-- Functions requiring values: fill, select, wait, goto, extract, done
+- Tools requiring refs: click, fill, select, hover, check, uncheck, focus, enter
+- Tools requiring values: fill, select, wait, goto, extract, done
 - goto() can only use URLs that appeared earlier in the conversation
 - wait() requires a numeric value
 {% if hasGuardrails %}
-- ALL FUNCTION CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+- ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 
 `.trim(),
@@ -353,16 +358,16 @@ export const buildStepValidationFeedbackPrompt = (
   });
 
 /**
- * Function Call Error Correction Template
+ * Tool Call Error Correction Template
  *
- * Used by WebAgent when AI provides reasoning but fails to call any function.
- * Called from convertFunctionCallToAction() when no function calls are detected.
+ * Used by WebAgent when AI provides reasoning but fails to call any tool.
+ * Called from convertToolCallToAction() when no tool calls are detected.
  *
  * Purpose:
  * - Shows the AI what they said vs what they should do
- * - Lists all available functions with proper JSON syntax
+ * - Lists all available tools with proper JSON syntax
  * - Provides specific guidance based on their reasoning text
- * - Reinforces the requirement to call exactly one function per turn
+ * - Reinforces the requirement to use exactly one tool per turn
  *
  * Usage in WebAgent:
  * - Triggered when response.toolCalls is empty
@@ -370,27 +375,27 @@ export const buildStepValidationFeedbackPrompt = (
  * - Followed by retry attempt in generateNextAction()
  * - Used in the retry loop before fatal error
  */
-const functionCallErrorTemplate = buildPromptTemplate(
+const toolCallErrorTemplate = buildPromptTemplate(
   `
-⚠️ FUNCTION CALL ERROR: You provided reasoning but no function call.
+TOOL CALL ERROR: You provided reasoning but no tool call.
 
 Your reasoning: {{ reasoningText }}
 
-You MUST call exactly one function on every turn. Based on your reasoning, choose the appropriate function:
+You MUST use exactly one tool on every turn. Based on your reasoning, choose the appropriate tool:
 
-Available Functions:
-{{ functionExamples }}
+Available Tools:
+{{ toolExamples }}
 
-Call the function that best matches your reasoning.
+Use the tool that best matches your reasoning.
 
-${functionCallInstruction}
+${toolCallInstruction}
 `.trim(),
 );
 
-export const buildFunctionCallErrorPrompt = (reasoningText: string) =>
-  functionCallErrorTemplate({
+export const buildToolCallErrorPrompt = (reasoningText: string) =>
+  toolCallErrorTemplate({
     reasoningText,
-    functionExamples,
+    toolExamples,
   });
 
 /**
@@ -406,12 +411,12 @@ export const buildFunctionCallErrorPrompt = (reasoningText: string) =>
  * - Prevents premature task completion when work remains
  *
  * Usage in WebAgent:
- * - Triggered when AI calls done() function
+ * - Triggered when AI calls done() tool
  * - Uses conversation history and final answer for evaluation context
  * - Result determines if task execution should continue or complete
  * - Up to maxValidationAttempts retries allowed for improvement
  *
- * Function calls generated:
+ * Tool calls generated:
  * - validate_task(): Returns taskAssessment, completionQuality, and feedback
  *
  * Validation results guide the main execution loop:
@@ -428,7 +433,7 @@ Result: {{ finalAnswer }}
 
 Evaluation criteria:
 - **failed**: Task not completed or result doesn't accomplish what was requested
-- **partial**: Task partially completed but result is missing key elements  
+- **partial**: Task partially completed but result is missing key elements
 - **complete**: Task fully completed and result accomplishes what was requested
 - **excellent**: Task completed exceptionally well with valuable additional elements
 
@@ -439,7 +444,7 @@ Call validate_task() with:
 - completionQuality: Choose from "failed", "partial", "complete", or "excellent" based on evaluation criteria above
 - feedback: Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done
 
-${functionCallInstruction}
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -467,9 +472,9 @@ export const buildTaskValidationPrompt = (
  * - Returns extracted data in simple, compact format for easy consumption
  *
  * Usage in WebAgent:
- * - Triggered when AI calls extract(description) function
+ * - Triggered when AI calls extract(description) tool
  * - Uses browser.getMarkdown() for clean page content representation
- * - Uses simple text generation (not function calling) for extraction
+ * - Uses simple text generation (not tool calling) for extraction
  * - Result is added to conversation history for AI context
  *
  * This prompt enables the AI to gather information from the current page
@@ -484,9 +489,8 @@ Page Content (Markdown):
 {{ markdown }}
 
 Instructions:
-- Extract the requested information accurately from the markdown content above
-- Present the results in a compact, clear, well-structured json format
 - Include all relevant details that match the extraction request
+- Present the data in well-structured markdown format
 
 Provide the extracted data:
 `.trim(),

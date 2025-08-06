@@ -1,10 +1,10 @@
 import { PageAction } from "../browser/ariaBrowser.js";
 import { Action } from "../schemas.js";
-import { buildFunctionCallErrorPrompt } from "../prompts.js";
+import { buildToolCallErrorPrompt } from "../prompts.js";
 import { RepetitionValidator } from "./RepetitionValidator.js";
 
 /**
- * Response structure from AI function calling
+ * Response structure from AI tool calling
  */
 type ToolCallResponse = {
   toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
@@ -19,7 +19,7 @@ type ToolCallResponse = {
 /**
  * Result from validating and parsing a ToolCallResponse
  */
-export interface FunctionCallValidationResult {
+export interface ToolCallValidationResult {
   isValid: boolean;
   errors: string[];
   action?: Action;
@@ -151,9 +151,9 @@ export class ActionValidator {
   }
 
   /**
-   * Validates function call action for basic requirements
+   * Validates tool call action for basic requirements
    */
-  validateFunctionCallAction(action: Action): { isValid: boolean; errors: string[] } {
+  validateToolCallAction(action: Action): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!action.action?.action) {
@@ -188,7 +188,7 @@ export class ActionValidator {
             args,
             wasRepeated: true,
             feedbackMessage:
-              "⚠️ You repeated the same function call multiple times. Call each function exactly once with proper JSON arguments.",
+              "⚠️ You repeated the same tool call multiple times. Use each tool exactly once with proper JSON arguments.",
           };
         } catch (parseError) {
           // Could not parse cleaned JSON, return original
@@ -202,27 +202,27 @@ export class ActionValidator {
 
   /**
    * Validates and parses a ToolCallResponse into an Action
-   * Handles all function call validation logic in one place
+   * Handles all tool call validation logic in one place
    */
-  validateAndParseToolCallResponse(response: ToolCallResponse): FunctionCallValidationResult {
-    // Check if any function calls were provided
+  validateAndParseToolCallResponse(response: ToolCallResponse): ToolCallValidationResult {
+    // Check if any tool calls were provided
     if (!response.toolCalls || response.toolCalls.length === 0) {
       const reasoningText = response.text || response.reasoning || "No reasoning provided";
       return {
         isValid: false,
-        errors: ["No function call found in response"],
-        feedbackMessage: buildFunctionCallErrorPrompt(reasoningText),
+        errors: ["No tool call found in response"],
+        feedbackMessage: buildToolCallErrorPrompt(reasoningText),
       };
     }
 
-    // Warn about multiple function calls but use the first one
+    // Warn about multiple tool calls but use the first one
     if (response.toolCalls.length > 1) {
       console.warn(
         `⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`,
       );
     }
 
-    // Parse the function call into an Action
+    // Parse the tool call into an Action
     const toolCall = response.toolCalls[0];
 
     // Handle potential repetition in tool call arguments
@@ -232,13 +232,13 @@ export class ActionValidator {
     const cleanedToolCall = { ...toolCall, args: cleanedArgs };
 
     try {
-      const action = this.parseFunctionCallToAction(cleanedToolCall, response);
+      const action = this.parseToolCallToAction(cleanedToolCall, response);
 
       // If repetition was detected, include feedback message
       let resultFeedbackMessage = feedbackMessage;
 
       // Validate the parsed action
-      const validationResult = this.validateFunctionCallAction(action);
+      const validationResult = this.validateToolCallAction(action);
 
       if (!validationResult.isValid) {
         return {
@@ -265,21 +265,21 @@ export class ActionValidator {
   }
 
   /**
-   * Parses a function call into an Action object
-   * Handles the mapping from function call arguments to Action format
+   * Parses a tool call into an Action object
+   * Handles the mapping from tool call arguments to Action format
    */
-  private parseFunctionCallToAction(
+  private parseToolCallToAction(
     toolCall: { toolName: string; args: Record<string, any> },
     response: ToolCallResponse,
   ): Action {
-    const functionName = toolCall.toolName;
-    const action = functionName as PageAction;
+    const toolName = toolCall.toolName;
+    const action = toolName as PageAction;
 
-    // Convert arguments to the expected format based on function type
+    // Convert arguments to the expected format based on tool type
     let ref: string | undefined;
     let value: string | undefined;
 
-    switch (functionName) {
+    switch (toolName) {
       case "click":
       case "hover":
       case "check":
@@ -311,11 +311,11 @@ export class ActionValidator {
         // No args needed
         break;
       default:
-        throw new Error(`Unhandled function: ${functionName}`);
+        throw new Error(`Unhandled tool: ${toolName}`);
     }
 
     // Use the reasoning text if available, otherwise fall back to regular text
-    const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
+    const thinkingText = response.reasoning ?? response.text ?? "Tool call executed";
 
     return {
       observation: thinkingText,

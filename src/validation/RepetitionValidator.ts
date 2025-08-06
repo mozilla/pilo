@@ -1,5 +1,5 @@
 /**
- * RepetitionValidator - Handles AI repetition/looping issues in function calls
+ * RepetitionValidator - Handles AI repetition/looping issues in tool calls
  *
  * Common issue where AI generates the same JSON object multiple times:
  * {"foo":"bar"}{"foo":"bar"}{"foo":"bar"} instead of {"foo":"bar"}
@@ -46,7 +46,7 @@ export class RepetitionValidator {
       cleanedResponse: { ...response, toolCalls: cleanedToolCalls },
       wasRepeated,
       feedbackMessage: wasRepeated
-        ? "⚠️ You repeated the same function call multiple times. Call each function exactly once with proper JSON arguments."
+        ? "⚠️ You repeated the same tool call multiple times. Use each tool exactly once with proper JSON arguments."
         : undefined,
     };
   }

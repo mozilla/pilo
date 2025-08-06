@@ -40,8 +40,8 @@ describe("prompts", () => {
 
       // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
-      // Verify function call instruction is included
-      expect(prompt).toContain("Call exactly one function with the required parameters");
+      // Verify tool call instruction is included
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
     });
 
     it("should include current date in prompt", () => {
@@ -88,8 +88,8 @@ describe("prompts", () => {
 
       // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
-      // Verify function call instruction is included
-      expect(prompt).toContain("Call exactly one function with the required parameters");
+      // Verify tool call instruction is included
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
     });
 
     it("should include starting URL when provided", () => {
@@ -123,7 +123,7 @@ describe("prompts", () => {
   describe("actionLoopPrompt", () => {
     it("should contain action loop instructions", () => {
       expect(actionLoopPrompt).toContain("Think through the current page state");
-      expect(actionLoopPrompt).toContain("Available Functions:");
+      expect(actionLoopPrompt).toContain("Available Tools:");
       expect(actionLoopPrompt).toContain("Rules:");
       expect(actionLoopPrompt).toContain("Best Practices:");
     });
@@ -133,8 +133,10 @@ describe("prompts", () => {
       expect(actionLoopPrompt).toContain(
         "You are an expert at completing tasks using a web browser",
       );
-      // Verify function call instruction is included
-      expect(actionLoopPrompt).toContain("Call exactly one function with the required parameters");
+      // Verify tool call instruction is included
+      expect(actionLoopPrompt).toContain(
+        "You MUST use exactly one tool with the required parameters",
+      );
     });
 
     it("should list all available actions", () => {
@@ -157,10 +159,12 @@ describe("prompts", () => {
       });
     });
 
-    it("should include function call format instructions", () => {
-      expect(actionLoopPrompt).toContain("Call exactly one function with the required parameters");
+    it("should include tool call format instructions", () => {
+      expect(actionLoopPrompt).toContain(
+        "You MUST use exactly one tool with the required parameters",
+      );
       expect(actionLoopPrompt).toContain("Use valid JSON format for all arguments");
-      expect(actionLoopPrompt).toContain("Call EXACTLY ONE function per turn");
+      expect(actionLoopPrompt).toContain("Use EXACTLY ONE tool per turn");
     });
 
     it("should include ref format examples", () => {
@@ -387,18 +391,18 @@ describe("prompts", () => {
       const errors = "Some error";
       const prompt = buildStepValidationFeedbackPrompt(errors);
 
-      expect(prompt).toContain("call the correct function with valid parameters");
+      expect(prompt).toContain("use the correct tool with valid parameters");
       expect(prompt).toContain("Use element refs from the page snapshot");
-      expect(prompt).toContain("Functions requiring refs");
-      expect(prompt).toContain("Functions requiring values");
+      expect(prompt).toContain("Tools requiring refs");
+      expect(prompt).toContain("Tools requiring values");
     });
 
     it("should include field requirements", () => {
       const errors = "Test error";
       const prompt = buildStepValidationFeedbackPrompt(errors);
 
-      expect(prompt).toContain("Functions requiring refs: click, fill, select");
-      expect(prompt).toContain("Functions requiring values: fill, select, wait");
+      expect(prompt).toContain("Tools requiring refs: click, fill, select");
+      expect(prompt).toContain("Tools requiring values: fill, select, wait");
       expect(prompt).toContain("goto() can only use URLs that appeared earlier");
     });
 
@@ -433,8 +437,8 @@ describe("prompts", () => {
     it("should contain required instructions", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      // Verify function call instruction is included
-      expect(prompt).toContain("Call exactly one function with the required parameters");
+      // Verify tool call instruction is included
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
     });
 
     it("should include feedback instruction", () => {
@@ -511,22 +515,22 @@ describe("prompts", () => {
       });
     });
 
-    it("should maintain function call format consistency", () => {
-      const functionCallPrompts = [
+    it("should maintain tool call format consistency", () => {
+      const toolCallPrompts = [
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopPrompt,
         buildStepValidationFeedbackPrompt("errors"),
       ];
 
-      // Check that most prompts contain function call instructions
-      const promptsWithCallInstructions = functionCallPrompts.filter(
+      // Check that most prompts contain tool call instructions
+      const promptsWithCallInstructions = toolCallPrompts.filter(
         (prompt) =>
-          prompt.includes("Call") ||
-          prompt.includes("function") ||
-          prompt.includes("call the correct function"),
+          prompt.includes("use exactly one tool") ||
+          prompt.includes("tool") ||
+          prompt.includes("use the correct tool"),
       );
-      expect(promptsWithCallInstructions.length).toBeGreaterThan(functionCallPrompts.length / 2);
+      expect(promptsWithCallInstructions.length).toBeGreaterThan(toolCallPrompts.length / 2);
     });
   });
 });

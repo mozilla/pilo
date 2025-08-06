@@ -51,7 +51,7 @@ import { nanoid } from "nanoid";
 
 // Type definitions for better type safety
 
-// Response structure from AI function calling
+// Response structure from AI tool calling
 type ToolCallResponse = {
   toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
   text?: string;
@@ -247,7 +247,7 @@ export class WebAgent {
       message: "Making a plan and finding the best starting URL",
     });
 
-    const response = await this.generateGenericFunctionCall(
+    const response = await this.generateGenericToolCall(
       planningTools,
       buildPlanAndUrlPrompt(task, this.guardrails),
       undefined,
@@ -256,7 +256,7 @@ export class WebAgent {
     );
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
-      throw new Error("No function call found in planning response");
+      throw new Error("No tool call found in planning response");
     }
 
     const toolCall = response.toolCalls[0];
@@ -283,7 +283,7 @@ export class WebAgent {
   async generatePlan(task: string, startingUrl?: string) {
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
 
-    const response = await this.generateGenericFunctionCall(
+    const response = await this.generateGenericToolCall(
       planningTools,
       buildPlanPrompt(task, startingUrl, this.guardrails),
       undefined,
@@ -292,7 +292,7 @@ export class WebAgent {
     );
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
-      throw new Error("No function call found in planning response");
+      throw new Error("No tool call found in planning response");
     }
 
     const toolCall = response.toolCalls[0];
@@ -403,13 +403,13 @@ export class WebAgent {
   }
 
   /**
-   * Generate the next action using function calling based on current page state
+   * Generate the next action using tool calling based on current page state
    *
    * This is the core decision-making method that:
    * 1. Compresses the page snapshot to reduce token usage
    * 2. Updates the conversation with current page state
-   * 3. Uses function calling to let the LLM decide what action to take
-   * 4. Converts function calls back to Action format for compatibility
+   * 3. Uses tool calling to let the LLM decide what action to take
+   * 4. Converts tool calls back to Action format for compatibility
    *
    * @param pageSnapshot - Raw aria tree snapshot of the current page
    * @param retryCount - Number of validation retry attempts (for error handling)
@@ -445,14 +445,14 @@ export class WebAgent {
       this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
     }
 
-    // Use function calling to get the next action
+    // Use tool calling to get the next action
     const response = await this.withProcessingEvents(
       "Planning next action",
-      () => this.generateFunctionCallResponse(this.messages),
+      () => this.generateToolCallResponse(this.messages),
       this.vision,
     );
 
-    // Validate and parse the function call response using centralized validation
+    // Validate and parse the tool call response using centralized validation
     const validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
 
     if (!validationResult.isValid) {
@@ -573,9 +573,9 @@ export class WebAgent {
   // Repetition handling is now done in ActionValidator.handleRepeatedToolCallArguments()
 
   /**
-   * Generic function calling method for any set of tools
+   * Generic tool calling method for any set of tools
    */
-  protected async generateGenericFunctionCall(
+  protected async generateGenericToolCall(
     tools: any,
     prompt?: string,
     messages?: any[],
@@ -612,18 +612,18 @@ export class WebAgent {
       return response;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI function call request was cancelled");
+        throw new Error("AI tool call request was cancelled");
       }
       throw error;
     }
   }
 
   /**
-   * Generate function call response using AI SDK (but treat it like structured JSON)
-   * We use function calling purely for better response conformity, not for actual function calling conversation
+   * Generate tool call response using AI SDK (but treat it like structured JSON)
+   * We use tool calling purely for better response conformity, not for actual tool calling conversation
    */
-  protected async generateFunctionCallResponse(messages: any[]): Promise<ToolCallResponse> {
-    // Create a clean messages array without any function call artifacts that might confuse the AI
+  protected async generateToolCallResponse(messages: any[]): Promise<ToolCallResponse> {
+    // Create a clean messages array without any tool call artifacts that might confuse the AI
     const cleanMessages = messages.map((msg) => {
       if (msg.role === "assistant" && msg.tool_calls) {
         // Remove tool_calls from assistant messages to keep conversation clean
@@ -642,7 +642,7 @@ export class WebAgent {
       toolChoice: "required" as const,
       temperature: 0,
       maxTokens: DEFAULT_GENERATION_MAX_TOKENS, // Generous limit to prevent infinite loops, especially for "done" actions
-      maxToolRoundtrips: 0, // Prevent multiple function calls in one response
+      maxToolRoundtrips: 0, // Prevent multiple tool calls in one response
       providerOptions: {
         openrouter: {
           reasoning: {
@@ -660,10 +660,10 @@ export class WebAgent {
       const response = await generateText(finalConfig);
 
       // Emit observation first (the AI's reasoning/thinking)
-      const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
+      const thinkingText = response.reasoning ?? response.text ?? "Tool call executed";
       this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
 
-      // Then emit events for the function call
+      // Then emit events for the tool call
       if (response.toolCalls && response.toolCalls.length > 0) {
         const toolCall = response.toolCalls[0];
         // Properly handle union types based on function name
@@ -722,15 +722,15 @@ export class WebAgent {
     } catch (error) {
       // Handle AbortError specifically
       if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI function call request was cancelled");
+        throw new Error("AI tool call request was cancelled");
       }
 
       if (error instanceof Error) {
         // Add generic error feedback to conversation without showing the raw error details
         this.addUserMessage(
           `⚠️ Error: ${error.message}. ` +
-            `Please follow the function calling instructions carefully and try again. ` +
-            `Call exactly one function with valid parameters.`,
+            `Please follow the tool calling instructions carefully and try again. ` +
+            `Use exactly one tool with valid parameters.`,
         );
 
         // Emit error event for logging
@@ -741,8 +741,8 @@ export class WebAgent {
           messages: cleanMessages,
         });
 
-        // Retry the function call once
-        return this.generateFunctionCallResponse(cleanMessages);
+        // Retry the tool call once
+        return this.generateToolCallResponse(cleanMessages);
       }
       throw error;
     }
@@ -1091,7 +1091,7 @@ export class WebAgent {
   private recordActionResult(result: ActionExecutionResult, actionSuccess: boolean) {
     if (actionSuccess) {
       // Add the action result to conversation history in our normal format
-      // This maintains our existing conversation flow while using function calls for format
+      // This maintains our existing conversation flow while using tool calls for format
       this.addAssistantMessage(result);
 
       // For extract actions, also add the extracted data to conversation history
@@ -1128,7 +1128,7 @@ export class WebAgent {
       // Create extraction prompt using the template
       const extractionPrompt = buildExtractionPrompt(extractionDescription, markdown);
 
-      // Use simple text generation for extraction - no need for function calling with plain text
+      // Use simple text generation for extraction - no need for tool calling with plain text
       const response = await generateText({
         model: this.provider,
         prompt: extractionPrompt,
@@ -1241,7 +1241,7 @@ export class WebAgent {
     }
 
     const response = await this.withProcessingEvents("Validating task completion", async () => {
-      const result = await this.generateGenericFunctionCall(
+      const result = await this.generateGenericToolCall(
         validationTools,
         validationPrompt,
         undefined,
@@ -1250,7 +1250,7 @@ export class WebAgent {
       );
 
       if (!result.toolCalls || result.toolCalls.length === 0) {
-        throw new Error("No function call found in validation response");
+        throw new Error("No tool call found in validation response");
       }
 
       const toolCall = result.toolCalls[0];

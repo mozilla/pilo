@@ -27,7 +27,7 @@ export const taskValidationSchema = z.object({
 // Export the type for task validation result
 export type TaskValidationResult = z.infer<typeof taskValidationSchema>;
 
-// Function call schemas for web actions
+// Tool call schemas for web actions
 export const webActionFunctions = {
   click: {
     description: "Click on an element on the page",
@@ -141,7 +141,7 @@ export const webActionFunctions = {
   },
 };
 
-// Function calling schemas for planning
+// Tool calling schemas for planning
 export const planningFunctions = {
   create_plan: {
     description: "Create a step-by-step plan for completing the task",
@@ -161,7 +161,7 @@ export const planningFunctions = {
   },
 };
 
-// Function calling schemas for task validation
+// Tool calling schemas for task validation
 export const validationFunctions = {
   validate_task: {
     description: "Evaluate how well the task result accomplishes what the user requested",
@@ -177,7 +177,7 @@ export const validationFunctions = {
   },
 };
 
-// Function calling schemas for data extraction (not currently used)
+// Tool calling schemas for data extraction (not currently used)
 export const extractionFunctions = {
   extract_data: {
     description: "Extract the requested data from the page content",
@@ -187,43 +187,43 @@ export const extractionFunctions = {
   },
 };
 
-// Convert function definitions to tools format for AI SDK
+// Convert tool definitions to tools format for AI SDK
 export const webActionTools = Object.fromEntries(
-  Object.entries(webActionFunctions).map(([key, func]) => [
+  Object.entries(webActionFunctions).map(([key, tool]) => [
     key,
     {
-      description: func.description,
-      parameters: func.parameters,
+      description: tool.description,
+      parameters: tool.parameters,
     },
   ]),
 );
 
 export const planningTools = Object.fromEntries(
-  Object.entries(planningFunctions).map(([key, func]) => [
+  Object.entries(planningFunctions).map(([key, tool]) => [
     key,
     {
-      description: func.description,
-      parameters: func.parameters,
+      description: tool.description,
+      parameters: tool.parameters,
     },
   ]),
 );
 
 export const validationTools = Object.fromEntries(
-  Object.entries(validationFunctions).map(([key, func]) => [
+  Object.entries(validationFunctions).map(([key, tool]) => [
     key,
     {
-      description: func.description,
-      parameters: func.parameters,
+      description: tool.description,
+      parameters: tool.parameters,
     },
   ]),
 );
 
 export const extractionTools = Object.fromEntries(
-  Object.entries(extractionFunctions).map(([key, func]) => [
+  Object.entries(extractionFunctions).map(([key, tool]) => [
     key,
     {
-      description: func.description,
-      parameters: func.parameters,
+      description: tool.description,
+      parameters: tool.parameters,
     },
   ]),
 );
