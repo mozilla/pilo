@@ -19,7 +19,6 @@ import {
   buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
   buildExtractionPrompt,
-  buildFunctionCallErrorPrompt,
 } from "./prompts.js";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
@@ -53,6 +52,7 @@ import { nanoid } from "nanoid";
 
 // Type definitions for better type safety
 
+// Response structure from AI function calling
 type ToolCallResponse = {
   toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
   text?: string;
@@ -63,12 +63,8 @@ type ToolCallResponse = {
   providerMetadata?: any;
 };
 
-type ActionExecutionResult = {
-  action: {
-    action: string;
-    ref?: string;
-    value?: string;
-  };
+// ActionExecutionResult is now just an Action with optional extracted data
+type ActionExecutionResult = Action & {
   extractedData?: string;
 };
 
@@ -467,42 +463,13 @@ export class WebAgent {
       this.vision,
     );
 
-    // Convert function call to Action format for compatibility
-    let action: Action;
-    try {
-      action = this.convertFunctionCallToAction(response);
-    } catch (error) {
-      // Handle "No function call found" as a validation error that can be retried
-      if (error instanceof Error && error.message.includes("No function call found")) {
-        // Emit validation error event for logging
-        this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
-          errors: [error.message],
-          retryCount,
-          rawResponse: response,
-        });
+    // Validate and parse the function call response using centralized validation
+    const validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
 
-        if (retryCount >= MAX_RETRY_ATTEMPTS) {
-          throw new Error(
-            `Failed to get valid response after ${
-              retryCount + 1
-            } attempts. Error: ${error.message}`,
-          );
-        }
-
-        // The feedback message was already added in convertFunctionCallToAction
-        return this.generateNextAction(pageSnapshot, retryCount + 1);
-      }
-      // Re-throw other errors
-      throw error;
-    }
-
-    // Validate the converted action
-    const { isValid, errors } = this.validateFunctionCallAction(action);
-
-    if (!isValid) {
+    if (!validationResult.isValid) {
       // Emit validation error event for logging
       this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
-        errors,
+        errors: validationResult.errors,
         retryCount,
         rawResponse: response,
       });
@@ -511,15 +478,23 @@ export class WebAgent {
         throw new Error(
           `Failed to get valid response after ${
             retryCount + 1
-          } attempts. Errors: ${errors.join(", ")}`,
+          } attempts. Errors: ${validationResult.errors.join(", ")}`,
         );
       }
 
-      this.addValidationErrorFeedback(errors, response);
+      // Add feedback message if provided by the validator
+      if (validationResult.feedbackMessage) {
+        this.addUserMessage(validationResult.feedbackMessage);
+      } else {
+        // Fallback to general validation feedback
+        this.addValidationErrorFeedback(validationResult.errors, response);
+      }
+
       return this.generateNextAction(pageSnapshot, retryCount + 1);
     }
 
-    return action;
+    // Return the validated and parsed action
+    return validationResult.action!;
   }
 
   /**
@@ -821,6 +796,8 @@ export class WebAgent {
     }
   }
 
+  // Repetition handling is now done in ActionValidator.handleRepeatedToolCallArguments()
+
   /**
    * Generic function calling method for any set of tools
    */
@@ -997,91 +974,7 @@ export class WebAgent {
     }
   }
 
-  /**
-   * Convert function call response to Action format for compatibility
-   */
-  protected convertFunctionCallToAction(response: ToolCallResponse): Action {
-    if (!response.toolCalls || response.toolCalls.length === 0) {
-      // Extract the reasoning text from the response to provide context
-      const reasoningText = response.text || response.reasoning || "No reasoning provided";
-
-      // Add structured feedback using the dedicated prompt template
-      this.addUserMessage(buildFunctionCallErrorPrompt(reasoningText));
-      throw new Error("No function call found in response");
-    }
-
-    if (response.toolCalls.length > 1) {
-      console.warn(
-        `⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`,
-      );
-    }
-
-    const toolCall = response.toolCalls[0];
-    const functionName = toolCall.toolName;
-
-    // Function names now match PageAction enum exactly - no mapping needed
-    const action = functionName as PageAction;
-
-    // Convert arguments to the expected format based on function type
-    let ref: string | undefined;
-    let value: string | undefined;
-
-    switch (functionName) {
-      case "click":
-      case "hover":
-      case "check":
-      case "uncheck":
-      case "focus":
-      case "enter":
-        ref = (toolCall.args as { ref: string }).ref;
-        break;
-      case "fill":
-      case "fill_and_enter":
-      case "select":
-        ref = (toolCall.args as { ref: string; value: string }).ref;
-        value = (toolCall.args as { ref: string; value: string }).value;
-        break;
-      case "wait":
-        value = String((toolCall.args as { seconds: number }).seconds);
-        break;
-      case "goto":
-        value = (toolCall.args as { url: string }).url;
-        break;
-      case "extract":
-        value = (toolCall.args as { description: string }).description;
-        break;
-      case "done":
-        value = (toolCall.args as { result: string }).result;
-        break;
-      case "back":
-      case "forward":
-        // No args needed
-        break;
-      default:
-        throw new Error(`Unhandled function: ${functionName}`);
-    }
-
-    // Use the reasoning text if available, otherwise fall back to regular text
-    const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
-
-    return {
-      observation: thinkingText,
-      observationStatusMessage: "Action planned",
-      action: {
-        action,
-        ref,
-        value,
-      },
-      actionStatusMessage: "Executing action",
-    };
-  }
-
-  /**
-   * Validate function call action for basic requirements
-   */
-  protected validateFunctionCallAction(action: Action): { isValid: boolean; errors: string[] } {
-    return this.actionValidator.validateFunctionCallAction(action);
-  }
+  // Function call validation and parsing is now handled by ActionValidator
 
   /**
    * Centralized error handling for AI generation failures

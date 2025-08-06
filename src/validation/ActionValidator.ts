@@ -1,11 +1,41 @@
 import { PageAction } from "../browser/ariaBrowser.js";
 import { Action } from "../schemas.js";
+import { buildFunctionCallErrorPrompt } from "../prompts.js";
+import { RepetitionValidator } from "./RepetitionValidator.js";
+
+/**
+ * Response structure from AI function calling
+ */
+type ToolCallResponse = {
+  toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
+  text?: string;
+  reasoning?: string;
+  finishReason?: string;
+  usage?: any;
+  warnings?: any;
+  providerMetadata?: any;
+};
+
+/**
+ * Result from validating and parsing a ToolCallResponse
+ */
+export interface FunctionCallValidationResult {
+  isValid: boolean;
+  errors: string[];
+  action?: Action;
+  feedbackMessage?: string;
+}
 
 /**
  * Handles validation of actions and their parameters
  */
 export class ActionValidator {
   private currentPageSnapshot: string = "";
+  private repetitionValidator: RepetitionValidator;
+
+  constructor() {
+    this.repetitionValidator = new RepetitionValidator();
+  }
 
   /**
    * Updates the current page snapshot for reference validation
@@ -171,6 +201,165 @@ export class ActionValidator {
     return {
       isValid: errors.length === 0,
       errors,
+    };
+  }
+
+  /**
+   * Detects and handles AI repetition/looping in tool call arguments using RepetitionValidator
+   * Returns the cleaned arguments and whether repetition was detected
+   */
+  private handleRepeatedToolCallArguments(toolArgs: any): {
+    args: any;
+    wasRepeated: boolean;
+    feedbackMessage?: string;
+  } {
+    if (typeof toolArgs === "string") {
+      const cleanResult = this.repetitionValidator.cleanRepeatedJsonString(toolArgs);
+      if (cleanResult.wasRepeated) {
+        try {
+          const args = JSON.parse(cleanResult.cleanedJson);
+          return {
+            args,
+            wasRepeated: true,
+            feedbackMessage:
+              "⚠️ You repeated the same function call multiple times. Call each function exactly once with proper JSON arguments.",
+          };
+        } catch (parseError) {
+          // Could not parse cleaned JSON, return original
+          return { args: toolArgs, wasRepeated: false };
+        }
+      }
+    }
+
+    return { args: toolArgs, wasRepeated: false };
+  }
+
+  /**
+   * Validates and parses a ToolCallResponse into an Action
+   * Handles all function call validation logic in one place
+   */
+  validateAndParseToolCallResponse(response: ToolCallResponse): FunctionCallValidationResult {
+    // Check if any function calls were provided
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      const reasoningText = response.text || response.reasoning || "No reasoning provided";
+      return {
+        isValid: false,
+        errors: ["No function call found in response"],
+        feedbackMessage: buildFunctionCallErrorPrompt(reasoningText),
+      };
+    }
+
+    // Warn about multiple function calls but use the first one
+    if (response.toolCalls.length > 1) {
+      console.warn(
+        `⚠️  Multiple tool calls detected (${response.toolCalls.length}), using only the first one`,
+      );
+    }
+
+    // Parse the function call into an Action
+    const toolCall = response.toolCalls[0];
+
+    // Handle potential repetition in tool call arguments
+    const { args: cleanedArgs, feedbackMessage } = this.handleRepeatedToolCallArguments(
+      toolCall.args,
+    );
+    const cleanedToolCall = { ...toolCall, args: cleanedArgs };
+
+    try {
+      const action = this.parseFunctionCallToAction(cleanedToolCall, response);
+
+      // If repetition was detected, include feedback message
+      let resultFeedbackMessage = feedbackMessage;
+
+      // Validate the parsed action
+      const validationResult = this.validateFunctionCallAction(action);
+
+      if (!validationResult.isValid) {
+        return {
+          isValid: false,
+          errors: validationResult.errors,
+          action,
+          feedbackMessage: resultFeedbackMessage,
+        };
+      }
+
+      return {
+        isValid: true,
+        errors: [],
+        action,
+        feedbackMessage: resultFeedbackMessage,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        isValid: false,
+        errors: [errorMessage],
+      };
+    }
+  }
+
+  /**
+   * Parses a function call into an Action object
+   * Handles the mapping from function call arguments to Action format
+   */
+  private parseFunctionCallToAction(
+    toolCall: { toolName: string; args: Record<string, any> },
+    response: ToolCallResponse,
+  ): Action {
+    const functionName = toolCall.toolName;
+    const action = functionName as PageAction;
+
+    // Convert arguments to the expected format based on function type
+    let ref: string | undefined;
+    let value: string | undefined;
+
+    switch (functionName) {
+      case "click":
+      case "hover":
+      case "check":
+      case "uncheck":
+      case "focus":
+      case "enter":
+        ref = (toolCall.args as { ref: string }).ref;
+        break;
+      case "fill":
+      case "fill_and_enter":
+      case "select":
+        ref = (toolCall.args as { ref: string; value: string }).ref;
+        value = (toolCall.args as { ref: string; value: string }).value;
+        break;
+      case "wait":
+        value = String((toolCall.args as { seconds: number }).seconds);
+        break;
+      case "goto":
+        value = (toolCall.args as { url: string }).url;
+        break;
+      case "extract":
+        value = (toolCall.args as { description: string }).description;
+        break;
+      case "done":
+        value = (toolCall.args as { result: string }).result;
+        break;
+      case "back":
+      case "forward":
+        // No args needed
+        break;
+      default:
+        throw new Error(`Unhandled function: ${functionName}`);
+    }
+
+    // Use the reasoning text if available, otherwise fall back to regular text
+    const thinkingText = response.reasoning ?? response.text ?? "Function call executed";
+
+    return {
+      observation: thinkingText,
+      observationStatusMessage: "Action planned",
+      action: {
+        action,
+        ref,
+        value,
+      },
+      actionStatusMessage: "Executing action",
     };
   }
 }

@@ -29,7 +29,7 @@ const functionExamples = `
 `.trim();
 
 const functionCallInstruction =
-  "Call exactly one function with the required parameters. Use valid JSON format for all arguments.";
+  "Call exactly one function with the required parameters. Use valid JSON format for all arguments. CRITICAL: Output each function call exactly ONCE. Do not repeat or duplicate the same function call multiple times.";
 
 /**
  * Planning Prompt Template

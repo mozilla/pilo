@@ -12,6 +12,7 @@ import {
 import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
+import TurndownService from "turndown";
 
 // Type extension for Playwright's private AI snapshot function
 type PageEx = Page & {
@@ -310,45 +311,34 @@ export class PlaywrightBrowser implements AriaBrowser {
     return await (this.page as PageEx)._snapshotForAI();
   }
 
+  /**
+   * Gets simplified HTML with noise elements removed in browser context
+   * Reduces payload size by removing elements we don't need
+   */
+  async getSimpleHtml(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+
+    return await this.page.evaluate(() => {
+      const body = document.body || document.documentElement;
+      if (!body) return "";
+
+      const clone = body.cloneNode(true) as Element;
+
+      // Remove noise elements in browser context to reduce wire transfer
+      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+
+      return clone.innerHTML;
+    });
+  }
+
   async getMarkdown(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
 
     try {
-      // Get cleaned HTML using a simple approach first
-      const cleanedHtml = await this.page.evaluate(() => {
-        // Simple HTML cleaning without external dependencies
-        const body = document.body || document.documentElement;
-        const clone = body.cloneNode(true) as Element;
-
-        // Remove script, style, and other unwanted elements
-        const unwantedElements = clone.querySelectorAll(
-          "script, style, noscript, meta, title, head, iframe, embed, object",
-        );
-        unwantedElements.forEach((el) => el.remove());
-
-        // Remove unwanted attributes
-        const allElements = clone.querySelectorAll("*");
-        allElements.forEach((el) => {
-          const attrsToRemove = ["style", "class", "id", "onclick", "onload", "onerror", "data-*"];
-          attrsToRemove.forEach((attr) => {
-            if (attr === "data-*") {
-              // Remove all data-* attributes
-              Array.from(el.attributes).forEach((attribute) => {
-                if (attribute.name.startsWith("data-")) {
-                  el.removeAttribute(attribute.name);
-                }
-              });
-            } else {
-              el.removeAttribute(attr);
-            }
-          });
-        });
-
-        return clone.innerHTML;
-      });
+      // Get simplified HTML (noise removed in browser context)
+      const html = await this.getSimpleHtml();
 
       // Convert HTML to markdown using turndown
-      const TurndownService = (await import("turndown")).default;
       const turndown = new TurndownService({
         headingStyle: "atx",
         codeBlockStyle: "fenced",
@@ -356,21 +346,7 @@ export class PlaywrightBrowser implements AriaBrowser {
         strongDelimiter: "**",
       });
 
-      // Configure turndown to ignore certain elements
-      turndown.remove(["script", "style", "noscript", "meta", "title", "head"]);
-
-      const markdown = turndown.turndown(cleanedHtml);
-
-      // Normalize whitespace in the markdown
-      const normalizedMarkdown = markdown
-        .replace(/\n{3,}/g, "\n\n") // Replace 3+ newlines with 2
-        .replace(/[ \t]+/g, " ") // Replace multiple spaces/tabs with single space
-        .replace(/[ \t]*\n[ \t]*/g, "\n") // Remove spaces around newlines
-        .trim();
-
-      return normalizedMarkdown;
-
-      console.log(normalizedMarkdown);
+      return turndown.turndown(html);
     } catch (error) {
       throw new Error(
         `Failed to get markdown: ${error instanceof Error ? error.message : String(error)}`,
