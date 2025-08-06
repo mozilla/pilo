@@ -9,7 +9,7 @@
  * 3. Validates task completion and retries if needed
  */
 
-import { generateObject, streamObject, generateText, LanguageModel } from "ai";
+import { generateObject, generateText, LanguageModel } from "ai";
 import {
   buildActionLoopPrompt,
   buildPlanPrompt,
@@ -24,7 +24,6 @@ import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
   Action,
   TaskValidationResult,
-  getActionSchemaFieldOrder,
   webActionTools,
   planningTools,
   validationTools,
@@ -181,9 +180,6 @@ export class WebAgent {
 
   /** Maximum total iterations to prevent infinite loops */
   private maxIterations: number;
-
-  /** Cached field order for action schema to avoid repeated Object.keys calls */
-  private readonly actionSchemaFieldOrder: string[] = getActionSchemaFieldOrder();
 
   // === Event System ===
   /** Event emitter for logging and monitoring */
@@ -350,13 +346,6 @@ export class WebAgent {
     error?: string;
   } {
     return this.actionValidator.validateAriaRef(ref);
-  }
-
-  protected validateActionResponse(response: any): {
-    isValid: boolean;
-    errors: string[];
-  } {
-    return this.actionValidator.validateActionResponse(response);
   }
 
   // === PAGE STATE MANAGEMENT ===
@@ -578,221 +567,6 @@ export class WebAgent {
         -(MAX_CONVERSATION_MESSAGES - systemMessages.length),
       );
       this.messages = [...systemMessages, ...messagesToKeep];
-    }
-  }
-
-  /**
-   * Maps action response fields to their corresponding WebAgent events
-   *
-   * This centralized mapping ensures consistent event emission for each field type
-   * and provides a single place to manage field-to-event relationships.
-   *
-   * @param fieldName - The field name from the action response schema
-   * @param value - The field value to emit
-   */
-  private emitFieldEvent(fieldName: string, value: any): void {
-    switch (fieldName) {
-      case "observation":
-        this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: value });
-        break;
-      case "observationStatusMessage":
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: value });
-        break;
-      case "action":
-        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-          action: value.action,
-          ref: value.ref ?? undefined,
-          value: value.value ?? undefined,
-        });
-        break;
-      case "actionStatusMessage":
-        this.emit(WebAgentEventType.AGENT_STATUS, { message: value });
-        break;
-      default:
-        // Unknown field type - no event emission
-        break;
-    }
-  }
-
-  /**
-   * Emits AI generation metadata after successful streaming completion
-   *
-   * @param stream - The completed stream object
-   * @param schema - Zod schema for response validation
-   * @param messages - Conversation history for context
-   * @param final - The final action response
-   */
-  private emitAIGenerationMetadata(stream: any, schema: any, messages: any[], final: Action): void {
-    this.emit(WebAgentEventType.AI_GENERATION, {
-      prompt: undefined,
-      schema,
-      messages,
-      temperature: 0,
-      object: final,
-      finishReason: (stream as any).finishReason,
-      usage: (stream as any).usage,
-      warnings: (stream as any).warnings,
-      providerMetadata: (stream as any).providerMetadata,
-    });
-  }
-
-  /**
-   * Handles errors during streaming AI generation with retry logic
-   *
-   * @param error - The error that occurred
-   * @param schema - Zod schema for response validation
-   * @param messages - Conversation history for context
-   * @param retryCount - Current retry attempt number
-   * @returns Promise that resolves to Action or throws error
-   */
-  private async handleStreamingError(
-    error: unknown,
-    schema: any,
-    messages: any[],
-    retryCount: number,
-  ): Promise<Action> {
-    try {
-      await this.handleAIGenerationError(error, {
-        retryCount,
-        messages,
-        schema,
-      });
-    } catch (err) {
-      if (err instanceof Error && err.message === "RETRY_NEEDED") {
-        return this.generateStreamingActionResponse(schema, messages, retryCount + 1);
-      }
-      throw err;
-    }
-
-    // This should never be reached due to the Promise<never> return type
-    throw error;
-  }
-
-  /**
-   * Emits remaining field events after streaming completes
-   *
-   * @param final - The complete action response
-   * @param fieldOrder - Array of field names in expected order
-   * @param emittedFields - Set of fields already emitted during streaming
-   * @param chunkCount - Number of chunks processed during streaming
-   */
-  private emitRemainingFieldEvents(
-    final: Action,
-    fieldOrder: string[],
-    emittedFields: Set<string>,
-    chunkCount: number,
-  ): void {
-    // Fallback: emit all events if streaming failed
-    if (chunkCount === 0) {
-      for (const field of fieldOrder) {
-        if (final[field as keyof Action]) {
-          this.emitFieldEvent(field, final[field as keyof Action]);
-        }
-      }
-    } else {
-      // Emit any remaining fields (typically the last field)
-      for (const field of fieldOrder) {
-        if (final[field as keyof Action] && !emittedFields.has(field)) {
-          this.emitFieldEvent(field, final[field as keyof Action]);
-          emittedFields.add(field);
-        }
-      }
-    }
-  }
-
-  /**
-   * Processes streaming partial objects and emits field events as they complete
-   *
-   * @param stream - The streaming response object
-   * @param fieldOrder - Array of field names in expected order
-   * @returns Number of chunks processed and set of emitted fields
-   */
-  private async processStreamingResponse(
-    stream: any,
-    fieldOrder: string[],
-  ): Promise<{ chunkCount: number; emittedFields: Set<string> }> {
-    const emittedFields = new Set<string>();
-    let chunkCount = 0;
-
-    // Process streaming partial objects
-    for await (const partialObject of stream.partialObjectStream) {
-      chunkCount++;
-      const partial = partialObject as Partial<Action>;
-
-      // Emit fields when we detect the next field has appeared (indicating current field is complete)
-      for (let i = 0; i < fieldOrder.length; i++) {
-        const currentField = fieldOrder[i] as keyof Action;
-        const nextField = fieldOrder[i + 1] as keyof Action;
-
-        if (partial[currentField] && !emittedFields.has(currentField)) {
-          // Only emit if next field exists and has appeared (current field is complete)
-          if (nextField && partial[nextField]) {
-            this.emitFieldEvent(currentField, partial[currentField]);
-            emittedFields.add(currentField);
-          }
-          // Special case: if this is the last field and all fields are present, emit it
-          else if (!nextField && Object.keys(partial).length === fieldOrder.length) {
-            this.emitFieldEvent(currentField, partial[currentField]);
-            emittedFields.add(currentField);
-          }
-          // Note: Last field is normally handled after stream completes
-        }
-      }
-    }
-
-    return { chunkCount, emittedFields };
-  }
-
-  /**
-   * Generates AI action responses with real-time streaming event emission
-   *
-   * This method uses the AI SDK's streamObject to get incremental responses and emits
-   * WebAgent events as soon as each field is complete, providing real-time UI updates.
-   *
-   * @param schema - Zod schema for response validation
-   * @param messages - Conversation history for context
-   * @param retryCount - Current retry attempt (for error handling)
-   * @returns Complete validated Action object
-   */
-  protected async generateStreamingActionResponse(
-    schema: any,
-    messages: any[],
-    retryCount = 0,
-  ): Promise<Action> {
-    const config: any = {
-      model: this.provider,
-      schema,
-      messages,
-      temperature: 0,
-    };
-
-    // Add AbortSignal if provided
-    if (this.abortSignal) {
-      config.abortSignal = this.abortSignal;
-    }
-
-    try {
-      const stream = await streamObject(config);
-
-      // Use cached field order to avoid repeated Object.keys calls
-      const fieldOrder = this.actionSchemaFieldOrder;
-
-      // Process streaming partial objects and emit field events
-      const { chunkCount, emittedFields } = await this.processStreamingResponse(stream, fieldOrder);
-
-      // Get final complete response
-      const finalResponse = await stream.object;
-      const final = finalResponse as Action;
-
-      // Emit any remaining fields and handle fallback for failed streaming
-      this.emitRemainingFieldEvents(final, fieldOrder, emittedFields, chunkCount);
-
-      // Emit AI generation metadata
-      this.emitAIGenerationMetadata(stream, schema, messages, final);
-
-      return final;
-    } catch (error) {
-      return this.handleStreamingError(error, schema, messages, retryCount);
     }
   }
 

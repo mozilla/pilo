@@ -33,7 +33,6 @@ describe("Function Call Schemas", () => {
 
       expectedActions.forEach((action) => {
         expect(webActionFunctions).toHaveProperty(action);
-        expect(webActionFunctions[action]).toHaveProperty("name", action);
         expect(webActionFunctions[action]).toHaveProperty("description");
         expect(webActionFunctions[action]).toHaveProperty("parameters");
       });

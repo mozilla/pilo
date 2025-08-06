@@ -45,16 +45,6 @@ export class ActionValidator {
   }
 
   /**
-   * Validates that a required string field exists and is non-empty
-   */
-  private validateRequiredStringField(obj: any, fieldName: string, errors: string[]): void {
-    const value = obj?.[fieldName];
-    if (typeof value !== "string" || !value.trim()) {
-      errors.push(`Missing or empty required field "${fieldName}"`);
-    }
-  }
-
-  /**
    * Validates aria reference by checking if it exists in the current page snapshot
    */
   validateAriaRef(ref: string): { isValid: boolean; error?: string } {
@@ -158,30 +148,6 @@ export class ActionValidator {
     }
 
     return errors;
-  }
-
-  /**
-   * Validates the complete action response structure
-   */
-  validateActionResponse(response: any): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    this.validateRequiredStringField(response, "observation", errors);
-    this.validateRequiredStringField(response, "observationStatusMessage", errors);
-    this.validateRequiredStringField(response, "actionStatusMessage", errors);
-
-    if (!response.action || typeof response.action !== "object") {
-      errors.push('Missing or invalid "action" field - must be an object');
-      return { isValid: false, errors };
-    }
-
-    const actionErrors = this.validateActionObject(response.action);
-    errors.push(...actionErrors);
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
   }
 
   /**
