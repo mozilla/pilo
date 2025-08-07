@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
-  actionLoopPrompt,
+  actionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   buildStepValidationFeedbackPrompt,
@@ -120,21 +120,21 @@ describe("prompts", () => {
     });
   });
 
-  describe("actionLoopPrompt", () => {
+  describe("actionLoopSystemPrompt", () => {
     it("should contain action loop instructions", () => {
-      expect(actionLoopPrompt).toContain("Think through the current page state");
-      expect(actionLoopPrompt).toContain("Available Tools:");
-      expect(actionLoopPrompt).toContain("Rules:");
-      expect(actionLoopPrompt).toContain("Best Practices:");
+      expect(actionLoopSystemPrompt).toContain("Analyze the current page state");
+      expect(actionLoopSystemPrompt).toContain("Available Tools:");
+      expect(actionLoopSystemPrompt).toContain("Core Rules:");
+      expect(actionLoopSystemPrompt).toContain("Best Practices:");
     });
 
     it("should contain required instructions", () => {
       // Verify youArePrompt content is included
-      expect(actionLoopPrompt).toContain(
+      expect(actionLoopSystemPrompt).toContain(
         "You are an expert at completing tasks using a web browser",
       );
       // Verify tool call instruction is included
-      expect(actionLoopPrompt).toContain(
+      expect(actionLoopSystemPrompt).toContain(
         "You MUST use exactly one tool with the required parameters",
       );
     });
@@ -152,29 +152,30 @@ describe("prompts", () => {
         "back",
         "forward",
         "done",
+        "abort",
       ];
 
       expectedActions.forEach((action) => {
-        expect(actionLoopPrompt).toContain(`${action}(`);
+        expect(actionLoopSystemPrompt).toContain(`${action}(`);
       });
     });
 
     it("should include tool call format instructions", () => {
-      expect(actionLoopPrompt).toContain(
+      expect(actionLoopSystemPrompt).toContain(
         "You MUST use exactly one tool with the required parameters",
       );
-      expect(actionLoopPrompt).toContain("Use valid JSON format for all arguments");
-      expect(actionLoopPrompt).toContain("Use EXACTLY ONE tool per turn");
+      expect(actionLoopSystemPrompt).toContain("Use valid JSON format for all arguments");
+      expect(actionLoopSystemPrompt).toContain("Execute EXACTLY ONE tool per turn");
     });
 
     it("should include ref format examples", () => {
-      expect(actionLoopPrompt).toContain("s1e33");
-      expect(actionLoopPrompt).toContain("element refs from page snapshot");
+      expect(actionLoopSystemPrompt).toContain("s1e33");
+      expect(actionLoopSystemPrompt).toContain("element refs from page snapshot");
     });
 
     it("should include goto restrictions", () => {
-      expect(actionLoopPrompt).toContain("only previously seen URLs");
-      expect(actionLoopPrompt).toContain("goto() can ONLY use URLs");
+      expect(actionLoopSystemPrompt).toContain("only previously seen URLs");
+      expect(actionLoopSystemPrompt).toContain("goto() only accepts URLs");
     });
   });
 
@@ -501,7 +502,7 @@ describe("prompts", () => {
       const prompts = [
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
-        actionLoopPrompt,
+        actionLoopSystemPrompt,
         buildTaskAndPlanPrompt("test", "explanation", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
         buildStepValidationFeedbackPrompt("errors"),
@@ -519,7 +520,7 @@ describe("prompts", () => {
       const toolCallPrompts = [
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
-        actionLoopPrompt,
+        actionLoopSystemPrompt,
         buildStepValidationFeedbackPrompt("errors"),
       ];
 

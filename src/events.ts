@@ -8,6 +8,7 @@ export enum WebAgentEventType {
   TASK_SETUP = "task:setup",
   TASK_STARTED = "task:started",
   TASK_COMPLETED = "task:completed",
+  TASK_ABORTED = "task:aborted",
   TASK_VALIDATED = "task:validated",
   TASK_VALIDATION_ERROR = "task:validation_error",
 
@@ -79,6 +80,15 @@ export interface TaskStartEventData extends WebAgentEventData {
  */
 export interface TaskCompleteEventData extends WebAgentEventData {
   finalAnswer: string | null;
+  success?: boolean;
+}
+
+/**
+ * Event data when a task is aborted
+ */
+export interface TaskAbortedEventData extends WebAgentEventData {
+  reason: string;
+  finalAnswer: string;
 }
 
 /**
@@ -250,6 +260,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_SETUP; data: TaskSetupEventData }
   | { type: WebAgentEventType.TASK_STARTED; data: TaskStartEventData }
   | { type: WebAgentEventType.TASK_COMPLETED; data: TaskCompleteEventData }
+  | { type: WebAgentEventType.TASK_ABORTED; data: TaskAbortedEventData }
   | { type: WebAgentEventType.TASK_VALIDATED; data: TaskValidationEventData }
   | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
@@ -266,6 +277,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
   | { type: WebAgentEventType.BROWSER_NETWORK_WAITING; data: NetworkWaitingEventData }
   | { type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
+  | { type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED; data: ScreenshotCapturedEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };
 

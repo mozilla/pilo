@@ -1,7 +1,9 @@
 import { PageAction } from "../browser/ariaBrowser.js";
 import { Action } from "../schemas.js";
-import { buildToolCallErrorPrompt } from "../prompts.js";
 import { RepetitionValidator } from "./RepetitionValidator.js";
+import { MalformedCallValidator } from "./MalformedCallValidator.js";
+import { buildStepErrorFeedbackPrompt } from "../prompts.js";
+import { LanguageModel } from "ai";
 
 /**
  * Response structure from AI tool calling
@@ -24,6 +26,7 @@ export interface ToolCallValidationResult {
   errors: string[];
   action?: Action;
   feedbackMessage?: string;
+  wasCorrected?: boolean;
 }
 
 /**
@@ -32,9 +35,20 @@ export interface ToolCallValidationResult {
 export class ActionValidator {
   private currentPageSnapshot: string = "";
   private repetitionValidator: RepetitionValidator;
+  private malformedCallValidator?: MalformedCallValidator;
 
-  constructor() {
+  constructor(provider?: LanguageModel, abortSignal?: AbortSignal) {
     this.repetitionValidator = new RepetitionValidator();
+    if (provider) {
+      this.malformedCallValidator = new MalformedCallValidator(provider, abortSignal);
+    }
+  }
+
+  /**
+   * Expose the malformed call validator for direct access
+   */
+  get malformedValidator() {
+    return this.malformedCallValidator;
   }
 
   /**
@@ -201,17 +215,93 @@ export class ActionValidator {
   }
 
   /**
+   * Attempts to correct malformed function calls using LLM
+   */
+  async attemptMalformedCallCorrection(
+    schema: any,
+    malformedResponse: any,
+  ): Promise<ToolCallValidationResult> {
+    if (!this.malformedCallValidator) {
+      return {
+        isValid: false,
+        errors: ["Malformed call correction not available - no LLM provider configured"],
+      };
+    }
+
+    const correctionResult = await this.malformedCallValidator.correctMalformedCall(
+      schema,
+      malformedResponse,
+    );
+
+    if (!correctionResult.isSuccess) {
+      return {
+        isValid: false,
+        errors: [`Malformed call correction failed: ${correctionResult.error}`],
+      };
+    }
+
+    // Try to validate the corrected response
+    try {
+      const correctedResponse = {
+        ...malformedResponse,
+        toolCalls: correctionResult.correctedResponse?.toolCalls || [
+          correctionResult.correctedResponse,
+        ],
+      };
+
+      // Validate the corrected response without recursive correction attempts
+      const correctedToolCallResponse: ToolCallResponse = correctedResponse;
+
+      // Check if any tool calls were provided in corrected response
+      if (
+        !correctedToolCallResponse.toolCalls ||
+        correctedToolCallResponse.toolCalls.length === 0
+      ) {
+        return {
+          isValid: false,
+          errors: ["Corrected response still has no tool calls"],
+        };
+      }
+
+      // Parse the corrected tool call into an Action
+      const toolCall = correctedToolCallResponse.toolCalls[0];
+      const action = this.parseToolCallToAction(toolCall, correctedToolCallResponse);
+
+      // Validate the corrected action
+      const validationResult = this.validateToolCallAction(action);
+
+      if (validationResult.isValid) {
+        return {
+          isValid: true,
+          errors: [],
+          action,
+          wasCorrected: true,
+          feedbackMessage: "✅ Malformed function call was automatically corrected.",
+        };
+      } else {
+        return {
+          isValid: false,
+          errors: [`Corrected call still invalid: ${validationResult.errors.join(", ")}`],
+        };
+      }
+    } catch (error) {
+      return {
+        isValid: false,
+        errors: [`Failed to process corrected response: ${error}`],
+      };
+    }
+  }
+
+  /**
    * Validates and parses a ToolCallResponse into an Action
    * Handles all tool call validation logic in one place
    */
   validateAndParseToolCallResponse(response: ToolCallResponse): ToolCallValidationResult {
     // Check if any tool calls were provided
     if (!response.toolCalls || response.toolCalls.length === 0) {
-      const reasoningText = response.text || response.reasoning || "No reasoning provided";
       return {
         isValid: false,
         errors: ["No tool call found in response"],
-        feedbackMessage: buildToolCallErrorPrompt(reasoningText),
       };
     }
 
@@ -262,6 +352,13 @@ export class ActionValidator {
         errors: [errorMessage],
       };
     }
+  }
+
+  /**
+   * Generates simple error feedback using the step error template
+   */
+  generateErrorFeedback(error: string, hasGuardrails: boolean = false): string {
+    return buildStepErrorFeedbackPrompt(error, hasGuardrails);
   }
 
   /**

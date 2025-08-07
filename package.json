@@ -73,7 +73,8 @@
     "nanoid": "^5.1.5",
     "playwright": "1.53.0",
     "turndown": "^7.2.0",
-    "zod": "^3.25.75"
+    "zod": "^3.25.75",
+    "zod-to-json-schema": "^3.24.6"
   },
   "packageManager": "pnpm@9.0.0"
 }

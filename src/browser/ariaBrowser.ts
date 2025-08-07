@@ -24,6 +24,7 @@ export enum PageAction {
   Forward = "forward",
   Extract = "extract",
   Done = "done",
+  Abort = "abort",
 }
 
 /**

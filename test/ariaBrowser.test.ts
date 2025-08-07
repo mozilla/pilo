@@ -20,6 +20,7 @@ describe("AriaBrowser interface", () => {
         "forward",
         "extract",
         "done",
+        "abort",
       ];
 
       const actualActions = Object.values(PageAction);
@@ -47,6 +48,7 @@ describe("AriaBrowser interface", () => {
       expect(PageAction.Forward).toBe("forward");
       expect(PageAction.Extract).toBe("extract");
       expect(PageAction.Done).toBe("done");
+      expect(PageAction.Abort).toBe("abort");
     });
 
     it("should categorize actions correctly", () => {
@@ -67,7 +69,12 @@ describe("AriaBrowser interface", () => {
       const navigationActions = [PageAction.Goto, PageAction.Back, PageAction.Forward];
 
       // Control actions
-      const controlActions = [PageAction.Wait, PageAction.Extract, PageAction.Done];
+      const controlActions = [
+        PageAction.Wait,
+        PageAction.Extract,
+        PageAction.Done,
+        PageAction.Abort,
+      ];
 
       const allActions = [...elementActions, ...navigationActions, ...controlActions];
       const enumValues = Object.values(PageAction);
@@ -157,6 +164,7 @@ describe("AriaBrowser interface", () => {
         PageAction.Wait, // seconds to wait
         PageAction.Goto, // URL to navigate to
         PageAction.Done, // final result
+        PageAction.Abort, // reason for aborting
       ];
 
       // These actions need additional data to function
@@ -215,7 +223,7 @@ describe("AriaBrowser interface", () => {
         checkboxes: [PageAction.Check, PageAction.Uncheck],
         navigation: [PageAction.Goto, PageAction.Back, PageAction.Forward],
         interaction: [PageAction.Hover, PageAction.Focus],
-        control: [PageAction.Wait, PageAction.Done],
+        control: [PageAction.Wait, PageAction.Done, PageAction.Abort],
       };
 
       // Verify we have actions for all major categories

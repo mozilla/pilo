@@ -225,6 +225,7 @@ describe("WebAgent", () => {
     webAgent = new WebAgent(mockBrowser, {
       provider: mockProvider,
       logger: mockLogger,
+      enableErrorCorrection: false, // Disable error correction in tests
     });
   });
 
@@ -636,6 +637,111 @@ describe("WebAgent", () => {
       );
 
       expect(mockGenerateText).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe("Error message handling", () => {
+    it("should provide generic error feedback in test environment", async () => {
+      // Mock the AI SDK throwing various types of errors
+      mockGenerateText
+        .mockRejectedValueOnce(
+          new Error(
+            "Model tried to call unavailable tool 'extractdoneextractdoneextractdone'. Available tools: click, fill, select, hover, check, uncheck, focus, enter, fill_and_enter, wait, goto, back, forward, extract, done.",
+          ),
+        )
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" }));
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+      expect(result.action.ref).toBe("s1e23");
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
+
+      // With error correction disabled, should get generic error feedback
+      const messages = (webAgent as any).messages;
+      const errorFeedbackMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content.includes("Tool call error"),
+      );
+
+      expect(errorFeedbackMessage).toBeDefined();
+      expect(errorFeedbackMessage.content).toContain("Available tools:");
+      expect(errorFeedbackMessage.content).toContain("proper JSON arguments");
+      expect(errorFeedbackMessage.content).not.toContain("extractdoneextractdoneextractdone");
+    });
+
+    it("should handle JSON errors with generic feedback in test environment", async () => {
+      // Mock the AI SDK throwing a JSON error
+      mockGenerateText
+        .mockRejectedValueOnce(new Error("Invalid JSON in tool call arguments"))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" }));
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+      expect(result.action.ref).toBe("s1e23");
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
+
+      // With error correction disabled, should get generic error feedback
+      const messages = (webAgent as any).messages;
+      const errorFeedbackMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content.includes("Tool call error"),
+      );
+
+      expect(errorFeedbackMessage).toBeDefined();
+      expect(errorFeedbackMessage.content).toContain("Available tools:");
+    });
+
+    it("should handle network errors with generic feedback in test environment", async () => {
+      // Mock a generic network error
+      mockGenerateText
+        .mockRejectedValueOnce(new Error("Network timeout occurred"))
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" }));
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+      expect(result.action.ref).toBe("s1e23");
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
+
+      // With error correction disabled, should get generic error feedback without echoing the error
+      const messages = (webAgent as any).messages;
+      const errorFeedbackMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content.includes("Tool call error"),
+      );
+
+      expect(errorFeedbackMessage).toBeDefined();
+      expect(errorFeedbackMessage.content).toContain("Available tools:");
+      expect(errorFeedbackMessage.content).not.toContain("Network timeout occurred");
+    });
+  });
+
+  describe("LLM error correction", () => {
+    it("should have error correction validator initialized", () => {
+      // Simple test to verify the error correction validator exists
+      const webAgentInstance = webAgent as any;
+      expect(webAgentInstance.errorCorrectionValidator).toBeDefined();
+      expect(typeof webAgentInstance.errorCorrectionValidator.generateErrorCorrectionFeedback).toBe(
+        "function",
+      );
+    });
+
+    it("should disable error correction when configured off", async () => {
+      // Verify that error correction is disabled when enableErrorCorrection is false
+      // This test validates that configuration controls error correction properly
+      mockGenerateText
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "invalid_ref" })) // Invalid action
+        .mockResolvedValueOnce(createMockActionResponse("click", { ref: "s1e23" })); // Success
+
+      mockBrowser.setCurrentText("button [ref=s1e23]");
+
+      const result = await webAgent.generateNextAction("button [ref=s1e23]");
+
+      expect(result.action.ref).toBe("s1e23");
+      // Should only need 2 calls - the invalid one and the success, no error correction LLM call
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
     });
   });
 });

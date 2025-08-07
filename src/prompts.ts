@@ -27,8 +27,9 @@ const toolExamples = `
 - goto({"url": "https://example.com"}) - Navigate to URL (only previously seen URLs)
 - back() - Go to previous page
 - forward() - Go to next page
-- extract({"description": "data to extract"}) - Extract data from current page
+- extract({"description": "data to extract"}) - Extract specific data from current page for later reference
 - done({"result": "your final answer"}) - Complete the task
+- abort({"description": "what was tried and why it failed"}) - Abort when task cannot be completed
 `.trim();
 
 const toolCallInstruction = `
@@ -112,7 +113,7 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 // Tool calling approach - no longer need response format template
 
 /**
- * Action Loop Prompt Template
+ * Action Loop System Prompt Template
  *
  * Used by WebAgent during the EXECUTION PHASE as the system prompt for action generation.
  * Called from initializeConversation() to set up the conversation context.
@@ -135,63 +136,64 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
  * This prompt is the core instruction set that guides the AI's decision-making
  * throughout the entire task execution process.
  */
-const actionLoopPromptTemplate = buildPromptTemplate(
+const actionLoopSystemPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 
-Think through the current page state and decide what action to take next. Consider the outcome of previous actions and your reasoning for the next step.
+Analyze the current page state and determine your next action based on previous outcomes.
 
-Remember: When you complete the task with done(), ensure your result fully accomplishes what the user requested.
-{% if hasGuardrails %}
-🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
-{% endif %}
-
-Available Tools:
+**Available Tools:**
 {{ toolExamples }}
 
-Rules:
+**Core Rules:**
 1. Use element refs from page snapshot (e.g., s1e33)
-2. Use EXACTLY ONE tool per turn - never use multiple tools or repeat the same tool
-3. You MUST complete ALL steps in your plan before using done()
-4. done() means the ENTIRE task is finished with comprehensive results
-5. goto() can ONLY use URLs that appeared earlier in this conversation
+2. Execute EXACTLY ONE tool per turn
+3. Complete ALL planned steps before using done()
+4. done() indicates ENTIRE task completion with comprehensive results
+5. goto() only accepts URLs from earlier in conversation
 6. Use wait() for page loads, animations, or dynamic content
-{% if hasGuardrails %}7. ALL ACTIONS MUST COMPLY with the provided guardrails{% endif %}
+{% if hasGuardrails %}7. ALL actions MUST comply with provided guardrails{% endif %}
 
-**CRITICAL: You MUST use exactly ONE tool with valid arguments on EVERY turn. Never provide text-only responses.**
-- If you think the task is complete, you must use done(result)
-- If you need to take an action, use the appropriate tool
-- If you're unsure, use extract() to gather more information
+**CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
+- done(result) if task is complete
+- abort(description) if task cannot be completed due to site issues, blocking, or missing data
+- Appropriate action tool if work remains
+- extract() if you need more information
 
-Best Practices:
-- You can see the entire page content - no need to scroll or navigate within the page
-- Close any modals, popups, or overlays that obstruct your view
-- Use click() instead of goto() for navigation elements on the page
-- For forms, use enter() or click the submit button after filling fields
-- If an element isn't found, look for alternative elements
-- Adapt if planned steps isn't possible - work with what's available
-- For research tasks: Use extract() to capture data from relevant pages as you discover it - don't wait until the end
-{% if hasGuardrails %}- Verify each action complies with guardrails before using the tool{% endif %}
+**Best Practices:**
+- Full page content is visible - no scrolling needed
+- Clear obstructing modals/popups first
+- Prefer click() over goto() for page navigation
+- Submit forms via enter() or submit button after filling
+- Find alternative elements if primary ones aren't available
+- Adapt your approach based on what's actually available
+- Use abort() only when you have exhausted reasonable alternatives and the task truly cannot be completed (site down, access blocked, required data unavailable)
+- For research: Use extract() immediately when finding relevant data
+{% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
 
-When using done():
-- The result should be a summary of the steps you took to complete the task
-- The result should reassure the user that you carefully followed their request
-- The result should be thorough and include all the information requested in the task
-- If the task included criteria, you should mention specific details of how you met those criteria
+**When using done():**
+Your result should:
+- Summarize completed steps
+- Confirm careful adherence to user's request
+- Include all requested information thoroughly
+- Reference specific criteria met (if applicable)
 
-Think carefully, then use exactly one appropriate tool. Failure to do so will result in an error.
+{% if hasGuardrails %}
+🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
+{% endif %}
+
 ${toolCallInstruction}
 `.trim(),
 );
 
-const buildActionLoopPrompt = (hasGuardrails: boolean) =>
-  actionLoopPromptTemplate({
+const buildActionLoopSystemPrompt = (hasGuardrails: boolean) =>
+  actionLoopSystemPromptTemplate({
     hasGuardrails,
     toolExamples,
   });
 
-export const actionLoopPrompt = buildActionLoopPrompt(false);
-export { buildActionLoopPrompt };
+export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false);
+export { buildActionLoopSystemPrompt };
 
 /**
  * Task and Plan Context Template
@@ -284,11 +286,13 @@ URL: {{ url }}
 \`\`\`
 
 The snapshot above contains the entire page content - you can see everything without scrolling or navigating within the page.
-Assess the current state and choose your next action.
-Focus on the most relevant elements that help complete your task.
-If content appears dynamic or paginated, consider waiting or exploring navigation options.
-If an action has failed or a planned step isn't possible, adapt your approach and work with what's actually available on the page. Do not keep trying the same action repeatedly - be flexible and find alternative ways to accomplish your goal.
-{% if hasScreenshot %}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
+- Assess the current state and choose your next action.
+- Focus on the most relevant elements that help complete your task.
+- If an action has failed or a planned step isn't possible, adapt your approach and work with what's actually available on the page. Do not keep trying the same action repeatedly - be flexible and find alternative ways to accomplish your goal.
+{% if hasScreenshot %}- Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
+- Respect any provided guardrails
+
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -306,95 +310,44 @@ export const buildPageSnapshotPrompt = (
   });
 
 /**
- * Step Validation Feedback Template
+ * Step Error Feedback Template
  *
- * Used by WebAgent to provide error feedback when AI generates invalid actions.
- * Called from addValidationErrorFeedback() when action validation fails.
+ * Used by WebAgent to provide error feedback when AI actions fail.
+ * Provides simple, direct feedback about what went wrong.
  *
  * Purpose:
- * - Informs the AI about specific validation errors in its tool calls
- * - Provides reminders about correct tool call formats and requirements
- * - Guides the AI to retry with corrected parameters
+ * - Informs the AI about the specific error that occurred
+ * - Shows all available tools with proper JSON syntax
+ * - Provides clear instruction to retry with correct tool call
  * - Reinforces guardrails compliance when applicable
  *
  * Usage in WebAgent:
- * - Triggered when validateToolCallAction() detects errors
+ * - Triggered when any step fails (validation, execution, etc.)
  * - Added as user message after the failed assistant response
- * - Followed by retry attempt with generateNextAction()
- * - Used in the retry loop (up to MAX_RETRY_ATTEMPTS)
+ * - Followed by retry attempt
  *
- * Tool calls expected after this prompt:
- * - Corrected version of the previously failed tool call
- *
- * This prompt is critical for the AI's learning loop - it helps the AI
- * understand what went wrong and how to fix it on subsequent attempts.
+ * This prompt helps the AI understand what went wrong and retry correctly.
  */
-const stepValidationFeedbackTemplate = buildPromptTemplate(
+const stepErrorFeedbackTemplate = buildPromptTemplate(
   `
-Your previous tool call had validation errors:
+# Error Occurred
+{{ error }}
 
-{{ validationErrors }}
-
-Please use the correct tool with valid parameters. Remember:
-- Use element refs from the page snapshot (format: s1e23)
-- Tools requiring refs: click, fill, select, hover, check, uncheck, focus, enter
-- Tools requiring values: fill, select, wait, goto, extract, done
-- goto() can only use URLs that appeared earlier in the conversation
-- wait() requires a numeric value
-{% if hasGuardrails %}
-- ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
-{% endif %}
-
-`.trim(),
-);
-
-export const buildStepValidationFeedbackPrompt = (
-  validationErrors: string,
-  hasGuardrails: boolean = false,
-) =>
-  stepValidationFeedbackTemplate({
-    validationErrors,
-    hasGuardrails,
-  });
-
-/**
- * Tool Call Error Correction Template
- *
- * Used by WebAgent when AI provides reasoning but fails to call any tool.
- * Called from convertToolCallToAction() when no tool calls are detected.
- *
- * Purpose:
- * - Shows the AI what they said vs what they should do
- * - Lists all available tools with proper JSON syntax
- * - Provides specific guidance based on their reasoning text
- * - Reinforces the requirement to use exactly one tool per turn
- *
- * Usage in WebAgent:
- * - Triggered when response.toolCalls is empty
- * - Includes the AI's reasoning text for context
- * - Followed by retry attempt in generateNextAction()
- * - Used in the retry loop before fatal error
- */
-const toolCallErrorTemplate = buildPromptTemplate(
-  `
-TOOL CALL ERROR: You provided reasoning but no tool call.
-
-Your reasoning: {{ reasoningText }}
-
-You MUST use exactly one tool on every turn. Based on your reasoning, choose the appropriate tool:
-
-Available Tools:
+Available tools:
 {{ toolExamples }}
 
-Use the tool that best matches your reasoning.
+{% if hasGuardrails %}
+ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+{% endif %}
 
 ${toolCallInstruction}
 `.trim(),
 );
 
-export const buildToolCallErrorPrompt = (reasoningText: string) =>
-  toolCallErrorTemplate({
-    reasoningText,
+export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boolean = false) =>
+  stepErrorFeedbackTemplate({
+    error,
+    hasGuardrails,
     toolExamples,
   });
 

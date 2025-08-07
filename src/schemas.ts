@@ -120,7 +120,7 @@ export const webActionFunctions = {
   },
 
   extract: {
-    description: "Extract data from the current page",
+    description: "Extract specific data from the current page for later reference",
     parameters: z.object({
       description: z
         .string()
@@ -136,6 +136,18 @@ export const webActionFunctions = {
         .string()
         .describe(
           "A summary of the steps you took to complete the task and the final results that directly address ALL parts of the original task",
+        ),
+    }),
+  },
+
+  abort: {
+    description:
+      "Abort the task when it cannot be completed due to site issues, blocking, or missing data",
+    parameters: z.object({
+      description: z
+        .string()
+        .describe(
+          "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
         ),
     }),
   },

@@ -119,6 +119,7 @@ describe("WebAgentEventEmitter", () => {
         "task:setup",
         "task:started",
         "task:completed",
+        "task:aborted",
         "task:validated",
         "task:validation_error",
         "ai:generation",

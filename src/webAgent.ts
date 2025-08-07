@@ -11,12 +11,11 @@
 
 import { generateObject, generateText, LanguageModel } from "ai";
 import {
-  buildActionLoopPrompt,
+  buildActionLoopSystemPrompt,
   buildPlanPrompt,
   buildPlanAndUrlPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildStepValidationFeedbackPrompt,
   buildTaskValidationPrompt,
   buildExtractionPrompt,
 } from "./prompts.js";
@@ -234,7 +233,7 @@ export class WebAgent {
     this.eventEmitter = new WebAgentEventEmitter();
     this.logger = options.logger ?? new ConsoleLogger();
     this.logger.initialize(this.eventEmitter);
-    this.actionValidator = new ActionValidator();
+    this.actionValidator = new ActionValidator(this.provider, this.abortSignal ?? undefined);
     this.eventHelper = new EventEmissionHelper((type, data) => this.emit(type, data));
   }
 
@@ -275,13 +274,12 @@ export class WebAgent {
       message: "Making a plan and finding the best starting URL",
     });
 
-    const response = await this.generateGenericToolCall(
-      planningTools,
-      buildPlanAndUrlPrompt(task, this.guardrails),
-      undefined,
-      "create_plan_with_url",
-      DEFAULT_PLANNING_MAX_TOKENS,
-    );
+    const response = await this.generateToolCall({
+      tools: planningTools,
+      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
+      specificFunction: "create_plan_with_url",
+      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
+    });
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
       throw new Error("No tool call found in planning response");
@@ -311,13 +309,12 @@ export class WebAgent {
   async generatePlan(task: string, startingUrl?: string) {
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
 
-    const response = await this.generateGenericToolCall(
-      planningTools,
-      buildPlanPrompt(task, startingUrl, this.guardrails),
-      undefined,
-      "create_plan",
-      DEFAULT_PLANNING_MAX_TOKENS,
-    );
+    const response = await this.generateToolCall({
+      tools: planningTools,
+      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
+      specificFunction: "create_plan",
+      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
+    });
 
     if (!response.toolCalls || response.toolCalls.length === 0) {
       throw new Error("No tool call found in planning response");
@@ -349,7 +346,7 @@ export class WebAgent {
     this.messages = [
       {
         role: "system",
-        content: buildActionLoopPrompt(hasGuardrails),
+        content: buildActionLoopSystemPrompt(hasGuardrails),
       },
       {
         role: "user",
@@ -431,18 +428,32 @@ export class WebAgent {
   }
 
   /**
+   * Checks if an action type changes the page state and requires a fresh snapshot
+   */
+  private actionChangesPageState(actionType: string): boolean {
+    // Actions that modify page state or trigger content changes
+    const stateChangingActions = [
+      'click', 'select', 'fill_and_enter', 'enter', 'goto', 'back', 'forward',
+      'fill', 'check', 'uncheck', 'focus', 'hover', 'wait'
+    ];
+    return stateChangingActions.includes(actionType);
+  }
+
+  /**
    * Generate the next action using tool calling based on current page state
    *
    * This is the core decision-making method that:
    * 1. Compresses the page snapshot to reduce token usage
-   * 2. Updates the conversation with current page state
+   * 2. Updates the conversation with current page state (only when needed)
    * 3. Uses tool calling to let the LLM decide what action to take
    * 4. Converts tool calls back to Action format for compatibility
    *
    * @param pageSnapshot - Raw aria tree snapshot of the current page
+   * @param skipSnapshotUpdate - Skip adding snapshot to conversation (used for retries)
+   * @param lastActionType - The type of the last action executed (to determine if snapshot update is needed)
    * @returns The validated action to execute
    */
-  async generateNextAction(pageSnapshot: string): Promise<Action> {
+  async generateNextAction(pageSnapshot: string, skipSnapshotUpdate = false, lastActionType?: string): Promise<Action> {
     // Store the current page snapshot for ref validation
     this.actionValidator.updatePageSnapshot(pageSnapshot);
 
@@ -464,8 +475,13 @@ export class WebAgent {
       });
     }
 
-    // Add the current page snapshot to the conversation for LLM context
-    await this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
+    // Add the current page snapshot to the conversation for LLM context 
+    // Only update if this is not a retry AND (it's the first action OR the last action changed page state)
+    const shouldUpdateSnapshot = !skipSnapshotUpdate && (!lastActionType || this.actionChangesPageState(lastActionType));
+    if (shouldUpdateSnapshot) {
+      await this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
+    }
+
 
     // Debug logging: show full conversation history
     if (this.DEBUG) {
@@ -475,12 +491,36 @@ export class WebAgent {
     // Use tool calling to get the next action
     const response = await this.withProcessingEvents(
       "Planning next action",
-      () => this.generateToolCallResponse(this.messages),
+      () => this.generateActionToolCall(this.messages),
       this.vision,
     );
 
     // Validate and parse the tool call response using centralized validation
-    const validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
+    let validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
+
+    // If validation fails, try malformed call correction first
+    // Only attempt malformed correction if we actually got tool calls that were malformed
+    if (
+      !validationResult.isValid &&
+      this.actionValidator &&
+      response.toolCalls &&
+      response.toolCalls.length > 0
+    ) {
+      try {
+        const correctionResult = await this.actionValidator.attemptMalformedCallCorrection(
+          webActionTools, // schema
+          response, // malformed response
+          // NO conversation context!
+        );
+
+        if (correctionResult.isValid) {
+          validationResult = correctionResult;
+          console.log("✅ Successfully corrected malformed function call");
+        }
+      } catch (correctionError) {
+        console.warn("Malformed call correction failed:", correctionError);
+      }
+    }
 
     if (!validationResult.isValid) {
       // Check action failure limit
@@ -493,15 +533,15 @@ export class WebAgent {
         rawResponse: response,
       });
 
-      // Add feedback message if provided by the validator
-      if (validationResult.feedbackMessage) {
-        this.addUserMessage(validationResult.feedbackMessage);
-      } else {
-        // Fallback to general validation feedback
-        this.addValidationErrorFeedback(validationResult.errors, response);
-      }
+      // Add the failed response to conversation history so we can see what the AI tried to do
+      this.addAssistantMessage(response);
 
-      return this.generateNextAction(pageSnapshot);
+      // Use simple step error feedback for all errors
+      const hasGuardrails = !!this.guardrails;
+      const feedbackMessage = this.actionValidator.generateErrorFeedback(validationResult.errors.join(", "), hasGuardrails);
+      this.addUserMessage(feedbackMessage);
+
+      return this.generateNextAction(pageSnapshot, true, lastActionType); // Skip snapshot update on retry
     }
 
     // Success! Reset failure counter since we got a valid action
@@ -563,12 +603,36 @@ export class WebAgent {
   }
 
   /**
-   * Helper to add assistant response to conversation history
+   * Helper to add assistant response to conversation history in clean format
    */
   protected addAssistantMessage(response: any): void {
+    // Extract reasoning/thinking from the response
+    const reasoning =
+      response.reasoning || response.text || response.observation || "No reasoning provided";
+
+    // Format tool call information
+    let toolUsed = "[none - no tool call made]";
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      const toolCall = response.toolCalls[0];
+      const args = JSON.stringify(toolCall.args || {});
+      toolUsed = `${toolCall.toolName}(${args})`;
+    } else if (response.action && response.action.action) {
+      // Handle old format responses
+      const action = response.action;
+      const args = {
+        ...(action.ref && { ref: action.ref }),
+        ...(action.value && { value: action.value }),
+      };
+      toolUsed = `${action.action}(${JSON.stringify(args)})`;
+    }
+
+    const cleanContent = `Reasoning: ${reasoning}
+
+Tool used: ${toolUsed}`;
+
     this.messages.push({
       role: "assistant",
-      content: JSON.stringify(response),
+      content: cleanContent,
     });
   }
 
@@ -598,15 +662,16 @@ export class WebAgent {
   // Repetition handling is now done in ActionValidator.handleRepeatedToolCallArguments()
 
   /**
-   * Generic tool calling method for any set of tools
+   * Generic tool calling method - thin wrapper around AI SDK with unified error correction
    */
-  protected async generateGenericToolCall(
-    tools: any,
-    prompt?: string,
-    messages?: any[],
-    specificFunction?: string,
-    maxTokens?: number,
-  ): Promise<ToolCallResponse> {
+  protected async generateToolCall(options: {
+    tools: any;
+    prompt?: string;
+    messages?: any[];
+    specificFunction?: string;
+    maxTokens?: number;
+  }): Promise<ToolCallResponse> {
+    const { tools, prompt, messages, specificFunction, maxTokens } = options;
     const config: any = {
       model: this.provider,
       tools,
@@ -615,6 +680,13 @@ export class WebAgent {
         : ("required" as const),
       temperature: 0,
       maxToolRoundtrips: 0,
+      providerOptions: {
+        openrouter: {
+          reasoning: {
+            effort: "low",
+          },
+        },
+      },
     };
 
     // Add max tokens if specified
@@ -639,15 +711,20 @@ export class WebAgent {
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("AI tool call request was cancelled");
       }
+
+      // Re-throw the error - will be handled by callers
+      if (error instanceof Error) {
+        // Any malformed call correction will be handled at a higher level
+      }
+
       throw error;
     }
   }
 
   /**
-   * Generate tool call response using AI SDK (but treat it like structured JSON)
-   * We use tool calling purely for better response conformity, not for actual tool calling conversation
+   * Generate action tool call response for web actions in the main execution loop
    */
-  protected async generateToolCallResponse(messages: any[]): Promise<ToolCallResponse> {
+  protected async generateActionToolCall(messages: any[]): Promise<ToolCallResponse> {
     // Create a clean messages array without any tool call artifacts that might confuse the AI
     const cleanMessages = messages.map((msg) => {
       if (msg.role === "assistant" && msg.tool_calls) {
@@ -660,92 +737,20 @@ export class WebAgent {
       return msg;
     });
 
-    const config = {
-      model: this.provider,
-      messages: cleanMessages,
-      tools: webActionTools,
-      toolChoice: "required" as const,
-      temperature: 0,
-      maxTokens: DEFAULT_GENERATION_MAX_TOKENS, // Generous limit to prevent infinite loops, especially for "done" actions
-      maxToolRoundtrips: 0, // Prevent multiple tool calls in one response
-      providerOptions: {
-        openrouter: {
-          reasoning: {
-            max_tokens: 500,
-            exclude: false,
-          },
-        },
-      },
-    };
-
-    // Add AbortSignal if provided
-    const finalConfig = this.abortSignal ? { ...config, abortSignal: this.abortSignal } : config;
-
     try {
-      const response = await generateText(finalConfig);
-
-      // Emit observation first (the AI's reasoning/thinking)
-      const thinkingText = response.reasoning ?? response.text ?? "Tool call executed";
-      this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
-
-      // Then emit events for the tool call
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        const toolCall = response.toolCalls[0];
-        // Properly handle union types based on function name
-        let ref: string | undefined;
-        let value: string | number | undefined;
-
-        switch (toolCall.toolName) {
-          case "click":
-          case "hover":
-          case "check":
-          case "uncheck":
-          case "focus":
-          case "enter":
-            ref = (toolCall.args as { ref: string }).ref;
-            break;
-          case "fill":
-          case "fill_and_enter":
-          case "select":
-            ref = (toolCall.args as { ref: string; value: string }).ref;
-            value = (toolCall.args as { ref: string; value: string }).value;
-            break;
-          case "wait":
-            value = (toolCall.args as { seconds: number }).seconds;
-            break;
-          case "goto":
-            value = (toolCall.args as { url: string }).url;
-            break;
-          case "extract":
-            value = (toolCall.args as { description: string }).description;
-            break;
-          case "done":
-            value = (toolCall.args as { result: string }).result;
-            break;
-        }
-
-        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-          action: toolCall.toolName,
-          ref,
-          value,
-        });
-      }
-
-      this.emit(WebAgentEventType.AI_GENERATION, {
-        prompt: undefined,
-        schema: undefined,
+      // Use the generic tool call method with web action tools
+      const response = await this.generateToolCall({
+        tools: webActionTools,
         messages: cleanMessages,
-        temperature: 0,
-        object: response.toolCalls?.[0] ?? null,
-        finishReason: response.finishReason,
-        usage: response.usage,
-        warnings: (response as any).warnings,
-        providerMetadata: (response as any).providerMetadata,
+        maxTokens: DEFAULT_GENERATION_MAX_TOKENS,
       });
+
+      // Emit web-specific events after successful tool call
+      this.emitActionEvents(response);
 
       return response;
     } catch (error) {
-      // Handle AbortError specifically
+      // Handle action-specific errors and retry logic
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("AI tool call request was cancelled");
       }
@@ -754,12 +759,17 @@ export class WebAgent {
         // Check action failure limit before retrying
         this.checkActionFailureLimit("Tool call generation failed");
 
-        // Add generic error feedback to conversation without showing the raw error details
-        this.addUserMessage(
-          `⚠️ Error: ${error.message}. ` +
-            `Please follow the tool calling instructions carefully and try again. ` +
-            `Use exactly one tool with valid parameters.`,
-        );
+        // Handle malformed correction with action-specific conversion
+        const correctedResponse = await this.tryActionMalformedCorrection(error);
+        if (correctedResponse) {
+          return correctedResponse;
+        }
+
+        // Use simple error feedback and retry
+        console.log("💡 Action generation error, retrying:", error.message);
+        
+        // Add error feedback to conversation
+        this.addUserMessage(`Error generating action: ${error.message}. Please try again with a valid tool call.`);
 
         // Emit error event for logging
         this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
@@ -770,11 +780,160 @@ export class WebAgent {
         });
 
         // Retry the tool call (now bounded by failure counter)
-        return this.generateToolCallResponse(cleanMessages);
+        return this.generateActionToolCall(cleanMessages);
       }
       throw error;
     }
   }
+
+  /**
+   * Emits web-specific events for action tool calls
+   */
+  private emitActionEvents(response: ToolCallResponse): void {
+    // Emit observation first (the AI's reasoning/thinking)
+    const thinkingText = response.reasoning ?? response.text ?? "Tool call executed";
+    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
+
+    // Then emit events for the tool call
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      const toolCall = response.toolCalls[0];
+      // Properly handle union types based on function name
+      let ref: string | undefined;
+      let value: string | number | undefined;
+
+      switch (toolCall.toolName) {
+        case "click":
+        case "hover":
+        case "check":
+        case "uncheck":
+        case "focus":
+        case "enter":
+          ref = (toolCall.args as { ref: string }).ref;
+          break;
+        case "fill":
+        case "fill_and_enter":
+        case "select":
+          ref = (toolCall.args as { ref: string; value: string }).ref;
+          value = (toolCall.args as { ref: string; value: string }).value;
+          break;
+        case "wait":
+          value = (toolCall.args as { seconds: number }).seconds;
+          break;
+        case "goto":
+          value = (toolCall.args as { url: string }).url;
+          break;
+        case "extract":
+          value = (toolCall.args as { description: string }).description;
+          break;
+        case "done":
+          value = (toolCall.args as { result: string }).result;
+          break;
+        case "abort":
+          value = (toolCall.args as { description: string }).description;
+          break;
+      }
+
+      this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: toolCall.toolName,
+        ref,
+        value,
+      });
+    }
+
+    this.emit(WebAgentEventType.AI_GENERATION, {
+      prompt: undefined,
+      schema: undefined,
+      messages: [], // Clean for display
+      temperature: 0,
+      object: response.toolCalls?.[0] ?? null,
+      finishReason: response.finishReason,
+      usage: response.usage,
+      warnings: (response as any).warnings,
+      providerMetadata: (response as any).providerMetadata,
+    });
+  }
+
+  /**
+   * Attempts malformed correction with action-specific conversion logic
+   */
+  private async tryActionMalformedCorrection(error: Error): Promise<ToolCallResponse | null> {
+    if (
+      !this.actionValidator.malformedValidator ||
+      !(
+        error.message.includes("tried to call unavailable tool") ||
+        error.message.includes("JSON parsing failed") ||
+        error.message.includes("Invalid arguments")
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      // Create a mock response with the error to pass to correction
+      const mockResponse = {
+        text: error.message,
+        toolCalls: [], // Empty since the tool call failed
+        reasoning: `Error: ${error.message}`,
+      };
+
+      const correctionResult = await this.actionValidator.attemptMalformedCallCorrection(
+        webActionTools, // schema
+        mockResponse, // malformed response
+      );
+
+      if (correctionResult.isValid && correctionResult.action) {
+        console.log("✅ Successfully corrected malformed tool call");
+
+        // Convert the corrected action back to a tool call response format
+        const correctedToolCallResponse = {
+          toolCalls: [
+            {
+              toolName: correctionResult.action.action.action,
+              args: {
+                ...(correctionResult.action.action.ref && {
+                  ref: correctionResult.action.action.ref,
+                }),
+                ...(correctionResult.action.action.value &&
+                correctionResult.action.action.action === "wait"
+                  ? { seconds: Number(correctionResult.action.action.value) }
+                  : correctionResult.action.action.value
+                    ? correctionResult.action.action.action === "goto"
+                      ? { url: correctionResult.action.action.value }
+                      : correctionResult.action.action.action === "extract"
+                        ? { description: correctionResult.action.action.value }
+                        : correctionResult.action.action.action === "done"
+                          ? { result: correctionResult.action.action.value }
+                          : correctionResult.action.action.action === "abort"
+                            ? { description: correctionResult.action.action.value }
+                            : { value: correctionResult.action.action.value }
+                    : {}),
+              },
+            },
+          ],
+          text: correctionResult.action.observation,
+          reasoning: correctionResult.action.observation,
+          finishReason: "stop" as const,
+        };
+
+        // Emit the corrected action events
+        this.emit(WebAgentEventType.AGENT_OBSERVED, {
+          observation: correctionResult.action.observation,
+        });
+        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+          action: correctionResult.action.action.action,
+          ref: correctionResult.action.action.ref,
+          value: correctionResult.action.action.value,
+        });
+
+        return correctedToolCallResponse;
+      }
+    } catch (correctionError) {
+      console.warn("Malformed call correction failed:", correctionError);
+    }
+
+    return null;
+  }
+
 
   // Function call validation and parsing is now handled by ActionValidator
 
@@ -1015,13 +1174,6 @@ export class WebAgent {
     }
   }
 
-  private addValidationErrorFeedback(errors: string[], response: any) {
-    const hasGuardrails = !!this.guardrails;
-    // Add the attempted response to conversation, then the error feedback
-    this.addAssistantMessage(response);
-    this.addUserMessage(buildStepValidationFeedbackPrompt(errors.join("\n"), hasGuardrails));
-  }
-
   private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
     // Add the task completion attempt, then feedback about quality
     this.addAssistantMessage(result);
@@ -1084,6 +1236,10 @@ export class WebAgent {
 
         case "done":
           // "done" actions are handled in the main loop, not here
+          break;
+
+        case "abort":
+          // "abort" actions are handled in the main loop, not here
           break;
 
         default:
@@ -1270,13 +1426,12 @@ export class WebAgent {
     }
 
     const response = await this.withProcessingEvents("Validating task completion", async () => {
-      const result = await this.generateGenericToolCall(
-        validationTools,
-        validationPrompt,
-        undefined,
-        "validate_task",
-        DEFAULT_VALIDATION_MAX_TOKENS,
-      );
+      const result = await this.generateToolCall({
+        tools: validationTools,
+        prompt: validationPrompt,
+        specificFunction: "validate_task",
+        maxTokens: DEFAULT_VALIDATION_MAX_TOKENS,
+      });
 
       if (!result.toolCalls || result.toolCalls.length === 0) {
         throw new Error("No tool call found in validation response");
@@ -1401,6 +1556,7 @@ export class WebAgent {
       validationAttempts: 0,
       currentIteration: 0,
       lastValidationResult: undefined as TaskValidationResult | undefined,
+      lastActionType: undefined as string | undefined,
     };
   }
 
@@ -1462,18 +1618,51 @@ export class WebAgent {
   ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
     this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
     const pageSnapshot = await this.browser.getTreeWithRefs();
-    const result = await this.generateNextAction(pageSnapshot);
+    const result = await this.generateNextAction(pageSnapshot, false, state.lastActionType);
 
     // Handle task completion
     if (result.action.action === "done") {
       return await this.handleTaskCompletion(task, result, state);
     }
 
+    // Handle task abortion
+    if (result.action.action === "abort") {
+      return await this.handleTaskAbortion(result, state);
+    }
+
     // Execute regular action
     const actionSuccess = await this.executeAction(result);
     this.recordActionResult(result, actionSuccess);
+    
+    // Track the last action type for next iteration's snapshot decision
+    state.lastActionType = result.action.action;
 
     return { shouldExit: false, success: false, finalAnswer: null };
+  }
+
+  /**
+   * Handles task abortion when it cannot be completed
+   */
+  private async handleTaskAbortion(
+    result: ActionExecutionResult,
+    state: ReturnType<typeof this.createExecutionState>,
+  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
+    const abortReason = result.action.value!;
+    state.finalAnswer = `Task aborted: ${abortReason}`;
+
+    // Emit specific abort event
+    this.emit(WebAgentEventType.TASK_ABORTED, {
+      reason: abortReason,
+      finalAnswer: state.finalAnswer,
+    });
+
+    // Also emit general completion event for backward compatibility
+    this.emit(WebAgentEventType.TASK_COMPLETED, {
+      finalAnswer: state.finalAnswer,
+      success: false,
+    });
+
+    return { shouldExit: true, success: false, finalAnswer: state.finalAnswer! };
   }
 
   /**

@@ -56,6 +56,9 @@ importers:
       zod:
         specifier: ^3.25.75
         version: 3.25.75
+      zod-to-json-schema:
+        specifier: ^3.24.6
+        version: 3.24.6(zod@3.25.75)
     devDependencies:
       '@types/jsdom':
         specifier: ^21.1.7
