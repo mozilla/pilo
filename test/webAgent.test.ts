@@ -274,12 +274,13 @@ describe("WebAgent", () => {
         throw new Error("Aborted");
       });
 
-      await expect(
-        webAgent.execute("Test task", {
-          startingUrl: "https://example.com",
-          abortSignal: controller.signal,
-        }),
-      ).rejects.toThrow();
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+        abortSignal: controller.signal,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toBe("Task aborted by user");
     });
   });
 
@@ -388,7 +389,7 @@ describe("WebAgent", () => {
 
       await expect(
         webAgent.execute("Test task", { startingUrl: "https://example.com" }),
-      ).rejects.toThrow("Failed to generate plan");
+      ).rejects.toThrow(/Failed to generate plan/);
     });
   });
 

@@ -222,54 +222,42 @@ describe("Validator", () => {
       expect(result.feedback).toBe("Wrong button clicked");
     });
 
-    it("should handle missing tool calls", async () => {
+    it("should throw error when missing tool calls", async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: "No tool call",
         toolCalls: [],
       } as any);
 
-      const result = await validator.checkTaskComplete(
-        "Do something",
-        "Something done",
-        mockProvider,
-      );
-
-      expect(result.isComplete).toBe(false);
-      expect(result.feedback).toBe("Could not validate task completion");
+      await expect(
+        validator.checkTaskComplete("Do something", "Something done", mockProvider),
+      ).rejects.toThrow("No valid tool call in validation response");
     });
 
-    it("should handle undefined tool calls", async () => {
+    it("should throw error when tool calls undefined", async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: "No tool call",
       } as any);
 
-      const result = await validator.checkTaskComplete(
-        "Do something",
-        "Something done",
-        mockProvider,
-      );
-
-      expect(result.isComplete).toBe(false);
-      expect(result.feedback).toBe("Could not validate task completion");
+      await expect(
+        validator.checkTaskComplete("Do something", "Something done", mockProvider),
+      ).rejects.toThrow("No valid tool call in validation response");
     });
 
-    it("should handle errors gracefully", async () => {
+    it("should propagate API errors", async () => {
       const errorMessage = "API error occurred";
       mockGenerateText.mockRejectedValueOnce(new Error(errorMessage));
 
-      const result = await validator.checkTaskComplete("Perform task", "Task result", mockProvider);
-
-      expect(result.isComplete).toBe(false);
-      expect(result.feedback).toBe(`Validation error: ${errorMessage}`);
+      await expect(
+        validator.checkTaskComplete("Perform task", "Task result", mockProvider),
+      ).rejects.toThrow(errorMessage);
     });
 
-    it("should handle non-Error exceptions", async () => {
+    it("should propagate non-Error exceptions", async () => {
       mockGenerateText.mockRejectedValueOnce("String error");
 
-      const result = await validator.checkTaskComplete("Perform task", "Task result", mockProvider);
-
-      expect(result.isComplete).toBe(false);
-      expect(result.feedback).toBe("Validation error: Unknown error");
+      await expect(
+        validator.checkTaskComplete("Perform task", "Task result", mockProvider),
+      ).rejects.toThrow("String error");
     });
 
     it("should pass correct parameters to generateText", async () => {

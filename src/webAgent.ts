@@ -153,25 +153,49 @@ export class WebAgent {
    * Main entry point - keep this simple and clear
    */
   async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
-    // 1. Validate input
+    // 1. Validate input (let validation errors throw)
     this.validateInput(task, options);
 
     // 2. Setup phase
     await this.setup(task, options);
 
-    // 3. Planning phase
-    await this.planTask(task, options.startingUrl);
-
-    // 4. Navigation phase
-    await this.navigateToStart(task);
-    this.initializeConversation(task);
-
-    // 5. Main execution loop
     const state = this.createExecutionState();
-    const result = await this.runMainLoop(task, state);
+    
+    try {
+      // 3. Planning phase
+      await this.planTask(task, options.startingUrl);
 
-    // 6. Return results
-    return this.buildResult(result, state);
+      // 4. Navigation phase
+      await this.navigateToStart(task);
+      this.initializeConversation(task);
+
+      // 5. Main execution loop
+      const result = await this.runMainLoop(task, state);
+
+      // 6. Return results
+      return this.buildResult(result, state);
+    } catch (error) {
+      // Check if aborted
+      if (this.abortSignal?.aborted) {
+        return this.buildResult(
+          { success: false, finalAnswer: "Task aborted by user" },
+          state
+        );
+      }
+      
+      // Re-throw setup/planning errors (they indicate configuration issues)
+      if (error instanceof Error && 
+          (error.message.includes("Failed to generate plan") || 
+           error.message.includes("No starting URL"))) {
+        throw error;
+      }
+      
+      // Convert runtime errors to results
+      return this.buildResult(
+        { success: false, finalAnswer: `Task failed: ${error instanceof Error ? error.message : String(error)}` },
+        state
+      );
+    }
   }
 
   /**
@@ -275,17 +299,98 @@ export class WebAgent {
   }
 
   /**
+   * Wrapper for generateText with tools that adds retry logic
+   */
+  private async generateWithTools(config: {
+    messages?: any[];
+    prompt?: string;
+    tools: any;
+    toolChoice: any;
+    maxTokens: number;
+    maxRetries?: number;
+  }): Promise<any> {
+    const maxRetries = config.maxRetries ?? 2;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await generateText({
+          model: this.provider,
+          messages: config.messages,
+          prompt: config.prompt,
+          tools: config.tools,
+          toolChoice: config.toolChoice,
+          maxTokens: config.maxTokens,
+          abortSignal: this.abortSignal ?? undefined,
+        });
+
+        // If we get a valid response, return it
+        if (response?.toolCalls?.length || (!config.tools && response?.text)) {
+          return response;
+        }
+
+        throw new Error("No valid tool call in response");
+      } catch (error) {
+        lastError = error as Error;
+
+        // Check if aborted - if so, throw immediately
+        if (this.abortSignal?.aborted) {
+          throw new Error("Operation aborted by user");
+        }
+
+        // Emit error event if this is the first attempt (original error)
+        if (attempt === 0) {
+          this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+            error: lastError.message,
+            iterationId: this.currentIterationId,
+          });
+        }
+
+        // If we have more retries, add feedback to help the model
+        if (attempt < maxRetries && config.messages) {
+          config.messages.push({
+            role: "user",
+            content: `Error: Please provide a valid tool call response. The previous attempt failed with: ${lastError.message}`,
+          });
+        }
+      }
+    }
+
+    throw lastError || new Error("Failed to generate valid tool response");
+  }
+
+  /**
    * Generate action via AI - keep this here as it's core logic
    */
   private async generateNextAction(): Promise<Action> {
-    const response = await generateText({
-      model: this.provider,
+    // Emit processing event before LLM call
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "start",
+      operation: "Thinking about next action",
+      iterationId: this.currentIterationId,
+    });
+
+    const response = await this.generateWithTools({
       messages: this.messages,
       tools: webActionTools,
       toolChoice: "required",
       maxTokens: DEFAULT_GENERATION_MAX_TOKENS,
-      abortSignal: this.abortSignal ?? undefined,
     });
+
+    // Emit processing complete
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "end",
+      operation: "Thinking about next action",
+      iterationId: this.currentIterationId,
+    });
+
+    // If there's reasoning text, emit it as observation
+    if (response.text && response.text.trim()) {
+      this.emit(WebAgentEventType.AGENT_OBSERVED, {
+        observation: response.text,
+        iterationId: this.currentIterationId,
+      });
+    }
 
     if (!response.toolCalls?.length) {
       throw new Error("No tool call in response");
@@ -365,10 +470,67 @@ export class WebAgent {
   }
 
   /**
-   * Validate task completion
+   * Validate task completion with retry logic
    */
   private async validateCompletion(task: string, finalAnswer: string): Promise<boolean> {
-    const check = await this.validator.checkTaskComplete(task, finalAnswer, this.provider);
+    // Emit processing event for validation
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "start",
+      operation: "Validating task completion",
+      iterationId: this.currentIterationId,
+    });
+
+    let check: { isComplete: boolean; feedback?: string } | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = 2;
+
+    // Try validation with retries
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        check = await this.validator.checkTaskComplete(task, finalAnswer, this.provider);
+        break; // Success, exit retry loop
+      } catch (error) {
+        lastError = error as Error;
+
+        // Log validation errors only on final attempt
+        if (attempt === maxRetries) {
+          console.error("Task validation failed after retries:", lastError.message);
+        }
+      }
+    }
+
+    // Emit processing complete
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "end",
+      operation: "Validating task completion",
+      iterationId: this.currentIterationId,
+    });
+
+    // If validation failed completely, treat as incomplete with error feedback
+    if (!check) {
+      check = {
+        isComplete: false,
+        feedback: `Validation error: ${lastError?.message || "Unknown error"}`,
+      };
+    }
+
+    // Emit validation result event
+    if (check.isComplete) {
+      this.emit(WebAgentEventType.TASK_VALIDATED, {
+        observation: "Task completed successfully",
+        completionQuality: "complete",
+        finalAnswer: finalAnswer,
+        iterationId: this.currentIterationId,
+      });
+    } else {
+      this.emit(WebAgentEventType.TASK_VALIDATED, {
+        observation: "Task not yet complete",
+        completionQuality: "partial",
+        feedback: check.feedback,
+        finalAnswer: finalAnswer,
+        iterationId: this.currentIterationId,
+      });
+    }
 
     if (!check.isComplete && check.feedback) {
       this.validator.giveFeedback(this.messages, check.feedback);
@@ -414,13 +576,39 @@ export class WebAgent {
       ? buildPlanPrompt(task, startingUrl, this.guardrails)
       : buildPlanAndUrlPrompt(task, this.guardrails);
 
-    const response = await generateText({
-      model: this.provider,
-      prompt,
-      tools: planningTools,
-      toolChoice: "required",
-      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
-      abortSignal: this.abortSignal ?? undefined,
+    // Emit processing event before planning
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "start",
+      operation: "Creating task plan",
+      iterationId: this.currentIterationId || "planning",
+    });
+
+    let response;
+    try {
+      response = await this.generateWithTools({
+        prompt,
+        tools: planningTools,
+        toolChoice: "required",
+        maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
+      });
+    } catch (error) {
+      // Emit processing complete even on error
+      this.emit(WebAgentEventType.AGENT_PROCESSING, {
+        status: "end",
+        operation: "Creating task plan",
+        iterationId: this.currentIterationId || "planning",
+      });
+      
+      // Preserve original error for better debugging
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to generate plan: ${errorMessage}`);
+    }
+
+    // Emit processing complete
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "end",
+      operation: "Creating task plan",
+      iterationId: this.currentIterationId || "planning",
     });
 
     if (!response.toolCalls?.length) {
@@ -542,39 +730,69 @@ export class WebAgent {
   }
 
   private async updatePageState(): Promise<void> {
-    const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
+    try {
+      const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
 
-    this.currentPage = { title, url };
+      this.currentPage = { title, url };
 
-    this.emit(WebAgentEventType.BROWSER_NAVIGATED, {
-      title,
-      url,
-    });
+      this.emit(WebAgentEventType.BROWSER_NAVIGATED, {
+        title,
+        url,
+      });
+    } catch (error) {
+      // Browser might be disconnected or page might be in transition
+      console.error("Failed to update page state:", error);
+      // Use cached values if available
+      if (!this.currentPage.url) {
+        throw new Error("Browser disconnected or page unavailable");
+      }
+    }
   }
 
   private async getPageInfo(): Promise<{ title: string; url: string }> {
-    const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
+    try {
+      const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
 
-    this.currentPage = { title, url };
-    return { title, url };
+      this.currentPage = { title, url };
+      return { title, url };
+    } catch (error) {
+      // Browser might be disconnected or page might be in transition
+      console.error("Failed to get page info:", error);
+      // Return cached values if available
+      if (this.currentPage.url) {
+        return this.currentPage;
+      }
+      throw new Error("Browser disconnected or page unavailable");
+    }
   }
 
   private async extractData(description: string): Promise<void> {
-    const markdown = await this.browser.getMarkdown();
-    const prompt = buildExtractionPrompt(description, markdown);
+    try {
+      const markdown = await this.browser.getMarkdown();
+      const prompt = buildExtractionPrompt(description, markdown);
 
-    const response = await generateText({
-      model: this.provider,
-      prompt,
-      maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
-      abortSignal: this.abortSignal ?? undefined,
-    });
+      const response = await generateText({
+        model: this.provider,
+        prompt,
+        maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
+        abortSignal: this.abortSignal ?? undefined,
+      });
 
-    // Add extraction result to conversation
-    this.messages.push({
-      role: "assistant",
-      content: `Extracted data:\n${response.text}`,
-    });
+      // Add extraction result to conversation
+      this.messages.push({
+        role: "assistant",
+        content: `Extracted data:\n${response.text}`,
+      });
+    } catch (error) {
+      // Check if aborted
+      if (this.abortSignal?.aborted) {
+        throw new Error("Extraction aborted by user");
+      }
+      
+      // Re-throw with context
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to extract data: ${errorMessage}`);
+    }
   }
 
   private parseToolCall(toolCall: any): Action {

@@ -76,38 +76,27 @@ export class Validator {
     result: string,
     provider: LanguageModel,
   ): Promise<TaskCompletionCheck> {
-    try {
-      const response = await generateText({
-        model: provider,
-        prompt: buildTaskValidationPrompt(task, result, ""),
-        tools: validationTools,
-        toolChoice: { type: "tool", toolName: "validate_task" },
-        maxTokens: 1000,
-      });
+    const response = await generateText({
+      model: provider,
+      prompt: buildTaskValidationPrompt(task, result, ""),
+      tools: validationTools,
+      toolChoice: { type: "tool", toolName: "validate_task" },
+      maxTokens: 1000,
+    });
 
-      if (!response.toolCalls || response.toolCalls.length === 0) {
-        // If no tool call, assume incomplete
-        return {
-          isComplete: false,
-          feedback: "Could not validate task completion",
-        };
-      }
-
-      const validation = response.toolCalls[0].args as any;
-      const isComplete =
-        validation.completionQuality === "complete" || validation.completionQuality === "excellent";
-
-      return {
-        isComplete,
-        feedback: !isComplete ? validation.feedback || undefined : undefined,
-      };
-    } catch (error) {
-      // On error, be conservative and say not complete
-      return {
-        isComplete: false,
-        feedback: `Validation error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
+    // Check for valid tool call
+    if (!response.toolCalls || response.toolCalls.length === 0) {
+      throw new Error("No valid tool call in validation response");
     }
+
+    const validation = response.toolCalls[0].args as any;
+    const isComplete =
+      validation.completionQuality === "complete" || validation.completionQuality === "excellent";
+
+    return {
+      isComplete,
+      feedback: !isComplete ? validation.feedback || undefined : undefined,
+    };
   }
 
   /**
