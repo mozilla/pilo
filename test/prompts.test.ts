@@ -5,7 +5,7 @@ import {
   actionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildStepValidationFeedbackPrompt,
+  buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
 } from "../src/prompts.js";
 
@@ -377,41 +377,40 @@ describe("prompts", () => {
     });
   });
 
-  describe("buildStepValidationFeedbackPrompt", () => {
-    it("should format validation errors", () => {
-      const errors = "Missing ref field\nInvalid action type\nValue is required";
-      const prompt = buildStepValidationFeedbackPrompt(errors);
+  describe("buildStepErrorFeedbackPrompt", () => {
+    it("should format error message", () => {
+      const error = "Missing ref field\nInvalid action type\nValue is required";
+      const prompt = buildStepErrorFeedbackPrompt(error);
 
-      expect(prompt).toContain("had validation errors");
+      expect(prompt).toContain("Error Occurred");
       expect(prompt).toContain("Missing ref field");
       expect(prompt).toContain("Invalid action type");
       expect(prompt).toContain("Value is required");
     });
 
-    it("should include format reminder", () => {
-      const errors = "Some error";
-      const prompt = buildStepValidationFeedbackPrompt(errors);
+    it("should include available tools", () => {
+      const error = "Some error";
+      const prompt = buildStepErrorFeedbackPrompt(error);
 
-      expect(prompt).toContain("use the correct tool with valid parameters");
-      expect(prompt).toContain("Use element refs from the page snapshot");
-      expect(prompt).toContain("Tools requiring refs");
-      expect(prompt).toContain("Tools requiring values");
+      expect(prompt).toContain("Available tools:");
+      expect(prompt).toContain('click({"ref": "s1e33"})');
+      expect(prompt).toContain('fill({"ref": "s1e33", "value": "text"})');
+      expect(prompt).toContain('goto({"url": "https://example.com"})');
     });
 
-    it("should include field requirements", () => {
-      const errors = "Test error";
-      const prompt = buildStepValidationFeedbackPrompt(errors);
+    it("should include tool call instruction", () => {
+      const error = "Test error";
+      const prompt = buildStepErrorFeedbackPrompt(error);
 
-      expect(prompt).toContain("Tools requiring refs: click, fill, select");
-      expect(prompt).toContain("Tools requiring values: fill, select, wait");
-      expect(prompt).toContain("goto() can only use URLs that appeared earlier");
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
+      expect(prompt).toContain("Use valid JSON format for all arguments");
     });
 
     it("should handle empty errors", () => {
-      const prompt = buildStepValidationFeedbackPrompt("");
+      const prompt = buildStepErrorFeedbackPrompt("");
 
-      expect(prompt).toContain("validation errors:");
-      expect(prompt).toContain("Remember:");
+      expect(prompt).toContain("Error Occurred");
+      expect(prompt).toContain("Available tools:");
     });
   });
 
@@ -420,7 +419,7 @@ describe("prompts", () => {
       const task = "Submit contact form";
       const finalAnswer = "Form submitted successfully with ID: 12345";
 
-      const prompt = buildTaskValidationPrompt(task, finalAnswer);
+      const prompt = buildTaskValidationPrompt(task, finalAnswer, "conversation history");
 
       expect(prompt).toContain("Evaluate how well the task result accomplishes");
       expect(prompt).toContain("Task: Submit contact form");
@@ -505,8 +504,8 @@ describe("prompts", () => {
         actionLoopSystemPrompt,
         buildTaskAndPlanPrompt("test", "explanation", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
-        buildStepValidationFeedbackPrompt("errors"),
-        buildTaskValidationPrompt("task", "answer"),
+        buildStepErrorFeedbackPrompt("errors"),
+        buildTaskValidationPrompt("task", "answer", "conversation history"),
       ];
 
       // All prompts should be non-empty strings
@@ -521,7 +520,7 @@ describe("prompts", () => {
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopSystemPrompt,
-        buildStepValidationFeedbackPrompt("errors"),
+        buildStepErrorFeedbackPrompt("errors"),
       ];
 
       // Check that most prompts contain tool call instructions

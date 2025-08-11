@@ -3,7 +3,7 @@ import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { config } from "./config.js";
-import { getEnv } from "./env.js";
+import { getEnv } from "./utils/env.js";
 
 /**
  * Creates and configures an AI language model based on the current configuration

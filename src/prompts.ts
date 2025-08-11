@@ -1,4 +1,4 @@
-import { buildPromptTemplate } from "./templateUtils.js";
+import { buildPromptTemplate } from "./utils/template.js";
 
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.

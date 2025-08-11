@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { buildPromptTemplate } from "../src/templateUtils.js";
+import { buildPromptTemplate } from "../../src/utils/template.js";
 
-describe("templateUtils", () => {
+describe("utils/template", () => {
   describe("buildPromptTemplate", () => {
     it("should create a basic template function", () => {
       const template = buildPromptTemplate("Hello {{ name }}!");

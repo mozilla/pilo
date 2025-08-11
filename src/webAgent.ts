@@ -1,347 +1,469 @@
 /**
- * WebAgent - AI-powered web automation using natural language tasks
+ * WebAgent
  *
- * This module provides the core WebAgent class that combines LLM reasoning with browser automation
- * to execute natural language tasks on web pages. The agent follows a plan-action-validate cycle:
- *
- * 1. Plans the task by generating a step-by-step approach
- * 2. Executes actions on web pages using accessibility tree navigation
- * 3. Validates task completion and retries if needed
+ * Core web automation agent that executes tasks using browser automation.
+ * Handles the main execution loop with:
+ * - SnapshotCompressor: Optimizes accessibility tree for token efficiency
+ * - Validator: Context validation and task completion checking
  */
 
-import { generateObject, generateText, LanguageModel } from "ai";
-import {
-  buildActionLoopSystemPrompt,
-  buildPlanPrompt,
-  buildPlanAndUrlPrompt,
-  buildTaskAndPlanPrompt,
-  buildPageSnapshotPrompt,
-  buildTaskValidationPrompt,
-  buildExtractionPrompt,
-} from "./prompts.js";
+import { generateText, LanguageModel } from "ai";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
-import {
-  Action,
-  TaskValidationResult,
-  webActionTools,
-  planningTools,
-  validationTools,
-} from "./schemas.js";
-import { WebAgentEventEmitter, WebAgentEventType, WebAgentEvent } from "./events.js";
+import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
+import { SnapshotCompressor } from "./snapshotCompressor.js";
+import { Validator } from "./validator.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
-import { ActionValidator } from "./validation/ActionValidator.js";
-import { EventEmissionHelper } from "./events/EventEmissionHelper.js";
 import {
-  SUCCESS_QUALITIES,
-  DEFAULT_MAX_VALIDATION_ATTEMPTS,
-  DEFAULT_MAX_ITERATIONS,
-  DEFAULT_GENERATION_MAX_TOKENS,
-  DEFAULT_EXTRACTION_MAX_TOKENS,
-  DEFAULT_PLANNING_MAX_TOKENS,
-  DEFAULT_VALIDATION_MAX_TOKENS,
-  MAX_RETRY_ATTEMPTS,
-  RETRY_DELAY_MS,
-  MAX_CONVERSATION_MESSAGES,
-  FILTERED_PREFIXES,
-  ARIA_TRANSFORMATIONS,
-  MAX_ACTION_FAILURES,
-} from "./config/WebAgentConfig.js";
+  buildActionLoopSystemPrompt,
+  buildTaskAndPlanPrompt,
+  buildPageSnapshotPrompt,
+  buildPlanAndUrlPrompt,
+  buildPlanPrompt,
+  buildExtractionPrompt,
+} from "./prompts.js";
+import { webActionTools, planningTools } from "./schemas.js";
 import { nanoid } from "nanoid";
 
-// Type definitions for better type safety
+// === Configuration Constants ===
+const DEFAULT_MAX_ITERATIONS = 50;
+const DEFAULT_GENERATION_MAX_TOKENS = 3000;
+const DEFAULT_EXTRACTION_MAX_TOKENS = 5000;
+const DEFAULT_PLANNING_MAX_TOKENS = 1500;
+const MAX_ACTION_FAILURES = 5;
 
-// Response structure from AI tool calling
-type ToolCallResponse = {
-  toolCalls?: Array<{ toolName: string; args: Record<string, any> }>;
-  text?: string;
-  reasoning?: string;
-  finishReason?: string;
-  usage?: any;
-  warnings?: any;
-  providerMetadata?: any;
-};
+// === Type Definitions ===
 
-// ActionExecutionResult is now just an Action with optional extracted data
-type ActionExecutionResult = Action & {
-  extractedData?: string;
-};
+export interface WebAgentOptions {
+  /** Language model provider */
+  provider: LanguageModel;
+  /** Debug mode for additional logging */
+  debug?: boolean;
+  /** Whether to use vision capabilities */
+  vision?: boolean;
+  /** Maximum iterations for task completion */
+  maxIterations?: number;
+  /** Optional guardrails to constrain agent behavior */
+  guardrails?: string | null;
+  /** Event emitter for custom event handling */
+  eventEmitter?: WebAgentEventEmitter;
+  /** Logger for handling events */
+  logger?: Logger;
+  /** @deprecated maxValidationAttempts is no longer used */
+  maxValidationAttempts?: number;
+}
 
-/**
- * Options for WebAgent.execute()
- */
 export interface ExecuteOptions {
-  /** Optional URL to begin from (if not provided, AI will choose) */
+  /** Optional starting URL */
   startingUrl?: string;
-
-  /** Optional contextual data to reference during task execution */
+  /** Optional data to provide to the agent */
   data?: any;
-
-  /** Optional AbortSignal to cancel execution */
+  /** Abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
 
-/**
- * Result returned by WebAgent.execute()
- */
 export interface TaskExecutionResult {
   /** Whether the task completed successfully */
   success: boolean;
+  /** Final answer or result from the agent */
+  finalAnswer: string | null;
+  /** Execution statistics */
+  stats: {
+    iterations: number;
+    actions: number;
+    startTime: number;
+    endTime: number;
+    durationMs: number;
+  };
+}
 
-  /** The final answer provided by the agent */
-  finalAnswer: string;
+interface Action {
+  type: string;
+  ref?: string;
+  value?: string;
+  url?: string;
+  seconds?: number;
+  result?: string;
+  description?: string;
+}
 
-  /** The plan that was created for the task */
-  plan: string;
-
-  /** The explanation of how the task will be approached */
-  taskExplanation: string;
-
-  /** Validation result details (only present if validation was performed) */
-  validationResult?: TaskValidationResult;
-
-  /** Number of iterations taken during execution */
-  iterations: number;
-
-  /** Number of validation attempts made */
-  validationAttempts: number;
+interface ExecutionState {
+  currentIteration: number;
+  actionCount: number;
+  startTime: number;
+  finalAnswer: string | null;
+  consecutiveFailures: number;
+  lastActionType?: string;
 }
 
 /**
- * Options for configuring the WebAgent
- */
-export interface WebAgentOptions {
-  /** Custom logger to use (defaults to ConsoleLogger) */
-  logger?: Logger;
-
-  /** Enable debug mode with additional logging */
-  debug?: boolean;
-
-  /** Enable vision capabilities to include screenshots */
-  vision?: boolean;
-
-  /** AI Provider to use for LLM requests (required) */
-  provider: LanguageModel;
-
-  /** Optional guardrails to limit what the agent can do */
-  guardrails?: string;
-
-  /** Maximum validation attempts when task completion quality is insufficient (defaults to 3) */
-  maxValidationAttempts?: number;
-
-  /** Maximum total iterations to prevent infinite loops (defaults to 50) */
-  maxIterations?: number;
-}
-
-/**
- * WebAgent - Main class for AI-powered web automation
- *
- * Orchestrates the complete task execution lifecycle:
- * 1. Task planning and URL generation
- * 2. Browser navigation and page interaction
- * 3. Action generation and validation
- * 4. Task completion verification
- *
- * The agent maintains conversation state with the LLM and tracks page state
- * to provide context for decision making.
+ * Simplified WebAgent with core execution logic
  */
 export class WebAgent {
-  // === Task State ===
-  /** The generated plan for the current task */
+  // === Core State (stays here) ===
   private plan: string = "";
-
-  /** Starting URL for the task (generated or provided) */
   private url: string = "";
-
-  /** Conversation history with the LLM for context */
   private messages: any[] = [];
-
-  /** Explanation of how the task will be approached */
   private taskExplanation: string = "";
-
-  /** Optional contextual data passed from CLI for task execution */
-  private data: any = null;
-
-  // === Configuration ===
-  /** LLM provider for AI reasoning (defaults to OpenAI GPT-4.1) */
-  private provider: LanguageModel;
-
-  /** Debug mode flag for additional logging */
-  private DEBUG = false;
-
-  /** Vision mode flag for including screenshots */
-  private vision = false;
-
-  /** Optional guardrails to constrain agent behavior */
-  private guardrails: string | null = null;
-
-  /** Maximum attempts to validate task completion before giving up */
-  private maxValidationAttempts: number;
-
-  /** Maximum total iterations to prevent infinite loops */
-  private maxIterations: number;
-
-  // === Event System ===
-  /** Event emitter for logging and monitoring */
-  private eventEmitter: WebAgentEventEmitter;
-
-  /** Logger for console output and debugging */
-  private logger: Logger;
-
-  /** Action validator for validating actions and refs */
-  private actionValidator: ActionValidator;
-
-  /** Event emission helper for common event patterns */
-  private eventHelper: EventEmissionHelper;
-
-  // === State Tracking ===
-  /** Current page information for navigation tracking */
   private currentPage: { url: string; title: string } = { url: "", title: "" };
-
-  /** Current iteration ID for linking events within an execution loop */
   private currentIterationId: string = "";
-
-  /** AbortSignal for cancelling execution */
+  private data: any = null;
   private abortSignal: AbortSignal | null = null;
 
-  // === Action Failure Tracking ===
-  /** Count of consecutive action failures for circuit breaker logic */
-  private consecutiveActionFailures = 0;
+  // === Services ===
+  private compressor: SnapshotCompressor;
+  private validator: Validator;
+  private eventEmitter: WebAgentEventEmitter;
+  private logger: Logger;
 
-  // === Validation Patterns ===
-  // No regex patterns needed - we just check if refs exist in the page snapshot
+  // === Configuration ===
+  private readonly provider: LanguageModel;
+  private readonly debug: boolean;
+  private readonly vision: boolean;
+  private readonly maxIterations: number;
+  private readonly guardrails: string | null;
 
-  /**
-   * Initialize WebAgent with browser interface and configuration options
-   *
-   * @param browser - Browser automation interface (usually PlaywrightBrowser)
-   * @param options - Configuration options for the agent
-   */
   constructor(
     private browser: AriaBrowser,
     options: WebAgentOptions,
   ) {
-    // Initialize configuration from options with sensible defaults
-    this.DEBUG = options.debug ?? false;
-    this.vision = options.vision ?? false;
+    // Initialize configuration
     this.provider = options.provider;
-    this.guardrails = options.guardrails ?? null;
-    this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
+    this.debug = options.debug ?? false;
+    this.vision = options.vision ?? false;
     this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+    this.guardrails = options.guardrails ?? null;
 
-    // Set up event system for logging and monitoring
-    this.eventEmitter = new WebAgentEventEmitter();
+    // Initialize services
+    this.compressor = new SnapshotCompressor();
+    this.validator = new Validator();
+    this.eventEmitter = options.eventEmitter ?? new WebAgentEventEmitter();
     this.logger = options.logger ?? new ConsoleLogger();
+
+    // Initialize logger with event emitter
     this.logger.initialize(this.eventEmitter);
-    this.actionValidator = new ActionValidator(this.provider, this.abortSignal ?? undefined);
-    this.eventHelper = new EventEmissionHelper((type, data) => this.emit(type, data));
-  }
 
-  // === Action Failure Management ===
-
-  /**
-   * Increment action failure counter and check if we should stop
-   */
-  private checkActionFailureLimit(failureType: string): void {
-    this.consecutiveActionFailures++;
-
-    if (this.consecutiveActionFailures >= MAX_ACTION_FAILURES) {
-      throw new Error(
-        `Action failed ${this.consecutiveActionFailures} consecutive times (${failureType}). ` +
-          `Stopping to prevent infinite retry loop.`,
-      );
+    // Log initialization
+    if (this.debug) {
+      console.log("WebAgent initialized");
     }
   }
 
   /**
-   * Reset action failure counter on successful action
+   * Main entry point - keep this simple and clear
    */
-  private resetActionFailures(): void {
-    this.consecutiveActionFailures = 0;
+  async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
+    // 1. Validate input
+    this.validateInput(task, options);
+
+    // 2. Setup phase
+    await this.setup(task, options);
+
+    // 3. Planning phase
+    await this.planTask(task, options.startingUrl);
+
+    // 4. Navigation phase
+    await this.navigateToStart(task);
+    this.initializeConversation(task);
+
+    // 5. Main execution loop
+    const state = this.createExecutionState();
+    const result = await this.runMainLoop(task, state);
+
+    // 6. Return results
+    return this.buildResult(result, state);
   }
 
   /**
-   * Generate a task plan and determine the starting URL automatically
-   *
-   * Used when no starting URL is provided - the LLM determines the best
-   * website to visit based on the task description.
-   *
-   * @param task - Natural language description of what to accomplish
-   * @returns The generated plan and starting URL
+   * The main loop - keep it here where it belongs
    */
-  async generatePlanWithUrl(task: string) {
+  private async runMainLoop(
+    task: string,
+    state: ExecutionState,
+  ): Promise<{ success: boolean; finalAnswer: string | null }> {
+    let iteration = 0;
+    let finalAnswer: string | null = null;
+
+    while (iteration++ < this.maxIterations) {
+      try {
+        this.currentIterationId = nanoid(8);
+        state.currentIteration = iteration;
+
+        // Get and compress page snapshot
+        const pageSnapshot = await this.browser.getTreeWithRefs();
+        const compressed = this.compressor.compress(pageSnapshot);
+
+        // Update conversation with page state (only when needed)
+        if (this.shouldUpdateSnapshot(state.lastActionType)) {
+          await this.updateConversation(compressed, state.lastActionType);
+        }
+
+        // Generate next action
+        const action = await this.generateNextAction();
+
+        // Context validation
+        const error = this.validator.checkAction(action, pageSnapshot);
+        if (error) {
+          this.validator.giveFeedback(this.messages, error);
+          state.consecutiveFailures++;
+
+          if (state.consecutiveFailures >= MAX_ACTION_FAILURES) {
+            return {
+              success: false,
+              finalAnswer: "Too many consecutive failures. Task could not be completed.",
+            };
+          }
+          continue;
+        }
+
+        // Reset failure counter on successful validation
+        state.consecutiveFailures = 0;
+
+        // Handle terminal actions
+        if (action.type === "done") {
+          finalAnswer = action.result || action.value || "";
+          const isComplete = await this.validateCompletion(task, finalAnswer);
+          if (isComplete) {
+            return { success: true, finalAnswer };
+          }
+          this.validator.giveFeedback(
+            this.messages,
+            "Task not complete. Please continue working on it.",
+          );
+          continue;
+        }
+
+        if (action.type === "abort") {
+          const reason = action.description || action.value || "Task aborted";
+          return { success: false, finalAnswer: `Aborted: ${reason}` };
+        }
+
+        // Execute action
+        const success = await this.executeAction(action);
+        if (!success) {
+          this.validator.giveFeedback(this.messages, "Action failed. Please try something else.");
+          state.consecutiveFailures++;
+        } else {
+          state.actionCount++;
+          state.lastActionType = action.type;
+        }
+      } catch (error) {
+        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+          error: error instanceof Error ? error.message : String(error),
+          iterationId: this.currentIterationId,
+        });
+
+        this.validator.giveFeedback(
+          this.messages,
+          `Error: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`,
+        );
+        state.consecutiveFailures++;
+
+        if (state.consecutiveFailures >= MAX_ACTION_FAILURES) {
+          return {
+            success: false,
+            finalAnswer: "Too many errors. Task could not be completed.",
+          };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      finalAnswer: finalAnswer || "Maximum iterations reached without completing the task.",
+    };
+  }
+
+  /**
+   * Generate action via AI - keep this here as it's core logic
+   */
+  private async generateNextAction(): Promise<Action> {
+    const response = await generateText({
+      model: this.provider,
+      messages: this.messages,
+      tools: webActionTools,
+      toolChoice: "required",
+      maxTokens: DEFAULT_GENERATION_MAX_TOKENS,
+      abortSignal: this.abortSignal ?? undefined,
+    });
+
+    if (!response.toolCalls?.length) {
+      throw new Error("No tool call in response");
+    }
+
+    return this.parseToolCall(response.toolCalls[0]);
+  }
+
+  /**
+   * Execute browser action - keep here as it coordinates browser
+   */
+  private async executeAction(action: Action): Promise<boolean> {
+    try {
+      this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: action.type,
+        ref: action.ref,
+        value: action.value,
+      });
+
+      switch (action.type) {
+        case "wait":
+          const seconds = action.seconds || parseInt(action.value || "1");
+          await this.wait(seconds);
+          break;
+
+        case "goto":
+          const url = action.url || action.value;
+          if (!url) throw new Error("goto requires a URL");
+          await this.browser.goto(url);
+          await this.updatePageState();
+          break;
+
+        case "back":
+          await this.browser.goBack();
+          await this.updatePageState();
+          break;
+
+        case "forward":
+          await this.browser.goForward();
+          await this.updatePageState();
+          break;
+
+        case "extract":
+          const description = action.description || action.value;
+          if (!description) throw new Error("extract requires a description");
+          await this.extractData(description);
+          break;
+
+        case "fill_and_enter":
+          if (!action.ref || !action.value) {
+            throw new Error("fill_and_enter requires ref and value");
+          }
+          await this.browser.performAction(action.ref, PageAction.Fill, action.value);
+          await this.browser.performAction(action.ref, PageAction.Enter);
+          break;
+
+        default:
+          // Standard browser actions
+          if (action.ref) {
+            await this.browser.performAction(action.ref, action.type as PageAction, action.value);
+          }
+      }
+
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: action.type,
+      });
+
+      return true;
+    } catch (error) {
+      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Validate task completion
+   */
+  private async validateCompletion(task: string, finalAnswer: string): Promise<boolean> {
+    const check = await this.validator.checkTaskComplete(task, finalAnswer, this.provider);
+
+    if (!check.isComplete && check.feedback) {
+      this.validator.giveFeedback(this.messages, check.feedback);
+    }
+
+    return check.isComplete;
+  }
+
+  // === Helper Methods ===
+
+  private validateInput(task: string, options: ExecuteOptions): void {
+    if (!task?.trim()) {
+      throw new Error("Task cannot be empty");
+    }
+
+    if (options.startingUrl && !this.isValidUrl(options.startingUrl)) {
+      throw new Error("Invalid starting URL");
+    }
+  }
+
+  private async setup(task: string, options: ExecuteOptions): Promise<void> {
+    this.resetState();
+    this.data = options.data || null;
+    this.abortSignal = options.abortSignal || null;
+
+    this.emit(WebAgentEventType.TASK_SETUP, {
+      task,
+      browserName: this.browser.browserName,
+      url: options.startingUrl,
+      guardrails: this.guardrails,
+      data: this.data,
+      pwEndpoint: (this.browser as any).pwEndpoint,
+      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
+      proxy: (this.browser as any).proxyServer,
+      vision: this.vision,
+    });
+
+    await this.browser.start();
+  }
+
+  private async planTask(task: string, startingUrl?: string): Promise<void> {
+    const prompt = startingUrl
+      ? buildPlanPrompt(task, startingUrl, this.guardrails)
+      : buildPlanAndUrlPrompt(task, this.guardrails);
+
+    const response = await generateText({
+      model: this.provider,
+      prompt,
+      tools: planningTools,
+      toolChoice: "required",
+      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
+      abortSignal: this.abortSignal ?? undefined,
+    });
+
+    if (!response.toolCalls?.length) {
+      throw new Error("Failed to generate plan");
+    }
+
+    const planData = response.toolCalls[0].args as any;
+    this.plan = planData.plan;
+    this.taskExplanation = planData.explanation;
+
+    if (!startingUrl && "url" in planData && planData.url) {
+      this.url = planData.url;
+    } else if (startingUrl) {
+      this.url = startingUrl;
+    }
+
     this.emit(WebAgentEventType.AGENT_STATUS, {
-      message: "Making a plan and finding the best starting URL",
+      message: "Task plan created",
+      plan: this.plan,
+      explanation: this.taskExplanation,
+      url: this.url,
     });
-
-    const response = await this.generateToolCall({
-      tools: planningTools,
-      prompt: buildPlanAndUrlPrompt(task, this.guardrails),
-      specificFunction: "create_plan_with_url",
-      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
-    });
-
-    if (!response.toolCalls || response.toolCalls.length === 0) {
-      throw new Error("No tool call found in planning response");
-    }
-
-    const toolCall = response.toolCalls[0];
-    const args = toolCall.args as { explanation: string; plan: string; url: string };
-
-    // Store the plan details for later use in conversation
-    this.taskExplanation = args.explanation;
-    this.plan = args.plan;
-    this.url = args.url;
-
-    return { plan: this.plan, url: this.url };
   }
 
-  /**
-   * Generate a task plan for a specific starting URL
-   *
-   * Used when a starting URL is provided - the LLM creates a plan
-   * tailored to accomplish the task on that specific website.
-   *
-   * @param task - Natural language description of what to accomplish
-   * @param startingUrl - Optional URL to start from (included in planning context)
-   * @returns The generated plan
-   */
-  async generatePlan(task: string, startingUrl?: string) {
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Making a plan" });
-
-    const response = await this.generateToolCall({
-      tools: planningTools,
-      prompt: buildPlanPrompt(task, startingUrl, this.guardrails),
-      specificFunction: "create_plan",
-      maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
-    });
-
-    if (!response.toolCalls || response.toolCalls.length === 0) {
-      throw new Error("No tool call found in planning response");
+  private async navigateToStart(task: string): Promise<void> {
+    if (!this.url) {
+      throw new Error("No starting URL determined");
     }
 
-    const toolCall = response.toolCalls[0];
-    const args = toolCall.args as { explanation: string; plan: string };
+    await this.browser.goto(this.url);
+    await this.updatePageState();
 
-    // Store the plan details for later use in conversation
-    this.taskExplanation = args.explanation;
-    this.plan = args.plan;
-
-    return { plan: this.plan };
+    this.emit(WebAgentEventType.TASK_STARTED, {
+      task: task,
+      explanation: this.taskExplanation,
+      plan: this.plan,
+      url: this.url,
+      title: this.currentPage.title,
+    });
   }
 
-  /**
-   * Initialize the conversation with the LLM for the action execution phase
-   *
-   * Sets up the system prompt and initial user message with task context.
-   * This conversation will be used throughout the execution to maintain context
-   * and generate appropriate actions based on page state.
-   *
-   * @param task - The original task description
-   * @returns The initialized message array
-   */
-  initializeConversation(task: string) {
-    const hasGuardrails = !!this.guardrails;
+  private initializeConversation(task: string): void {
+    const hasGuardrails = Boolean(this.guardrails);
 
     this.messages = [
       {
@@ -359,1473 +481,187 @@ export class WebAgent {
         ),
       },
     ];
-
-    return this.messages;
   }
 
-  /**
-   * Validates aria reference by checking if it exists in the current page snapshot
-   */
-  protected validateAriaRef(ref: string): {
-    isValid: boolean;
-    error?: string;
-  } {
-    return this.actionValidator.validateAriaRef(ref);
+  private async updateConversation(
+    compressedSnapshot: string,
+    _lastActionType?: string,
+  ): Promise<void> {
+    // Truncate old snapshots to save tokens
+    this.truncateOldSnapshots();
+
+    const { title, url } = await this.getPageInfo();
+
+    const content = buildPageSnapshotPrompt(title, url, compressedSnapshot, this.vision);
+
+    this.messages.push({ role: "user", content });
   }
 
-  // === PAGE STATE MANAGEMENT ===
-  //
-  // Design rationale: Page state tracking is separated into distinct methods to handle
-  // different scenarios while maintaining consistency and avoiding duplicate events.
-  //
-  // The separation allows us to:
-  // 1. Update state without emitting events (for internal tracking)
-  // 2. Emit events without state changes (for detected navigation)
-  // 3. Combine both for confirmed navigation
-  // 4. Refresh from browser when state might be stale
+  private shouldUpdateSnapshot(lastActionType?: string): boolean {
+    // Always update on first iteration
+    if (!lastActionType) return true;
 
-  /**
-   * Updates internal page state only (no side effects)
-   *
-   * Used when we need to track page state changes without triggering events.
-   * This is important for maintaining accurate internal state during navigation detection.
-   */
-  private updatePageState(title: string, url: string): void {
-    this.currentPage = { url, title };
+    // Update after state-changing actions
+    const stateChangingActions = [
+      "click",
+      "select",
+      "fill_and_enter",
+      "enter",
+      "goto",
+      "back",
+      "forward",
+      "fill",
+      "check",
+      "uncheck",
+      "focus",
+      "hover",
+      "wait",
+    ];
+
+    return stateChangingActions.includes(lastActionType);
   }
 
-  /**
-   * Emits navigation event for logging/display
-   *
-   * Separated from state updates to avoid duplicate events when we detect navigation
-   * that may have already been recorded elsewhere.
-   */
-  private emitNavigationEvent(title: string, url: string): void {
-    this.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
+  private truncateOldSnapshots(): void {
+    // Keep system and initial task messages, truncate old snapshots
+    this.messages = this.messages.map((msg, index) => {
+      if (index < 2) return msg; // Keep system and task messages
+
+      if (msg.role === "user" && msg.content?.includes("accessibility tree snapshot")) {
+        // Truncate old snapshot to just title and URL
+        const lines = msg.content.split("\n");
+        const titleLine = lines.find((l: string) => l.startsWith("Title:"));
+        const urlLine = lines.find((l: string) => l.startsWith("URL:"));
+        return {
+          ...msg,
+          content: `Previous page state:\n${titleLine}\n${urlLine}`,
+        };
+      }
+
+      return msg;
+    });
   }
 
-  /**
-   * Fetches current page info and updates internal state
-   *
-   * Used when we need fresh page info but don't want to emit navigation events
-   * (e.g., when checking if navigation occurred after an action).
-   */
-  private async refreshPageState(): Promise<{ title: string; url: string }> {
+  private async updatePageState(): Promise<void> {
     const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
-    this.updatePageState(title, url);
+
+    this.currentPage = { title, url };
+
+    this.emit(WebAgentEventType.BROWSER_NAVIGATED, {
+      title,
+      url,
+    });
+  }
+
+  private async getPageInfo(): Promise<{ title: string; url: string }> {
+    const [title, url] = await Promise.all([this.browser.getTitle(), this.browser.getUrl()]);
+
+    this.currentPage = { title, url };
     return { title, url };
   }
 
-  /**
-   * Fetches current page info and records navigation
-   *
-   * Used when we expect navigation to have occurred and want to both update state
-   * and emit events for the change.
-   */
-  private async refreshAndRecordNavigation(): Promise<void> {
-    const { title, url } = await this.refreshPageState();
-    this.emitNavigationEvent(title, url);
-  }
+  private async extractData(description: string): Promise<void> {
+    const markdown = await this.browser.getMarkdown();
+    const prompt = buildExtractionPrompt(description, markdown);
 
-  /**
-   * Checks if an action type changes the page state and requires a fresh snapshot
-   */
-  private actionChangesPageState(actionType: string): boolean {
-    // Actions that modify page state or trigger content changes
-    const stateChangingActions = [
-      'click', 'select', 'fill_and_enter', 'enter', 'goto', 'back', 'forward',
-      'fill', 'check', 'uncheck', 'focus', 'hover', 'wait'
-    ];
-    return stateChangingActions.includes(actionType);
-  }
+    const response = await generateText({
+      model: this.provider,
+      prompt,
+      maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
+      abortSignal: this.abortSignal ?? undefined,
+    });
 
-  /**
-   * Generate the next action using tool calling based on current page state
-   *
-   * This is the core decision-making method that:
-   * 1. Compresses the page snapshot to reduce token usage
-   * 2. Updates the conversation with current page state (only when needed)
-   * 3. Uses tool calling to let the LLM decide what action to take
-   * 4. Converts tool calls back to Action format for compatibility
-   *
-   * @param pageSnapshot - Raw aria tree snapshot of the current page
-   * @param skipSnapshotUpdate - Skip adding snapshot to conversation (used for retries)
-   * @param lastActionType - The type of the last action executed (to determine if snapshot update is needed)
-   * @returns The validated action to execute
-   */
-  async generateNextAction(pageSnapshot: string, skipSnapshotUpdate = false, lastActionType?: string): Promise<Action> {
-    // Store the current page snapshot for ref validation
-    this.actionValidator.updatePageSnapshot(pageSnapshot);
-
-    // Compress the page snapshot to reduce token usage while preserving essential information
-    const compressedSnapshot = this.compressSnapshot(pageSnapshot);
-
-    // Get current page info and update internal state for AI context
-    const { title: pageTitle, url: pageUrl } = await this.refreshPageState();
-
-    // Debug logging: show compression effectiveness
-    if (this.DEBUG) {
-      const originalSize = pageSnapshot.length;
-      const compressedSize = compressedSnapshot.length;
-      const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
-        originalSize,
-        compressedSize,
-        compressionPercent,
-      });
-    }
-
-    // Add the current page snapshot to the conversation for LLM context 
-    // Only update if this is not a retry AND (it's the first action OR the last action changed page state)
-    const shouldUpdateSnapshot = !skipSnapshotUpdate && (!lastActionType || this.actionChangesPageState(lastActionType));
-    if (shouldUpdateSnapshot) {
-      await this.updateMessagesWithSnapshot(pageTitle, pageUrl, compressedSnapshot);
-    }
-
-
-    // Debug logging: show full conversation history
-    if (this.DEBUG) {
-      this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
-    }
-
-    // Use tool calling to get the next action
-    const response = await this.withProcessingEvents(
-      "Planning next action",
-      () => this.generateActionToolCall(this.messages),
-      this.vision,
-    );
-
-    // Validate and parse the tool call response using centralized validation
-    let validationResult = this.actionValidator.validateAndParseToolCallResponse(response);
-
-    // If validation fails, try malformed call correction first
-    // Only attempt malformed correction if we actually got tool calls that were malformed
-    if (
-      !validationResult.isValid &&
-      this.actionValidator &&
-      response.toolCalls &&
-      response.toolCalls.length > 0
-    ) {
-      try {
-        const correctionResult = await this.actionValidator.attemptMalformedCallCorrection(
-          webActionTools, // schema
-          response, // malformed response
-          // NO conversation context!
-        );
-
-        if (correctionResult.isValid) {
-          validationResult = correctionResult;
-          console.log("✅ Successfully corrected malformed function call");
-        }
-      } catch (correctionError) {
-        console.warn("Malformed call correction failed:", correctionError);
-      }
-    }
-
-    if (!validationResult.isValid) {
-      // Check action failure limit
-      this.checkActionFailureLimit("Tool call validation failed");
-
-      // Emit validation error event for logging
-      this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
-        errors: validationResult.errors,
-        retryCount: this.consecutiveActionFailures - 1, // For logging purposes
-        rawResponse: response,
-      });
-
-      // Add the failed response to conversation history so we can see what the AI tried to do
-      this.addAssistantMessage(response);
-
-      // Use simple step error feedback for all errors
-      const hasGuardrails = !!this.guardrails;
-      const feedbackMessage = this.actionValidator.generateErrorFeedback(validationResult.errors.join(", "), hasGuardrails);
-      this.addUserMessage(feedbackMessage);
-
-      return this.generateNextAction(pageSnapshot, true, lastActionType); // Skip snapshot update on retry
-    }
-
-    // Success! Reset failure counter since we got a valid action
-    this.resetActionFailures();
-
-    // Return the validated and parsed action
-    return validationResult.action!;
-  }
-
-  /**
-   * Centralized event emission with automatic timestamp and iteration ID injection
-   *
-   * Design decision: All events flow through this single method to ensure:
-   * 1. Consistent timestamp injection for debugging and monitoring
-   * 2. Automatic iteration ID injection to link events within execution loops
-   * 3. Type safety through WebAgentEventType enum
-   * 4. Error isolation - logging failures don't crash the main task
-   * 5. Single point of control for event filtering/debugging
-   *
-   * @param type - Event type from WebAgentEventType enum
-   * @param data - Event-specific data (timestamp and iterationId will be auto-injected)
-   */
-  protected emit(type: WebAgentEventType, data: Omit<any, "timestamp" | "iterationId">) {
-    try {
-      this.eventEmitter.emitEvent({
-        type,
-        data: {
-          timestamp: Date.now(),
-          iterationId: this.currentIterationId,
-          ...data,
-        },
-      } as WebAgentEvent);
-    } catch (error) {
-      // Critical design decision: Never let logging errors crash the main task
-      // The task execution is more important than perfect logging
-      console.error("Failed to emit event:", error);
-    }
-  }
-
-  /**
-   * Helper to emit processing start/end events around AI operations
-   *
-   * This wrapper ensures we always emit both start and end events, even if the AI operation
-   * fails. This is important for UI consistency - users need to know when processing has stopped.
-   *
-   * Design pattern: Using higher-order function to guarantee paired events
-   *
-   * @param operation - Human-readable description of what the AI is processing
-   * @param task - The async AI operation to execute
-   * @param hasScreenshot - Whether this processing includes screenshot data
-   * @returns The result of the AI operation
-   */
-  protected async withProcessingEvents<T>(
-    operation: string,
-    task: () => Promise<T>,
-    hasScreenshot?: boolean,
-  ): Promise<T> {
-    return this.eventHelper.withProcessingEvents(operation, task, hasScreenshot);
-  }
-
-  /**
-   * Helper to add assistant response to conversation history in clean format
-   */
-  protected addAssistantMessage(response: any): void {
-    // Extract reasoning/thinking from the response
-    const reasoning =
-      response.reasoning || response.text || response.observation || "No reasoning provided";
-
-    // Format tool call information
-    let toolUsed = "[none - no tool call made]";
-    if (response.toolCalls && response.toolCalls.length > 0) {
-      const toolCall = response.toolCalls[0];
-      const args = JSON.stringify(toolCall.args || {});
-      toolUsed = `${toolCall.toolName}(${args})`;
-    } else if (response.action && response.action.action) {
-      // Handle old format responses
-      const action = response.action;
-      const args = {
-        ...(action.ref && { ref: action.ref }),
-        ...(action.value && { value: action.value }),
-      };
-      toolUsed = `${action.action}(${JSON.stringify(args)})`;
-    }
-
-    const cleanContent = `Reasoning: ${reasoning}
-
-Tool used: ${toolUsed}`;
-
+    // Add extraction result to conversation
     this.messages.push({
       role: "assistant",
-      content: cleanContent,
+      content: `Extracted data:\n${response.text}`,
     });
   }
 
-  /**
-   * Helper to add user message to conversation history
-   */
-  protected addUserMessage(content: string): void {
-    this.messages.push({
-      role: "user",
-      content,
-    });
+  private parseToolCall(toolCall: any): Action {
+    const args = toolCall.args || {};
 
-    // Prevent memory bloat by limiting conversation history
-    if (this.messages.length > MAX_CONVERSATION_MESSAGES) {
-      // Keep system message and remove oldest user/assistant messages
-      const systemMessages = this.messages.filter((msg) => msg.role === "system");
-      const otherMessages = this.messages.filter((msg) => msg.role !== "system");
-
-      // Keep the most recent messages up to the limit
-      const messagesToKeep = otherMessages.slice(
-        -(MAX_CONVERSATION_MESSAGES - systemMessages.length),
-      );
-      this.messages = [...systemMessages, ...messagesToKeep];
-    }
-  }
-
-  // Repetition handling is now done in ActionValidator.handleRepeatedToolCallArguments()
-
-  /**
-   * Generic tool calling method - thin wrapper around AI SDK with unified error correction
-   */
-  protected async generateToolCall(options: {
-    tools: any;
-    prompt?: string;
-    messages?: any[];
-    specificFunction?: string;
-    maxTokens?: number;
-  }): Promise<ToolCallResponse> {
-    const { tools, prompt, messages, specificFunction, maxTokens } = options;
-    const config: any = {
-      model: this.provider,
-      tools,
-      toolChoice: specificFunction
-        ? ({ type: "tool", toolName: specificFunction } as const)
-        : ("required" as const),
-      temperature: 0,
-      maxToolRoundtrips: 0,
-      providerOptions: {
-        openrouter: {
-          reasoning: {
-            effort: "low",
-          },
-        },
-      },
+    return {
+      type: toolCall.toolName,
+      ref: args.ref,
+      value: args.value || args.result || args.url || args.description,
+      url: args.url,
+      seconds: args.seconds,
+      result: args.result,
+      description: args.description,
     };
+  }
 
-    // Add max tokens if specified
-    if (maxTokens) {
-      config.maxTokens = maxTokens;
-    }
+  private async wait(seconds: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  }
 
-    // Add prompt or messages
-    if (prompt) {
-      config.prompt = prompt;
-    } else if (messages) {
-      config.messages = messages;
-    }
-
-    // Add AbortSignal if provided
-    const finalConfig = this.abortSignal ? { ...config, abortSignal: this.abortSignal } : config;
-
+  private isValidUrl(url: string): boolean {
     try {
-      const response = await generateText(finalConfig);
-      return response;
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI tool call request was cancelled");
-      }
-
-      // Re-throw the error - will be handled by callers
-      if (error instanceof Error) {
-        // Any malformed call correction will be handled at a higher level
-      }
-
-      throw error;
-    }
-  }
-
-  /**
-   * Generate action tool call response for web actions in the main execution loop
-   */
-  protected async generateActionToolCall(messages: any[]): Promise<ToolCallResponse> {
-    // Create a clean messages array without any tool call artifacts that might confuse the AI
-    const cleanMessages = messages.map((msg) => {
-      if (msg.role === "assistant" && msg.tool_calls) {
-        // Remove tool_calls from assistant messages to keep conversation clean
-        return {
-          role: msg.role,
-          content: msg.content ?? "Action taken",
-        };
-      }
-      return msg;
-    });
-
-    try {
-      // Use the generic tool call method with web action tools
-      const response = await this.generateToolCall({
-        tools: webActionTools,
-        messages: cleanMessages,
-        maxTokens: DEFAULT_GENERATION_MAX_TOKENS,
-      });
-
-      // Emit web-specific events after successful tool call
-      this.emitActionEvents(response);
-
-      return response;
-    } catch (error) {
-      // Handle action-specific errors and retry logic
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("AI tool call request was cancelled");
-      }
-
-      if (error instanceof Error) {
-        // Check action failure limit before retrying
-        this.checkActionFailureLimit("Tool call generation failed");
-
-        // Handle malformed correction with action-specific conversion
-        const correctedResponse = await this.tryActionMalformedCorrection(error);
-        if (correctedResponse) {
-          return correctedResponse;
-        }
-
-        // Use simple error feedback and retry
-        console.log("💡 Action generation error, retrying:", error.message);
-        
-        // Add error feedback to conversation
-        this.addUserMessage(`Error generating action: ${error.message}. Please try again with a valid tool call.`);
-
-        // Emit error event for logging
-        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-          error: `AI generation error - attempting retry: ${error.message}`,
-          prompt: undefined,
-          schema: undefined,
-          messages: cleanMessages,
-        });
-
-        // Retry the tool call (now bounded by failure counter)
-        return this.generateActionToolCall(cleanMessages);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Emits web-specific events for action tool calls
-   */
-  private emitActionEvents(response: ToolCallResponse): void {
-    // Emit observation first (the AI's reasoning/thinking)
-    const thinkingText = response.reasoning ?? response.text ?? "Tool call executed";
-    this.emit(WebAgentEventType.AGENT_OBSERVED, { observation: thinkingText });
-
-    // Then emit events for the tool call
-    if (response.toolCalls && response.toolCalls.length > 0) {
-      const toolCall = response.toolCalls[0];
-      // Properly handle union types based on function name
-      let ref: string | undefined;
-      let value: string | number | undefined;
-
-      switch (toolCall.toolName) {
-        case "click":
-        case "hover":
-        case "check":
-        case "uncheck":
-        case "focus":
-        case "enter":
-          ref = (toolCall.args as { ref: string }).ref;
-          break;
-        case "fill":
-        case "fill_and_enter":
-        case "select":
-          ref = (toolCall.args as { ref: string; value: string }).ref;
-          value = (toolCall.args as { ref: string; value: string }).value;
-          break;
-        case "wait":
-          value = (toolCall.args as { seconds: number }).seconds;
-          break;
-        case "goto":
-          value = (toolCall.args as { url: string }).url;
-          break;
-        case "extract":
-          value = (toolCall.args as { description: string }).description;
-          break;
-        case "done":
-          value = (toolCall.args as { result: string }).result;
-          break;
-        case "abort":
-          value = (toolCall.args as { description: string }).description;
-          break;
-      }
-
-      this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-        action: toolCall.toolName,
-        ref,
-        value,
-      });
-    }
-
-    this.emit(WebAgentEventType.AI_GENERATION, {
-      prompt: undefined,
-      schema: undefined,
-      messages: [], // Clean for display
-      temperature: 0,
-      object: response.toolCalls?.[0] ?? null,
-      finishReason: response.finishReason,
-      usage: response.usage,
-      warnings: (response as any).warnings,
-      providerMetadata: (response as any).providerMetadata,
-    });
-  }
-
-  /**
-   * Attempts malformed correction with action-specific conversion logic
-   */
-  private async tryActionMalformedCorrection(error: Error): Promise<ToolCallResponse | null> {
-    if (
-      !this.actionValidator.malformedValidator ||
-      !(
-        error.message.includes("tried to call unavailable tool") ||
-        error.message.includes("JSON parsing failed") ||
-        error.message.includes("Invalid arguments")
-      )
-    ) {
-      return null;
-    }
-
-    try {
-      // Create a mock response with the error to pass to correction
-      const mockResponse = {
-        text: error.message,
-        toolCalls: [], // Empty since the tool call failed
-        reasoning: `Error: ${error.message}`,
-      };
-
-      const correctionResult = await this.actionValidator.attemptMalformedCallCorrection(
-        webActionTools, // schema
-        mockResponse, // malformed response
-      );
-
-      if (correctionResult.isValid && correctionResult.action) {
-        console.log("✅ Successfully corrected malformed tool call");
-
-        // Convert the corrected action back to a tool call response format
-        const correctedToolCallResponse = {
-          toolCalls: [
-            {
-              toolName: correctionResult.action.action.action,
-              args: {
-                ...(correctionResult.action.action.ref && {
-                  ref: correctionResult.action.action.ref,
-                }),
-                ...(correctionResult.action.action.value &&
-                correctionResult.action.action.action === "wait"
-                  ? { seconds: Number(correctionResult.action.action.value) }
-                  : correctionResult.action.action.value
-                    ? correctionResult.action.action.action === "goto"
-                      ? { url: correctionResult.action.action.value }
-                      : correctionResult.action.action.action === "extract"
-                        ? { description: correctionResult.action.action.value }
-                        : correctionResult.action.action.action === "done"
-                          ? { result: correctionResult.action.action.value }
-                          : correctionResult.action.action.action === "abort"
-                            ? { description: correctionResult.action.action.value }
-                            : { value: correctionResult.action.action.value }
-                    : {}),
-              },
-            },
-          ],
-          text: correctionResult.action.observation,
-          reasoning: correctionResult.action.observation,
-          finishReason: "stop" as const,
-        };
-
-        // Emit the corrected action events
-        this.emit(WebAgentEventType.AGENT_OBSERVED, {
-          observation: correctionResult.action.observation,
-        });
-        this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-          action: correctionResult.action.action.action,
-          ref: correctionResult.action.action.ref,
-          value: correctionResult.action.action.value,
-        });
-
-        return correctedToolCallResponse;
-      }
-    } catch (correctionError) {
-      console.warn("Malformed call correction failed:", correctionError);
-    }
-
-    return null;
-  }
-
-
-  // Function call validation and parsing is now handled by ActionValidator
-
-  /**
-   * Centralized error handling for AI generation failures
-   */
-  private async handleAIGenerationError(
-    error: unknown,
-    context: {
-      retryCount: number;
-      messages?: any[];
-      prompt?: string;
-      schema?: any;
-    },
-  ): Promise<never> {
-    const { retryCount, messages, prompt, schema } = context;
-
-    // Handle AbortError specifically
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("AI request was cancelled");
-    }
-
-    if (error instanceof Error) {
-      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-        error: error.message,
-        prompt,
-        schema,
-        messages,
-      });
-    }
-
-    // Check if this is a recoverable AI generation error
-    const isRecoverableError =
-      error instanceof Error &&
-      (error.message.includes("response did not match schema") ||
-        error.message.includes("AI_NoObjectGeneratedError") ||
-        error.message.includes("No object generated") ||
-        error.message.includes("Invalid JSON response") ||
-        error.message.includes("AI_APICallError") ||
-        error.name === "AI_APICallError");
-
-    if (isRecoverableError) {
-      console.error(
-        `AI response schema mismatch (attempt ${retryCount + 1}):`,
-        (error as Error).message,
-      );
-
-      // Log debugging info on the first failure
-      if (retryCount === 0 && this.DEBUG && messages) {
-        console.error("Debug info - Last few messages:");
-        const lastMessages = messages.slice(-2);
-        console.error(JSON.stringify(lastMessages, null, 2));
-      }
-
-      if (retryCount < MAX_RETRY_ATTEMPTS) {
-        console.log("🔄 Retrying AI generation...");
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-        return Promise.reject(new Error("RETRY_NEEDED")); // Special error to indicate retry is needed
-      } else {
-        const errorMessage =
-          `AI generation failed after ${retryCount + 1} attempts. This may be due to:\n` +
-          `1. The AI response not matching the expected schema format\n` +
-          `2. Network issues or AI service problems\n` +
-          `3. Complex page content that confused the AI\n` +
-          `Original error: ${(error as Error).message}`;
-        throw new Error(errorMessage);
-      }
-    }
-
-    // Re-throw non-recoverable errors
-    throw error;
-  }
-
-  /**
-   * Centralized AI generation with consistent configuration
-   */
-  protected async generateAIResponse<T>(
-    schema: any,
-    options: {
-      prompt?: string;
-      messages?: any[];
-      maxTokens?: number;
-      retryCount?: number;
-    } = {},
-  ): Promise<T> {
-    const { prompt, messages, maxTokens, retryCount = 0 } = options;
-
-    const config: any = {
-      model: this.provider,
-      schema,
-      temperature: 0,
-    };
-
-    // Add token limit if specified
-    if (maxTokens) {
-      config.maxTokens = maxTokens;
-    }
-
-    // Add AbortSignal if provided
-    if (this.abortSignal) {
-      config.abortSignal = this.abortSignal;
-    }
-
-    if (prompt) {
-      config.prompt = prompt;
-    } else if (messages) {
-      config.messages = messages;
-    }
-
-    try {
-      const response = await generateObject(config);
-      this.emit(WebAgentEventType.AI_GENERATION, {
-        prompt,
-        schema,
-        messages,
-        temperature: config.temperature,
-        object: response.object,
-        finishReason: response.finishReason,
-        usage: response.usage,
-        warnings: response.warnings,
-        providerMetadata: response.providerMetadata,
-      });
-      return response.object as T;
-    } catch (error) {
-      // Log raw response for debugging when parsing fails
-      if (error instanceof Error && error.message.includes("could not parse the response")) {
-        console.error("❌ Raw AI response that failed to parse:", (error as any).response);
-      }
-
-      try {
-        await this.handleAIGenerationError(error, {
-          retryCount,
-          messages,
-          prompt,
-          schema,
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message === "RETRY_NEEDED") {
-          return this.generateAIResponse<T>(schema, {
-            prompt,
-            messages,
-            maxTokens,
-            retryCount: retryCount + 1,
-          });
-        }
-        throw err;
-      }
-
-      // This should never be reached due to the Promise<never> return type
-      throw error;
-    }
-  }
-
-  private truncateSnapshotsInMessages(messages: any[]): any[] {
-    return messages.map((msg) => {
-      if (msg.role === "user") {
-        // Handle text-only messages
-        if (
-          typeof msg.content === "string" &&
-          msg.content.includes("snapshot") &&
-          msg.content.includes("```")
-        ) {
-          return {
-            ...msg,
-            content: msg.content.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
-          };
-        }
-        // Handle multimodal messages (text + image)
-        if (Array.isArray(msg.content)) {
-          return {
-            ...msg,
-            content: msg.content.map((item: any) => {
-              if (
-                item.type === "text" &&
-                item.text.includes("snapshot") &&
-                item.text.includes("```")
-              ) {
-                return {
-                  ...item,
-                  text: item.text.replace(/```[\s\S]*$/g, "```[snapshot clipped for length]```"),
-                };
-              }
-              if (item.type === "image") {
-                return {
-                  type: "text",
-                  text: "[screenshot clipped for length]",
-                };
-              }
-              return item;
-            }),
-          };
-        }
-      }
-      return msg;
-    });
-  }
-
-  private async updateMessagesWithSnapshot(pageTitle: string, pageUrl: string, snapshot: string) {
-    // Clip old snapshots from existing messages
-    this.messages = this.truncateSnapshotsInMessages(this.messages);
-
-    const textContent = buildPageSnapshotPrompt(pageTitle, pageUrl, snapshot, this.vision);
-
-    if (this.vision) {
-      try {
-        const screenshot = await this.browser.getScreenshot();
-        this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
-          size: screenshot.length,
-          format: "jpeg" as const,
-        });
-        this.messages.push({
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: textContent,
-            },
-            {
-              type: "image",
-              image: screenshot,
-              mimeType: "image/jpeg",
-            },
-          ],
-        });
-      } catch (error) {
-        // If screenshot fails, fall back to text-only
-        console.warn("Screenshot capture failed, falling back to text-only:", error);
-        this.messages.push({
-          role: "user",
-          content: textContent,
-        });
-      }
-    } else {
-      this.messages.push({
-        role: "user",
-        content: textContent,
-      });
-    }
-  }
-
-  private addTaskRetryFeedback(result: any, validationResult: TaskValidationResult) {
-    // Add the task completion attempt, then feedback about quality
-    this.addAssistantMessage(result);
-    this.addUserMessage(
-      `Task completion quality: ${validationResult.completionQuality}. ${validationResult.feedback} Please continue working on the task.`,
-    );
-  }
-
-  protected async executeAction(result: ActionExecutionResult): Promise<boolean> {
-    try {
-      switch (result.action.action) {
-        case "wait":
-          const seconds = parseInt(result.action.value ?? "1", 10);
-          await this.wait(seconds);
-          break;
-
-        case "goto":
-          if (result.action.value) {
-            await this.browser.goto(result.action.value);
-            await this.refreshAndRecordNavigation();
-          } else {
-            throw new Error("Missing URL for goto action");
-          }
-          break;
-
-        case "back":
-          await this.browser.goBack();
-          await this.refreshAndRecordNavigation();
-          break;
-
-        case "forward":
-          await this.browser.goForward();
-          await this.refreshAndRecordNavigation();
-          break;
-
-        case "extract":
-          if (!result.action.value) {
-            throw new Error("Missing extraction description for extract action");
-          }
-          const extractedData = await this.extractDataFromPage(result.action.value);
-
-          // Store the extracted data so we can add it to conversation history
-          (result as any).extractedData = extractedData;
-          break;
-
-        case "fill_and_enter":
-          if (!result.action.ref) {
-            throw new Error("Missing ref for fill_and_enter action");
-          }
-          if (!result.action.value) {
-            throw new Error("Missing value for fill_and_enter action");
-          }
-
-          // Fill the element first
-          await this.browser.performAction(result.action.ref, PageAction.Fill, result.action.value);
-
-          // Then press enter on the same element
-          await this.browser.performAction(result.action.ref, PageAction.Enter, undefined);
-          break;
-
-        case "done":
-          // "done" actions are handled in the main loop, not here
-          break;
-
-        case "abort":
-          // "abort" actions are handled in the main loop, not here
-          break;
-
-        default:
-          if (!result.action.ref) {
-            throw new Error("Missing ref for action");
-          }
-
-          await this.browser.performAction(
-            result.action.ref,
-            result.action.action as PageAction,
-            result.action.value,
-          );
-
-          // Check if navigation occurred for actions that might navigate
-          if (["click", "select", "fill_and_enter"].includes(result.action.action)) {
-            const { title: actionTitle, url: actionUrl } = await this.refreshPageState();
-
-            if (actionUrl !== this.currentPage.url || actionTitle !== this.currentPage.title) {
-              this.emitNavigationEvent(actionTitle, actionUrl);
-            }
-          }
-      }
+      new URL(url);
       return true;
-    } catch (error) {
-      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return false;
-    }
-  }
-
-  private recordActionResult(result: ActionExecutionResult, actionSuccess: boolean) {
-    if (actionSuccess) {
-      // Add the action result to conversation history in our normal format
-      // This maintains our existing conversation flow while using tool calls for format
-      this.addAssistantMessage(result);
-
-      // For extract actions, also add the extracted data to conversation history
-      if (result.action.action === "extract" && result.extractedData) {
-        this.addUserMessage(`Extraction result: ${result.extractedData}`);
-      }
-
-      this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, { success: true });
-    } else {
-      this.addAssistantMessage(`Failed to execute action: ${result.action.action}`);
-    }
-  }
-
-  // Helper function to wait for a specified number of seconds
-  async wait(seconds: number) {
-    this.emit(WebAgentEventType.AGENT_WAITING, { seconds });
-
-    return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-  }
-
-  /**
-   * Extracts data from the current page using clean markdown representation
-   *
-   * @param extractionDescription - Description of what data to extract
-   * @returns The extracted data
-   */
-  private async extractDataFromPage(extractionDescription: string): Promise<string> {
-    if (!this.browser) throw new Error("Browser not started");
-
-    try {
-      // Get the page content as clean markdown
-      const markdown = await this.browser.getMarkdown();
-
-      // Create extraction prompt using the template
-      const extractionPrompt = buildExtractionPrompt(extractionDescription, markdown);
-
-      // Use simple text generation for extraction - no need for tool calling with plain text
-      const response = await generateText({
-        model: this.provider,
-        prompt: extractionPrompt,
-        maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
-        temperature: 0,
-        abortSignal: this.abortSignal ?? undefined,
-      });
-
-      let extractedData = response.text;
-
-      // Check if response was truncated due to token limit
-      if (response.finishReason === "length") {
-        console.warn(
-          "⚠️  Data extraction was truncated due to token limit - response may be incomplete",
-        );
-        extractedData += "\n\n[Response truncated due to length limit]";
-      }
-
-      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData });
-
-      return extractedData;
-    } catch (error) {
-      const errorMsg = `Failed to extract data: ${error instanceof Error ? error.message : String(error)}`;
-      this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData: errorMsg });
-      return errorMsg;
-    }
-  }
-
-  /**
-   * Validates if a string is a valid URL
-   */
-  private isValidUrl(urlString: string): boolean {
-    try {
-      const url = new URL(urlString);
-      return url.protocol === "http:" || url.protocol === "https:";
     } catch {
       return false;
     }
   }
 
-  /**
-   * Emits the task setup event with initial task information
-   */
-  private emitTaskSetupEvent(task: string) {
-    this.emit(WebAgentEventType.TASK_SETUP, {
-      task,
-      browserName: this.browser.browserName,
-      url: this.url,
-      guardrails: this.guardrails,
-      data: this.data,
-      pwEndpoint: (this.browser as any).pwEndpoint,
-      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
-      proxy: (this.browser as any).proxyServer,
-      vision: this.vision,
-    });
-  }
-
-  /**
-   * Emits the task start event with all initial task information
-   */
-  private emitTaskStartEvent(task: string) {
-    this.emit(WebAgentEventType.TASK_STARTED, {
-      task,
-      explanation: this.taskExplanation,
-      plan: this.plan,
-      url: this.url,
-    });
-  }
-
-  // Reset the state for a new task
-  resetState() {
+  private resetState(): void {
     this.plan = "";
     this.url = "";
     this.messages = [];
-    this.data = null;
+    this.taskExplanation = "";
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
+    this.data = null;
     this.abortSignal = null;
-    this.consecutiveActionFailures = 0;
   }
 
-  private formatConversationHistory(): string {
-    // Clip snapshots for validation - we don't need massive page content for validation
-    const clippedMessages = this.truncateSnapshotsInMessages(this.messages);
-
-    return clippedMessages
-      .map((msg) => {
-        let content = msg.content;
-        // Handle multimodal content by extracting text parts
-        if (Array.isArray(content)) {
-          content = content
-            .map((item: any) => (item.type === "text" ? item.text : `[${item.type}]`))
-            .join(" ");
-        }
-        return `${msg.role}: ${content}`;
-      })
-      .join("\n\n");
-  }
-
-  protected async validateTaskCompletion(
-    task: string,
-    finalAnswer: string,
-  ): Promise<TaskValidationResult> {
-    const conversationHistory = this.formatConversationHistory();
-
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Reviewing the answer" });
-
-    const validationPrompt = buildTaskValidationPrompt(task, finalAnswer, conversationHistory);
-    if (this.DEBUG) {
-      console.log("🔍 Task validation prompt:", validationPrompt);
-    }
-
-    const response = await this.withProcessingEvents("Validating task completion", async () => {
-      const result = await this.generateToolCall({
-        tools: validationTools,
-        prompt: validationPrompt,
-        specificFunction: "validate_task",
-        maxTokens: DEFAULT_VALIDATION_MAX_TOKENS,
-      });
-
-      if (!result.toolCalls || result.toolCalls.length === 0) {
-        throw new Error("No tool call found in validation response");
-      }
-
-      const toolCall = result.toolCalls[0];
-      return toolCall.args as TaskValidationResult;
-    });
-
-    this.emit(WebAgentEventType.TASK_VALIDATED, {
-      taskAssessment: response.taskAssessment,
-      completionQuality: response.completionQuality,
-      feedback: response.feedback,
-      finalAnswer,
-    });
-
-    return response;
-  }
-
-  /**
-   * Execute a natural language task with optional starting URL and context data
-   *
-   * This is the main entry point for task execution. The method follows this lifecycle:
-   *
-   * 1. **Planning Phase**: Generate task plan and determine starting URL
-   * 2. **Navigation Phase**: Launch browser and navigate to starting page
-   * 3. **Execution Phase**: Iteratively analyze page, generate actions, and execute them
-   * 4. **Validation Phase**: Verify task completion and retry if needed
-   *
-   * The agent will continue executing actions until:
-   * - Task is marked as "done" and validation succeeds
-   * - Maximum validation attempts are reached
-   * - Maximum iteration limit is hit (safety mechanism)
-   * - AbortSignal is triggered (immediate cancellation)
-   *
-   * @param task - Natural language description of what to accomplish
-   * @param options - Optional configuration for task execution
-   * @returns Complete execution results including success status and metrics
-   */
-  async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
-    this.validateTaskInput(task, options);
-    await this.setupTaskExecution(task, options);
-    await this.initializeBrowserAndPlan(task, options.startingUrl);
-    await this.navigateToStartingPage(task);
-
-    const executionState = this.createExecutionState();
-    const loopResult = await this.runMainExecutionLoop(task, executionState);
-
-    return this.buildExecutionResult(loopResult, executionState);
-  }
-
-  /**
-   * Validates task input and options before execution begins
-   */
-  private validateTaskInput(task: string, options: ExecuteOptions): void {
-    if (!task?.trim()) {
-      throw new Error("Task cannot be empty or whitespace-only.");
-    }
-
-    if (task.length > 10000) {
-      throw new Error("Task description is too long (maximum 10,000 characters).");
-    }
-
-    if (options.startingUrl && !this.isValidUrl(options.startingUrl)) {
-      throw new Error("Invalid starting URL provided.");
-    }
-  }
-
-  /**
-   * Sets up the task execution environment
-   */
-  private async setupTaskExecution(task: string, options: ExecuteOptions): Promise<void> {
-    this.emitTaskSetupEvent(task);
-    this.resetState();
-    this.abortSignal = options.abortSignal ?? null;
-
-    if (options.data) {
-      this.data = options.data;
-    }
-  }
-
-  /**
-   * Initializes browser and creates task plan in parallel for efficiency
-   */
-  private async initializeBrowserAndPlan(task: string, startingUrl?: string): Promise<void> {
-    try {
-      this.emit(WebAgentEventType.AGENT_STATUS, {
-        message: "Starting browser and creating plan",
-      });
-
-      if (startingUrl) {
-        this.url = startingUrl;
-        await Promise.all([this.generatePlan(task, startingUrl), this.browser.start()]);
-      } else {
-        await Promise.all([this.generatePlanWithUrl(task), this.browser.start()]);
-      }
-    } catch (error) {
-      await this.cleanupOnInitializationError();
-      throw new Error(
-        `Failed to initialize task: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  /**
-   * Navigates to the starting page and records the navigation
-   */
-  private async navigateToStartingPage(task: string): Promise<void> {
-    this.emitTaskStartEvent(task);
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Navigating to starting page" });
-    await this.browser.goto(this.url);
-    await this.refreshAndRecordNavigation();
-    this.initializeConversation(task);
-  }
-
-  /**
-   * Creates the initial execution state for the main loop
-   */
-  private createExecutionState() {
+  private createExecutionState(): ExecutionState {
     return {
-      finalAnswer: null as string | null,
-      validationAttempts: 0,
       currentIteration: 0,
-      lastValidationResult: undefined as TaskValidationResult | undefined,
-      lastActionType: undefined as string | undefined,
+      actionCount: 0,
+      startTime: Date.now(),
+      finalAnswer: null,
+      consecutiveFailures: 0,
+      lastActionType: undefined,
     };
   }
 
-  /**
-   * Runs the main execution loop until completion or termination
-   */
-  private async runMainExecutionLoop(
-    task: string,
-    state: ReturnType<typeof this.createExecutionState>,
-  ): Promise<{ success: boolean; finalAnswer: string | null }> {
-    while (true) {
-      // Safety check: prevent infinite loops
-      state.currentIteration++;
-      if (state.currentIteration > this.maxIterations) {
-        this.emit(WebAgentEventType.TASK_COMPLETED, {
-          finalAnswer: `Task stopped after reaching maximum iterations (${this.maxIterations})`,
-          success: false,
-        });
-        state.finalAnswer = `Task stopped after reaching maximum iterations (${this.maxIterations})`;
-        break;
-      }
-
-      this.currentIterationId = nanoid(8);
-
-      try {
-        const loopResult = await this.executeMainLoopIteration(task, state);
-        if (loopResult.shouldExit) {
-          return loopResult;
-        }
-      } catch (error) {
-        // Emit error details before handling
-        this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-          error: `Main loop iteration failed: ${error instanceof Error ? error.message : String(error)}`,
-          iterationId: this.currentIterationId,
-          currentIteration: state.currentIteration,
-        });
-
-        const errorResult = this.handleMainLoopError(error);
-        if (errorResult.shouldExit) {
-          state.finalAnswer = errorResult.finalAnswer ?? null;
-          break;
-        }
-      }
-    }
-
-    const success = state.lastValidationResult
-      ? SUCCESS_QUALITIES.includes(state.lastValidationResult.completionQuality as any)
-      : false;
-
-    return { success, finalAnswer: state.finalAnswer };
-  }
-
-  /**
-   * Executes a single iteration of the main loop
-   */
-  private async executeMainLoopIteration(
-    task: string,
-    state: ReturnType<typeof this.createExecutionState>,
-  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
-    this.emit(WebAgentEventType.AGENT_STATUS, { message: "Analyzing the page..." });
-    const pageSnapshot = await this.browser.getTreeWithRefs();
-    const result = await this.generateNextAction(pageSnapshot, false, state.lastActionType);
-
-    // Handle task completion
-    if (result.action.action === "done") {
-      return await this.handleTaskCompletion(task, result, state);
-    }
-
-    // Handle task abortion
-    if (result.action.action === "abort") {
-      return await this.handleTaskAbortion(result, state);
-    }
-
-    // Execute regular action
-    const actionSuccess = await this.executeAction(result);
-    this.recordActionResult(result, actionSuccess);
-    
-    // Track the last action type for next iteration's snapshot decision
-    state.lastActionType = result.action.action;
-
-    return { shouldExit: false, success: false, finalAnswer: null };
-  }
-
-  /**
-   * Handles task abortion when it cannot be completed
-   */
-  private async handleTaskAbortion(
-    result: ActionExecutionResult,
-    state: ReturnType<typeof this.createExecutionState>,
-  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
-    const abortReason = result.action.value!;
-    state.finalAnswer = `Task aborted: ${abortReason}`;
-
-    // Emit specific abort event
-    this.emit(WebAgentEventType.TASK_ABORTED, {
-      reason: abortReason,
-      finalAnswer: state.finalAnswer,
-    });
-
-    // Also emit general completion event for backward compatibility
-    this.emit(WebAgentEventType.TASK_COMPLETED, {
-      finalAnswer: state.finalAnswer,
-      success: false,
-    });
-
-    return { shouldExit: true, success: false, finalAnswer: state.finalAnswer! };
-  }
-
-  /**
-   * Handles task completion validation and retry logic
-   */
-  private async handleTaskCompletion(
-    task: string,
-    result: ActionExecutionResult,
-    state: ReturnType<typeof this.createExecutionState>,
-  ): Promise<{ shouldExit: boolean; success: boolean; finalAnswer: string | null }> {
-    state.finalAnswer = result.action.value!;
-    const validationResult = await this.validateTaskCompletion(task, state.finalAnswer);
-    state.lastValidationResult = validationResult;
-    state.validationAttempts++;
-
-    if (SUCCESS_QUALITIES.includes(validationResult.completionQuality as any)) {
-      this.emit(WebAgentEventType.TASK_COMPLETED, { finalAnswer: state.finalAnswer });
-      return { shouldExit: true, success: true, finalAnswer: state.finalAnswer! };
-    }
-
-    if (state.validationAttempts >= this.maxValidationAttempts) {
-      return { shouldExit: true, success: false, finalAnswer: state.finalAnswer! };
-    }
-
-    this.emit(WebAgentEventType.AGENT_STATUS, {
-      message: "Task needs improvement, continuing work",
-    });
-    this.addTaskRetryFeedback(result, validationResult);
-    state.finalAnswer = null;
-
-    return { shouldExit: false, success: false, finalAnswer: null };
-  }
-
-  /**
-   * Handles errors that occur during the main execution loop
-   */
-  private handleMainLoopError(error: unknown): {
-    shouldExit: boolean;
-    finalAnswer?: string;
-  } {
-    const isCancellation =
-      error instanceof Error &&
-      (error.name === "AbortError" ||
-        (this.abortSignal?.aborted &&
-          (error.message.includes("cancelled") || error.message.includes("aborted"))));
-
-    if (isCancellation) {
-      this.emit(WebAgentEventType.TASK_COMPLETED, {
-        finalAnswer: "Task cancelled",
-        success: false,
-      });
-      return { shouldExit: true, finalAnswer: "Task cancelled" };
-    }
-
-    // Log the full error details for debugging
-    console.error("❌ Main loop error:", error);
-    if (error instanceof Error) {
-      console.error("Error stack:", error.stack);
-    }
-
-    const errorMessage = `Task failed due to AI generation error: ${
-      error instanceof Error ? error.message : String(error)
-    }`;
-
-    this.emit(WebAgentEventType.TASK_COMPLETED, {
-      finalAnswer: errorMessage,
-      success: false,
-    });
-
-    return {
-      shouldExit: true,
-      finalAnswer: errorMessage,
-    };
-  }
-
-  /**
-   * Builds the final execution result
-   */
-  private buildExecutionResult(
+  private buildResult(
     loopResult: { success: boolean; finalAnswer: string | null },
-    state: ReturnType<typeof this.createExecutionState>,
+    state: ExecutionState,
   ): TaskExecutionResult {
+    const endTime = Date.now();
+
+    this.emit(WebAgentEventType.TASK_COMPLETED, {
+      success: loopResult.success,
+      finalAnswer: loopResult.finalAnswer,
+    });
+
     return {
       success: loopResult.success,
-      finalAnswer: loopResult.finalAnswer ?? "Task did not complete",
-      plan: this.plan,
-      taskExplanation: this.taskExplanation,
-      validationResult: state.lastValidationResult,
-      iterations: state.currentIteration,
-      validationAttempts: state.validationAttempts,
+      finalAnswer: loopResult.finalAnswer,
+      stats: {
+        iterations: state.currentIteration,
+        actions: state.actionCount,
+        startTime: state.startTime,
+        endTime,
+        durationMs: endTime - state.startTime,
+      },
     };
   }
 
-  /**
-   * Cleans up resources when initialization fails
-   */
-  private async cleanupOnInitializationError(): Promise<void> {
-    try {
-      await this.browser.shutdown();
-    } catch (shutdownError) {
-      console.warn("Failed to shutdown browser during error cleanup:", shutdownError);
-    }
+  private emit(type: WebAgentEventType, data: any): void {
+    this.eventEmitter.emit(type, data);
   }
 
-  async close() {
+  /**
+   * Close the browser and clean up resources
+   */
+  async close(): Promise<void> {
     // Dispose the logger
     this.logger.dispose();
 
     // Close the browser
     await this.browser.shutdown();
-  }
-
-  /**
-   * Compresses the aria tree snapshot to reduce token usage while maintaining essential information
-   *
-   * This is a critical optimization that can reduce page snapshots by 60-80% while preserving
-   * all actionable elements. Large pages can easily exceed LLM context limits without this.
-   *
-   * Compression strategy:
-   * 1. Normalize whitespace and remove bullet points
-   * 2. Filter out noise (URLs, non-actionable content)
-   * 3. Apply semantic transformations (listitem -> li, etc.)
-   * 4. Deduplicate repeated text content
-   *
-   * @param snapshot - Raw aria tree snapshot from browser
-   * @returns Compressed snapshot optimized for LLM processing
-   */
-  protected compressSnapshot(snapshot: string): string {
-    // === STEP 1: Basic cleanup and filtering ===
-    const transformed = snapshot
-      .split("\n")
-      .map((line) => line.trim()) // Remove leading/trailing whitespace
-      .map((line) => line.replace(/^- /, "")) // Remove bullet point prefixes
-      .filter((line) => !FILTERED_PREFIXES.some((start) => line.startsWith(start))) // Remove noise
-      .map((line) => {
-        // === STEP 2: Apply semantic transformations ===
-        // Convert verbose aria descriptions to concise equivalents for better LLM understanding
-        return ARIA_TRANSFORMATIONS.reduce(
-          (processed, [pattern, replacement]) => processed.replace(pattern, replacement),
-          line,
-        );
-      })
-      .filter(Boolean); // Remove empty lines
-
-    // === STEP 3: Deduplicate repeated text content ===
-    // Many pages have repeated text (navigation, footers, etc.) that wastes tokens
-    let lastQuotedText = "";
-    const deduped = transformed.map((line) => {
-      const match = line.match(/^([^"]*)"([^"]+)"(.*)$/);
-      if (!match) return line;
-
-      const [, prefix, quotedText, suffix] = match;
-
-      // If this text is identical to the previous line's text, replace with reference
-      // This commonly happens with repeated navigation elements, saving significant tokens
-      if (quotedText === lastQuotedText) {
-        return `${prefix}[same as above]${suffix}`;
-      }
-
-      lastQuotedText = quotedText;
-      return line;
-    });
-
-    return deduped.join("\n");
   }
 }
