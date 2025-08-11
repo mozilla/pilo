@@ -1,5 +1,6 @@
 import { buildPromptTemplate } from "./utils/template.js";
 
+/** Base AI persona for web automation tasks. */
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.
 You have deep knowledge of the web and use only the highest quality sources.
@@ -12,7 +13,7 @@ IMPORTANT:
 - Focus on the elements you need to interact with directly.
 `.trim();
 
-// Available tools with proper JSON syntax
+/** Available browser action tools with JSON syntax examples. */
 const toolExamples = `
 - click({"ref": "s1e33"}) - Click on an element
 - fill({"ref": "s1e33", "value": "text"}) - Enter text into a field
@@ -32,6 +33,7 @@ const toolExamples = `
 - abort({"description": "what was tried and why it failed"}) - Abort when task cannot be completed
 `.trim();
 
+/** Standard tool calling instruction. */
 const toolCallInstruction = `
 You MUST use exactly one tool with the required parameters.
 Use valid JSON format for all arguments.
@@ -39,25 +41,9 @@ CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool c
 `.trim();
 
 /**
- * Planning Prompt Template
- *
- * Used by WebAgent during the PLANNING PHASE to generate task execution plans.
- * Called from generatePlanWithUrl() and generatePlan() methods.
- *
- * Purpose:
- * - Converts natural language tasks into structured step-by-step plans
- * - Determines optimal starting URLs when not provided by user
- * - Incorporates guardrails and contextual data into planning
- *
- * Usage in WebAgent:
- * 1. generatePlanWithUrl() - When no starting URL provided, AI chooses best site
- * 2. generatePlan() - When starting URL is provided, plan is tailored to that site
- *
- * Tool calls generated:
- * - create_plan_with_url(): Returns explanation, plan, and starting URL
- * - create_plan(): Returns explanation and plan (URL already known)
- *
- * The plan and explanation are stored in WebAgent state for use throughout execution.
+ * Planning prompt - converts tasks into structured execution plans.
+ * Generates: create_plan_with_url() or create_plan() tool calls.
+ * Used by: planTask() in WebAgent during planning phase.
  */
 const planPromptTemplate = buildPromptTemplate(
   `
@@ -110,31 +96,10 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
     guardrails,
   });
 
-// Tool calling approach - no longer need response format template
-
 /**
- * Action Loop System Prompt Template
- *
- * Used by WebAgent during the EXECUTION PHASE as the system prompt for action generation.
- * Called from initializeConversation() to set up the conversation context.
- *
- * Purpose:
- * - Provides the AI with instructions on how to interact with web pages
- * - Lists all available browser actions (click, fill, navigate, etc.)
- * - Establishes rules for tool calling and task completion
- * - Integrates guardrails when provided to constrain AI behavior
- *
- * Usage in WebAgent:
- * - Set as the system message in initializeConversation()
- * - Remains constant throughout the action execution loop
- * - Works with generateNextAction() to produce appropriate browser actions
- *
- * Tool calls generated:
- * - All web action tools: click, fill, select, hover, check, uncheck, focus, enter,
- *   fill_and_enter, wait, goto, back, forward, extract, done
- *
- * This prompt is the core instruction set that guides the AI's decision-making
- * throughout the entire task execution process.
+ * Action system prompt - guides AI browser interactions during execution.
+ * Generates: All web action tool calls (click, fill, done, abort, etc.).
+ * Used by: initializeConversation() as the system message.
  */
 const actionLoopSystemPromptTemplate = buildPromptTemplate(
   `
@@ -186,6 +151,7 @@ ${toolCallInstruction}
 `.trim(),
 );
 
+/** Build action system prompt with optional guardrails. */
 const buildActionLoopSystemPrompt = (hasGuardrails: boolean) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -196,24 +162,8 @@ export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false);
 export { buildActionLoopSystemPrompt };
 
 /**
- * Task and Plan Context Template
- *
- * Used by WebAgent to provide task context to the AI during action execution.
- * Called from initializeConversation() as the initial user message.
- *
- * Purpose:
- * - Gives the AI the original task description and generated plan
- * - Provides current date context for time-sensitive tasks
- * - Includes any input data provided by the user (JSON format)
- * - Reinforces guardrails as mandatory requirements
- *
- * Usage in WebAgent:
- * - Added as the first user message in initializeConversation()
- * - Contains the plan generated during the planning phase
- * - Includes taskExplanation, plan, data, and guardrails from WebAgent state
- *
- * This template connects the planning phase to the execution phase by providing
- * the AI with all the context it needs to execute the planned actions.
+ * Task context prompt - provides task, plan, and data to AI.
+ * Used by: initializeConversation() as the first user message.
  */
 const taskAndPlanTemplate = buildPromptTemplate(
   `
@@ -254,25 +204,9 @@ export const buildTaskAndPlanPrompt = (
   });
 
 /**
- * Page Snapshot Context Template
- *
- * Used by WebAgent to provide current page state to the AI for action decisions.
- * Called from updateMessagesWithSnapshot() during each iteration.
- *
- * Purpose:
- * - Shows the AI the current page content via accessibility tree snapshot
- * - Provides page title and URL for context
- * - Includes screenshot when vision mode is enabled
- * - Guides the AI to focus on actionable elements
- *
- * Usage in WebAgent:
- * - Added as user message before each generateNextAction() call
- * - Contains compressed page snapshot from compressSnapshot()
- * - Page snapshots from previous iterations are truncated to save tokens
- * - Screenshot is included when vision=true in WebAgent options
- *
- * This is the primary way the AI "sees" the current state of the web page
- * and determines what action to take next based on available elements.
+ * Page snapshot prompt - shows current page state to AI.
+ * Used by: updateConversation() before each action generation.
+ * Includes: Accessibility tree, title, URL, optional screenshot.
  */
 const pageSnapshotTemplate = buildPromptTemplate(
   `
@@ -310,23 +244,8 @@ export const buildPageSnapshotPrompt = (
   });
 
 /**
- * Step Error Feedback Template
- *
- * Used by WebAgent to provide error feedback when AI actions fail.
- * Provides simple, direct feedback about what went wrong.
- *
- * Purpose:
- * - Informs the AI about the specific error that occurred
- * - Shows all available tools with proper JSON syntax
- * - Provides clear instruction to retry with correct tool call
- * - Reinforces guardrails compliance when applicable
- *
- * Usage in WebAgent:
- * - Triggered when any step fails (validation, execution, etc.)
- * - Added as user message after the failed assistant response
- * - Followed by retry attempt
- *
- * This prompt helps the AI understand what went wrong and retry correctly.
+ * Error feedback prompt - informs AI when actions fail.
+ * Used by: Validator.giveFeedback() after failures.
  */
 const stepErrorFeedbackTemplate = buildPromptTemplate(
   `
@@ -352,29 +271,10 @@ export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boole
   });
 
 /**
- * Task Validation Template
- *
- * Used by WebAgent to validate task completion quality after AI calls done().
- * Called from validateTaskCompletion() during the VALIDATION PHASE.
- *
- * Purpose:
- * - Evaluates whether the AI's final result actually accomplishes the user's task
- * - Provides objective assessment of completion quality (failed/partial/complete/excellent)
- * - Generates feedback for improvement when task is incomplete
- * - Prevents premature task completion when work remains
- *
- * Usage in WebAgent:
- * - Triggered when AI calls done() tool
- * - Uses conversation history and final answer for evaluation context
- * - Result determines if task execution should continue or complete
- * - Up to maxValidationAttempts retries allowed for improvement
- *
- * Tool calls generated:
- * - validate_task(): Returns taskAssessment, completionQuality, and feedback
- *
- * Validation results guide the main execution loop:
- * - "complete"/"excellent": Task execution completes successfully
- * - "failed"/"partial": AI receives feedback and continues working
+ * Task validation prompt - evaluates completion quality.
+ * Generates: validate_task() tool call.
+ * Used by: validateCompletion() when AI calls done().
+ * Returns: Quality rating (failed/partial/complete/excellent) and feedback.
  */
 const taskValidationTemplate = buildPromptTemplate(
   `
@@ -413,25 +313,9 @@ export const buildTaskValidationPrompt = (
   });
 
 /**
- * Data Extraction Template
- *
- * Used by WebAgent to extract specific data from web pages when extract() action is called.
- * Called from extractDataFromPage() during action execution.
- *
- * Purpose:
- * - Extracts specific information from page content based on AI's request
- * - Uses clean markdown representation instead of raw HTML for better accuracy
- * - Provides focused data extraction without navigating away from current page
- * - Returns extracted data in simple, compact format for easy consumption
- *
- * Usage in WebAgent:
- * - Triggered when AI calls extract(description) tool
- * - Uses browser.getMarkdown() for clean page content representation
- * - Uses simple text generation (not tool calling) for extraction
- * - Result is added to conversation history for AI context
- *
- * This prompt enables the AI to gather information from the current page
- * without changing the page state, useful for collecting data mid-task.
+ * Data extraction prompt - extracts specific data from pages.
+ * Used by: executeAction() when AI calls extract() tool.
+ * Input: Page markdown content and extraction description.
  */
 const extractionPromptTemplate = buildPromptTemplate(
   `
@@ -455,6 +339,7 @@ export const buildExtractionPrompt = (extractionDescription: string, markdown: s
     markdown,
   });
 
+/** Get current date in "MMM D, YYYY" format. */
 function getCurrentFormattedDate() {
   const date = new Date();
   return date.toLocaleDateString("en-US", {
