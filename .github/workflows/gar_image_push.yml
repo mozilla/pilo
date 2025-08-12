@@ -36,7 +36,7 @@ jobs:
       - name: Output version.json
         run: cat version.json
       - name: Build Docker images
-        uses: mozilla-it/deploy-actions/docker-build@v4.0.1
+        uses: mozilla-it/deploy-actions/docker-build@v4.3.2
         with:
           gar_location: us
           image_name: tabs-spark
@@ -46,7 +46,7 @@ jobs:
           image_build_context: .
           dockerfile_path: "./server/Dockerfile"
       - name: Push the Docker image to GAR
-        uses: mozilla-it/deploy-actions/docker-push@v4.0.1
+        uses: mozilla-it/deploy-actions/docker-push@v4.3.2
         with:
           gar_location: us
           workload_identity_pool_project_number: ${{ vars.GCPV2_WORKLOAD_IDENTITY_POOL_PROJECT_NUMBER }}
