@@ -160,7 +160,7 @@ export class WebAgent {
     await this.setup(task, options);
 
     const state = this.createExecutionState();
-    
+
     try {
       // 3. Planning phase
       await this.planTask(task, options.startingUrl);
@@ -177,23 +177,25 @@ export class WebAgent {
     } catch (error) {
       // Check if aborted
       if (this.abortSignal?.aborted) {
-        return this.buildResult(
-          { success: false, finalAnswer: "Task aborted by user" },
-          state
-        );
+        return this.buildResult({ success: false, finalAnswer: "Task aborted by user" }, state);
       }
-      
+
       // Re-throw setup/planning errors (they indicate configuration issues)
-      if (error instanceof Error && 
-          (error.message.includes("Failed to generate plan") || 
-           error.message.includes("No starting URL"))) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("Failed to generate plan") ||
+          error.message.includes("No starting URL"))
+      ) {
         throw error;
       }
-      
+
       // Convert runtime errors to results
       return this.buildResult(
-        { success: false, finalAnswer: `Task failed: ${error instanceof Error ? error.message : String(error)}` },
-        state
+        {
+          success: false,
+          finalAnswer: `Task failed: ${error instanceof Error ? error.message : String(error)}`,
+        },
+        state,
       );
     }
   }
@@ -598,7 +600,7 @@ export class WebAgent {
         operation: "Creating task plan",
         iterationId: this.currentIterationId || "planning",
       });
-      
+
       // Preserve original error for better debugging
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to generate plan: ${errorMessage}`);
@@ -788,7 +790,7 @@ export class WebAgent {
       if (this.abortSignal?.aborted) {
         throw new Error("Extraction aborted by user");
       }
-      
+
       // Re-throw with context
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to extract data: ${errorMessage}`);
