@@ -329,7 +329,7 @@ Instructions:
 - Include all relevant details that match the extraction request
 - Present the data in well-structured markdown format
 
-Provide the extracted data:
+Return only the extracted data – no other text or commentary.
 `.trim(),
 );
 

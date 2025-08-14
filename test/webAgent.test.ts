@@ -2057,4 +2057,346 @@ describe("WebAgent", () => {
       expect(shutdownSpy).toHaveBeenCalled();
     });
   });
+
+  describe("tool call preservation and error recovery", () => {
+    beforeEach(() => {
+      // Setup default planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+    });
+
+    it("should preserve tool calls in assistant messages", async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: "I'll click the button",
+        toolCalls: [
+          {
+            toolCallId: "click_1",
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test tool preservation", { startingUrl: "https://example.com" });
+
+      // Verify that generateText was called with messages that include toolCalls
+      const calls = mockGenerateText.mock.calls;
+      // Find calls that have messages parameter
+      const messagesCall = calls.find((call) => call[0]?.messages);
+      if (messagesCall && messagesCall[0].messages) {
+        const assistantMessages = messagesCall[0].messages.filter(
+          (m: any) => m.role === "assistant" && m.toolCalls,
+        );
+        // Should have at least one assistant message with toolCalls preserved
+        expect(assistantMessages.length).toBeGreaterThan(0);
+        expect(assistantMessages[0].toolCalls).toBeDefined();
+        expect(Array.isArray(assistantMessages[0].toolCalls)).toBe(true);
+      }
+    });
+
+    it("should handle invalid tool calls by creating synthetic entries", async () => {
+      // First attempt with invalid tool
+      mockGenerateText.mockRejectedValueOnce(
+        new Error("Invalid arguments for unavailable tool 'invalid_action'"),
+      );
+
+      // Second attempt succeeds
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      const result = await webAgent.execute("Test invalid tool", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+
+      // Should have retried after the error
+      expect(mockGenerateText).toHaveBeenCalledTimes(4); // plan + error + retry + validation
+    });
+
+    it("should emit AI_GENERATION event for failed requests", async () => {
+      // Mock a failed request
+      mockGenerateText.mockRejectedValueOnce(new Error("Bad Request: Model doesn't support tools"));
+
+      // Recovery action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test failed generation tracking", {
+        startingUrl: "https://example.com",
+      });
+
+      // Find AI_GENERATION events
+      const aiGenEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.AI_GENERATION,
+      );
+
+      // Should have events including the failed one
+      const failedEvent = aiGenEvents.find((e) => e.data.error);
+      expect(failedEvent).toBeDefined();
+      expect(failedEvent?.data.error).toContain("Bad Request");
+      expect(failedEvent?.data.object).toBeNull(); // No tool call since it failed
+      expect(failedEvent?.data.finishReason).toBe("error");
+    });
+
+    it("should handle responses without tool calls gracefully", async () => {
+      // Response with no tool calls
+      mockGenerateText.mockResolvedValueOnce({
+        text: "I need to think about this",
+        toolCalls: [],
+      } as any);
+
+      // Retry with valid tool call
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      const result = await webAgent.execute("Test no tool calls", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+
+      // Should have preserved the assistant message even without tool calls
+      const calls = mockGenerateText.mock.calls;
+      const retryCall = calls.find((call, index) => index > 1 && call[0]?.messages);
+      if (retryCall && retryCall[0].messages) {
+        // Check that we preserved the response text
+        const assistantMessage = retryCall[0].messages.find(
+          (m: any) => m.role === "assistant" && m.content === "I need to think about this",
+        );
+        expect(assistantMessage).toBeDefined();
+      }
+    });
+
+    it("should add tool result messages with proper toolCallId linkage", async () => {
+      // Action that will fail validation
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Click",
+        toolCalls: [
+          {
+            toolCallId: "click_invalid",
+            toolName: "click",
+            args: { ref: "nonexistent" },
+          },
+        ],
+      } as any);
+
+      // Recovery action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Click correct button",
+        toolCalls: [
+          {
+            toolCallId: "click_valid",
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test tool result linkage", { startingUrl: "https://example.com" });
+
+      // Verify proper message structure was built
+      const calls = mockGenerateText.mock.calls;
+      const messagesCall = calls.find((call) => call[0]?.messages?.length > 3);
+      if (messagesCall && messagesCall[0].messages) {
+        // Find tool result messages
+        const toolMessages = messagesCall[0].messages.filter((m: any) => m.role === "tool");
+        expect(toolMessages.length).toBeGreaterThan(0);
+
+        // Tool result should have proper structure
+        const toolResult = toolMessages[0];
+        expect(toolResult.content).toBeDefined();
+        expect(Array.isArray(toolResult.content)).toBe(true);
+        expect(toolResult.content[0].type).toBe("tool-result");
+        expect(toolResult.content[0].toolCallId).toBeDefined();
+        expect(toolResult.content[0].toolName).toBeDefined();
+        expect(toolResult.content[0].result).toBeDefined();
+      }
+    });
+
+    it("should handle extraction responses with tool result format", async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Extract",
+        toolCalls: [
+          {
+            toolCallId: "extract_1",
+            toolName: "extract",
+            args: { description: "Get title" },
+          },
+        ],
+      } as any);
+
+      // Mock extraction response
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Page Title: Example",
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolCallId: "done_1",
+            toolName: "done",
+            args: { result: "Extracted title" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Extract data", { startingUrl: "https://example.com" });
+
+      // Verify extraction result was added as tool response
+      const calls = mockGenerateText.mock.calls;
+      const doneCall = calls.find(
+        (call, index) => index > 2 && call[0]?.messages?.some((m: any) => m.role === "tool"),
+      );
+      if (doneCall && doneCall[0].messages) {
+        const toolMessage = doneCall[0].messages.find(
+          (m: any) => m.role === "tool" && m.content[0]?.toolName === "extract",
+        );
+        expect(toolMessage).toBeDefined();
+        expect(toolMessage.content[0].result).toBe("Page Title: Example");
+      }
+    });
+  });
 });

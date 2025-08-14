@@ -15,6 +15,7 @@
 import { generateText, LanguageModel } from "ai";
 import { buildTaskValidationPrompt } from "./prompts.js";
 import { validationTools } from "./schemas.js";
+import { tryJSONParse } from "./utils/jsonParser.js";
 
 export interface TaskCompletionCheck {
   isComplete: boolean;
@@ -76,13 +77,49 @@ export class Validator {
     result: string,
     provider: LanguageModel,
   ): Promise<TaskCompletionCheck> {
-    const response = await generateText({
-      model: provider,
-      prompt: buildTaskValidationPrompt(task, result, ""),
-      tools: validationTools,
-      toolChoice: { type: "tool", toolName: "validate_task" },
-      maxTokens: 1000,
-    });
+    let response;
+
+    try {
+      response = await generateText({
+        model: provider,
+        prompt: buildTaskValidationPrompt(task, result, ""),
+        tools: validationTools,
+        toolChoice: { type: "tool", toolName: "validate_task" },
+        maxTokens: 1000,
+      });
+    } catch (error) {
+      // If the error is due to malformed JSON from repeated responses, try to extract and parse
+      if (error instanceof Error && error.message.includes("JSON")) {
+        // Try to extract the JSON from the error message if it's included
+        const errorText = error.message;
+        const jsonMatch = errorText.match(/Text:\s*({.*})/s);
+
+        if (jsonMatch) {
+          const parsed = tryJSONParse(jsonMatch[1]);
+
+          if (parsed) {
+            // Single warning when we recover from malformed JSON
+            console.warn("Corrected malformed validation response from error message");
+
+            // Create a mock response with the parsed data
+            response = {
+              toolCalls: [
+                {
+                  toolCallId: "validate_task_recovery",
+                  toolName: "validate_task",
+                  args: parsed,
+                },
+              ],
+            };
+          }
+        }
+      }
+
+      // If we couldn't recover, re-throw the error
+      if (!response) {
+        throw error;
+      }
+    }
 
     // Check for valid tool call
     if (!response.toolCalls || response.toolCalls.length === 0) {

@@ -24,6 +24,7 @@ import {
 } from "./prompts.js";
 import { webActionTools, planningTools } from "./schemas.js";
 import { nanoid } from "nanoid";
+import { tryJSONParse } from "./utils/jsonParser.js";
 
 // === Configuration Constants ===
 const DEFAULT_MAX_ITERATIONS = 50;
@@ -289,9 +290,13 @@ export class WebAgent {
         }
 
         // Execute action
-        const success = await this.executeAction(action);
-        if (!success) {
-          this.validator.giveFeedback(this.messages, "Action failed. Please try something else.");
+        const result = await this.executeAction(action);
+        if (!result.success) {
+          // Provide the actual error message to the agent
+          const feedback = result.error
+            ? `Action failed: ${result.error}`
+            : "Action failed. Please try something else.";
+          this.validator.giveFeedback(this.messages, feedback);
           state.consecutiveFailures++;
         } else {
           state.actionCount++;
@@ -337,6 +342,7 @@ export class WebAgent {
   }): Promise<any> {
     const maxRetries = config.maxRetries ?? 2;
     let lastError: Error | null = null;
+    let lastResponse: any = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -350,11 +356,15 @@ export class WebAgent {
           abortSignal: this.abortSignal ?? undefined,
         });
 
+        // Store the response even if it has issues
+        lastResponse = response;
+
         // If we get a valid response, return it
         if (response?.toolCalls?.length || (!config.tools && response?.text)) {
           return response;
         }
 
+        // The response exists but has no tool calls
         throw new Error("No valid tool call in response");
       } catch (error) {
         lastError = error as Error;
@@ -370,14 +380,101 @@ export class WebAgent {
             error: lastError.message,
             iterationId: this.currentIterationId,
           });
+
+          // Also emit AI_GENERATION event for failed requests
+          // Critical for accurate LLM usage tracking and metrics
+          this.emit(WebAgentEventType.AI_GENERATION, {
+            messages: config.messages || [],
+            temperature: 0,
+            object: null, // No tool call since it failed
+            error: lastError.message,
+            finishReason: "error",
+            usage: null,
+            warnings: [],
+            providerMetadata: null,
+          });
         }
 
-        // If we have more retries, add feedback to help the model
+        // If we have more retries and messages array, add proper tool error response
         if (attempt < maxRetries && config.messages) {
-          config.messages.push({
-            role: "user",
-            content: `Error: Please provide a valid tool call response. The previous attempt failed with: ${lastError.message}`,
-          });
+          if (lastResponse && lastResponse.toolCalls?.length > 0) {
+            // We have a response with tool calls (but they might be invalid)
+            config.messages.push({
+              role: "assistant",
+              content: lastResponse.text || "",
+              toolCalls: lastResponse.toolCalls,
+            });
+
+            // Add tool error response for the invalid tool call
+            const toolCall = lastResponse.toolCalls[0];
+
+            config.messages.push({
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  result: `Error: ${lastError.message}`,
+                },
+              ],
+            });
+          } else if (lastResponse && !lastResponse.toolCalls?.length) {
+            // We got a response but it had no tool calls - preserve it
+
+            // Only add the assistant message if there's actual content
+            if (lastResponse.text) {
+              config.messages.push({
+                role: "assistant",
+                content: lastResponse.text,
+                // Don't include toolCalls property at all if there are none
+              });
+            }
+
+            // Add user message asking for a valid tool call
+            config.messages.push({
+              role: "user",
+              content: `Error: ${lastError.message}`,
+            });
+          } else if (lastError.message.includes("unavailable tool")) {
+            // SDK rejected the tool call before giving us a response
+            // Extract the invalid tool name from the error message
+            const toolMatch = lastError.message.match(/tool '([^']+)'/);
+            const invalidTool = toolMatch ? toolMatch[1] : "unknown";
+
+            // Create a synthetic tool call to preserve in history
+            const syntheticToolCall = {
+              toolCallId: `invalid_${Date.now()}`,
+              toolName: invalidTool,
+              args: {},
+            };
+
+            // Add synthetic assistant message with the invalid tool call
+            config.messages.push({
+              role: "assistant",
+              content: "",
+              toolCalls: [syntheticToolCall],
+            });
+
+            // Add tool error response
+            config.messages.push({
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: syntheticToolCall.toolCallId,
+                  toolName: invalidTool,
+                  result: lastError.message,
+                },
+              ],
+            });
+          } else {
+            // Fallback to user message if no tool call to respond to
+            config.messages.push({
+              role: "user",
+              content: `Error: Please provide a valid tool call response. The previous attempt failed with: ${lastError.message}`,
+            });
+          }
         }
       }
     }
@@ -457,7 +554,7 @@ export class WebAgent {
   /**
    * Execute browser action - keep here as it coordinates browser
    */
-  private async executeAction(action: Action): Promise<boolean> {
+  private async executeAction(action: Action): Promise<{ success: boolean; error?: string }> {
     try {
       // Emit BROWSER_ACTION_STARTED only for actual browser operations
       this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
@@ -517,13 +614,14 @@ export class WebAgent {
         action: action.type,
       });
 
-      return true;
+      return { success: true };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
-      return false;
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -554,6 +652,16 @@ export class WebAgent {
         if (attempt === maxRetries) {
           console.error("Task validation failed after retries:", lastError.message);
         }
+
+        // Clean up any malformed validation attempts from the error message
+        // Don't let raw JSON parsing errors leak into the conversation
+        if (
+          lastError.message.includes("JSON parsing failed") ||
+          lastError.message.includes("Invalid arguments for tool validate_task")
+        ) {
+          // Simplify the error for feedback
+          lastError = new Error("Task validation failed. Please try again.");
+        }
       }
     }
 
@@ -564,11 +672,11 @@ export class WebAgent {
       iterationId: this.currentIterationId,
     });
 
-    // If validation failed completely, treat as incomplete with error feedback
+    // If validation failed completely, treat as incomplete with simplified feedback
     if (!check) {
       check = {
         isComplete: false,
-        feedback: `Validation error: ${lastError?.message || "Unknown error"}`,
+        feedback: "Task not complete. Please continue working on it.",
       };
     }
 
@@ -646,7 +754,9 @@ export class WebAgent {
       response = await this.generateWithTools({
         prompt,
         tools: planningTools,
-        toolChoice: "required",
+        toolChoice: startingUrl
+          ? { type: "tool", toolName: "create_plan" }
+          : { type: "tool", toolName: "create_plan_with_url" },
         maxTokens: DEFAULT_PLANNING_MAX_TOKENS,
       });
     } catch (error) {
@@ -873,7 +983,18 @@ export class WebAgent {
   }
 
   private parseToolCall(toolCall: any): Action {
-    const args = toolCall.args || {};
+    let args = toolCall.args || {};
+
+    // If args is a string (shouldn't happen normally but might with malformed responses),
+    // try to parse it
+    if (typeof args === "string") {
+      const parsed = tryJSONParse(args);
+      if (parsed) {
+        args = parsed;
+      } else {
+        args = {};
+      }
+    }
 
     return {
       type: toolCall.toolName,
