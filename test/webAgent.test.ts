@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebAgent, WebAgentOptions, ExecuteOptions, TaskExecutionResult } from "../src/webAgent.js";
 import { AriaBrowser, PageAction } from "../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
-import { LanguageModel, generateText } from "ai";
+import { LanguageModel, generateText, type ModelMessage } from "ai";
 import { Logger } from "../src/loggers/types.js";
 
 // Mock the AI module
@@ -2115,18 +2115,27 @@ describe("WebAgent", () => {
 
       await webAgent.execute("Test tool preservation", { startingUrl: "https://example.com" });
 
-      // Verify that generateText was called with messages that include toolCalls
+      // Verify that generateText was called with messages that include tool calls
       const calls = mockGenerateText.mock.calls;
       // Find calls that have messages parameter
       const messagesCall = calls.find((call) => call[0]?.messages);
       if (messagesCall && messagesCall[0].messages) {
-        const assistantMessages = messagesCall[0].messages.filter(
-          (m: any) => m.role === "assistant" && m.toolCalls,
+        const messages: ModelMessage[] = messagesCall[0].messages;
+        const assistantMessages = messages.filter(
+          (m) =>
+            m.role === "assistant" &&
+            Array.isArray(m.content) &&
+            m.content.some((c: any) => c.type === "tool-call"),
         );
-        // Should have at least one assistant message with toolCalls preserved
+        // Should have at least one assistant message with tool calls preserved
         expect(assistantMessages.length).toBeGreaterThan(0);
-        expect(assistantMessages[0].toolCalls).toBeDefined();
-        expect(Array.isArray(assistantMessages[0].toolCalls)).toBe(true);
+        const toolCallContent = assistantMessages[0].content.find(
+          (c: any) => c.type === "tool-call",
+        );
+        expect(toolCallContent).toBeDefined();
+        expect(toolCallContent.toolCallId).toBeDefined();
+        expect(toolCallContent.toolName).toBeDefined();
+        expect(toolCallContent.input).toBeDefined();
       }
     });
 
@@ -2263,8 +2272,9 @@ describe("WebAgent", () => {
       const retryCall = calls.find((call, index) => index > 1 && call[0]?.messages);
       if (retryCall && retryCall[0].messages) {
         // Check that we preserved the response text
-        const assistantMessage = retryCall[0].messages.find(
-          (m: any) => m.role === "assistant" && m.content === "I need to think about this",
+        const retryMessages: ModelMessage[] = retryCall[0].messages;
+        const assistantMessage = retryMessages.find(
+          (m) => m.role === "assistant" && m.content === "I need to think about this",
         );
         expect(assistantMessage).toBeDefined();
       }
@@ -2327,7 +2337,8 @@ describe("WebAgent", () => {
       const messagesCall = calls.find((call) => call[0]?.messages?.length > 3);
       if (messagesCall && messagesCall[0].messages) {
         // Find tool result messages
-        const toolMessages = messagesCall[0].messages.filter((m: any) => m.role === "tool");
+        const messages: ModelMessage[] = messagesCall[0].messages;
+        const toolMessages = messages.filter((m) => m.role === "tool");
         expect(toolMessages.length).toBeGreaterThan(0);
 
         // Tool result should have proper structure
@@ -2337,7 +2348,7 @@ describe("WebAgent", () => {
         expect(toolResult.content[0].type).toBe("tool-result");
         expect(toolResult.content[0].toolCallId).toBeDefined();
         expect(toolResult.content[0].toolName).toBeDefined();
-        expect(toolResult.content[0].result).toBeDefined();
+        expect(toolResult.content[0].output).toBeDefined();
       }
     });
 
@@ -2391,11 +2402,13 @@ describe("WebAgent", () => {
         (call, index) => index > 2 && call[0]?.messages?.some((m: any) => m.role === "tool"),
       );
       if (doneCall && doneCall[0].messages) {
-        const toolMessage = doneCall[0].messages.find(
-          (m: any) => m.role === "tool" && m.content[0]?.toolName === "extract",
+        const messages: ModelMessage[] = doneCall[0].messages;
+        const toolMessage = messages.find(
+          (m) =>
+            m.role === "tool" && Array.isArray(m.content) && m.content[0]?.toolName === "extract",
         );
         expect(toolMessage).toBeDefined();
-        expect(toolMessage.content[0].result).toBe("Page Title: Example");
+        expect(toolMessage.content[0].output.value).toBe("Page Title: Example");
       }
     });
   });

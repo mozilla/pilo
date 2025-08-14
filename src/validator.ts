@@ -12,7 +12,7 @@
  * Also includes simple feedback utility for adding error messages to conversation.
  */
 
-import { generateText, LanguageModel } from "ai";
+import { generateText, LanguageModel, ModelMessage } from "ai";
 import { buildTaskValidationPrompt } from "./prompts.js";
 import { validationTools } from "./schemas.js";
 import { tryJSONParse } from "./utils/jsonParser.js";
@@ -142,30 +142,37 @@ export class Validator {
    * @param messages - The conversation messages array
    * @param feedback - The feedback message to add
    */
-  giveFeedback(messages: any[], feedback: string): void {
+  giveFeedback(messages: ModelMessage[], feedback: string): void {
     // Check if the last message contains a tool call we need to respond to
     const lastMessage = messages[messages.length - 1];
 
-    if (lastMessage?.role === "assistant" && lastMessage?.toolCalls?.length > 0) {
-      // Add as tool result message for the most recent tool call
-      const toolCall = lastMessage.toolCalls[0];
-      messages.push({
-        role: "tool",
-        content: [
-          {
-            type: "tool-result",
-            toolCallId: toolCall.toolCallId,
-            toolName: toolCall.toolName,
-            result: feedback,
-          },
-        ],
-      });
-    } else {
-      // Fallback to user message if no tool call to respond to
-      messages.push({
-        role: "user",
-        content: feedback,
-      });
+    if (lastMessage?.role === "assistant") {
+      // Check if content contains tool calls
+      const content = lastMessage.content;
+      if (Array.isArray(content)) {
+        const toolCall = content.find((part) => part.type === "tool-call");
+        if (toolCall && toolCall.type === "tool-call") {
+          // Add as tool result message for the most recent tool call
+          messages.push({
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                output: { type: "text", value: feedback },
+              },
+            ],
+          });
+          return;
+        }
+      }
     }
+
+    // Fallback to user message if no tool call to respond to
+    messages.push({
+      role: "user",
+      content: feedback,
+    });
   }
 }

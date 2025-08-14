@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Validator } from "../src/validator.js";
-import { generateText } from "ai";
+import { generateText, type ModelMessage } from "ai";
 
 // Mock the AI functions
 vi.mock("ai", () => ({
@@ -288,7 +288,7 @@ describe("Validator", () => {
 
   describe("giveFeedback", () => {
     it("should add user message with feedback to messages array", () => {
-      const messages: any[] = [];
+      const messages: ModelMessage[] = [];
       const feedback = "Please try a different approach";
 
       validator.giveFeedback(messages, feedback);
@@ -317,7 +317,7 @@ describe("Validator", () => {
     });
 
     it("should handle empty feedback string", () => {
-      const messages: any[] = [];
+      const messages: ModelMessage[] = [];
       const feedback = "";
 
       validator.giveFeedback(messages, feedback);

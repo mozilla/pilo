@@ -7,7 +7,7 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { generateText, LanguageModel } from "ai";
+import { generateText, LanguageModel, ModelMessage } from "ai";
 import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
@@ -104,7 +104,7 @@ export class WebAgent {
   // === Core State (stays here) ===
   private plan: string = "";
   private url: string = "";
-  private messages: any[] = [];
+  private messages: ModelMessage[] = [];
   private taskExplanation: string = "";
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
@@ -299,6 +299,8 @@ export class WebAgent {
           this.validator.giveFeedback(this.messages, feedback);
           state.consecutiveFailures++;
         } else {
+          // Add success tool result message
+          this.validator.giveFeedback(this.messages, "Success");
           state.actionCount++;
           state.lastActionType = action.type;
         }
@@ -333,7 +335,7 @@ export class WebAgent {
    * Wrapper for generateText with tools that adds retry logic
    */
   private async generateWithTools(config: {
-    messages?: any[];
+    messages?: ModelMessage[];
     prompt?: string;
     tools: any;
     toolChoice: any;
@@ -399,15 +401,24 @@ export class WebAgent {
         if (attempt < maxRetries && config.messages) {
           if (lastResponse && lastResponse.toolCalls?.length > 0) {
             // We have a response with tool calls (but they might be invalid)
+            const toolCall = lastResponse.toolCalls[0];
+
+            // Convert to proper message format
+            const toolCallParts = lastResponse.toolCalls.map((tc: any) => ({
+              type: "tool-call" as const,
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              input: tc.input,
+            }));
+
             config.messages.push({
               role: "assistant",
-              content: lastResponse.text || "",
-              toolCalls: lastResponse.toolCalls,
+              content: lastResponse.text
+                ? [{ type: "text" as const, text: lastResponse.text }, ...toolCallParts]
+                : toolCallParts,
             });
 
             // Add tool error response for the invalid tool call
-            const toolCall = lastResponse.toolCalls[0];
-
             config.messages.push({
               role: "tool",
               content: [
@@ -415,7 +426,7 @@ export class WebAgent {
                   type: "tool-result",
                   toolCallId: toolCall.toolCallId,
                   toolName: toolCall.toolName,
-                  result: `Error: ${lastError.message}`,
+                  output: { type: "text", value: `Error: ${lastError.message}` },
                 },
               ],
             });
@@ -452,8 +463,14 @@ export class WebAgent {
             // Add synthetic assistant message with the invalid tool call
             config.messages.push({
               role: "assistant",
-              content: "",
-              toolCalls: [syntheticToolCall],
+              content: [
+                {
+                  type: "tool-call" as const,
+                  toolCallId: syntheticToolCall.toolCallId,
+                  toolName: syntheticToolCall.toolName,
+                  input: syntheticToolCall.args as Record<string, unknown>,
+                },
+              ],
             });
 
             // Add tool error response
@@ -464,7 +481,7 @@ export class WebAgent {
                   type: "tool-result",
                   toolCallId: syntheticToolCall.toolCallId,
                   toolName: invalidTool,
-                  result: lastError.message,
+                  output: { type: "text", value: lastError.message },
                 },
               ],
             });
@@ -535,10 +552,19 @@ export class WebAgent {
     const action = this.parseToolCall(response.toolCalls[0]);
 
     // Add the tool call to the conversation history
+    // Convert from SDK response format to ModelMessage format
+    const toolCallParts = response.toolCalls.map((tc: any) => ({
+      type: "tool-call" as const,
+      toolCallId: tc.toolCallId,
+      toolName: tc.toolName,
+      input: tc.input,
+    }));
+
     this.messages.push({
       role: "assistant",
-      content: response.text || "", // Include any reasoning
-      toolCalls: response.toolCalls, // Preserve the actual tool calls
+      content: response.text
+        ? [{ type: "text" as const, text: response.text }, ...toolCallParts]
+        : toolCallParts,
     });
 
     // Emit AGENT_ACTION for ALL actions to show what the agent decided
@@ -882,7 +908,11 @@ export class WebAgent {
     this.messages = this.messages.map((msg, index) => {
       if (index < 2) return msg; // Keep system and task messages
 
-      if (msg.role === "user" && msg.content?.includes("accessibility tree snapshot")) {
+      if (
+        msg.role === "user" &&
+        typeof msg.content === "string" &&
+        msg.content.includes("accessibility tree snapshot")
+      ) {
         // Truncate old snapshot to just title and URL
         const lines = msg.content.split("\n");
         const titleLine = lines.find((l: string) => l.startsWith("Title:"));
@@ -948,26 +978,32 @@ export class WebAgent {
 
       // Add extraction result as a tool response
       const lastMessage = this.messages[this.messages.length - 1];
-      if (lastMessage?.role === "assistant" && lastMessage?.toolCalls?.length > 0) {
-        const toolCall = lastMessage.toolCalls[0];
-        this.messages.push({
-          role: "tool",
-          content: [
-            {
-              type: "tool-result",
-              toolCallId: toolCall.toolCallId,
-              toolName: "extract",
-              result: response.text,
-            },
-          ],
-        });
-      } else {
-        // Fallback if no tool call found (shouldn't happen)
-        this.messages.push({
-          role: "assistant",
-          content: `Extracted data:\n${response.text}`,
-        });
+      if (lastMessage?.role === "assistant") {
+        const content = lastMessage.content;
+        if (Array.isArray(content)) {
+          const toolCall = content.find((part) => part.type === "tool-call");
+          if (toolCall && toolCall.type === "tool-call") {
+            this.messages.push({
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: toolCall.toolCallId,
+                  toolName: "extract",
+                  output: { type: "text", value: response.text },
+                },
+              ],
+            });
+            return response.text;
+          }
+        }
       }
+
+      // Fallback if no tool call found (shouldn't happen)
+      this.messages.push({
+        role: "assistant",
+        content: `Extracted data:\n${response.text}`,
+      });
 
       return response.text;
     } catch (error) {
