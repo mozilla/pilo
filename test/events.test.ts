@@ -124,6 +124,7 @@ describe("WebAgentEventEmitter", () => {
         "task:validation_error",
         "ai:generation",
         "ai:generation:error",
+        "agent:action",
         "agent:step",
         "agent:observed",
         "agent:reasoned",

@@ -47,7 +47,8 @@ export class ConsoleLogger implements Logger {
 
     // Browser events
     emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
@@ -82,7 +83,8 @@ export class ConsoleLogger implements Logger {
 
       // Browser events
       this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
@@ -193,14 +195,16 @@ export class ConsoleLogger implements Logger {
     console.log("   " + data.extractedData);
   };
 
-  private handleActionExecution = (data: ActionExecutionEventData): void => {
-    console.log("\n🎯 Planned Action:");
+  private handleAgentAction = (data: ActionExecutionEventData): void => {
     console.log(
-      `   1. ${data.action.toUpperCase()}`,
+      "\n🎯 Agent Action:",
+      data.action.toUpperCase(),
       data.ref ? `ref: ${data.ref}` : "",
       data.value ? `value: "${data.value}"` : "",
     );
+  };
 
+  private handleBrowserAction = (data: ActionExecutionEventData): void => {
     console.log(
       "\n🤖 Browser Executing:",
       data.action.toUpperCase(),

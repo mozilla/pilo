@@ -642,6 +642,19 @@ describe("WebAgent", () => {
       });
 
       expect(result.success).toBe(true);
+
+      // Check that AGENT_ACTION was emitted for extract
+      const agentAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "extract",
+      );
+      expect(agentAction).toBeDefined();
+      expect(agentAction?.data.value).toBe("Get page title");
+
+      // Check that BROWSER_ACTION_STARTED was emitted for extract (it still goes through executeAction)
+      const browserAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.BROWSER_ACTION_STARTED && e.data.action === "extract",
+      );
+      expect(browserAction).toBeDefined();
     });
 
     it("should execute fill_and_enter action", async () => {
@@ -685,6 +698,97 @@ describe("WebAgent", () => {
       expect(result.success).toBe(true);
     });
 
+    it("should emit both AGENT_ACTION and BROWSER_ACTION_STARTED for click", async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Click",
+        toolCalls: [
+          {
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Clicked" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Click button", { startingUrl: "https://example.com" });
+
+      // Check that AGENT_ACTION was emitted
+      const agentAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "click",
+      );
+      expect(agentAction).toBeDefined();
+      expect(agentAction?.data.ref).toBe("btn1");
+
+      // Check that BROWSER_ACTION_STARTED was also emitted for click
+      const browserAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.BROWSER_ACTION_STARTED && e.data.action === "click",
+      );
+      expect(browserAction).toBeDefined();
+      expect(browserAction?.data.ref).toBe("btn1");
+    });
+
+    it("should emit AGENT_ACTION for done action", async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Task completed" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test done action", { startingUrl: "https://example.com" });
+
+      // Check that AGENT_ACTION was emitted for done
+      const agentAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "done",
+      );
+      expect(agentAction).toBeDefined();
+      expect(agentAction?.data.value).toBe("Task completed");
+
+      // Check that BROWSER_ACTION_STARTED was NOT emitted for done
+      const browserAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.BROWSER_ACTION_STARTED && e.data.action === "done",
+      );
+      expect(browserAction).toBeUndefined();
+    });
+
     it("should handle abort action", async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: "Abort",
@@ -702,6 +806,19 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(false);
       expect(result.finalAnswer).toContain("Aborted: Cannot complete task");
+
+      // Check that AGENT_ACTION was emitted for abort
+      const agentAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "abort",
+      );
+      expect(agentAction).toBeDefined();
+      expect(agentAction?.data.value).toBe("Cannot complete task");
+
+      // Check that BROWSER_ACTION_STARTED was NOT emitted for abort
+      const browserAction = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.BROWSER_ACTION_STARTED && e.data.action === "abort",
+      );
+      expect(browserAction).toBeUndefined();
     });
 
     it("should handle action without tool calls", async () => {
@@ -1339,6 +1456,339 @@ describe("WebAgent", () => {
   });
 
   describe("event emission", () => {
+    it("should emit AI_GENERATION event with tool call details", async () => {
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+
+      // Action with metadata
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Clicking button",
+        toolCalls: [
+          {
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+        finishReason: "stop",
+        usage: { promptTokens: 100, completionTokens: 50 },
+        warnings: [],
+        providerMetadata: { model: "test" },
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test AI generation event", { startingUrl: "https://example.com" });
+
+      // Check AI_GENERATION event was emitted with details
+      const aiGenEvent = mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION);
+      expect(aiGenEvent).toBeDefined();
+      expect(aiGenEvent?.data.object).toBeDefined();
+      expect(aiGenEvent?.data.object.toolName).toBe("click");
+      expect(aiGenEvent?.data.temperature).toBe(0);
+      expect(aiGenEvent?.data.usage).toBeDefined();
+    });
+
+    it("should emit AGENT_EXTRACTED event when extracting data", async () => {
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Extract data",
+            },
+          },
+        ],
+      } as any);
+
+      // Extract action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Extract",
+        toolCalls: [
+          {
+            toolName: "extract",
+            args: { description: "Get page title" },
+          },
+        ],
+      } as any);
+
+      // Mock extraction response
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Extracted: Page Title",
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Extracted data" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Extract title", { startingUrl: "https://example.com" });
+
+      // Check AGENT_EXTRACTED event was emitted
+      const extractedEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_EXTRACTED,
+      );
+      expect(extractedEvent).toBeDefined();
+      expect(extractedEvent?.data.extractedData).toBe("Extracted: Page Title");
+    });
+
+    it("should emit AGENT_WAITING event when wait action executes", async () => {
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Wait",
+            },
+          },
+        ],
+      } as any);
+
+      // Wait action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Wait",
+        toolCalls: [
+          {
+            toolName: "wait",
+            args: { seconds: 2 },
+          },
+        ],
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Waited" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      const executePromise = webAgent.execute("Wait test", { startingUrl: "https://example.com" });
+      await vi.runAllTimersAsync();
+      await executePromise;
+
+      // Check AGENT_WAITING event was emitted
+      const waitingEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AGENT_WAITING,
+      );
+      expect(waitingEvent).toBeDefined();
+      expect(waitingEvent?.data.seconds).toBe(2);
+    });
+
+    it("should emit debug events when debug mode is enabled", async () => {
+      const debugAgent = new WebAgent(mockBrowser, {
+        provider: mockProvider,
+        debug: true,
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+
+      // Action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Click",
+        toolCalls: [
+          {
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await debugAgent.execute("Debug test", { startingUrl: "https://example.com" });
+
+      // Check debug events were emitted
+      const compressionEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
+      );
+      expect(compressionEvent).toBeDefined();
+      expect(compressionEvent?.data.originalSize).toBeDefined();
+      expect(compressionEvent?.data.compressedSize).toBeDefined();
+      expect(compressionEvent?.data.compressionPercent).toBeDefined();
+
+      const messageEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
+      );
+      expect(messageEvent).toBeDefined();
+      expect(messageEvent?.data.messages).toBeDefined();
+      expect(Array.isArray(messageEvent?.data.messages)).toBe(true);
+
+      await debugAgent.close();
+    });
+
+    it("should emit TASK_VALIDATION_ERROR event when validation fails", async () => {
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+
+      // Invalid action (ref doesn't exist)
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Click",
+        toolCalls: [
+          {
+            toolName: "click",
+            args: { ref: "nonexistent" },
+          },
+        ],
+      } as any);
+
+      // Valid action after retry
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test validation error", { startingUrl: "https://example.com" });
+
+      // Check TASK_VALIDATION_ERROR event was emitted
+      const validationErrorEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_VALIDATION_ERROR,
+      );
+      expect(validationErrorEvent).toBeDefined();
+      expect(validationErrorEvent?.data.errors).toBeDefined();
+      expect(Array.isArray(validationErrorEvent?.data.errors)).toBe(true);
+      expect(validationErrorEvent?.data.retryCount).toBeDefined();
+      expect(validationErrorEvent?.data.action).toBeDefined();
+    });
+
     it("should emit all expected events during execution", async () => {
       // Plan
       mockGenerateText.mockResolvedValueOnce({
@@ -1397,9 +1847,71 @@ describe("WebAgent", () => {
       expect(eventTypes).toContain(WebAgentEventType.TASK_SETUP);
       expect(eventTypes).toContain(WebAgentEventType.AGENT_STATUS); // Plan created
       expect(eventTypes).toContain(WebAgentEventType.TASK_STARTED);
+      expect(eventTypes).toContain(WebAgentEventType.AGENT_ACTION);
       expect(eventTypes).toContain(WebAgentEventType.BROWSER_ACTION_STARTED);
       expect(eventTypes).toContain(WebAgentEventType.BROWSER_ACTION_COMPLETED);
       expect(eventTypes).toContain(WebAgentEventType.TASK_COMPLETED);
+    });
+
+    it("should emit AGENT_OBSERVED event with reasoning text", async () => {
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolCalls: [
+          {
+            toolName: "create_plan",
+            args: {
+              explanation: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+
+      // Action with reasoning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "I'm clicking the button to proceed",
+        toolCalls: [
+          {
+            toolName: "click",
+            args: { ref: "btn1" },
+          },
+        ],
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Task is complete",
+        toolCalls: [
+          {
+            toolName: "done",
+            args: { result: "Complete" },
+          },
+        ],
+      } as any);
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Valid",
+        toolCalls: [
+          {
+            toolName: "validate_task",
+            args: {
+              completionQuality: "complete",
+              taskAssessment: "Done",
+            },
+          },
+        ],
+      } as any);
+
+      await webAgent.execute("Test reasoning", { startingUrl: "https://example.com" });
+
+      // Check AGENT_OBSERVED events were emitted
+      const observedEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.AGENT_OBSERVED,
+      );
+      expect(observedEvents.length).toBeGreaterThan(0);
+      const firstObserved = observedEvents[0];
+      expect(firstObserved?.data.observation).toBe("I'm clicking the button to proceed");
     });
   });
 

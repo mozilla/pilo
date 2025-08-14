@@ -219,9 +219,26 @@ export class WebAgent {
         const pageSnapshot = await this.browser.getTreeWithRefs();
         const compressed = this.compressor.compress(pageSnapshot);
 
+        // Debug logging: show compression effectiveness
+        if (this.debug) {
+          const originalSize = pageSnapshot.length;
+          const compressedSize = compressed.length;
+          const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
+          this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
+            originalSize,
+            compressedSize,
+            compressionPercent,
+          });
+        }
+
         // Update conversation with page state (only when needed)
         if (this.shouldUpdateSnapshot(state.lastActionType)) {
           await this.updateConversation(compressed, state.lastActionType);
+
+          // Debug logging: show full conversation history
+          if (this.debug) {
+            this.emit(WebAgentEventType.SYSTEM_DEBUG_MESSAGE, { messages: this.messages });
+          }
         }
 
         // Generate next action
@@ -230,6 +247,13 @@ export class WebAgent {
         // Context validation
         const error = this.validator.checkAction(action, pageSnapshot);
         if (error) {
+          // Emit validation error event
+          this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+            errors: [error],
+            retryCount: state.consecutiveFailures,
+            action: action,
+          });
+
           this.validator.giveFeedback(this.messages, error);
           state.consecutiveFailures++;
 
@@ -245,7 +269,7 @@ export class WebAgent {
         // Reset failure counter on successful validation
         state.consecutiveFailures = 0;
 
-        // Handle terminal actions
+        // Handle terminal actions (these don't use the browser)
         if (action.type === "done") {
           finalAnswer = action.result || action.value || "";
           const isComplete = await this.validateCompletion(task, finalAnswer);
@@ -394,11 +418,33 @@ export class WebAgent {
       });
     }
 
+    // Emit AI generation details event
+    if (response.toolCalls?.length) {
+      this.emit(WebAgentEventType.AI_GENERATION, {
+        messages: this.messages,
+        temperature: 0,
+        object: response.toolCalls[0],
+        finishReason: response.finishReason,
+        usage: response.usage,
+        warnings: response.warnings,
+        providerMetadata: response.providerMetadata,
+      });
+    }
+
     if (!response.toolCalls?.length) {
       throw new Error("No tool call in response");
     }
 
-    return this.parseToolCall(response.toolCalls[0]);
+    const action = this.parseToolCall(response.toolCalls[0]);
+
+    // Emit AGENT_ACTION for ALL actions to show what the agent decided
+    this.emit(WebAgentEventType.AGENT_ACTION, {
+      action: action.type,
+      ref: action.ref,
+      value: action.value || action.result || action.description,
+    });
+
+    return action;
   }
 
   /**
@@ -406,6 +452,7 @@ export class WebAgent {
    */
   private async executeAction(action: Action): Promise<boolean> {
     try {
+      // Emit BROWSER_ACTION_STARTED only for actual browser operations
       this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
         action: action.type,
         ref: action.ref,
@@ -415,6 +462,7 @@ export class WebAgent {
       switch (action.type) {
         case "wait":
           const seconds = action.seconds || parseInt(action.value || "1");
+          this.emit(WebAgentEventType.AGENT_WAITING, { seconds });
           await this.wait(seconds);
           break;
 
@@ -438,7 +486,8 @@ export class WebAgent {
         case "extract":
           const description = action.description || action.value;
           if (!description) throw new Error("extract requires a description");
-          await this.extractData(description);
+          const extractedData = await this.extractData(description);
+          this.emit(WebAgentEventType.AGENT_EXTRACTED, { extractedData });
           break;
 
         case "fill_and_enter":
@@ -768,7 +817,7 @@ export class WebAgent {
     }
   }
 
-  private async extractData(description: string): Promise<void> {
+  private async extractData(description: string): Promise<string> {
     try {
       const markdown = await this.browser.getMarkdown();
       const prompt = buildExtractionPrompt(description, markdown);
@@ -785,6 +834,8 @@ export class WebAgent {
         role: "assistant",
         content: `Extracted data:\n${response.text}`,
       });
+
+      return response.text;
     } catch (error) {
       // Check if aborted
       if (this.abortSignal?.aborted) {

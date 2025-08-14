@@ -48,7 +48,8 @@ export class ChalkConsoleLogger implements Logger {
 
     // Browser events
     emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
     emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
@@ -83,7 +84,8 @@ export class ChalkConsoleLogger implements Logger {
 
       // Browser events
       this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
       this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
@@ -203,14 +205,16 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.whiteBright("   " + data.extractedData));
   };
 
-  private handleActionExecution = (data: ActionExecutionEventData): void => {
-    console.log(chalk.yellow.bold("\n🎯 Planned Action:"));
+  private handleAgentAction = (data: ActionExecutionEventData): void => {
     console.log(
-      chalk.whiteBright(`   1. ${data.action.toUpperCase()}`),
+      chalk.yellow.bold("\n🎯 Agent Action:"),
+      chalk.whiteBright(data.action.toUpperCase()),
       data.ref ? chalk.cyan(`ref: ${data.ref}`) : "",
       data.value ? chalk.green(`value: "${data.value}"`) : "",
     );
+  };
 
+  private handleBrowserAction = (data: ActionExecutionEventData): void => {
     console.log(
       chalk.cyan.bold("\n🤖 Browser Executing:"),
       chalk.whiteBright(data.action.toUpperCase()),

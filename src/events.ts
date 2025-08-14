@@ -17,6 +17,7 @@ export enum WebAgentEventType {
   AI_GENERATION_ERROR = "ai:generation:error",
 
   // Agent reasoning and status
+  AGENT_ACTION = "agent:action",
   AGENT_STEP = "agent:step",
   AGENT_OBSERVED = "agent:observed",
   AGENT_REASONED = "agent:reasoned",
@@ -265,6 +266,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
   | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
+  | { type: WebAgentEventType.AGENT_ACTION; data: ActionExecutionEventData }
   | { type: WebAgentEventType.AGENT_STEP; data: CurrentStepEventData }
   | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
   | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }
