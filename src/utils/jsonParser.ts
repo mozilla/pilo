@@ -110,20 +110,22 @@ function extractFirstJSONObject(text: string): string | null {
  * @returns The parsed arguments or an empty object if parsing fails
  */
 export function parseToolCallArgs(toolCall: any): any {
-  // If args is already an object, return it
-  if (toolCall.args && typeof toolCall.args === "object") {
-    return toolCall.args;
+  const argsField = toolCall.input;
+
+  // If already an object, return it
+  if (argsField && typeof argsField === "object") {
+    return argsField;
   }
 
-  // If args is a string, try to parse it
-  if (toolCall.args && typeof toolCall.args === "string") {
-    const parsed = tryJSONParse(toolCall.args);
+  // If string, try to parse it
+  if (argsField && typeof argsField === "string") {
+    const parsed = tryJSONParse(argsField);
     return parsed || {};
   }
 
-  // Check if there's a raw args string in other properties
-  if (toolCall.argsText) {
-    const parsed = tryJSONParse(toolCall.argsText);
+  // Check for raw input string in other properties
+  if (toolCall.inputText) {
+    const parsed = tryJSONParse(toolCall.inputText);
     return parsed || {};
   }
 

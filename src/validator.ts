@@ -85,7 +85,7 @@ export class Validator {
         prompt: buildTaskValidationPrompt(task, result, ""),
         tools: validationTools,
         toolChoice: { type: "tool", toolName: "validate_task" },
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
       });
     } catch (error) {
       // If the error is due to malformed JSON from repeated responses, try to extract and parse
@@ -126,7 +126,7 @@ export class Validator {
       throw new Error("No valid tool call in validation response");
     }
 
-    const validation = response.toolCalls[0].args as any;
+    const validation = (response.toolCalls[0] as any).input;
     const isComplete =
       validation.completionQuality === "complete" || validation.completionQuality === "excellent";
 

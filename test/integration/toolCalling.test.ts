@@ -80,7 +80,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "plan_1",
           toolName: "create_plan",
-          args: {
+          input: {
             explanation: "Test task",
             plan: "1. Click button\n2. Extract result",
           },
@@ -108,7 +108,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "click_1",
           toolName: "click",
-          args: { ref: "btn1" },
+          input: { ref: "btn1" },
         },
       ],
       finishReason: "stop",
@@ -130,7 +130,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "extract_1",
           toolName: "extract",
-          args: { description: "Get result text" },
+          input: { description: "Get result text" },
         },
       ],
     } as any);
@@ -147,7 +147,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "done_1",
           toolName: "done",
-          args: { result: "Successfully clicked button and extracted result" },
+          input: { result: "Successfully clicked button and extracted result" },
         },
       ],
     } as any);
@@ -167,7 +167,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "validate_1",
           toolName: "validate_task",
-          args: {
+          input: {
             completionQuality: "complete",
             taskAssessment: "Task completed successfully",
           },
@@ -258,7 +258,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "plan_1",
           toolName: "create_plan_with_url",
-          args: {
+          input: {
             explanation: "Test",
             plan: "1. Test",
             url: "https://test.com",
@@ -277,7 +277,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "done_1",
           toolName: "done",
-          args: { result: "Complete" },
+          input: { result: "Complete" },
         },
       ],
     } as any);
@@ -289,7 +289,7 @@ describe("Tool Calling Integration", () => {
         {
           toolCallId: "validate_1",
           toolName: "validate_task",
-          args: {
+          input: {
             completionQuality: "complete",
             taskAssessment: "Done",
           },

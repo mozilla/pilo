@@ -144,7 +144,7 @@ describe("tryJSONParse", () => {
 describe("parseToolCallArgs", () => {
   it("should return args if already an object", () => {
     const toolCall = {
-      args: { ref: "btn1", value: "test" },
+      input: { ref: "btn1", value: "test" },
     };
 
     const result = parseToolCallArgs(toolCall);
@@ -153,7 +153,7 @@ describe("parseToolCallArgs", () => {
 
   it("should parse args if it's a JSON string", () => {
     const toolCall = {
-      args: '{"ref": "input1", "value": "hello"}',
+      input: '{"ref": "input1", "value": "hello"}',
     };
 
     const result = parseToolCallArgs(toolCall);
@@ -162,7 +162,7 @@ describe("parseToolCallArgs", () => {
 
   it("should handle repeated JSON in args string", () => {
     const toolCall = {
-      args: '{"action": "click"}{"action": "click"}',
+      input: '{"action": "click"}{"action": "click"}',
     };
 
     const result = parseToolCallArgs(toolCall);
@@ -171,16 +171,16 @@ describe("parseToolCallArgs", () => {
 
   it("should return empty object for invalid JSON string", () => {
     const toolCall = {
-      args: "not valid json",
+      input: "not valid json",
     };
 
     const result = parseToolCallArgs(toolCall);
     expect(result).toEqual({});
   });
 
-  it("should use argsText if args is not present", () => {
+  it("should use inputText if input is not present", () => {
     const toolCall = {
-      argsText: '{"ref": "btn1"}',
+      inputText: '{"ref": "btn1"}',
     };
 
     const result = parseToolCallArgs(toolCall);
@@ -196,7 +196,7 @@ describe("parseToolCallArgs", () => {
 
   it("should handle null args", () => {
     const toolCall = {
-      args: null,
+      input: null,
     };
 
     const result = parseToolCallArgs(toolCall);
@@ -205,7 +205,7 @@ describe("parseToolCallArgs", () => {
 
   it("should handle undefined args", () => {
     const toolCall = {
-      args: undefined,
+      input: undefined,
     };
 
     const result = parseToolCallArgs(toolCall);

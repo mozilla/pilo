@@ -243,28 +243,28 @@ describe("Function Call Schemas", () => {
     it("should convert web action functions to tools format", () => {
       expect(webActionTools).toBeDefined();
       expect(webActionTools.click).toHaveProperty("description");
-      expect(webActionTools.click).toHaveProperty("parameters");
+      expect(webActionTools.click).toHaveProperty("inputSchema");
       expect(webActionTools.click).not.toHaveProperty("name");
     });
 
     it("should convert planning functions to tools format", () => {
       expect(planningTools).toBeDefined();
       expect(planningTools.create_plan).toHaveProperty("description");
-      expect(planningTools.create_plan).toHaveProperty("parameters");
+      expect(planningTools.create_plan).toHaveProperty("inputSchema");
       expect(planningTools.create_plan).not.toHaveProperty("name");
     });
 
     it("should convert validation functions to tools format", () => {
       expect(validationTools).toBeDefined();
       expect(validationTools.validate_task).toHaveProperty("description");
-      expect(validationTools.validate_task).toHaveProperty("parameters");
+      expect(validationTools.validate_task).toHaveProperty("inputSchema");
       expect(validationTools.validate_task).not.toHaveProperty("name");
     });
 
     it("should convert extraction functions to tools format", () => {
       expect(extractionTools).toBeDefined();
       expect(extractionTools.extract_data).toHaveProperty("description");
-      expect(extractionTools.extract_data).toHaveProperty("parameters");
+      expect(extractionTools.extract_data).toHaveProperty("inputSchema");
       expect(extractionTools.extract_data).not.toHaveProperty("name");
     });
   });

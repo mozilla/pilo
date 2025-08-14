@@ -162,7 +162,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Need to click button",
               plan: "1. Find button\n2. Click it",
             },
@@ -176,7 +176,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -187,7 +187,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Button clicked successfully" },
+            input: { result: "Button clicked successfully" },
           },
         ],
       } as any);
@@ -198,7 +198,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Task completed successfully",
             },
@@ -224,7 +224,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Fill form with provided data",
               plan: "1. Use provided data to fill form",
             },
@@ -238,7 +238,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Form filled" },
+            input: { result: "Form filled" },
           },
         ],
       } as any);
@@ -249,7 +249,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -291,7 +291,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan_with_url",
-            args: {
+            input: {
               explanation: "Search for flights",
               plan: "1. Go to travel site\n2. Search flights",
               url: "https://travel.example.com",
@@ -306,7 +306,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -317,7 +317,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -340,7 +340,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Navigate and interact",
               plan: "1. Use the page\n2. Complete task",
             },
@@ -354,7 +354,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -365,7 +365,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -401,7 +401,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -416,7 +416,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -426,7 +426,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Clicked" },
+            input: { result: "Clicked" },
           },
         ],
       } as any);
@@ -436,7 +436,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -456,7 +456,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "fill",
-            args: { ref: "input1", value: "test text" },
+            input: { ref: "input1", value: "test text" },
           },
         ],
       } as any);
@@ -466,7 +466,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Filled" },
+            input: { result: "Filled" },
           },
         ],
       } as any);
@@ -476,7 +476,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -495,7 +495,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "wait",
-            args: { seconds: 1 },
+            input: { seconds: 1 },
           },
         ],
       } as any);
@@ -505,7 +505,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Waited" },
+            input: { result: "Waited" },
           },
         ],
       } as any);
@@ -515,7 +515,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -540,7 +540,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "goto",
-            args: { url: "https://other.com" },
+            input: { url: "https://other.com" },
           },
         ],
       } as any);
@@ -551,7 +551,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "back",
-            args: {},
+            input: {},
           },
         ],
       } as any);
@@ -562,7 +562,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "forward",
-            args: {},
+            input: {},
           },
         ],
       } as any);
@@ -572,7 +572,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Navigated" },
+            input: { result: "Navigated" },
           },
         ],
       } as any);
@@ -582,7 +582,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -604,7 +604,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "extract",
-            args: { description: "Get page title" },
+            input: { description: "Get page title" },
           },
         ],
       } as any);
@@ -619,7 +619,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Extracted" },
+            input: { result: "Extracted" },
           },
         ],
       } as any);
@@ -629,7 +629,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -663,7 +663,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "fill_and_enter",
-            args: { ref: "input1", value: "search query" },
+            input: { ref: "input1", value: "search query" },
           },
         ],
       } as any);
@@ -673,7 +673,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Searched" },
+            input: { result: "Searched" },
           },
         ],
       } as any);
@@ -683,7 +683,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -704,7 +704,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -714,7 +714,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Clicked" },
+            input: { result: "Clicked" },
           },
         ],
       } as any);
@@ -724,7 +724,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -755,7 +755,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Task completed" },
+            input: { result: "Task completed" },
           },
         ],
       } as any);
@@ -765,7 +765,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -795,7 +795,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "abort",
-            args: { description: "Cannot complete task" },
+            input: { description: "Cannot complete task" },
           },
         ],
       } as any);
@@ -833,7 +833,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -843,7 +843,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -865,7 +865,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -881,7 +881,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "nonexistent" },
+            input: { ref: "nonexistent" },
           },
         ],
       } as any);
@@ -892,7 +892,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -902,7 +902,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Clicked" },
+            input: { result: "Clicked" },
           },
         ],
       } as any);
@@ -912,7 +912,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -933,7 +933,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "wait",
-            args: { seconds: 35 },
+            input: { seconds: 35 },
           },
         ],
       } as any);
@@ -944,7 +944,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "wait",
-            args: { seconds: 2 },
+            input: { seconds: 2 },
           },
         ],
       } as any);
@@ -954,7 +954,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Waited" },
+            input: { result: "Waited" },
           },
         ],
       } as any);
@@ -964,7 +964,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -988,7 +988,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Incomplete result" },
+            input: { result: "Incomplete result" },
           },
         ],
       } as any);
@@ -999,7 +999,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "partial",
               taskAssessment: "Not complete",
               feedback: "Need to do more",
@@ -1014,7 +1014,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1025,7 +1025,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete result" },
+            input: { result: "Complete result" },
           },
         ],
       } as any);
@@ -1036,7 +1036,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1058,7 +1058,7 @@ describe("WebAgent", () => {
           toolCalls: [
             {
               toolName: "click",
-              args: { ref: "invalid_ref" },
+              input: { ref: "invalid_ref" },
             },
           ],
         } as any);
@@ -1080,7 +1080,7 @@ describe("WebAgent", () => {
           toolCalls: [
             {
               toolName: "click",
-              args: { ref: "invalid" },
+              input: { ref: "invalid" },
             },
           ],
         } as any);
@@ -1092,7 +1092,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1104,7 +1104,7 @@ describe("WebAgent", () => {
           toolCalls: [
             {
               toolName: "click",
-              args: { ref: "invalid" },
+              input: { ref: "invalid" },
             },
           ],
         } as any);
@@ -1116,7 +1116,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1126,7 +1126,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1148,7 +1148,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1167,7 +1167,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Recovered" },
+            input: { result: "Recovered" },
           },
         ],
       } as any);
@@ -1177,7 +1177,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1207,7 +1207,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1218,7 +1218,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1228,7 +1228,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1265,7 +1265,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1280,7 +1280,7 @@ describe("WebAgent", () => {
           toolCalls: [
             {
               toolName: "click",
-              args: { ref: "btn1" },
+              input: { ref: "btn1" },
             },
           ],
         } as any);
@@ -1305,7 +1305,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1319,7 +1319,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1329,7 +1329,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "fill",
-            args: { ref: "input1", value: "test" },
+            input: { ref: "input1", value: "test" },
           },
         ],
       } as any);
@@ -1340,7 +1340,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1350,7 +1350,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1378,7 +1378,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1392,7 +1392,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1403,7 +1403,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "extract",
-            args: { description: "Get text" },
+            input: { description: "Get text" },
           },
         ],
       } as any);
@@ -1419,7 +1419,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1430,7 +1430,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1440,7 +1440,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1463,7 +1463,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1477,7 +1477,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
         finishReason: "stop",
@@ -1492,7 +1492,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1502,7 +1502,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1528,7 +1528,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Extract data",
             },
@@ -1542,7 +1542,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "extract",
-            args: { description: "Get page title" },
+            input: { description: "Get page title" },
           },
         ],
       } as any);
@@ -1558,7 +1558,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Extracted data" },
+            input: { result: "Extracted data" },
           },
         ],
       } as any);
@@ -1568,7 +1568,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1593,7 +1593,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Wait",
             },
@@ -1607,7 +1607,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "wait",
-            args: { seconds: 2 },
+            input: { seconds: 2 },
           },
         ],
       } as any);
@@ -1618,7 +1618,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Waited" },
+            input: { result: "Waited" },
           },
         ],
       } as any);
@@ -1628,7 +1628,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1662,7 +1662,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1676,7 +1676,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1687,7 +1687,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1697,7 +1697,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1733,7 +1733,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1747,7 +1747,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "nonexistent" },
+            input: { ref: "nonexistent" },
           },
         ],
       } as any);
@@ -1758,7 +1758,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1768,7 +1768,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1796,7 +1796,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1810,7 +1810,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1821,7 +1821,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1831,7 +1831,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1860,7 +1860,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -1874,7 +1874,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1885,7 +1885,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1895,7 +1895,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -1932,7 +1932,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Click buttons only",
               plan: "1. Only click buttons per guardrails",
             },
@@ -1946,7 +1946,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -1957,7 +1957,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -1967,7 +1967,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2004,7 +2004,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Visual task",
               plan: "1. Use vision",
             },
@@ -2018,7 +2018,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2028,7 +2028,7 @@ describe("WebAgent", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2067,7 +2067,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "plan_1",
             toolName: "create_plan",
-            args: {
+            input: {
               explanation: "Test",
               plan: "1. Test",
             },
@@ -2083,7 +2083,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "click_1",
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -2094,7 +2094,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2105,7 +2105,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2143,7 +2143,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2154,7 +2154,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2183,7 +2183,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2194,7 +2194,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2233,7 +2233,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2244,7 +2244,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2278,7 +2278,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "click_invalid",
             toolName: "click",
-            args: { ref: "nonexistent" },
+            input: { ref: "nonexistent" },
           },
         ],
       } as any);
@@ -2290,7 +2290,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "click_valid",
             toolName: "click",
-            args: { ref: "btn1" },
+            input: { ref: "btn1" },
           },
         ],
       } as any);
@@ -2301,7 +2301,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Complete" },
+            input: { result: "Complete" },
           },
         ],
       } as any);
@@ -2312,7 +2312,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -2348,7 +2348,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "extract_1",
             toolName: "extract",
-            args: { description: "Get title" },
+            input: { description: "Get title" },
           },
         ],
       } as any);
@@ -2364,7 +2364,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "done_1",
             toolName: "done",
-            args: { result: "Extracted title" },
+            input: { result: "Extracted title" },
           },
         ],
       } as any);
@@ -2375,7 +2375,7 @@ describe("WebAgent", () => {
           {
             toolCallId: "validate_1",
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },

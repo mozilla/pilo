@@ -205,7 +205,7 @@ export const webActionTools = Object.fromEntries(
     key,
     {
       description: tool.description,
-      parameters: tool.parameters,
+      inputSchema: tool.parameters,
     },
   ]),
 );
@@ -215,7 +215,7 @@ export const planningTools = Object.fromEntries(
     key,
     {
       description: tool.description,
-      parameters: tool.parameters,
+      inputSchema: tool.parameters,
     },
   ]),
 );
@@ -225,7 +225,7 @@ export const validationTools = Object.fromEntries(
     key,
     {
       description: tool.description,
-      parameters: tool.parameters,
+      inputSchema: tool.parameters,
     },
   ]),
 );
@@ -235,7 +235,7 @@ export const extractionTools = Object.fromEntries(
     key,
     {
       description: tool.description,
-      parameters: tool.parameters,
+      inputSchema: tool.parameters,
     },
   ]),
 );

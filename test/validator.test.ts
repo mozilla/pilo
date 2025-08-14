@@ -130,7 +130,7 @@ describe("Validator", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Task successfully completed",
             },
@@ -154,7 +154,7 @@ describe("Validator", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "excellent",
               taskAssessment: "Task completed excellently",
             },
@@ -178,7 +178,7 @@ describe("Validator", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "partial",
               taskAssessment: "Task partially completed",
               feedback: "Need to complete remaining fields",
@@ -203,7 +203,7 @@ describe("Validator", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "failed",
               taskAssessment: "Task failed",
               feedback: "Wrong button clicked",
@@ -266,7 +266,7 @@ describe("Validator", () => {
         toolCalls: [
           {
             toolName: "validate_task",
-            args: {
+            input: {
               completionQuality: "complete",
               taskAssessment: "Done",
             },
@@ -280,7 +280,7 @@ describe("Validator", () => {
         expect.objectContaining({
           model: mockProvider,
           toolChoice: { type: "tool", toolName: "validate_task" },
-          maxTokens: 1000,
+          maxOutputTokens: 1000,
         }),
       );
     });

@@ -352,7 +352,7 @@ export class WebAgent {
           prompt: config.prompt,
           tools: config.tools,
           toolChoice: config.toolChoice,
-          maxTokens: config.maxTokens,
+          maxOutputTokens: config.maxTokens,
           abortSignal: this.abortSignal ?? undefined,
         });
 
@@ -783,7 +783,7 @@ export class WebAgent {
       throw new Error("Failed to generate plan");
     }
 
-    const planData = response.toolCalls[0].args as any;
+    const planData = (response.toolCalls[0] as any).input;
     this.plan = planData.plan;
     this.taskExplanation = planData.explanation;
 
@@ -942,7 +942,7 @@ export class WebAgent {
       const response = await generateText({
         model: this.provider,
         prompt,
-        maxTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
+        maxOutputTokens: DEFAULT_EXTRACTION_MAX_TOKENS,
         abortSignal: this.abortSignal ?? undefined,
       });
 
@@ -983,10 +983,9 @@ export class WebAgent {
   }
 
   private parseToolCall(toolCall: any): Action {
-    let args = toolCall.args || {};
+    let args = toolCall.input || {};
 
-    // If args is a string (shouldn't happen normally but might with malformed responses),
-    // try to parse it
+    // Parse if string
     if (typeof args === "string") {
       const parsed = tryJSONParse(args);
       if (parsed) {
