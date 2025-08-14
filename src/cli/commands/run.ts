@@ -7,6 +7,9 @@ import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } 
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "../../loggers/json.js";
+import { WebAgentEventType, WebAgentEventEmitter } from "../../events.js";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -135,6 +138,28 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     const aiProvider = createAIProvider(providerOverrides);
 
+    // Create event emitter for handling events
+    const eventEmitter = new WebAgentEventEmitter();
+
+    // Set up generation logging if debug mode is enabled
+    if (options.debug) {
+      // Create debug/generations directory if it doesn't exist
+      const debugDir = path.join(process.cwd(), "debug", "generations");
+      fs.mkdirSync(debugDir, { recursive: true });
+
+      console.log(chalk.gray(`📝 Generation logs will be written to: ${debugDir}`));
+
+      // Listen for AI generation events
+      eventEmitter.onEvent(WebAgentEventType.AI_GENERATION, (data) => {
+        // Create a timestamped file for this generation
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const generationLogPath = path.join(debugDir, `${timestamp}.json`);
+
+        // Write the exact data object to file
+        fs.writeFileSync(generationLogPath, JSON.stringify(data, null, 2));
+      });
+    }
+
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: options.debug,
@@ -146,6 +171,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         : undefined,
       provider: aiProvider,
       logger,
+      eventEmitter,
     });
 
     // Execute the task
