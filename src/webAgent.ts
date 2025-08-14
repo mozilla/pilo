@@ -437,6 +437,13 @@ export class WebAgent {
 
     const action = this.parseToolCall(response.toolCalls[0]);
 
+    // Add the tool call to the conversation history
+    this.messages.push({
+      role: "assistant",
+      content: response.text || "", // Include any reasoning
+      toolCalls: response.toolCalls, // Preserve the actual tool calls
+    });
+
     // Emit AGENT_ACTION for ALL actions to show what the agent decided
     this.emit(WebAgentEventType.AGENT_ACTION, {
       action: action.type,
@@ -829,11 +836,28 @@ export class WebAgent {
         abortSignal: this.abortSignal ?? undefined,
       });
 
-      // Add extraction result to conversation
-      this.messages.push({
-        role: "assistant",
-        content: `Extracted data:\n${response.text}`,
-      });
+      // Add extraction result as a tool response
+      const lastMessage = this.messages[this.messages.length - 1];
+      if (lastMessage?.role === "assistant" && lastMessage?.toolCalls?.length > 0) {
+        const toolCall = lastMessage.toolCalls[0];
+        this.messages.push({
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: toolCall.toolCallId,
+              toolName: "extract",
+              result: response.text,
+            },
+          ],
+        });
+      } else {
+        // Fallback if no tool call found (shouldn't happen)
+        this.messages.push({
+          role: "assistant",
+          content: `Extracted data:\n${response.text}`,
+        });
+      }
 
       return response.text;
     } catch (error) {

@@ -101,14 +101,34 @@ export class Validator {
 
   /**
    * Add feedback message to conversation
-   * Simple utility to add user message with feedback
+   * Adds as tool result if responding to a tool call, otherwise as user message
    * @param messages - The conversation messages array
    * @param feedback - The feedback message to add
    */
   giveFeedback(messages: any[], feedback: string): void {
-    messages.push({
-      role: "user",
-      content: feedback,
-    });
+    // Check if the last message contains a tool call we need to respond to
+    const lastMessage = messages[messages.length - 1];
+
+    if (lastMessage?.role === "assistant" && lastMessage?.toolCalls?.length > 0) {
+      // Add as tool result message for the most recent tool call
+      const toolCall = lastMessage.toolCalls[0];
+      messages.push({
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            result: feedback,
+          },
+        ],
+      });
+    } else {
+      // Fallback to user message if no tool call to respond to
+      messages.push({
+        role: "user",
+        content: feedback,
+      });
+    }
   }
 }
