@@ -7,7 +7,8 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { generateText, LanguageModel, ModelMessage } from "ai";
+import { generateText, ModelMessage } from "ai";
+import type { ProviderConfig } from "./provider.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
@@ -39,8 +40,8 @@ const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
 // === Type Definitions ===
 
 export interface WebAgentOptions {
-  /** Language model provider */
-  provider: LanguageModel;
+  /** Provider configuration including model and options */
+  providerConfig: ProviderConfig;
   /** Debug mode for additional logging */
   debug?: boolean;
   /** Whether to use vision capabilities */
@@ -114,7 +115,7 @@ export class WebAgent {
   private logger: Logger;
 
   // === Configuration ===
-  private readonly provider: LanguageModel;
+  private readonly providerConfig: ProviderConfig;
   private readonly debug: boolean;
   private readonly vision: boolean;
   private readonly maxIterations: number;
@@ -128,7 +129,7 @@ export class WebAgent {
     options: WebAgentOptions,
   ) {
     // Initialize configuration
-    this.provider = options.provider;
+    this.providerConfig = options.providerConfig;
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
     this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
@@ -207,7 +208,7 @@ export class WebAgent {
     const webActionTools = createWebActionTools({
       browser: this.browser,
       eventEmitter: this.eventEmitter,
-      provider: this.provider,
+      providerConfig: this.providerConfig,
       abortSignal: this.abortSignal || undefined,
     });
 
@@ -470,7 +471,7 @@ export class WebAgent {
     try {
       // Generate AI response
       aiResponse = await generateText({
-        model: this.provider,
+        ...this.providerConfig,
         messages: this.messages,
         tools: webActionTools,
         toolChoice: "required",
@@ -611,7 +612,7 @@ export class WebAgent {
       // Call validation tool
       const validationTools = createValidationTools();
       const validationResponse = await generateText({
-        model: this.provider,
+        ...this.providerConfig,
         prompt: validationPrompt,
         tools: validationTools,
         toolChoice: { type: "tool", toolName: "validate_task" },
@@ -718,7 +719,7 @@ export class WebAgent {
       const planningToolName = startingUrl ? "create_plan" : "create_plan_with_url";
 
       const planningResponse = await generateText({
-        model: this.provider,
+        ...this.providerConfig,
         prompt: planningPrompt,
         tools: planningTools,
         toolChoice: { type: "tool", toolName: planningToolName },

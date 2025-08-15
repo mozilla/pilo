@@ -5,16 +5,17 @@
  * Each tool includes description, inputSchema, and execute function.
  */
 
-import { tool, generateText, LanguageModel } from "ai";
+import { tool, generateText } from "ai";
 import { z } from "zod";
 import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt } from "../prompts.js";
+import type { ProviderConfig } from "../provider.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
   eventEmitter: WebAgentEventEmitter;
-  provider: LanguageModel;
+  providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
 }
 
@@ -278,7 +279,7 @@ export function createWebActionTools(context: WebActionContext) {
 
         // Use the provider to extract the data
         const extractResponse = await generateText({
-          model: context.provider,
+          ...context.providerConfig,
           prompt,
           maxOutputTokens: 5000,
           abortSignal: context.abortSignal,

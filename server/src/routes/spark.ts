@@ -153,7 +153,7 @@ spark.post("/run", async (c) => {
         });
 
         // Create AI provider with potential overrides
-        const provider = createAIProvider({
+        const providerConfig = createAIProvider({
           provider: body.provider,
           model: body.model,
           openai_api_key: body.openaiApiKey,
@@ -162,7 +162,7 @@ spark.post("/run", async (c) => {
 
         agent = new WebAgent(browser, {
           ...webAgentConfig,
-          provider,
+          providerConfig,
           logger,
         });
 

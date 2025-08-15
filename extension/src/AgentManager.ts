@@ -29,17 +29,20 @@ export class AgentManager {
 
     // Create OpenAI provider directly for browser extension
     const apiEndpoint = options.apiEndpoint || "https://api.openai.com/v1";
-    const model = options.model || "gpt-4.1-mini";
+    const modelName = options.model || "gpt-4.1-mini";
 
     const openai = createOpenAI({
       apiKey: options.apiKey,
       baseURL: apiEndpoint,
     });
-    const provider = openai(model);
+    const model = openai(modelName);
 
     // Create WebAgent - same as CLI and server
     const agent = new WebAgent(browser, {
-      provider,
+      providerConfig: {
+        model,
+        providerOptions: undefined, // No reasoning support in extension yet
+      },
       logger: options.logger,
       debug: false,
     });

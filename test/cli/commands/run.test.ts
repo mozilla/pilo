@@ -210,7 +210,10 @@ describe("CLI Run Command", () => {
         proxyPassword: undefined,
       });
 
-      expect(mockCreateAIProvider).toHaveBeenCalledWith({ provider: "openai" });
+      expect(mockCreateAIProvider).toHaveBeenCalledWith({
+        provider: "openai",
+        reasoning_effort: "none",
+      });
       expect(mockWebAgent).toHaveBeenCalled();
     });
 
@@ -234,6 +237,7 @@ describe("CLI Run Command", () => {
         model: "anthropic/claude-3-sonnet",
         openai_api_key: "sk-test123",
         openrouter_api_key: "sk-or-test123",
+        reasoning_effort: "none",
       });
     });
 

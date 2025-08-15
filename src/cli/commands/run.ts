@@ -62,6 +62,11 @@ export function createRunCommand(): Command {
       String(config.get("max_validation_attempts") || 3),
     )
     .option(
+      "--reasoning-effort <effort>",
+      "Reasoning effort level (none, low, medium, high)",
+      config.get("reasoning_effort") || "none",
+    )
+    .option(
       "--proxy <url>",
       "Proxy server URL (http://host:port, https://host:port, socks5://host:port)",
       config.get("proxy"),
@@ -135,8 +140,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     if (options.model) providerOverrides.model = options.model;
     if (options.openaiApiKey) providerOverrides.openai_api_key = options.openaiApiKey;
     if (options.openrouterApiKey) providerOverrides.openrouter_api_key = options.openrouterApiKey;
+    if (options.reasoningEffort) providerOverrides.reasoning_effort = options.reasoningEffort;
 
-    const aiProvider = createAIProvider(providerOverrides);
+    const providerConfig = createAIProvider(providerOverrides);
 
     // Create event emitter for handling events
     const eventEmitter = new WebAgentEventEmitter();
@@ -169,7 +175,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxValidationAttempts: options.maxValidationAttempts
         ? parseInt(options.maxValidationAttempts)
         : undefined,
-      provider: aiProvider,
+      providerConfig,
       logger,
       eventEmitter,
     });

@@ -152,7 +152,7 @@ describe("WebAgent", () => {
     mockProvider = { specificationVersion: "v1" } as unknown as LanguageModel;
 
     const options: WebAgentOptions = {
-      provider: mockProvider,
+      providerConfig: { model: mockProvider },
       debug: false,
       vision: false,
       maxIterations: 10,
@@ -859,7 +859,7 @@ describe("WebAgent", () => {
 
     it("should fail after consecutive errors exceed limit", async () => {
       const options: WebAgentOptions = {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         maxConsecutiveErrors: 2,
         maxTotalErrors: 10,
         eventEmitter,
@@ -904,7 +904,7 @@ describe("WebAgent", () => {
 
     it("should fail after total errors exceed limit", async () => {
       const options: WebAgentOptions = {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         maxConsecutiveErrors: 10,
         maxTotalErrors: 3,
         eventEmitter,
@@ -998,7 +998,7 @@ describe("WebAgent", () => {
 
     it("should handle maximum iterations", async () => {
       const options: WebAgentOptions = {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         maxIterations: 2,
         eventEmitter,
         logger: mockLogger,
@@ -1527,7 +1527,7 @@ describe("WebAgent", () => {
   describe("task validation", () => {
     it("should validate task completion when done is called", async () => {
       const webAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         eventEmitter,
         logger: mockLogger,
       });
@@ -1590,7 +1590,7 @@ describe("WebAgent", () => {
 
     it("should retry task when validation fails", async () => {
       const webAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 2,
@@ -1687,7 +1687,7 @@ describe("WebAgent", () => {
 
     it("should accept result after max validation attempts even if quality is poor", async () => {
       const webAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 1,
@@ -1756,7 +1756,7 @@ describe("WebAgent", () => {
       const guardrails = "Only interact with buttons, do not fill forms";
 
       const guardedAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         guardrails,
         eventEmitter,
         logger: mockLogger,
@@ -1876,7 +1876,7 @@ describe("WebAgent", () => {
   describe("vision mode", () => {
     it("should handle vision mode configuration", async () => {
       const visionAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         vision: true,
         eventEmitter,
         logger: mockLogger,
@@ -1955,7 +1955,7 @@ describe("WebAgent", () => {
         .mockResolvedValue(mockScreenshot);
 
       const visionAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         vision: true,
         eventEmitter,
         logger: mockLogger,
@@ -2070,7 +2070,7 @@ describe("WebAgent", () => {
       const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const visionAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         vision: true,
         eventEmitter,
         logger: mockLogger,
@@ -2305,7 +2305,7 @@ describe("WebAgent", () => {
       vi.spyOn(mockBrowser, "getScreenshot").mockResolvedValue(mockScreenshot);
 
       const visionAgent = new WebAgent(mockBrowser, {
-        provider: mockProvider,
+        providerConfig: { model: mockProvider },
         vision: true,
         eventEmitter,
         logger: mockLogger,

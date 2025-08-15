@@ -73,7 +73,7 @@ describe("Tool Calling Integration", () => {
 
   it.skip("should handle complete flow with malformed responses and recovery", async () => {
     const agent = new WebAgent(browser, {
-      provider: { specificationVersion: "v1" } as any,
+      providerConfig: { model: { specificationVersion: "v1" } as any },
       eventEmitter,
     });
 
@@ -310,7 +310,7 @@ describe("Tool Calling Integration", () => {
 
   it.skip("should track LLM usage even when models don't support tools", async () => {
     const agent = new WebAgent(browser, {
-      provider: { specificationVersion: "v1" } as any,
+      providerConfig: { model: { specificationVersion: "v1" } as any },
       eventEmitter,
     });
 

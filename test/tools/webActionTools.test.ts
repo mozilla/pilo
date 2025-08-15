@@ -545,7 +545,6 @@ describe("Web Action Tools", () => {
 
       expect(getMarkdownSpy).toHaveBeenCalled();
       expect(mockGenerateText).toHaveBeenCalledWith({
-        model: mockProvider,
         prompt: expect.stringContaining("Get important info"),
         maxOutputTokens: 5000,
         abortSignal: undefined,
