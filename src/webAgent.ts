@@ -20,17 +20,21 @@ import {
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
   buildStepErrorFeedbackPrompt,
+  buildTaskValidationPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
+import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
 
 // === Configuration Constants ===
 const DEFAULT_MAX_ITERATIONS = 50;
 const DEFAULT_GENERATION_MAX_TOKENS = 3000;
 const DEFAULT_PLANNING_MAX_TOKENS = 1500;
+const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
 const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
 const DEFAULT_MAX_TOTAL_ERRORS = 15;
+const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
 
 // === Type Definitions ===
 
@@ -53,7 +57,7 @@ export interface WebAgentOptions {
   eventEmitter?: WebAgentEventEmitter;
   /** Logger for handling events */
   logger?: Logger;
-  /** @deprecated maxValidationAttempts is no longer used */
+  /** Maximum validation attempts when task completion quality is insufficient */
   maxValidationAttempts?: number;
 }
 
@@ -87,6 +91,7 @@ interface ExecutionState {
   startTime: number;
   finalAnswer: string | null;
   lastAction?: string;
+  validationAttempts: number;
 }
 
 /**
@@ -115,6 +120,7 @@ export class WebAgent {
   private readonly maxIterations: number;
   private readonly maxConsecutiveErrors: number;
   private readonly maxTotalErrors: number;
+  private readonly maxValidationAttempts: number;
   private readonly guardrails: string | null;
 
   constructor(
@@ -128,6 +134,7 @@ export class WebAgent {
     this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
     this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
+    this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
     this.guardrails = options.guardrails ?? null;
 
     // Initialize services
@@ -160,7 +167,7 @@ export class WebAgent {
       this.initializeSystemPromptAndTask(task);
 
       // 5. Main execution loop
-      const loopOutcome = await this.runMainLoop(executionState);
+      const loopOutcome = await this.runMainLoop(task, executionState);
 
       // 6. Return results
       return this.buildResult(loopOutcome, executionState);
@@ -193,6 +200,7 @@ export class WebAgent {
    * The main execution loop - clean and maintainable
    */
   private async runMainLoop(
+    task: string,
     executionState: ExecutionState,
   ): Promise<{ success: boolean; finalAnswer: string | null }> {
     // Setup tools once
@@ -227,7 +235,7 @@ export class WebAgent {
 
       // Single try-catch for ALL iteration logic
       try {
-        const result = await this.generateAndProcessAction(webActionTools);
+        const result = await this.generateAndProcessAction(task, webActionTools, executionState);
 
         // Reset error counter on success
         consecutiveErrors = 0;
@@ -333,7 +341,11 @@ export class WebAgent {
    * Generate AI response and process the result
    * @returns Object with action details and terminal status
    */
-  private async generateAndProcessAction(webActionTools: any): Promise<{
+  private async generateAndProcessAction(
+    task: string,
+    webActionTools: any,
+    executionState: ExecutionState,
+  ): Promise<{
     isTerminal: boolean;
     finalAnswer: string | null;
     pageChanged: boolean;
@@ -415,13 +427,38 @@ export class WebAgent {
     // Check for terminal actions
     if (actionOutput.isTerminal) {
       if (actionOutput.action === "done") {
-        return {
-          isTerminal: true,
-          finalAnswer: actionOutput.result,
-          pageChanged: false,
-          actionExecuted: true,
-        };
+        // Validate the task completion before accepting it
+        const validationResult = await this.validateTaskCompletion(
+          task,
+          actionOutput.result,
+          executionState,
+        );
+
+        // Check if validation passed
+        if (validationResult.isAccepted) {
+          return {
+            isTerminal: true,
+            finalAnswer: actionOutput.result,
+            pageChanged: false,
+            actionExecuted: true,
+          };
+        } else {
+          // Validation failed - continue execution with feedback
+          return {
+            isTerminal: false,
+            finalAnswer: null,
+            pageChanged: false,
+            actionExecuted: true,
+          };
+        }
       } else if (actionOutput.action === "abort") {
+        // Emit TASK_ABORTED event
+        this.emit(WebAgentEventType.TASK_ABORTED, {
+          reason: actionOutput.reason,
+          finalAnswer: `Aborted: ${actionOutput.reason}`,
+          iterationId: this.currentIterationId,
+        });
+
         return {
           isTerminal: true,
           finalAnswer: `Aborted: ${actionOutput.reason}`,
@@ -438,6 +475,122 @@ export class WebAgent {
       pageChanged,
       actionExecuted: true,
     };
+  }
+
+  /**
+   * Validate task completion using the validation tool
+   */
+  private async validateTaskCompletion(
+    task: string,
+    finalAnswer: string,
+    executionState: ExecutionState,
+  ): Promise<{ isAccepted: boolean }> {
+    // Increment validation attempts
+    executionState.validationAttempts++;
+
+    // Emit processing event
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "start",
+      operation: "Validating task completion",
+      iterationId: this.currentIterationId,
+    });
+
+    try {
+      // Format conversation history for validation context
+      const conversationHistory = this.formatConversationHistory();
+
+      // Build validation prompt
+      const validationPrompt = buildTaskValidationPrompt(task, finalAnswer, conversationHistory);
+
+      // Call validation tool
+      const validationTools = createValidationTools();
+      const validationResponse = await generateText({
+        model: this.provider,
+        prompt: validationPrompt,
+        tools: validationTools,
+        toolChoice: { type: "tool", toolName: "validate_task" },
+        maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
+        abortSignal: this.abortSignal || undefined,
+      });
+
+      // Emit processing complete
+      this.emit(WebAgentEventType.AGENT_PROCESSING, {
+        status: "end",
+        operation: "Validating task completion",
+        iterationId: this.currentIterationId,
+      });
+
+      if (!validationResponse.toolResults?.[0]) {
+        throw new Error("Failed to validate task completion");
+      }
+
+      const validationResult = validationResponse.toolResults[0].output as any;
+      const { taskAssessment, completionQuality, feedback } = validationResult;
+
+      // Emit validation event
+      this.emit(WebAgentEventType.TASK_VALIDATED, {
+        observation: taskAssessment,
+        completionQuality,
+        feedback,
+        finalAnswer,
+        iterationId: this.currentIterationId,
+      });
+
+      // Check if quality is acceptable
+      const isAccepted = completionQuality === "complete" || completionQuality === "excellent";
+
+      // If not accepted and we haven't hit max attempts, add feedback to conversation
+      if (!isAccepted && executionState.validationAttempts < this.maxValidationAttempts) {
+        // Add feedback to conversation so agent can improve
+        const feedbackMessage = `Task validation result: ${completionQuality}. ${
+          feedback || "Please continue working to complete the task."
+        }`;
+        this.messages.push({ role: "user", content: feedbackMessage });
+      }
+
+      // Accept if quality is good OR we've hit max validation attempts
+      return {
+        isAccepted: isAccepted || executionState.validationAttempts >= this.maxValidationAttempts,
+      };
+    } catch (error) {
+      // Emit processing complete even on error
+      this.emit(WebAgentEventType.AGENT_PROCESSING, {
+        status: "end",
+        operation: "Validating task completion",
+        iterationId: this.currentIterationId,
+      });
+
+      // On validation error, accept the result if we've hit max attempts
+      if (executionState.validationAttempts >= this.maxValidationAttempts) {
+        return { isAccepted: true };
+      }
+
+      // Otherwise, continue execution
+      this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+        errors: [this.extractErrorMessage(error)],
+        retryCount: executionState.validationAttempts,
+        rawResponse: null,
+        iterationId: this.currentIterationId,
+      });
+
+      return { isAccepted: false };
+    }
+  }
+
+  /**
+   * Format conversation history for validation
+   */
+  private formatConversationHistory(): string {
+    // Take recent messages but don't truncate content - validation needs full context
+    // The validation prompt itself will manage token limits
+    const recentMessages = this.messages.slice(-30);
+
+    return recentMessages
+      .map((msg) => {
+        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+        return `${msg.role}: ${content}`;
+      })
+      .join("\n\n");
   }
 
   /**
@@ -705,6 +858,7 @@ export class WebAgent {
       actionCount: 0,
       startTime: Date.now(),
       finalAnswer: null,
+      validationAttempts: 0,
     };
   }
 
