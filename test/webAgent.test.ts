@@ -808,12 +808,8 @@ describe("WebAgent", () => {
       expect(result.success).toBe(false);
       expect(result.finalAnswer).toBe("Aborted: Cannot complete task");
 
-      // Check that AGENT_ACTION was emitted for abort
-      const agentAction = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "abort",
-      );
-      expect(agentAction).toBeDefined();
-      expect(agentAction?.data.value).toBe("Cannot complete task");
+      // AGENT_ACTION events are now emitted from within the tools themselves
+      // which are mocked in tests, so we don't check for them here
     });
 
     it("should handle extract action", async () => {
@@ -895,12 +891,8 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
 
-      // Check that AGENT_ACTION was emitted for extract
-      const agentAction = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AGENT_ACTION && e.data.action === "extract",
-      );
-      expect(agentAction).toBeDefined();
-      expect(agentAction?.data.value).toBe("Get page title");
+      // AGENT_ACTION events are now emitted from within the tools themselves
+      // which are mocked in tests, so we don't check for them here
     });
   });
 
@@ -1345,9 +1337,8 @@ describe("WebAgent", () => {
       expect(eventTypes).toContain(WebAgentEventType.TASK_SETUP);
       expect(eventTypes).toContain(WebAgentEventType.AGENT_STATUS); // Plan created
       expect(eventTypes).toContain(WebAgentEventType.TASK_STARTED);
-      expect(eventTypes).toContain(WebAgentEventType.AGENT_ACTION);
-      expect(eventTypes).toContain(WebAgentEventType.BROWSER_ACTION_STARTED);
-      expect(eventTypes).toContain(WebAgentEventType.BROWSER_ACTION_COMPLETED);
+      // AGENT_ACTION events are now emitted from within the tools themselves
+      // which are mocked in tests, so we don't expect them here
       expect(eventTypes).toContain(WebAgentEventType.TASK_COMPLETED);
     });
 

@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    // Override rootDir since we're including test files outside of src
     "rootDir": ".",
-    // No output for type checking
     "noEmit": true
   },
   "include": ["src/**/*", "test/**/*"],

@@ -160,6 +160,30 @@ describe("Web Action Tools", () => {
       });
     });
 
+    it("should emit browser action events", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      await tools.click.execute({ ref: "btn1" });
+
+      // Should emit AGENT_ACTION first
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "click",
+        ref: "btn1",
+        value: undefined,
+      });
+      // Then BROWSER_ACTION_STARTED
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "click",
+        ref: "btn1",
+        value: undefined,
+      });
+      // Finally BROWSER_ACTION_COMPLETED after the action
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "click",
+      });
+    });
+
     it("should validate input schema", () => {
       const schema = tools.click.inputSchema;
 
@@ -199,6 +223,27 @@ describe("Web Action Tools", () => {
         action: "fill",
         ref: "input1",
         value: "test text",
+      });
+    });
+
+    it("should emit browser action events", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      await tools.fill.execute({ ref: "input1", value: "test text" });
+
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "fill",
+        ref: "input1",
+        value: "test text",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "fill",
+        ref: "input1",
+        value: "test text",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "fill",
       });
     });
 
@@ -318,6 +363,27 @@ describe("Web Action Tools", () => {
         value: "query",
       });
     });
+
+    it("should emit browser action events", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      await tools.fill_and_enter.execute({ ref: "search1", value: "query" });
+
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "fill_and_enter",
+        ref: "search1",
+        value: "query",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "fill_and_enter",
+        ref: "search1",
+        value: "query",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "fill_and_enter",
+      });
+    });
   });
 
   describe("Wait Action", () => {
@@ -326,7 +392,12 @@ describe("Web Action Tools", () => {
 
       const waitPromise = tools.wait.execute({ seconds: 2 });
 
-      // Check that event was emitted immediately
+      // Check that events were emitted immediately
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "wait",
+        ref: undefined,
+        value: 2,
+      });
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_WAITING, { seconds: 2 });
 
       // Advance timers
@@ -362,6 +433,20 @@ describe("Web Action Tools", () => {
       const result = await tools.goto.execute({ url: "https://newsite.com" });
 
       expect(gotoSpy).toHaveBeenCalledWith("https://newsite.com");
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "goto",
+        ref: undefined,
+        value: "https://newsite.com",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "goto",
+        ref: undefined,
+        value: "https://newsite.com",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "goto",
+      });
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
         title: expect.any(String),
         url: expect.any(String),
@@ -391,6 +476,20 @@ describe("Web Action Tools", () => {
       const result = await tools.back.execute({});
 
       expect(goBackSpy).toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "back",
+        ref: undefined,
+        value: undefined,
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "back",
+        ref: undefined,
+        value: undefined,
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "back",
+      });
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
         title: "Previous Page",
         url: "https://previous.com",
@@ -408,6 +507,20 @@ describe("Web Action Tools", () => {
       const result = await tools.forward.execute({});
 
       expect(goForwardSpy).toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "forward",
+        ref: undefined,
+        value: undefined,
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
+        action: "forward",
+        ref: undefined,
+        value: undefined,
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: true,
+        action: "forward",
+      });
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
         title: "Next Page",
         url: "https://next.com",
@@ -436,6 +549,11 @@ describe("Web Action Tools", () => {
         prompt: expect.stringContaining("Get important info"),
         maxOutputTokens: 5000,
         abortSignal: undefined,
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "extract",
+        ref: undefined,
+        value: "Get important info",
       });
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_EXTRACTED, {
         extractedData: "Extracted data: Important info",
@@ -471,10 +589,17 @@ describe("Web Action Tools", () => {
 
   describe("Terminal Actions", () => {
     it("should execute done action with terminal flag", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
       const result = await tools.done.execute({
         result: "Task completed successfully",
       });
 
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "done",
+        ref: undefined,
+        value: "Task completed successfully",
+      });
       expect(result).toEqual({
         success: true,
         action: "done",
@@ -484,10 +609,17 @@ describe("Web Action Tools", () => {
     });
 
     it("should execute abort action with terminal flag", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
       const result = await tools.abort.execute({
         description: "Site is down, cannot proceed",
       });
 
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "abort",
+        ref: undefined,
+        value: "Site is down, cannot proceed",
+      });
       expect(result).toEqual({
         success: true,
         action: "abort",

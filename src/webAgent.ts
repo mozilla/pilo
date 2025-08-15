@@ -309,49 +309,6 @@ export class WebAgent {
           executionState.actionCount++;
           executionState.lastAction = actionOutput.action;
 
-          // Build action event data with appropriate field based on action type
-          const actionEventData = {
-            action: actionOutput.action,
-            ref: actionOutput.ref,
-            value:
-              actionOutput.value || // For fill, select actions
-              actionOutput.result || // For done action
-              actionOutput.description || // For extract action
-              actionOutput.reason || // For abort action
-              actionOutput.seconds || // For wait action
-              actionOutput.url || // For goto action
-              actionOutput.title, // For navigation actions
-          };
-          this.emit(WebAgentEventType.AGENT_ACTION, actionEventData);
-
-          // List of actions that involve browser interaction
-          const browserInteractionActions = [
-            "click",
-            "fill",
-            "select",
-            "hover",
-            "check",
-            "uncheck",
-            "focus",
-            "enter",
-            "fill_and_enter",
-            "goto",
-            "back",
-            "forward",
-          ];
-          if (browserInteractionActions.includes(actionOutput.action)) {
-            this.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-              action: actionOutput.action,
-              ref: actionOutput.ref,
-              value: actionOutput.value,
-            });
-
-            this.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-              success: true,
-              action: actionOutput.action,
-            });
-          }
-
           // Check for task completion or abort
           if (actionOutput.isTerminal === true) {
             if (actionOutput.action === "done") {
