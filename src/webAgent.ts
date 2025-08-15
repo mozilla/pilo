@@ -7,7 +7,7 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { generateText, LanguageModel, CoreMessage } from "ai";
+import { generateText, LanguageModel, ModelMessage } from "ai";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
@@ -19,6 +19,7 @@ import {
   buildPageSnapshotPrompt,
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
+  buildStepErrorFeedbackPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
@@ -28,6 +29,8 @@ import { nanoid } from "nanoid";
 const DEFAULT_MAX_ITERATIONS = 50;
 const DEFAULT_GENERATION_MAX_TOKENS = 3000;
 const DEFAULT_PLANNING_MAX_TOKENS = 1500;
+const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
+const DEFAULT_MAX_TOTAL_ERRORS = 15;
 
 // === Type Definitions ===
 
@@ -40,6 +43,10 @@ export interface WebAgentOptions {
   vision?: boolean;
   /** Maximum iterations for task completion */
   maxIterations?: number;
+  /** Maximum consecutive errors before failing */
+  maxConsecutiveErrors?: number;
+  /** Maximum total errors before failing */
+  maxTotalErrors?: number;
   /** Optional guardrails to constrain agent behavior */
   guardrails?: string | null;
   /** Event emitter for custom event handling */
@@ -89,7 +96,7 @@ export class WebAgent {
   // === Core State (stays here) ===
   private plan: string = "";
   private url: string = "";
-  private messages: CoreMessage[] = [];
+  private messages: ModelMessage[] = [];
   private taskExplanation: string = "";
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
@@ -106,6 +113,8 @@ export class WebAgent {
   private readonly debug: boolean;
   private readonly vision: boolean;
   private readonly maxIterations: number;
+  private readonly maxConsecutiveErrors: number;
+  private readonly maxTotalErrors: number;
   private readonly guardrails: string | null;
 
   constructor(
@@ -117,6 +126,8 @@ export class WebAgent {
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
     this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+    this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
+    this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
     this.guardrails = options.guardrails ?? null;
 
     // Initialize services
@@ -183,173 +194,243 @@ export class WebAgent {
   }
 
   /**
-   * The main loop with our own iteration control
+   * The main execution loop - clean and maintainable
    */
   private async runMainLoop(
     executionState: ExecutionState,
   ): Promise<{ success: boolean; finalAnswer: string | null }> {
-    try {
-      // Create web action tools with current context
-      const webActionTools = createWebActionTools({
-        browser: this.browser,
-        eventEmitter: this.eventEmitter,
-        provider: this.provider,
-        abortSignal: this.abortSignal || undefined,
-      });
+    // Setup tools once
+    const webActionTools = createWebActionTools({
+      browser: this.browser,
+      eventEmitter: this.eventEmitter,
+      provider: this.provider,
+      abortSignal: this.abortSignal || undefined,
+    });
 
-      // Main loop - we control the iterations
-      while (
-        executionState.currentIteration < this.maxIterations &&
-        executionState.finalAnswer === null
-      ) {
-        // Check abort signal
-        if (this.abortSignal?.aborted) {
-          return { success: false, finalAnswer: "Task aborted by user" };
-        }
+    let needsPageSnapshot = true;
+    let consecutiveErrors = 0;
+    let totalErrors = 0;
 
-        // Generate unique ID for this iteration
-        this.currentIterationId = nanoid(8);
-
-        // Emit processing start
-        this.emit(WebAgentEventType.AGENT_PROCESSING, {
-          status: "start",
-          operation: "Thinking about next action",
-          iterationId: this.currentIterationId,
-        });
-
-        // Always add page snapshot to get current state
-        const currentPageSnapshot = await this.browser.getTreeWithRefs();
-        const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
-
-        // Debug compression stats if enabled
-        if (this.debug) {
-          const originalSize = currentPageSnapshot.length;
-          const compressedSize = compressedSnapshot.length;
-          const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-          this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
-            originalSize,
-            compressedSize,
-            compressionPercent,
-          });
-        }
-
-        // Get current page info and add snapshot to conversation
-        const currentPageInfo = await this.getCurrentPageInfo();
-        const snapshotMessage = buildPageSnapshotPrompt(
-          currentPageInfo.title,
-          currentPageInfo.url,
-          compressedSnapshot,
-          this.vision,
-        );
-        this.messages.push({ role: "user", content: snapshotMessage });
-
-        // Generate next action using AI
-        const aiResponse = await generateText({
-          model: this.provider,
-          messages: this.messages,
-          tools: webActionTools,
-          toolChoice: "required",
-          maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
-          abortSignal: this.abortSignal || undefined,
-        });
-
-        // Add assistant response to messages (this includes the tool calls)
-        if (aiResponse.response && aiResponse.response.messages) {
-          // Add all messages from the response (assistant message + tool results)
-          for (const msg of aiResponse.response.messages) {
-            this.messages.push(msg);
-          }
-        }
-
-        // Emit AI generation event with actual response data and updated messages
-        this.emit(WebAgentEventType.AI_GENERATION, {
-          messages: this.messages,
-          temperature: 0,
-          object: null,
-          finishReason: aiResponse.finishReason,
-          usage: aiResponse.usage,
-          warnings: aiResponse.warnings || [],
-          providerMetadata: aiResponse.providerMetadata,
-        });
-
-        // Emit processing complete
-        this.emit(WebAgentEventType.AGENT_PROCESSING, {
-          status: "end",
-          operation: "Thinking about next action",
-          iterationId: this.currentIterationId,
-        });
-
-        // Emit observation if there's reasoning text
-        if (aiResponse.text && aiResponse.text.trim()) {
-          this.emit(WebAgentEventType.AGENT_OBSERVED, {
-            observation: aiResponse.text,
-            iterationId: this.currentIterationId,
-          });
-        }
-
-        // Process tool execution results
-        if (aiResponse.toolResults && aiResponse.toolResults.length > 0) {
-          const firstToolResult = aiResponse.toolResults[0];
-
-          // Extract the actual action output from the tool execution
-          // Structure: { type: 'tool-result', toolCallId, toolName, input, output, dynamic }
-          const actionOutput = firstToolResult.output as any;
-
-          if (!actionOutput) {
-            // Tool result is malformed, skip this iteration
-            this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-              error: "Tool result missing 'output' property",
-              iterationId: this.currentIterationId,
-            });
-            executionState.actionCount++;
-            continue;
-          }
-
-          // Update execution state with the executed action
-          executionState.actionCount++;
-          executionState.lastAction = actionOutput.action;
-
-          // Check for task completion or abort
-          if (actionOutput.isTerminal === true) {
-            if (actionOutput.action === "done") {
-              executionState.finalAnswer = actionOutput.result;
-              break; // Exit the loop
-            } else if (actionOutput.action === "abort") {
-              executionState.finalAnswer = `Aborted: ${actionOutput.reason}`;
-              break; // Exit the loop
-            }
-          }
-        }
-
-        executionState.currentIteration++;
-      }
-
-      // Check if we found a terminal action
-      if (executionState.finalAnswer !== null) {
-        const success = !executionState.finalAnswer.startsWith("Aborted:");
-        return { success, finalAnswer: executionState.finalAnswer };
-      }
-
-      // If no terminal action found, we hit max iterations
-      return {
-        success: false,
-        finalAnswer: "Maximum iterations reached without completing the task.",
-      };
-    } catch (error) {
-      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
-        error: error instanceof Error ? error.message : String(error),
-        iterationId: this.currentIterationId,
-      });
-
+    // Main loop
+    while (
+      executionState.currentIteration < this.maxIterations &&
+      executionState.finalAnswer === null
+    ) {
+      // Check abort signal once at the start of each iteration
       if (this.abortSignal?.aborted) {
         return { success: false, finalAnswer: "Task aborted by user" };
       }
 
-      return {
-        success: false,
-        finalAnswer: `Task failed: ${error instanceof Error ? error.message : String(error)}`,
-      };
+      // Generate unique iteration ID
+      this.currentIterationId = nanoid(8);
+
+      // Add page snapshot if needed
+      if (needsPageSnapshot) {
+        await this.addPageSnapshot();
+      }
+
+      // Single try-catch for ALL iteration logic
+      try {
+        const result = await this.generateAndProcessAction(webActionTools);
+
+        // Reset error counter on success
+        consecutiveErrors = 0;
+
+        // Handle terminal actions
+        if (result.isTerminal) {
+          executionState.finalAnswer = result.finalAnswer;
+          break;
+        }
+
+        // Update state for successful action
+        if (result.actionExecuted) {
+          executionState.actionCount++;
+        }
+
+        needsPageSnapshot = result.pageChanged;
+      } catch (error) {
+        consecutiveErrors++;
+        totalErrors++;
+
+        // Check if we should continue
+        if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors)) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            finalAnswer: `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`,
+          };
+        }
+
+        // Add error feedback and retry
+        this.addErrorFeedback(error);
+        needsPageSnapshot = false; // Nothing changed, don't snapshot
+      }
+
+      executionState.currentIteration++;
     }
+
+    // Check final state
+    if (executionState.finalAnswer !== null) {
+      const success = !executionState.finalAnswer.startsWith("Aborted:");
+      return { success, finalAnswer: executionState.finalAnswer };
+    }
+
+    // Max iterations reached
+    return {
+      success: false,
+      finalAnswer: "Maximum iterations reached without completing the task.",
+    };
+  }
+
+  /**
+   * Check if we should continue after an error
+   */
+  private shouldContinueAfterError(consecutiveErrors: number, totalErrors: number): boolean {
+    return consecutiveErrors < this.maxConsecutiveErrors && totalErrors < this.maxTotalErrors;
+  }
+
+  /**
+   * Add error feedback to the conversation
+   */
+  private addErrorFeedback(error: unknown): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Emit error event for logging
+    this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+      error: errorMessage,
+      iterationId: this.currentIterationId,
+    });
+
+    // Add error feedback to conversation
+    const hasGuardrails = Boolean(this.guardrails);
+    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, hasGuardrails);
+    this.messages.push({ role: "user", content: errorFeedback });
+  }
+
+  /**
+   * Add page snapshot to the conversation
+   */
+  private async addPageSnapshot(): Promise<void> {
+    const currentPageSnapshot = await this.browser.getTreeWithRefs();
+    const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
+
+    // Debug compression stats if enabled
+    if (this.debug) {
+      const originalSize = currentPageSnapshot.length;
+      const compressedSize = compressedSnapshot.length;
+      const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
+        originalSize,
+        compressedSize,
+        compressionPercent,
+      });
+    }
+
+    // Get current page info and add snapshot to conversation
+    const currentPageInfo = await this.getCurrentPageInfo();
+    const snapshotMessage = buildPageSnapshotPrompt(
+      currentPageInfo.title,
+      currentPageInfo.url,
+      compressedSnapshot,
+      this.vision,
+    );
+    this.messages.push({ role: "user", content: snapshotMessage });
+  }
+
+  /**
+   * Generate AI response and process the result
+   * @returns Object with action details and terminal status
+   */
+  private async generateAndProcessAction(webActionTools: any): Promise<{
+    isTerminal: boolean;
+    finalAnswer: string | null;
+    pageChanged: boolean;
+    actionExecuted: boolean;
+  }> {
+    // Start processing
+    this.emit(WebAgentEventType.AGENT_PROCESSING, {
+      status: "start",
+      operation: "Thinking about next action",
+      iterationId: this.currentIterationId,
+    });
+
+    // Generate AI response
+    const aiResponse = await generateText({
+      model: this.provider,
+      messages: this.messages,
+      tools: webActionTools,
+      toolChoice: "required",
+      maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
+      abortSignal: this.abortSignal || undefined,
+    });
+
+    // Add response to messages
+    if (aiResponse.response?.messages) {
+      for (const msg of aiResponse.response.messages) {
+        this.messages.push(msg);
+      }
+    }
+
+    // Emit generation event
+    this.emit(WebAgentEventType.AI_GENERATION, {
+      messages: this.messages,
+      temperature: 0,
+      object: null,
+      finishReason: aiResponse.finishReason,
+      usage: aiResponse.usage,
+      warnings: aiResponse.warnings || [],
+      providerMetadata: aiResponse.providerMetadata,
+    });
+
+    // Emit observation if present
+    if (aiResponse.text?.trim()) {
+      this.emit(WebAgentEventType.AGENT_OBSERVED, {
+        observation: aiResponse.text,
+        iterationId: this.currentIterationId,
+      });
+    }
+
+    // Process tool results
+    if (!aiResponse.toolResults?.length) {
+      throw new Error("You must use exactly one tool. Please use one of the available tools.");
+    }
+
+    const toolResult = aiResponse.toolResults[0];
+    const actionOutput = toolResult.output as any;
+
+    if (!actionOutput) {
+      throw new Error("Tool execution failed: missing output property.");
+    }
+
+    // Determine if page changed (most actions change the page, except extract)
+    const pageChanged = actionOutput.action !== "extract";
+
+    // Check for terminal actions
+    if (actionOutput.isTerminal) {
+      if (actionOutput.action === "done") {
+        return {
+          isTerminal: true,
+          finalAnswer: actionOutput.result,
+          pageChanged: false,
+          actionExecuted: true,
+        };
+      } else if (actionOutput.action === "abort") {
+        return {
+          isTerminal: true,
+          finalAnswer: `Aborted: ${actionOutput.reason}`,
+          pageChanged: false,
+          actionExecuted: true,
+        };
+      }
+    }
+
+    // Regular action executed successfully
+    return {
+      isTerminal: false,
+      finalAnswer: null,
+      pageChanged,
+      actionExecuted: true,
+    };
   }
 
   /**

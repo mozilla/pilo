@@ -252,11 +252,8 @@ const stepErrorFeedbackTemplate = buildPromptTemplate(
 # Error Occurred
 {{ error }}
 
-Available tools:
-{{ toolExamples }}
-
 {% if hasGuardrails %}
-ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 
 ${toolCallInstruction}

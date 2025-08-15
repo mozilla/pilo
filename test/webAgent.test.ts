@@ -1084,7 +1084,7 @@ describe("WebAgent", () => {
         (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
       );
       expect(errorEvent).toBeDefined();
-      expect(errorEvent?.data.error).toContain("Tool result missing 'output' property");
+      expect(errorEvent?.data.error).toContain("Tool execution failed: missing output property");
     });
   });
 
