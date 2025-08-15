@@ -25,7 +25,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.check.json",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "spark": "NODE_NO_WARNINGS=1 tsx src/cli.ts",

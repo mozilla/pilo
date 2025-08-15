@@ -227,7 +227,7 @@ describe("AriaBrowser interface", () => {
       };
 
       // Verify we have actions for all major categories
-      Object.entries(actionCategories).forEach(([category, actions]) => {
+      Object.entries(actionCategories).forEach(([_category, actions]) => {
         expect(actions.length).toBeGreaterThan(0);
         actions.forEach((action) => {
           expect(Object.values(PageAction)).toContain(action);

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConsoleLogger } from "../src/loggers/console.js";
 import { JSONConsoleLogger } from "../src/loggers/json.js";
-import type { Logger } from "../src/loggers/types.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import type {
   TaskStartEventData,
@@ -103,6 +102,7 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_STARTED events", () => {
       const eventData: TaskStartEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         task: "Complete a web form",
         explanation: "Fill out and submit a contact form on the website",
         plan: "1. Navigate to contact page\n2. Fill required fields\n3. Submit form",
@@ -128,6 +128,7 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_COMPLETED events", () => {
       const eventData: TaskCompleteEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         finalAnswer: "Form submitted successfully with confirmation ID: 12345",
       };
 
@@ -145,6 +146,7 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_COMPLETE events with null finalAnswer", () => {
       const eventData: TaskCompleteEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         finalAnswer: null,
       };
 
@@ -160,6 +162,7 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_VALIDATION events (valid)", () => {
       const eventData: TaskValidationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         observation: "Task completed successfully",
         completionQuality: "complete",
         finalAnswer: "Task completed successfully",
@@ -178,6 +181,7 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_VALIDATION events (invalid with feedback)", () => {
       const eventData: TaskValidationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         observation: "Task not completed properly",
         completionQuality: "partial",
         feedback: "Missing confirmation step in the process",
@@ -200,6 +204,7 @@ describe("ConsoleLogger", () => {
     it("should handle PAGE_NAVIGATION events", () => {
       const eventData: PageNavigationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         title: "Contact Us - Example Company",
         url: "https://example.com/contact",
       };
@@ -219,6 +224,7 @@ describe("ConsoleLogger", () => {
         "This is a very long page title that exceeds fifty characters and should be truncated for display purposes";
       const eventData: PageNavigationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         title: longTitle,
         url: "https://example.com/page",
       };
@@ -239,6 +245,7 @@ describe("ConsoleLogger", () => {
     it("should handle CURRENT_STEP events", () => {
       const eventData: CurrentStepEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         currentStep: "Working on Step 1: Navigate to contact form",
       };
 
@@ -255,6 +262,7 @@ describe("ConsoleLogger", () => {
     it("should handle OBSERVATION events", () => {
       const eventData: ObservationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         observation: "Found contact form with name, email, and message fields",
       };
 
@@ -271,6 +279,7 @@ describe("ConsoleLogger", () => {
     it("should handle THOUGHT events", () => {
       const eventData: ThoughtEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         thought: "I need to fill in all required fields before submitting",
       };
 
@@ -287,6 +296,7 @@ describe("ConsoleLogger", () => {
     it("should handle EXTRACTED_DATA events", () => {
       const eventData: ExtractedDataEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         extractedData: "Confirmation ID: 12345, Status: Submitted",
       };
 
@@ -305,6 +315,7 @@ describe("ConsoleLogger", () => {
     it("should handle ACTION_EXECUTION events", () => {
       const eventData: ActionExecutionEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "fill",
         ref: "s1e23",
         value: "john@example.com",
@@ -325,6 +336,7 @@ describe("ConsoleLogger", () => {
     it("should handle ACTION_EXECUTION events without ref and value", () => {
       const eventData: ActionExecutionEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "back",
       };
 
@@ -341,6 +353,7 @@ describe("ConsoleLogger", () => {
     it("should handle ACTION_RESULT events (success)", () => {
       const eventData: ActionResultEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         success: true,
       };
 
@@ -357,6 +370,7 @@ describe("ConsoleLogger", () => {
     it("should handle ACTION_RESULT events (failure)", () => {
       const eventData: ActionResultEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         success: false,
         error: "Element not found: s1e23",
       };
@@ -374,6 +388,7 @@ describe("ConsoleLogger", () => {
     it("should handle ACTION_RESULT events (failure without error message)", () => {
       const eventData: ActionResultEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         success: false,
       };
 
@@ -392,6 +407,7 @@ describe("ConsoleLogger", () => {
     it("should handle DEBUG_COMPRESSION events", () => {
       const eventData: CompressionDebugEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         originalSize: 10000,
         compressedSize: 3000,
         compressionPercent: 70,
@@ -412,6 +428,7 @@ describe("ConsoleLogger", () => {
     it("should handle DEBUG_MESSAGES events", () => {
       const eventData: MessagesDebugEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         messages: [
           { role: "system", content: "You are a helpful assistant" },
           { role: "user", content: "Help me with this task" },
@@ -434,6 +451,7 @@ describe("ConsoleLogger", () => {
     it("should handle WAITING events (single second)", () => {
       const eventData: WaitingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         seconds: 1,
       };
 
@@ -451,6 +469,7 @@ describe("ConsoleLogger", () => {
     it("should handle WAITING events (multiple seconds)", () => {
       const eventData: WaitingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         seconds: 5,
       };
 
@@ -467,6 +486,7 @@ describe("ConsoleLogger", () => {
     it("should handle NETWORK_WAITING events", () => {
       const eventData: NetworkWaitingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "click",
       };
 
@@ -483,6 +503,7 @@ describe("ConsoleLogger", () => {
     it("should handle NETWORK_TIMEOUT events", () => {
       const eventData: NetworkTimeoutEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "submit",
       };
 
@@ -499,6 +520,7 @@ describe("ConsoleLogger", () => {
     it("should handle SCREENSHOT_CAPTURED events", () => {
       const eventData: ScreenshotCapturedEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         size: 51200, // 50KB in bytes
         format: "jpeg",
       };
@@ -520,6 +542,7 @@ describe("ConsoleLogger", () => {
     it("should handle PROCESSING start events", () => {
       const eventData: ProcessingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         status: "start",
         operation: "Planning next action",
       };
@@ -539,6 +562,7 @@ describe("ConsoleLogger", () => {
     it("should handle PROCESSING start events with vision", () => {
       const eventData: ProcessingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         status: "start",
         operation: "Planning next action",
         hasScreenshot: true,
@@ -559,6 +583,7 @@ describe("ConsoleLogger", () => {
     it("should not log PROCESSING end events", () => {
       const eventData: ProcessingEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         status: "end",
         operation: "Planning next action",
       };
@@ -597,7 +622,7 @@ describe("ConsoleLogger", () => {
       }));
 
       // All events should have listeners
-      eventCounts.forEach(({ eventType, count }) => {
+      eventCounts.forEach(({ count }) => {
         expect(count).toBeGreaterThan(0);
       });
 
@@ -627,6 +652,7 @@ describe("ConsoleLogger", () => {
 
       const eventData: TaskStartEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         task: "Test task",
         explanation: "Test explanation",
         plan: "Test plan",
@@ -649,11 +675,12 @@ describe("ConsoleLogger", () => {
     it("should handle TASK_SETUP events", () => {
       const eventData: TaskSetupEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         task: "Complete a web form",
         browserName: "playwright:firefox",
-        guardrails: null,
+        guardrails: undefined,
         data: { key: "value" },
-        pwEndpoint: null,
+        pwEndpoint: undefined,
         proxy: "http://proxy.example.com:8080",
         vision: true,
       };
@@ -677,6 +704,7 @@ describe("ConsoleLogger", () => {
     it("should handle AI_GENERATION_ERROR events", () => {
       const eventData: AIGenerationErrorEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         prompt: "Generate a response",
         error: "API rate limit exceeded",
         schema: { type: "object" },
@@ -755,6 +783,7 @@ describe("JSONConsoleLogger", () => {
     it("should output valid JSON for all events", () => {
       const eventData: TaskStartEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         task: "Test task",
         explanation: "Test explanation",
         plan: "Test plan",
@@ -783,6 +812,7 @@ describe("JSONConsoleLogger", () => {
     it("should output JSON for TASK_SETUP events", () => {
       const eventData: TaskSetupEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         task: "Complete a web form",
         browserName: "playwright:firefox",
         guardrails: "test-guardrails",
@@ -814,6 +844,7 @@ describe("JSONConsoleLogger", () => {
     it("should output JSON for AI_GENERATION events", () => {
       const eventData: AIGenerationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         prompt: "Generate a response",
         schema: { type: "object", properties: { action: { type: "string" } } },
         messages: [{ role: "user", content: "test message" }],
@@ -848,6 +879,7 @@ describe("JSONConsoleLogger", () => {
     it("should output JSON for AI_GENERATION_ERROR events", () => {
       const eventData: AIGenerationErrorEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         prompt: "Generate a response",
         error: "API rate limit exceeded",
         schema: { type: "object" },
@@ -874,20 +906,25 @@ describe("JSONConsoleLogger", () => {
       const events = [
         {
           type: WebAgentEventType.BROWSER_NAVIGATED,
-          data: { timestamp: Date.now(), title: "Test Page", url: "https://example.com" },
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            title: "Test Page",
+            url: "https://example.com",
+          },
         },
         {
           type: WebAgentEventType.AGENT_OBSERVED,
-          data: { timestamp: Date.now(), observation: "Found form element" },
+          data: { timestamp: Date.now(), iterationId: "test-1", observation: "Found form element" },
         },
         {
           type: WebAgentEventType.BROWSER_ACTION_STARTED,
-          data: { timestamp: Date.now(), action: "click", ref: "button1" },
+          data: { timestamp: Date.now(), iterationId: "test-1", action: "click", ref: "button1" },
         },
       ];
 
       events.forEach((event) => {
-        emitter.emitEvent(event);
+        emitter.emitEvent(event as any);
       });
 
       expect(mockConsole.log).toHaveBeenCalledTimes(3);

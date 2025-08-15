@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { spawn } from "child_process";
-import path from "path";
 
 // Mock child_process spawn
 vi.mock("child_process", () => ({
@@ -35,30 +34,31 @@ describe("CLI index", () => {
   });
 
   describe("Data argument parsing", () => {
-    const runCLI = (args: string[]) => {
-      // Simulate running the CLI with given arguments
-      const originalArgv = process.argv;
-      process.argv = ["node", "index.js", ...args];
-
-      // Mock console methods
-      const originalConsoleError = console.error;
-      const originalConsoleLog = console.log;
-      const consoleErrorSpy = vi.fn();
-      const consoleLogSpy = vi.fn();
-      console.error = consoleErrorSpy;
-      console.log = consoleLogSpy;
-
-      try {
-        // Import and run the CLI module
-        // We can't directly test the CLI execution due to process.exit,
-        // but we can test the argument parsing logic
-        return { consoleErrorSpy, consoleLogSpy };
-      } finally {
-        process.argv = originalArgv;
-        console.error = originalConsoleError;
-        console.log = originalConsoleLog;
-      }
-    };
+    // Commented out as unused
+    // const runCLI = (args: string[]) => {
+    //   // Simulate running the CLI with given arguments
+    //   const originalArgv = process.argv;
+    //   process.argv = ["node", "index.js", ...args];
+    //
+    //   // Mock console methods
+    //   const originalConsoleError = console.error;
+    //   const originalConsoleLog = console.log;
+    //   const consoleErrorSpy = vi.fn();
+    //   const consoleLogSpy = vi.fn();
+    //   console.error = consoleErrorSpy;
+    //   console.log = consoleLogSpy;
+    //
+    //   try {
+    //     // Import and run the CLI module
+    //     // We can't directly test the CLI execution due to process.exit,
+    //     // but we can test the argument parsing logic
+    //     return { consoleErrorSpy, consoleLogSpy };
+    //   } finally {
+    //     process.argv = originalArgv;
+    //     console.error = originalConsoleError;
+    //     console.log = originalConsoleLog;
+    //   }
+    // };
 
     it("should handle valid JSON data argument", () => {
       const validJSON = '{"departure":"NYC","destination":"LAX","date":"2024-12-25"}';
@@ -298,7 +298,7 @@ describe("CLI index", () => {
         JSON.parse('{"invalid": json}');
       } catch (error) {
         expect(error).toBeInstanceOf(SyntaxError);
-        expect(error.message).toContain("JSON");
+        expect((error as Error).message).toContain("JSON");
       }
     });
   });

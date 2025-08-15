@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
-import { LanguageModel } from "ai";
 
 // Mock the shared config module that CLI now imports from
 vi.mock("../../src/config.js", () => ({

@@ -84,8 +84,8 @@ describe("CLI Run Command", () => {
   beforeEach(() => {
     // Mock process.exit to prevent tests from actually exiting
     originalExit = process.exit;
-    mockExit = vi.fn() as any;
-    process.exit = mockExit;
+    mockExit = vi.fn<Parameters<typeof process.exit>, never>() as any;
+    process.exit = mockExit as any;
 
     command = createRunCommand();
     vi.clearAllMocks();
