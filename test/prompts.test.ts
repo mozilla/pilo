@@ -349,12 +349,10 @@ describe("prompts", () => {
     it("should include guidance text", () => {
       const prompt = buildPageSnapshotPrompt("Test", "https://test.com", "content");
 
-      expect(prompt).toContain(
-        "This is a complete accessibility tree snapshot of the current page",
-      );
-      expect(prompt).toContain("Assess the current state");
+      expect(prompt).toContain("This accessibility tree shows the complete current page content");
+      expect(prompt).toContain("Analyze the current state");
       expect(prompt).toContain("most relevant elements");
-      expect(prompt).toContain("If an action has failed or a planned step isn't possible");
+      expect(prompt).toContain("If an action fails, adapt immediately");
     });
 
     it("should handle empty snapshot", () => {

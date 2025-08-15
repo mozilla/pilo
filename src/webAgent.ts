@@ -317,9 +317,72 @@ export class WebAgent {
   }
 
   /**
+   * Truncate old snapshots in messages to keep context size down
+   * Replaces everything after the first ``` with "[clipped for brevity]"
+   */
+  private truncateOldSnapshots(): void {
+    this.messages = this.messages.map((msg) => {
+      if (msg.role === "user") {
+        // Handle text-only messages
+        // Check if this is a snapshot message (starts with Title: and URL: followed by ```)
+        if (
+          typeof msg.content === "string" &&
+          msg.content.startsWith("Title:") &&
+          msg.content.includes("URL:") &&
+          msg.content.includes("```")
+        ) {
+          // Find the first ``` and replace everything after it
+          const firstBackticksIndex = msg.content.indexOf("```");
+          if (firstBackticksIndex !== -1) {
+            return {
+              ...msg,
+              content: msg.content.substring(0, firstBackticksIndex) + "[clipped for brevity]",
+            };
+          }
+        }
+        // Handle multimodal messages (text + image)
+        if (Array.isArray(msg.content)) {
+          return {
+            ...msg,
+            content: msg.content.map((item: any) => {
+              if (
+                item.type === "text" &&
+                item.text.startsWith("Title:") &&
+                item.text.includes("URL:") &&
+                item.text.includes("```")
+              ) {
+                // Find the first ``` and replace everything after it
+                const firstBackticksIndex = item.text.indexOf("```");
+                if (firstBackticksIndex !== -1) {
+                  return {
+                    ...item,
+                    text: item.text.substring(0, firstBackticksIndex) + "[clipped for brevity]",
+                  };
+                }
+              }
+              if (item.type === "image") {
+                // Remove the image data to save memory
+                return {
+                  type: "text",
+                  text: "[screenshot clipped for brevity]",
+                };
+              }
+              return item;
+            }),
+          };
+        }
+      }
+      return msg;
+    });
+  }
+
+  /**
    * Add page snapshot to the conversation
    */
   private async addPageSnapshot(): Promise<void> {
+    // First, truncate old snapshots to keep context size manageable
+    this.truncateOldSnapshots();
+
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
 
@@ -616,7 +679,20 @@ export class WebAgent {
 
     return recentMessages
       .map((msg) => {
-        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+        let content: string;
+        if (typeof msg.content === "string") {
+          content = msg.content;
+        } else if (Array.isArray(msg.content)) {
+          // Handle multimodal content by extracting text parts
+          content = msg.content
+            .map((item: any) => {
+              if (item.type === "text") return item.text;
+              return `[${item.type}]`;
+            })
+            .join(" ");
+        } else {
+          content = JSON.stringify(msg.content);
+        }
         return `${msg.role}: ${content}`;
       })
       .join("\n\n");

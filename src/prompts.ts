@@ -210,8 +210,6 @@ export const buildTaskAndPlanPrompt = (
  */
 const pageSnapshotTemplate = buildPromptTemplate(
   `
-This is a complete accessibility tree snapshot of the current page in the browser showing ALL page content.{% if hasScreenshot %} A screenshot is also provided to help you understand the visual layout.{% endif %}
-
 Title: {{ title }}
 URL: {{ url }}
 
@@ -219,12 +217,15 @@ URL: {{ url }}
 {{ snapshot }}
 \`\`\`
 
-The snapshot above contains the entire page content - you can see everything without scrolling or navigating within the page.
-- Assess the current state and choose your next action.
-- Focus on the most relevant elements that help complete your task.
-- If an action has failed or a planned step isn't possible, adapt your approach and work with what's actually available on the page. Do not keep trying the same action repeatedly - be flexible and find alternative ways to accomplish your goal.
-{% if hasScreenshot %}- Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
-- Respect any provided guardrails
+This accessibility tree shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
+
+**Your task:**
+- Analyze the current state and select your next action
+- Target the most relevant elements for your objective
+- If an action fails, adapt immediately—don't repeat failed attempts
+- Find alternative approaches when planned steps aren't viable
+{% if hasScreenshot %}- Use the screenshot to understand layout and identify elements missed in the text{% endif %}
+- Follow all guardrails
 
 ${toolCallInstruction}
 `.trim(),

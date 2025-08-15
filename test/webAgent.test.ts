@@ -2154,6 +2154,287 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("snapshot truncation", () => {
+    it("should truncate old snapshots to keep context size down", async () => {
+      // Plan with URL
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Navigate through pages",
+            },
+          },
+        ],
+      } as any);
+
+      // First action - navigate
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Navigating",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_1",
+            toolName: "click",
+            output: {
+              action: "click",
+              ref: "button-1",
+              isTerminal: false,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Clicking button",
+            },
+          ],
+        },
+      } as any);
+
+      // Second action - another navigation
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Navigating further",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_2",
+            toolName: "click",
+            output: {
+              action: "click",
+              ref: "link-2",
+              isTerminal: false,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Clicking link",
+            },
+          ],
+        },
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Complete",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Task complete",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Navigate through pages", { startingUrl: "https://example.com" });
+
+      // Check the messages passed to generateText in the later calls
+      // The first snapshot should be clipped
+      const callArgs = mockGenerateText.mock.calls;
+
+      // Find the second action call (after first navigation)
+      const secondActionCall = callArgs[2]; // Plan, First action, Second action
+      if (secondActionCall && secondActionCall[0].messages) {
+        const messages = secondActionCall[0].messages;
+
+        // Find user messages with snapshots (they start with Title:)
+        const snapshotMessages = messages.filter(
+          (msg: any) =>
+            msg.role === "user" &&
+            typeof msg.content === "string" &&
+            msg.content.startsWith("Title:"),
+        );
+
+        // If there are multiple snapshot messages, the earlier ones should be clipped
+        if (snapshotMessages.length > 1) {
+          const firstSnapshot = snapshotMessages[0].content;
+          expect(firstSnapshot).toContain("[clipped for brevity]");
+          // Should not contain the triple backticks anymore
+          expect(firstSnapshot).not.toContain("```");
+        }
+      }
+
+      // Third action call should have even more clipped snapshots
+      const thirdActionCall = callArgs[3]; // Plan, First action, Second action, Third action
+      if (thirdActionCall && thirdActionCall[0].messages) {
+        const messages = thirdActionCall[0].messages;
+
+        // Count clipped snapshots
+        let clippedCount = 0;
+        messages.forEach((msg: any) => {
+          if (
+            msg.role === "user" &&
+            typeof msg.content === "string" &&
+            msg.content.includes("[clipped for brevity]")
+          ) {
+            clippedCount++;
+          }
+        });
+
+        // Should have at least one clipped snapshot by the third action
+        expect(clippedCount).toBeGreaterThan(0);
+      }
+    });
+
+    it("should truncate screenshots in vision mode", async () => {
+      const mockScreenshot = Buffer.from("fake-screenshot-data");
+      vi.spyOn(mockBrowser, "getScreenshot").mockResolvedValue(mockScreenshot);
+
+      const visionAgent = new WebAgent(mockBrowser, {
+        provider: mockProvider,
+        vision: true,
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Visual task",
+              plan: "1. Analyze images",
+            },
+          },
+        ],
+      } as any);
+
+      // First action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Analyzing",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_1",
+            toolName: "click",
+            output: {
+              action: "click",
+              ref: "image-1",
+              isTerminal: false,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Clicking image",
+            },
+          ],
+        },
+      } as any);
+
+      // Second action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Continuing",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_2",
+            toolName: "click",
+            output: {
+              action: "click",
+              ref: "image-2",
+              isTerminal: false,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Clicking another image",
+            },
+          ],
+        },
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Complete",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Visual analysis complete",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await visionAgent.execute("Analyze visual elements", { startingUrl: "https://example.com" });
+
+      // Check that old screenshots are clipped
+      const callArgs = mockGenerateText.mock.calls;
+
+      // By the third action call, earlier screenshots should be clipped
+      const thirdActionCall = callArgs[3];
+      if (thirdActionCall && thirdActionCall[0].messages) {
+        const messages = thirdActionCall[0].messages;
+
+        // Count clipped screenshots
+        let clippedScreenshotCount = 0;
+        messages.forEach((msg: any) => {
+          if (msg.role === "user" && Array.isArray(msg.content)) {
+            msg.content.forEach((item: any) => {
+              if (item.type === "text" && item.text === "[screenshot clipped for brevity]") {
+                clippedScreenshotCount++;
+              }
+            });
+          }
+        });
+
+        // Should have at least one clipped screenshot
+        expect(clippedScreenshotCount).toBeGreaterThan(0);
+      }
+
+      await visionAgent.close();
+    });
+  });
+
   describe("cleanup", () => {
     it("should properly close and dispose resources", async () => {
       const disposeSpy = vi.spyOn(mockLogger, "dispose");
