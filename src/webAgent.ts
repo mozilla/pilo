@@ -243,17 +243,6 @@ export class WebAgent {
         );
         this.messages.push({ role: "user", content: snapshotMessage });
 
-        // Emit AI generation event
-        this.emit(WebAgentEventType.AI_GENERATION, {
-          messages: this.messages,
-          temperature: 0,
-          object: null,
-          finishReason: null,
-          usage: null,
-          warnings: [],
-          providerMetadata: null,
-        });
-
         // Generate next action using AI
         const aiResponse = await generateText({
           model: this.provider,
@@ -264,13 +253,6 @@ export class WebAgent {
           abortSignal: this.abortSignal || undefined,
         });
 
-        // Emit processing complete
-        this.emit(WebAgentEventType.AGENT_PROCESSING, {
-          status: "end",
-          operation: "Thinking about next action",
-          iterationId: this.currentIterationId,
-        });
-
         // Add assistant response to messages (this includes the tool calls)
         if (aiResponse.response && aiResponse.response.messages) {
           // Add all messages from the response (assistant message + tool results)
@@ -278,6 +260,24 @@ export class WebAgent {
             this.messages.push(msg);
           }
         }
+
+        // Emit AI generation event with actual response data and updated messages
+        this.emit(WebAgentEventType.AI_GENERATION, {
+          messages: this.messages,
+          temperature: 0,
+          object: null,
+          finishReason: aiResponse.finishReason,
+          usage: aiResponse.usage,
+          warnings: aiResponse.warnings || [],
+          providerMetadata: aiResponse.providerMetadata,
+        });
+
+        // Emit processing complete
+        this.emit(WebAgentEventType.AGENT_PROCESSING, {
+          status: "end",
+          operation: "Thinking about next action",
+          iterationId: this.currentIterationId,
+        });
 
         // Emit observation if there's reasoning text
         if (aiResponse.text && aiResponse.text.trim()) {
