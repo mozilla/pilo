@@ -2446,4 +2446,216 @@ describe("WebAgent", () => {
       expect(shutdownSpy).toHaveBeenCalled();
     });
   });
+
+  describe("enhanced error handling", () => {
+    it("should extract detailed error messages from provider errors", async () => {
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Create an error with AI SDK properties
+      const providerError = new Error("Provider returned error") as any;
+      providerError.statusCode = 422;
+
+      mockGenerateText.mockRejectedValueOnce(providerError);
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("[422]");
+      expect(result.finalAnswer).toContain("Provider returned error");
+    });
+
+    it("should fail immediately on 4xx provider errors", async () => {
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Create a 401 error (non-recoverable)
+      const authError = new Error("Unauthorized") as any;
+      authError.statusCode = 401;
+
+      mockGenerateText.mockRejectedValueOnce(authError);
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Task failed:");
+      // Should fail immediately, not after retries
+      expect(mockGenerateText).toHaveBeenCalledTimes(2); // 1 for planning, 1 for first action attempt
+    });
+
+    it("should retry on 429 rate limit errors", async () => {
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Create a 429 error (recoverable)
+      const rateLimitError = new Error("Rate limit exceeded") as any;
+      rateLimitError.statusCode = 429;
+
+      // First attempt fails with 429
+      mockGenerateText.mockRejectedValueOnce(rateLimitError);
+
+      // Second attempt succeeds
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Task completed",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed");
+      expect(mockGenerateText).toHaveBeenCalledTimes(4); // planning, failed attempt, successful attempt, validation
+    });
+
+    it("should retry on 5xx server errors", async () => {
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Create a 500 error (recoverable)
+      const serverError = new Error("Internal server error") as any;
+      serverError.statusCode = 500;
+
+      // First attempt fails with 500
+      mockGenerateText.mockRejectedValueOnce(serverError);
+
+      // Second attempt succeeds
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Task completed",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Task completed");
+    });
+
+    it("should handle errors without status codes", async () => {
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Create a regular error without status
+      const regularError = new Error("Network timeout");
+
+      // First 5 attempts fail with the error
+      for (let i = 0; i < 5; i++) {
+        mockGenerateText.mockRejectedValueOnce(regularError);
+      }
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Network timeout");
+      expect(result.finalAnswer).not.toContain("[");
+    });
+  });
 });

@@ -264,10 +264,14 @@ export class WebAgent {
         totalErrors++;
 
         // Check if we should continue
-        if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors)) {
+        if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors, error)) {
+          const isNonRecoverable = this.isNonRecoverableError(error);
+          const errorMessage = this.extractErrorMessage(error);
           return {
             success: false,
-            finalAnswer: `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${this.extractErrorMessage(error)}`,
+            finalAnswer: isNonRecoverable
+              ? `Task failed: ${errorMessage}`
+              : `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`,
           };
         }
 
@@ -295,8 +299,38 @@ export class WebAgent {
   /**
    * Check if we should continue after an error
    */
-  private shouldContinueAfterError(consecutiveErrors: number, totalErrors: number): boolean {
-    return consecutiveErrors < this.maxConsecutiveErrors && totalErrors < this.maxTotalErrors;
+  private shouldContinueAfterError(
+    consecutiveErrors: number,
+    totalErrors: number,
+    error: unknown,
+  ): boolean {
+    return (
+      !this.isNonRecoverableError(error) &&
+      consecutiveErrors < this.maxConsecutiveErrors &&
+      totalErrors < this.maxTotalErrors
+    );
+  }
+
+  /**
+   * Check if an error is non-recoverable (e.g., provider/API errors)
+   */
+  private isNonRecoverableError(error: unknown): boolean {
+    if (error instanceof Error) {
+      const errorAny = error as any;
+
+      // Check for HTTP status codes
+      const statusCode = errorAny.statusCode || errorAny.status;
+      if (statusCode) {
+        // 4xx errors are client errors - non-recoverable
+        // except 429 (rate limit) which might work after waiting
+        if (statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
+          return true;
+        }
+        // Note: 5xx errors (server errors) are potentially recoverable, so we retry those
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -312,8 +346,7 @@ export class WebAgent {
     });
 
     // Add error feedback to conversation
-    const hasGuardrails = Boolean(this.guardrails);
-    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, hasGuardrails);
+    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, Boolean(this.guardrails));
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
@@ -479,8 +512,8 @@ export class WebAgent {
         abortSignal: this.abortSignal || undefined,
       });
     } catch (error) {
-      // Capture error for re-throwing after cleanup
-      generationError = new Error(this.extractErrorMessage(error));
+      // Preserve original error
+      generationError = error instanceof Error ? error : new Error(String(error));
     }
 
     // Always append messages if they exist (even on error)
@@ -499,7 +532,7 @@ export class WebAgent {
       usage: aiResponse?.usage || {},
       warnings: aiResponse?.warnings || [],
       providerMetadata: aiResponse?.providerMetadata || {},
-      error: generationError ? generationError.message : undefined,
+      error: generationError ? this.extractErrorMessage(generationError) : undefined,
     });
 
     // Re-throw if generation failed
@@ -758,7 +791,12 @@ export class WebAgent {
    * Extract error message from unknown error type
    */
   private extractErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
+    if (!(error instanceof Error)) return String(error);
+
+    const e = error as any;
+    const status = e.statusCode || e.status;
+
+    return status ? `[${status}] ${error.message}` : error.message;
   }
 
   /**
