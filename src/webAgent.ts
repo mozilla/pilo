@@ -332,15 +332,52 @@ export class WebAgent {
       this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, stats);
     }
 
-    // Get current page info and add snapshot to conversation
+    // Get current page info
     const currentPageInfo = await this.getCurrentPageInfo();
+
+    // Build the text content for the snapshot
     const snapshotMessage = buildPageSnapshotPrompt(
       currentPageInfo.title,
       currentPageInfo.url,
       compressedSnapshot,
       this.vision,
     );
-    this.messages.push({ role: "user", content: snapshotMessage });
+
+    // Handle vision mode with screenshots
+    if (this.vision) {
+      try {
+        const screenshot = await this.browser.getScreenshot();
+
+        // Emit screenshot captured event
+        this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
+          size: screenshot.length,
+          format: "jpeg" as const,
+        });
+
+        // Add multimodal message with text and image
+        this.messages.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: snapshotMessage,
+            },
+            {
+              type: "image",
+              image: screenshot,
+              mediaType: "image/jpeg",
+            },
+          ],
+        });
+      } catch (error) {
+        // If screenshot fails, fall back to text-only
+        console.warn("Screenshot capture failed, falling back to text-only:", error);
+        this.messages.push({ role: "user", content: snapshotMessage });
+      }
+    } else {
+      // Text-only mode
+      this.messages.push({ role: "user", content: snapshotMessage });
+    }
   }
 
   /**

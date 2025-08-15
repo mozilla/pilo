@@ -1947,6 +1947,211 @@ describe("WebAgent", () => {
 
       await visionAgent.close();
     });
+
+    it("should capture screenshots and emit events when vision is enabled", async () => {
+      const mockScreenshot = Buffer.from("test-screenshot-data");
+      const screenshotSpy = vi
+        .spyOn(mockBrowser, "getScreenshot")
+        .mockResolvedValue(mockScreenshot);
+
+      const visionAgent = new WebAgent(mockBrowser, {
+        provider: mockProvider,
+        vision: true,
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Visual task",
+              plan: "1. Analyze visual elements",
+            },
+          },
+        ],
+      } as any);
+
+      // Action that requires page snapshot
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Analyzing page with vision",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_1",
+            toolName: "click",
+            input: { ref: "btn1" },
+            output: {
+              action: "click",
+              ref: "btn1",
+              isTerminal: false,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Clicking button",
+            },
+          ],
+        },
+      } as any);
+
+      // Done
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Task complete",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Visual analysis complete",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await visionAgent.execute("Analyze visual elements", { startingUrl: "https://example.com" });
+
+      // Verify screenshot was captured
+      expect(screenshotSpy).toHaveBeenCalled();
+
+      // Verify BROWSER_SCREENSHOT_CAPTURED event was emitted
+      const screenshotEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+      );
+      expect(screenshotEvents.length).toBeGreaterThan(0);
+
+      // Verify event data
+      const firstScreenshotEvent = screenshotEvents[0];
+      expect(firstScreenshotEvent?.data.size).toBe(mockScreenshot.length);
+      expect(firstScreenshotEvent?.data.format).toBe("jpeg");
+
+      // Verify messages include multimodal content with screenshots
+      const callArgs = mockGenerateText.mock.calls;
+      const actionCall = callArgs.find(
+        (call) =>
+          call[0].messages &&
+          call[0].messages.some(
+            (msg: any) =>
+              Array.isArray(msg.content) && msg.content.some((item: any) => item.type === "image"),
+          ),
+      );
+      expect(actionCall).toBeDefined();
+
+      await visionAgent.close();
+    });
+
+    it("should fallback to text-only when screenshot capture fails", async () => {
+      const screenshotError = new Error("Screenshot capture failed");
+      const screenshotSpy = vi
+        .spyOn(mockBrowser, "getScreenshot")
+        .mockRejectedValue(screenshotError);
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const visionAgent = new WebAgent(mockBrowser, {
+        provider: mockProvider,
+        vision: true,
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      // Plan
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Task",
+              plan: "1. Do something",
+            },
+          },
+        ],
+      } as any);
+
+      // Done immediately
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Done",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Complete",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Done",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await visionAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      // Verify screenshot was attempted
+      expect(screenshotSpy).toHaveBeenCalled();
+
+      // Verify warning was logged
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        "Screenshot capture failed, falling back to text-only:",
+        screenshotError,
+      );
+
+      // Verify no screenshot events were emitted
+      const screenshotEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+      );
+      expect(screenshotEvents.length).toBe(0);
+
+      // Verify messages are text-only (no multimodal content)
+      const callArgs = mockGenerateText.mock.calls;
+      const hasMultimodalContent = callArgs.some(
+        (call) =>
+          call[0].messages &&
+          call[0].messages.some(
+            (msg: any) =>
+              Array.isArray(msg.content) && msg.content.some((item: any) => item.type === "image"),
+          ),
+      );
+      expect(hasMultimodalContent).toBe(false);
+
+      consoleWarnSpy.mockRestore();
+      await visionAgent.close();
+    });
   });
 
   describe("cleanup", () => {
