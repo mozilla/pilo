@@ -3,19 +3,18 @@ import { WebAgentEventType, WebAgentEventEmitter } from "../events.js";
 import type {
   ActionExecutionEventData,
   ActionResultEventData,
+  AgentStepEventData,
   CompressionDebugEventData,
-  CurrentStepEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
   NetworkTimeoutEventData,
   NetworkWaitingEventData,
-  ObservationEventData,
   PageNavigationEventData,
+  ReasoningEventData,
   StatusMessageEventData,
   TaskCompleteEventData,
   TaskSetupEventData,
   TaskStartEventData,
-  ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
   ProcessingEventData,
@@ -56,9 +55,8 @@ export class ChalkConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
-    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-    emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
     emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
     emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
     emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -95,9 +93,8 @@ export class ChalkConsoleLogger implements Logger {
       );
 
       // Agent reasoning events
-      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-      this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
       this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
       this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
       this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -185,19 +182,13 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.blue.bold("📍 Current Page:"), chalk.blue(truncatedTitle));
   };
 
-  private handleCurrentStep = (data: CurrentStepEventData): void => {
-    console.log(chalk.magenta.bold("🎯 Agent Step:"));
-    console.log(chalk.whiteBright("   " + data.currentStep));
+  private handleAgentStep = (data: AgentStepEventData): void => {
+    console.log(chalk.cyan(`\n🔄 Iteration ${data.currentIteration} [${data.iterationId}]`));
   };
 
-  private handleObservation = (data: ObservationEventData): void => {
-    console.log(chalk.yellow.bold("👁️ Agent Observed:"));
-    console.log(chalk.whiteBright("   " + data.observation));
-  };
-
-  private handleThought = (data: ThoughtEventData): void => {
+  private handleReasoning = (data: ReasoningEventData): void => {
     console.log(chalk.yellow.bold("\n🧠 Agent Reasoned:"));
-    console.log(chalk.whiteBright("   " + data.thought));
+    console.log(chalk.whiteBright("   " + data.reasoning));
   };
 
   private handleExtractedData = (data: ExtractedDataEventData): void => {

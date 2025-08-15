@@ -1324,7 +1324,7 @@ describe("WebAgent", () => {
       expect(eventTypes).toContain(WebAgentEventType.AI_GENERATION);
     });
 
-    it("should emit AGENT_OBSERVED event with reasoning text", async () => {
+    it("should emit AGENT_REASONED event with reasoning text", async () => {
       // Plan
       mockGenerateText.mockResolvedValueOnce({
         text: "Planning",
@@ -1425,13 +1425,13 @@ describe("WebAgent", () => {
 
       await webAgent.execute("Test reasoning", { startingUrl: "https://example.com" });
 
-      // Check AGENT_OBSERVED events were emitted
-      const observedEvents = mockLogger.events.filter(
-        (e) => e.type === WebAgentEventType.AGENT_OBSERVED,
+      // Check AGENT_REASONED events were emitted
+      const reasonedEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.AGENT_REASONED,
       );
-      expect(observedEvents.length).toBeGreaterThan(0);
-      const firstObserved = observedEvents[0];
-      expect(firstObserved?.data.observation).toBe(
+      expect(reasonedEvents.length).toBeGreaterThan(0);
+      const firstReasoned = reasonedEvents[0];
+      expect(firstReasoned?.data.reasoning).toBe(
         "I need to click the button to proceed with the task",
       );
     });

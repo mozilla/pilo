@@ -6,8 +6,8 @@ import {
   TaskStartEventData,
   TaskCompleteEventData,
   PageNavigationEventData,
-  CurrentStepEventData,
-  ObservationEventData,
+  AgentStepEventData,
+  ReasoningEventData,
   ActionExecutionEventData,
   ActionResultEventData,
   TaskValidationEventData,
@@ -87,10 +87,10 @@ describe("WebAgentEventEmitter", () => {
     it("should handle multiple listeners for the same event", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      const eventData: CurrentStepEventData = {
+      const eventData: AgentStepEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        currentStep: "Step 1",
+        currentIteration: 1,
       };
 
       emitter.onEvent(WebAgentEventType.AGENT_STEP, listener1);
@@ -121,7 +121,6 @@ describe("WebAgentEventEmitter", () => {
         "ai:generation:error",
         "agent:action",
         "agent:step",
-        "agent:observed",
         "agent:reasoned",
         "agent:extracted",
         "agent:processing",
@@ -179,15 +178,11 @@ describe("WebAgentEventEmitter", () => {
         },
         {
           type: WebAgentEventType.AGENT_STEP,
-          data: { timestamp: Date.now(), iterationId: "test-1", currentStep: "test" },
-        },
-        {
-          type: WebAgentEventType.AGENT_OBSERVED,
-          data: { timestamp: Date.now(), iterationId: "test-1", observation: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", currentIteration: 0 },
         },
         {
           type: WebAgentEventType.AGENT_REASONED,
-          data: { timestamp: Date.now(), iterationId: "test-1", thought: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", reasoning: "test" },
         },
         {
           type: WebAgentEventType.AGENT_EXTRACTED,
@@ -432,19 +427,19 @@ describe("WebAgentEventEmitter", () => {
       });
       const successListener = vi.fn();
 
-      const eventData: ObservationEventData = {
+      const eventData: ReasoningEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        observation: "Test observation",
+        reasoning: "Test reasoning",
       };
 
-      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, errorListener);
-      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, successListener);
+      emitter.onEvent(WebAgentEventType.AGENT_REASONED, errorListener);
+      emitter.onEvent(WebAgentEventType.AGENT_REASONED, successListener);
 
       // EventEmitter will throw when a listener throws, but both listeners should be called
       expect(() => {
         emitter.emitEvent({
-          type: WebAgentEventType.AGENT_OBSERVED,
+          type: WebAgentEventType.AGENT_REASONED,
           data: eventData,
         });
       }).toThrow("Listener error");

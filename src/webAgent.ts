@@ -228,6 +228,12 @@ export class WebAgent {
       // Generate unique iteration ID
       this.currentIterationId = nanoid(8);
 
+      // Emit step event for this iteration
+      this.emit(WebAgentEventType.AGENT_STEP, {
+        iterationId: this.currentIterationId,
+        currentIteration: executionState.currentIteration,
+      });
+
       // Add page snapshot if needed
       if (needsPageSnapshot) {
         await this.addPageSnapshot();
@@ -400,11 +406,11 @@ export class WebAgent {
       throw generationError;
     }
 
-    // Emit observation if present
-    const observation = this.extractObservationText(aiResponse);
-    if (observation) {
-      this.emit(WebAgentEventType.AGENT_OBSERVED, {
-        observation,
+    // Emit reasoning if present
+    const reasoning = this.extractReasoningText(aiResponse);
+    if (reasoning) {
+      this.emit(WebAgentEventType.AGENT_REASONED, {
+        reasoning,
         iterationId: this.currentIterationId,
       });
     }
@@ -670,10 +676,10 @@ export class WebAgent {
   }
 
   /**
-   * Extract observation text from AI response
+   * Extract reasoning text from AI response
    * Prioritizes reasoning over plain text field
    */
-  private extractObservationText(aiResponse: any): string | undefined {
+  private extractReasoningText(aiResponse: any): string | undefined {
     const reasoningText = aiResponse.reasoning
       ?.map((r: { type: string; text: string }) => r.text)
       .join("")

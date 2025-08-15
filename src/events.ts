@@ -19,7 +19,6 @@ export enum WebAgentEventType {
   // Agent reasoning and status
   AGENT_ACTION = "agent:action",
   AGENT_STEP = "agent:step",
-  AGENT_OBSERVED = "agent:observed",
   AGENT_REASONED = "agent:reasoned",
   AGENT_EXTRACTED = "agent:extracted",
   AGENT_PROCESSING = "agent:processing",
@@ -130,24 +129,18 @@ export interface PageNavigationEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for current step tracking
+ * Event data for agent step tracking (each loop iteration)
  */
-export interface CurrentStepEventData extends WebAgentEventData {
-  currentStep: string;
+export interface AgentStepEventData extends WebAgentEventData {
+  iterationId: string;
+  currentIteration: number;
 }
 
 /**
- * Event data for agent observations
+ * Event data for agent reasoning
  */
-export interface ObservationEventData extends WebAgentEventData {
-  observation: string;
-}
-
-/**
- * Event data for agent thoughts
- */
-export interface ThoughtEventData extends WebAgentEventData {
-  thought: string;
+export interface ReasoningEventData extends WebAgentEventData {
+  reasoning: string;
 }
 
 /**
@@ -267,9 +260,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
   | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
   | { type: WebAgentEventType.AGENT_ACTION; data: ActionExecutionEventData }
-  | { type: WebAgentEventType.AGENT_STEP; data: CurrentStepEventData }
-  | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
-  | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }
+  | { type: WebAgentEventType.AGENT_STEP; data: AgentStepEventData }
+  | { type: WebAgentEventType.AGENT_REASONED; data: ReasoningEventData }
   | { type: WebAgentEventType.AGENT_EXTRACTED; data: ExtractedDataEventData }
   | { type: WebAgentEventType.AGENT_PROCESSING; data: ProcessingEventData }
   | { type: WebAgentEventType.AGENT_STATUS; data: StatusMessageEventData }

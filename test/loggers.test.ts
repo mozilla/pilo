@@ -10,9 +10,8 @@ import type {
   AIGenerationEventData,
   AIGenerationErrorEventData,
   PageNavigationEventData,
-  CurrentStepEventData,
-  ObservationEventData,
-  ThoughtEventData,
+  AgentStepEventData,
+  ReasoningEventData,
   ExtractedDataEventData,
   ActionExecutionEventData,
   ActionResultEventData,
@@ -242,11 +241,11 @@ describe("ConsoleLogger", () => {
   });
 
   describe("Agent reasoning events", () => {
-    it("should handle CURRENT_STEP events", () => {
-      const eventData: CurrentStepEventData = {
+    it("should handle AGENT_STEP events", () => {
+      const eventData: AgentStepEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        currentStep: "Working on Step 1: Navigate to contact form",
+        currentIteration: 1,
       };
 
       emitter.emitEvent({
@@ -256,18 +255,18 @@ describe("ConsoleLogger", () => {
 
       expect(mockConsole.log).toHaveBeenCalled();
       const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("Working on Step 1");
+      expect(allOutput).toContain("Iteration 1");
     });
 
-    it("should handle OBSERVATION events", () => {
-      const eventData: ObservationEventData = {
+    it("should handle AGENT_REASONED events", () => {
+      const eventData: ReasoningEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        observation: "Found contact form with name, email, and message fields",
+        reasoning: "Found contact form with name, email, and message fields",
       };
 
       emitter.emitEvent({
-        type: WebAgentEventType.AGENT_OBSERVED,
+        type: WebAgentEventType.AGENT_REASONED,
         data: eventData,
       });
 
@@ -276,11 +275,11 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("Found contact form");
     });
 
-    it("should handle THOUGHT events", () => {
-      const eventData: ThoughtEventData = {
+    it("should handle reasoning with different content", () => {
+      const eventData: ReasoningEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        thought: "I need to fill in all required fields before submitting",
+        reasoning: "I need to fill in all required fields before submitting",
       };
 
       emitter.emitEvent({
@@ -605,7 +604,6 @@ describe("ConsoleLogger", () => {
         WebAgentEventType.TASK_COMPLETED,
         WebAgentEventType.BROWSER_NAVIGATED,
         WebAgentEventType.AGENT_STEP,
-        WebAgentEventType.AGENT_OBSERVED,
         WebAgentEventType.AGENT_REASONED,
         WebAgentEventType.AGENT_EXTRACTED,
         WebAgentEventType.BROWSER_ACTION_STARTED,
@@ -914,8 +912,8 @@ describe("JSONConsoleLogger", () => {
           },
         },
         {
-          type: WebAgentEventType.AGENT_OBSERVED,
-          data: { timestamp: Date.now(), iterationId: "test-1", observation: "Found form element" },
+          type: WebAgentEventType.AGENT_REASONED,
+          data: { timestamp: Date.now(), iterationId: "test-1", reasoning: "Found form element" },
         },
         {
           type: WebAgentEventType.BROWSER_ACTION_STARTED,
@@ -949,7 +947,7 @@ describe("JSONConsoleLogger", () => {
         WebAgentEventType.AI_GENERATION,
         WebAgentEventType.AI_GENERATION_ERROR,
         WebAgentEventType.BROWSER_NAVIGATED,
-        WebAgentEventType.AGENT_OBSERVED,
+        WebAgentEventType.AGENT_REASONED,
       ];
 
       eventTypes.forEach((eventType) => {

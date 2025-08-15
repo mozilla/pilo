@@ -301,9 +301,9 @@ describe("Tool Calling Integration", () => {
     );
     expect(extractEvent).toBeDefined();
 
-    // Verify the agent observed reasoning text
-    const observedEvents = events.filter((e) => e.type === WebAgentEventType.AGENT_OBSERVED);
-    expect(observedEvents.length).toBeGreaterThan(0);
+    // Verify the agent reasoned text
+    const reasonedEvents = events.filter((e) => e.type === WebAgentEventType.AGENT_REASONED);
+    expect(reasonedEvents.length).toBeGreaterThan(0);
 
     await agent.close();
   });
