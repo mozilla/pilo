@@ -174,11 +174,7 @@ export class WebAgent {
       }
 
       // Re-throw setup/planning errors (they indicate configuration issues)
-      if (
-        error instanceof Error &&
-        (error.message.includes("Failed to generate plan") ||
-          error.message.includes("No starting URL"))
-      ) {
+      if (this.isSetupError(error)) {
         throw error;
       }
 
@@ -186,7 +182,7 @@ export class WebAgent {
       return this.buildResult(
         {
           success: false,
-          finalAnswer: `Task failed: ${error instanceof Error ? error.message : String(error)}`,
+          finalAnswer: `Task failed: ${this.extractErrorMessage(error)}`,
         },
         executionState,
       );
@@ -254,10 +250,9 @@ export class WebAgent {
 
         // Check if we should continue
         if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors)) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
           return {
             success: false,
-            finalAnswer: `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`,
+            finalAnswer: `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${this.extractErrorMessage(error)}`,
           };
         }
 
@@ -293,7 +288,7 @@ export class WebAgent {
    * Add error feedback to the conversation
    */
   private addErrorFeedback(error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = this.extractErrorMessage(error);
 
     // Emit error event for logging
     this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
@@ -316,14 +311,11 @@ export class WebAgent {
 
     // Debug compression stats if enabled
     if (this.debug) {
-      const originalSize = currentPageSnapshot.length;
-      const compressedSize = compressedSnapshot.length;
-      const compressionPercent = Math.round((1 - compressedSize / originalSize) * 100);
-      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, {
-        originalSize,
-        compressedSize,
-        compressionPercent,
-      });
+      const stats = this.calculateCompressionStats(
+        currentPageSnapshot.length,
+        compressedSnapshot.length,
+      );
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_COMPRESSION, stats);
     }
 
     // Get current page info and add snapshot to conversation
@@ -354,38 +346,53 @@ export class WebAgent {
       iterationId: this.currentIterationId,
     });
 
-    // Generate AI response
-    const aiResponse = await generateText({
-      model: this.provider,
-      messages: this.messages,
-      tools: webActionTools,
-      toolChoice: "required",
-      maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
-      abortSignal: this.abortSignal || undefined,
-    });
+    let aiResponse: any = null;
+    let generationError: Error | null = null;
 
-    // Add response to messages
-    if (aiResponse.response?.messages) {
+    try {
+      // Generate AI response
+      aiResponse = await generateText({
+        model: this.provider,
+        messages: this.messages,
+        tools: webActionTools,
+        toolChoice: "required",
+        maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
+        abortSignal: this.abortSignal || undefined,
+      });
+    } catch (error) {
+      // Capture error for re-throwing after cleanup
+      generationError = new Error(this.extractErrorMessage(error));
+    }
+
+    // Always append messages if they exist (even on error)
+    if (aiResponse?.response?.messages) {
       for (const msg of aiResponse.response.messages) {
         this.messages.push(msg);
       }
     }
 
-    // Emit generation event
+    // Always emit generation event (with error info if applicable)
     this.emit(WebAgentEventType.AI_GENERATION, {
       messages: this.messages,
       temperature: 0,
       object: null,
-      finishReason: aiResponse.finishReason,
-      usage: aiResponse.usage,
-      warnings: aiResponse.warnings || [],
-      providerMetadata: aiResponse.providerMetadata,
+      finishReason: aiResponse?.finishReason || "error",
+      usage: aiResponse?.usage || {},
+      warnings: aiResponse?.warnings || [],
+      providerMetadata: aiResponse?.providerMetadata || {},
+      error: generationError ? generationError.message : undefined,
     });
 
+    // Re-throw if generation failed
+    if (generationError) {
+      throw generationError;
+    }
+
     // Emit observation if present
-    if (aiResponse.text?.trim()) {
+    const observation = this.extractObservationText(aiResponse);
+    if (observation) {
       this.emit(WebAgentEventType.AGENT_OBSERVED, {
-        observation: aiResponse.text,
+        observation,
         iterationId: this.currentIterationId,
       });
     }
@@ -471,17 +478,13 @@ export class WebAgent {
         throw new Error("Failed to generate plan");
       }
 
-      const firstToolResult = planningResponse.toolResults[0] as any;
+      const { plan, explanation, url } = this.extractPlanOutput(planningResponse);
 
-      // Extract the actual plan output from the tool execution
-      // Structure: { type: 'tool-result', toolCallId, toolName, input, output, dynamic }
-      const planOutput = firstToolResult.output;
+      this.plan = plan;
+      this.taskExplanation = explanation;
 
-      this.plan = planOutput.plan || "";
-      this.taskExplanation = planOutput.explanation || "";
-
-      if (!startingUrl && planOutput.url) {
-        this.url = planOutput.url;
+      if (!startingUrl && url) {
+        this.url = url;
       } else if (startingUrl) {
         this.url = startingUrl;
       }
@@ -500,12 +503,78 @@ export class WebAgent {
         iterationId: this.currentIterationId || "planning",
       });
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to generate plan: ${errorMessage}`);
+      throw new Error(`Failed to generate plan: ${this.extractErrorMessage(error)}`);
     }
   }
 
   // === Helper Methods ===
+
+  /**
+   * Extract error message from unknown error type
+   */
+  private extractErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  /**
+   * Extract observation text from AI response
+   * Prioritizes reasoning over plain text field
+   */
+  private extractObservationText(aiResponse: any): string | undefined {
+    const reasoningText = aiResponse.reasoning
+      ?.map((r: { type: string; text: string }) => r.text)
+      .join("")
+      .trim();
+
+    return reasoningText || aiResponse.text?.trim();
+  }
+
+  /**
+   * Calculate compression statistics for debug logging
+   */
+  private calculateCompressionStats(
+    originalSize: number,
+    compressedSize: number,
+  ): {
+    originalSize: number;
+    compressedSize: number;
+    compressionPercent: number;
+  } {
+    return {
+      originalSize,
+      compressedSize,
+      compressionPercent: Math.round((1 - compressedSize / originalSize) * 100),
+    };
+  }
+
+  /**
+   * Check if error is a setup/planning error that should be re-thrown
+   */
+  private isSetupError(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      (error.message.includes("Failed to generate plan") ||
+        error.message.includes("No starting URL"))
+    );
+  }
+
+  /**
+   * Extract plan output from planning response
+   */
+  private extractPlanOutput(planningResponse: any): {
+    plan: string;
+    explanation: string;
+    url?: string;
+  } {
+    const firstToolResult = planningResponse.toolResults[0] as any;
+    const planOutput = firstToolResult.output;
+
+    return {
+      plan: planOutput.plan || "",
+      explanation: planOutput.explanation || "",
+      url: planOutput.url,
+    };
+  }
 
   private validateTaskAndOptions(task: string, options: ExecuteOptions): void {
     if (!task?.trim()) {

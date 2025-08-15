@@ -388,29 +388,28 @@ describe("prompts", () => {
       expect(prompt).toContain("Value is required");
     });
 
-    it("should include available tools", () => {
+    it("should include tool call instruction", () => {
       const error = "Some error";
       const prompt = buildStepErrorFeedbackPrompt(error);
 
-      expect(prompt).toContain("Available tools:");
-      expect(prompt).toContain('click({"ref": "s1e33"})');
-      expect(prompt).toContain('fill({"ref": "s1e33", "value": "text"})');
-      expect(prompt).toContain('goto({"url": "https://example.com"})');
+      expect(prompt).toContain("You MUST use exactly one tool");
+      expect(prompt).toContain("Use valid JSON format");
+      expect(prompt).toContain("CRITICAL: Use each tool exactly ONCE");
     });
 
-    it("should include tool call instruction", () => {
+    it("should include error message", () => {
       const error = "Test error";
       const prompt = buildStepErrorFeedbackPrompt(error);
 
-      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
-      expect(prompt).toContain("Use valid JSON format for all arguments");
+      expect(prompt).toContain("Error Occurred");
+      expect(prompt).toContain("Test error");
     });
 
     it("should handle empty errors", () => {
       const prompt = buildStepErrorFeedbackPrompt("");
 
       expect(prompt).toContain("Error Occurred");
-      expect(prompt).toContain("Available tools:");
+      expect(prompt).toContain("You MUST use exactly one tool");
     });
   });
 
