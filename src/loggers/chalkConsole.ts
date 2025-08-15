@@ -7,8 +7,6 @@ import type {
   CompressionDebugEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
-  NetworkTimeoutEventData,
-  NetworkWaitingEventData,
   PageNavigationEventData,
   ReasoningEventData,
   StatusMessageEventData,
@@ -50,8 +48,6 @@ export class ChalkConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
     emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
@@ -85,8 +81,6 @@ export class ChalkConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
       this.emitter.offEvent(
         WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
         this.handleScreenshotCaptured,
@@ -244,24 +238,14 @@ export class ChalkConsoleLogger implements Logger {
     );
   };
 
-  private handleNetworkWaiting = (data: NetworkWaitingEventData): void => {
-    console.log(chalk.gray(`   🌐 Browser Network Waiting after "${data.action}"...`));
-  };
-
-  private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
-    console.log(chalk.gray(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`));
-  };
-
   private handleScreenshotCaptured = (data: ScreenshotCapturedEventData): void => {
     const sizeKB = Math.round(data.size / 1024);
     console.log(chalk.gray(`   📸 Screenshot captured (${sizeKB}KB ${data.format.toUpperCase()})`));
   };
 
   private handleProcessing = (data: ProcessingEventData): void => {
-    if (data.status === "start") {
-      const visionIndicator = data.hasScreenshot ? "👁️ " : "";
-      console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
-    }
+    const visionIndicator = data.hasScreenshot ? "👁️ " : "";
+    console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
   };
 
   private handleValidationError = (data: ValidationErrorEventData): void => {

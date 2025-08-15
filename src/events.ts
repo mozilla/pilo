@@ -29,8 +29,6 @@ export enum WebAgentEventType {
   BROWSER_ACTION_STARTED = "browser:action_started",
   BROWSER_ACTION_COMPLETED = "browser:action_completed",
   BROWSER_NAVIGATED = "browser:navigated",
-  BROWSER_NETWORK_WAITING = "browser:network_waiting",
-  BROWSER_NETWORK_TIMEOUT = "browser:network_timeout",
   BROWSER_SCREENSHOT_CAPTURED = "browser:screenshot_captured",
 
   // System/Debug
@@ -151,12 +149,11 @@ export interface ExtractedDataEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for processing status
+ * Event data for when the agent is waiting for model generation
  */
 export interface ProcessingEventData extends WebAgentEventData {
-  status: "start" | "end";
   operation: string;
-  hasScreenshot?: boolean;
+  hasScreenshot: boolean;
 }
 
 /**
@@ -197,20 +194,6 @@ export interface MessagesDebugEventData extends WebAgentEventData {
  */
 export interface WaitingEventData extends WebAgentEventData {
   seconds: number;
-}
-
-/**
- * Event data for network waiting notification
- */
-export interface NetworkWaitingEventData extends WebAgentEventData {
-  action: string;
-}
-
-/**
- * Event data for network timeout notification
- */
-export interface NetworkTimeoutEventData extends WebAgentEventData {
-  action: string;
 }
 
 /**
@@ -269,8 +252,6 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.BROWSER_ACTION_STARTED; data: ActionExecutionEventData }
   | { type: WebAgentEventType.BROWSER_ACTION_COMPLETED; data: ActionResultEventData }
   | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
-  | { type: WebAgentEventType.BROWSER_NETWORK_WAITING; data: NetworkWaitingEventData }
-  | { type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
   | { type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED; data: ScreenshotCapturedEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };

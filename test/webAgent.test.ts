@@ -1501,26 +1501,26 @@ describe("WebAgent", () => {
         (e) => e.type === WebAgentEventType.AGENT_PROCESSING,
       );
 
-      // Should have start/end pairs for planning and at least one iteration
-      expect(processingEvents.length).toBeGreaterThanOrEqual(3); // planning start, planning end, and at least one thinking start
+      // Should have at least one for planning and one for thinking
+      expect(processingEvents.length).toBeGreaterThanOrEqual(2); // planning and at least one thinking
 
-      // Check we have start and end events
-      const startEvents = processingEvents.filter((e) => e.data.status === "start");
-      const endEvents = processingEvents.filter((e) => e.data.status === "end");
-
-      expect(startEvents.length).toBeGreaterThan(0);
-      expect(endEvents.length).toBeGreaterThan(0);
+      // Check all events have hasScreenshot field and operation
+      processingEvents.forEach((event) => {
+        expect(event.data).toHaveProperty("hasScreenshot");
+        expect(typeof event.data.hasScreenshot).toBe("boolean");
+        expect(event.data.operation).toBeTruthy();
+      });
 
       // Check operations are specified
       const planningEvents = processingEvents.filter(
         (e) => e.data.operation === "Creating task plan",
       );
-      expect(planningEvents.length).toBe(2); // start and end
+      expect(planningEvents.length).toBe(1); // only one planning event now
 
       const thinkingEvents = processingEvents.filter(
         (e) => e.data.operation === "Thinking about next action",
       );
-      expect(thinkingEvents.length).toBeGreaterThanOrEqual(1); // at least one start
+      expect(thinkingEvents.length).toBeGreaterThanOrEqual(1); // at least one thinking event
     });
   });
 

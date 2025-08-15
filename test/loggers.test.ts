@@ -18,8 +18,6 @@ import type {
   CompressionDebugEventData,
   MessagesDebugEventData,
   WaitingEventData,
-  NetworkWaitingEventData,
-  NetworkTimeoutEventData,
   ProcessingEventData,
   ScreenshotCapturedEventData,
 } from "../src/events.js";
@@ -482,40 +480,6 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("5 seconds");
     });
 
-    it("should handle NETWORK_WAITING events", () => {
-      const eventData: NetworkWaitingEventData = {
-        timestamp: Date.now(),
-        iterationId: "test-1",
-        action: "click",
-      };
-
-      emitter.emitEvent({
-        type: WebAgentEventType.BROWSER_NETWORK_WAITING,
-        data: eventData,
-      });
-
-      expect(mockConsole.log).toHaveBeenCalled();
-      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("Network Waiting");
-    });
-
-    it("should handle NETWORK_TIMEOUT events", () => {
-      const eventData: NetworkTimeoutEventData = {
-        timestamp: Date.now(),
-        iterationId: "test-1",
-        action: "submit",
-      };
-
-      emitter.emitEvent({
-        type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
-        data: eventData,
-      });
-
-      expect(mockConsole.log).toHaveBeenCalled();
-      const allOutput = mockConsole.log.mock.calls.flat().join(" ");
-      expect(allOutput).toContain("Network Timeout");
-    });
-
     it("should handle SCREENSHOT_CAPTURED events", () => {
       const eventData: ScreenshotCapturedEventData = {
         timestamp: Date.now(),
@@ -538,12 +502,12 @@ describe("ConsoleLogger", () => {
   });
 
   describe("Processing events", () => {
-    it("should handle PROCESSING start events", () => {
+    it("should handle PROCESSING events without vision", () => {
       const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        status: "start",
         operation: "Planning next action",
+        hasScreenshot: false,
       };
 
       emitter.emitEvent({
@@ -558,11 +522,10 @@ describe("ConsoleLogger", () => {
       expect(allOutput).not.toContain("👁️");
     });
 
-    it("should handle PROCESSING start events with vision", () => {
+    it("should handle PROCESSING events with vision", () => {
       const eventData: ProcessingEventData = {
         timestamp: Date.now(),
         iterationId: "test-1",
-        status: "start",
         operation: "Planning next action",
         hasScreenshot: true,
       };
@@ -577,23 +540,6 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("Planning next action");
       expect(allOutput).toContain("🧮");
       expect(allOutput).toContain("👁️");
-    });
-
-    it("should not log PROCESSING end events", () => {
-      const eventData: ProcessingEventData = {
-        timestamp: Date.now(),
-        iterationId: "test-1",
-        status: "end",
-        operation: "Planning next action",
-      };
-
-      emitter.emitEvent({
-        type: WebAgentEventType.AGENT_PROCESSING,
-        data: eventData,
-      });
-
-      // End events should not trigger console output
-      expect(mockConsole.log).not.toHaveBeenCalled();
     });
   });
 
@@ -611,8 +557,6 @@ describe("ConsoleLogger", () => {
         WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
         WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
         WebAgentEventType.AGENT_WAITING,
-        WebAgentEventType.BROWSER_NETWORK_WAITING,
-        WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
         WebAgentEventType.TASK_VALIDATED,
       ].map((eventType) => ({
         eventType,

@@ -129,8 +129,6 @@ describe("WebAgentEventEmitter", () => {
         "browser:action_started",
         "browser:action_completed",
         "browser:navigated",
-        "browser:network_waiting",
-        "browser:network_timeout",
         "browser:screenshot_captured",
         "system:debug_compression",
         "system:debug_message",
@@ -215,14 +213,6 @@ describe("WebAgentEventEmitter", () => {
           data: { timestamp: Date.now(), iterationId: "test-1", seconds: 5 },
         },
         {
-          type: WebAgentEventType.BROWSER_NETWORK_WAITING,
-          data: { timestamp: Date.now(), iterationId: "test-1", action: "click" },
-        },
-        {
-          type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
-          data: { timestamp: Date.now(), iterationId: "test-1", action: "click" },
-        },
-        {
           type: WebAgentEventType.TASK_VALIDATED,
           data: {
             timestamp: Date.now(),
@@ -256,8 +246,8 @@ describe("WebAgentEventEmitter", () => {
           data: {
             timestamp: Date.now(),
             iterationId: "test-1",
-            status: "start" as const,
             operation: "test operation",
+            hasScreenshot: false,
           },
         },
       ];

@@ -22,8 +22,6 @@ export type {
   TaskValidationEventData,
   StatusMessageEventData,
   WaitingEventData,
-  NetworkWaitingEventData,
-  NetworkTimeoutEventData,
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
 } from "./events.js";

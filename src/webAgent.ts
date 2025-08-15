@@ -394,10 +394,10 @@ export class WebAgent {
     pageChanged: boolean;
     actionExecuted: boolean;
   }> {
-    // Start processing
+    // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
-      status: "start",
       operation: "Thinking about next action",
+      hasScreenshot: this.vision,
       iterationId: this.currentIterationId,
     });
 
@@ -531,10 +531,10 @@ export class WebAgent {
     // Increment validation attempts
     executionState.validationAttempts++;
 
-    // Emit processing event
+    // Emit processing event - validation doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
-      status: "start",
       operation: "Validating task completion",
+      hasScreenshot: false,
       iterationId: this.currentIterationId,
     });
 
@@ -554,13 +554,6 @@ export class WebAgent {
         toolChoice: { type: "tool", toolName: "validate_task" },
         maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
         abortSignal: this.abortSignal || undefined,
-      });
-
-      // Emit processing complete
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        status: "end",
-        operation: "Validating task completion",
-        iterationId: this.currentIterationId,
       });
 
       if (!validationResponse.toolResults?.[0]) {
@@ -596,13 +589,6 @@ export class WebAgent {
         isAccepted: isAccepted || executionState.validationAttempts >= this.maxValidationAttempts,
       };
     } catch (error) {
-      // Emit processing complete even on error
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        status: "end",
-        operation: "Validating task completion",
-        iterationId: this.currentIterationId,
-      });
-
       // On validation error, accept the result if we've hit max attempts
       if (executionState.validationAttempts >= this.maxValidationAttempts) {
         return { isAccepted: true };
@@ -644,10 +630,10 @@ export class WebAgent {
       ? buildPlanPrompt(task, startingUrl, this.guardrails)
       : buildPlanAndUrlPrompt(task, this.guardrails);
 
-    // Emit processing event before planning
+    // Emit processing event before planning - planning doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
-      status: "start",
       operation: "Creating task plan",
+      hasScreenshot: false,
       iterationId: this.currentIterationId || "planning",
     });
 
@@ -661,13 +647,6 @@ export class WebAgent {
         tools: planningTools,
         toolChoice: { type: "tool", toolName: planningToolName },
         maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
-      });
-
-      // Emit processing complete
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        status: "end",
-        operation: "Creating task plan",
-        iterationId: this.currentIterationId || "planning",
       });
 
       if (!planningResponse.toolResults?.[0]) {
@@ -692,13 +671,6 @@ export class WebAgent {
         url: this.url,
       });
     } catch (error) {
-      // Emit processing complete even on error
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        status: "end",
-        operation: "Creating task plan",
-        iterationId: this.currentIterationId || "planning",
-      });
-
       throw new Error(`Failed to generate plan: ${this.extractErrorMessage(error)}`);
     }
   }
