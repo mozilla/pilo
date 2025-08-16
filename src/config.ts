@@ -5,12 +5,17 @@ import { config as loadDotenv } from "dotenv";
 
 export interface SparkConfig {
   // AI Configuration
-  provider?: "openai" | "openrouter" | "vertex";
+  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
+
+  // Local AI Provider Configuration
+  ollama_base_url?: string;
+  openai_compatible_base_url?: string;
+  openai_compatible_name?: string;
 
   // Browser Configuration
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
@@ -101,6 +106,17 @@ export class ConfigManager {
       }),
       ...((process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) && {
         vertex_location: process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION,
+      }),
+
+      // Local AI Provider Configuration
+      ...(process.env.SPARK_OLLAMA_BASE_URL && {
+        ollama_base_url: process.env.SPARK_OLLAMA_BASE_URL,
+      }),
+      ...(process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL && {
+        openai_compatible_base_url: process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL,
+      }),
+      ...(process.env.SPARK_OPENAI_COMPATIBLE_NAME && {
+        openai_compatible_name: process.env.SPARK_OPENAI_COMPATIBLE_NAME,
       }),
 
       // Browser Configuration
