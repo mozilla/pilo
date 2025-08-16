@@ -93,7 +93,7 @@ describe("Provider", () => {
 
       createAIProvider();
 
-      expect(mockOpenai).toHaveBeenCalledWith("gpt-4.1");
+      expect(mockOpenai).toHaveBeenCalledWith("gpt-4.1-mini");
       expect(mockCreateOpenAI).not.toHaveBeenCalled();
     });
 
@@ -377,7 +377,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openrouter",
-        model: "openai/gpt-4.1",
+        model: "openai/gpt-4.1-mini",
         hasApiKey: true,
         keySource: "global",
       });
@@ -392,7 +392,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openai",
-        model: "gpt-4.1",
+        model: "gpt-4.1-mini",
         hasApiKey: false,
         keySource: "not_set",
       });
@@ -405,7 +405,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openai",
-        model: "gpt-4.1",
+        model: "gpt-4.1-mini",
         hasApiKey: false,
         keySource: "not_set",
       });
@@ -423,7 +423,7 @@ describe("Provider", () => {
 
       expect(info).toEqual({
         provider: "openrouter",
-        model: "openai/gpt-4.1",
+        model: "openai/gpt-4.1-mini",
         hasApiKey: true,
         keySource: "env",
       });

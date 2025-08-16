@@ -92,8 +92,8 @@ export function createProviderFromConfig(
  */
 function getProviderConfig(provider: string, currentConfig: any, modelOverride?: string) {
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
   };
 
@@ -239,8 +239,8 @@ export function getAIProviderInfo() {
   const currentConfig = config.getConfig();
   const provider = currentConfig.provider || "openai";
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
   };
   const model = currentConfig.model || defaultModels[provider as keyof typeof defaultModels];

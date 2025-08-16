@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser, createAIProvider, getAIProviderInfo } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
-import { createAIProvider, getAIProviderInfo } from "../provider.js";
 import { config } from "../config.js";
 
 interface ErrorResponse {

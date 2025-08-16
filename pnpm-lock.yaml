@@ -12,20 +12,20 @@ importers:
         specifier: ^3.0.9
         version: 3.0.9(zod@4.0.17)
       '@ai-sdk/openai':
-        specifier: ^2.0.14
-        version: 2.0.14(zod@4.0.17)
+        specifier: ^2.0.15
+        version: 2.0.15(zod@4.0.17)
       '@ghostery/adblocker-playwright':
         specifier: ^2.11.3
         version: 2.11.3(playwright@1.53.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^1.1.2
-        version: 1.1.2(ai@5.0.14(zod@4.0.17))(zod@4.0.17)
+        version: 1.1.2(ai@5.0.15(zod@4.0.17))(zod@4.0.17)
       '@types/turndown':
         specifier: ^5.0.5
         version: 5.0.5
       ai:
-        specifier: ^5.0.14
-        version: 5.0.14(zod@4.0.17)
+        specifier: ^5.0.15
+        version: 5.0.15(zod@4.0.17)
       chalk:
         specifier: ^5.5.0
         version: 5.5.0
@@ -56,16 +56,13 @@ importers:
       zod:
         specifier: ^4.0.17
         version: 4.0.17
-      zod-to-json-schema:
-        specifier: ^3.24.6
-        version: 3.24.6(zod@4.0.17)
     devDependencies:
       '@types/jsdom':
         specifier: ^21.1.7
         version: 21.1.7
       '@types/node':
-        specifier: ^22.17.1
-        version: 22.17.1
+        specifier: ^22.17.2
+        version: 22.17.2
       jsdom:
         specifier: ^24.1.3
         version: 24.1.3
@@ -83,7 +80,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^1.6.1
-        version: 1.6.1(@types/node@22.17.1)(jsdom@24.1.3)
+        version: 1.6.1(@types/node@22.17.2)(jsdom@24.1.3)
 
 packages:
 
@@ -93,8 +90,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/gateway@1.0.6':
-    resolution: {integrity: sha512-JuSj1MtTr4vw2VBBth4wlbciQnQIV0o1YV9qGLFA+r85nR5H+cJp3jaYE0nprqfzC9rYG8w9c6XGHB3SDKgcgA==}
+  '@ai-sdk/gateway@1.0.7':
+    resolution: {integrity: sha512-Athrq7OARuNc0iHZJP6InhSQ53tImCc990vMWyR1UHaZgPZJbXjKhIMiOj54F0I0Nlemx48V4fHYUTfLkJotnQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -111,8 +108,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/openai@2.0.14':
-    resolution: {integrity: sha512-u/wi1ixcvcg29wAJySjO803HlXpyCl6mkcOHn+Zn7DA+CtjuQNkKikJ4pZBc7I3Qhi90kA4XnOfKikhBXh4c4Q==}
+  '@ai-sdk/openai@2.0.15':
+    resolution: {integrity: sha512-/IUyQ9ck4uUTtGojvQamcUWpNWkwpL/P1F6LYRxpQGj07H00oJEBH/VUizrIq0ZvW/vkuK6c6X4UJS9PrdYyxA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -620,8 +617,8 @@ packages:
   '@types/jsdom@21.1.7':
     resolution: {integrity: sha512-yOriVnggzrnQ3a9OKOCxaVuSug3w3/SbOj5i7VwXWZEyUNl3bLF9V3MfxGbZKuwqJOQyRfqXyROBB1CoZLFWzA==}
 
-  '@types/node@22.17.1':
-    resolution: {integrity: sha512-y3tBaz+rjspDTylNjAX37jEC3TETEFGNJL6uQDxwF9/8GLLIjW1rvVHlynyuUKMnMr1Roq8jOv3vkopBjC4/VA==}
+  '@types/node@22.17.2':
+    resolution: {integrity: sha512-gL6z5N9Jm9mhY+U2KXZpteb+09zyffliRkZyZOHODGATyC5B1Jt/7TzuuiLkFsSUMLbS1OLmlj/E+/3KF4Q/4w==}
 
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
@@ -657,8 +654,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@5.0.14:
-    resolution: {integrity: sha512-xiujFa879skB7YxGzbeHAxepsr6AEaWcHPXrc5a9MRM6p4WdVAwn6mGwVZkBnhqGfZtXFr4LUnU2ayvcjWp5ig==}
+  ai@5.0.15:
+    resolution: {integrity: sha512-EX5hF+NVFm6R11mvdZRbg6eJEjyMlniI4/xOnyTh4VtDQ457lhIgi3kDGrHW3/qw9ELon9m2e7AK3g5z5sLwsQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -1444,7 +1441,7 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
 
-  '@ai-sdk/gateway@1.0.6(zod@4.0.17)':
+  '@ai-sdk/gateway@1.0.7(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
@@ -1468,7 +1465,7 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
 
-  '@ai-sdk/openai@2.0.14(zod@4.0.17)':
+  '@ai-sdk/openai@2.0.15(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
@@ -1696,9 +1693,9 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@openrouter/ai-sdk-provider@1.1.2(ai@5.0.14(zod@4.0.17))(zod@4.0.17)':
+  '@openrouter/ai-sdk-provider@1.1.2(ai@5.0.15(zod@4.0.17))(zod@4.0.17)':
     dependencies:
-      ai: 5.0.14(zod@4.0.17)
+      ai: 5.0.15(zod@4.0.17)
       zod: 4.0.17
 
   '@opentelemetry/api@1.9.0': {}
@@ -1788,11 +1785,11 @@ snapshots:
 
   '@types/jsdom@21.1.7':
     dependencies:
-      '@types/node': 22.17.1
+      '@types/node': 22.17.2
       '@types/tough-cookie': 4.0.5
       parse5: 7.3.0
 
-  '@types/node@22.17.1':
+  '@types/node@22.17.2':
     dependencies:
       undici-types: 6.21.0
 
@@ -1837,9 +1834,9 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@5.0.14(zod@4.0.17):
+  ai@5.0.15(zod@4.0.17):
     dependencies:
-      '@ai-sdk/gateway': 1.0.6(zod@4.0.17)
+      '@ai-sdk/gateway': 1.0.7(zod@4.0.17)
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       '@opentelemetry/api': 1.9.0
@@ -2545,13 +2542,13 @@ snapshots:
 
   uuid@9.0.1: {}
 
-  vite-node@1.6.1(@types/node@22.17.1):
+  vite-node@1.6.1(@types/node@22.17.2):
     dependencies:
       cac: 6.7.14
       debug: 4.4.1(supports-color@5.5.0)
       pathe: 1.1.2
       picocolors: 1.1.1
-      vite: 5.4.19(@types/node@22.17.1)
+      vite: 5.4.19(@types/node@22.17.2)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -2563,16 +2560,16 @@ snapshots:
       - supports-color
       - terser
 
-  vite@5.4.19(@types/node@22.17.1):
+  vite@5.4.19(@types/node@22.17.2):
     dependencies:
       esbuild: 0.21.5
       postcss: 8.5.6
       rollup: 4.46.2
     optionalDependencies:
-      '@types/node': 22.17.1
+      '@types/node': 22.17.2
       fsevents: 2.3.3
 
-  vitest@1.6.1(@types/node@22.17.1)(jsdom@24.1.3):
+  vitest@1.6.1(@types/node@22.17.2)(jsdom@24.1.3):
     dependencies:
       '@vitest/expect': 1.6.1
       '@vitest/runner': 1.6.1
@@ -2591,11 +2588,11 @@ snapshots:
       strip-literal: 2.1.1
       tinybench: 2.9.0
       tinypool: 0.8.4
-      vite: 5.4.19(@types/node@22.17.1)
-      vite-node: 1.6.1(@types/node@22.17.1)
+      vite: 5.4.19(@types/node@22.17.2)
+      vite-node: 1.6.1(@types/node@22.17.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 22.17.1
+      '@types/node': 22.17.2
       jsdom: 24.1.3
     transitivePeerDependencies:
       - less
