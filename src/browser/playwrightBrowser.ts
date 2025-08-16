@@ -12,6 +12,7 @@ import {
 import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
+import TurndownService from "turndown";
 
 // Type extension for Playwright's private AI snapshot function
 type PageEx = Page & {
@@ -305,9 +306,52 @@ export class PlaywrightBrowser implements AriaBrowser {
     return this.page.title();
   }
 
-  async getText(): Promise<string> {
+  async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
     return await (this.page as PageEx)._snapshotForAI();
+  }
+
+  /**
+   * Gets simplified HTML with noise elements removed in browser context
+   * Reduces payload size by removing elements we don't need
+   */
+  async getSimpleHtml(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+
+    return await this.page.evaluate(() => {
+      const body = document.body || document.documentElement;
+      if (!body) return "";
+
+      const clone = body.cloneNode(true) as Element;
+
+      // Remove noise elements in browser context to reduce wire transfer
+      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+
+      return clone.innerHTML;
+    });
+  }
+
+  async getMarkdown(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+
+    try {
+      // Get simplified HTML (noise removed in browser context)
+      const html = await this.getSimpleHtml();
+
+      // Convert HTML to markdown using turndown
+      const turndown = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+        emDelimiter: "*",
+        strongDelimiter: "**",
+      });
+
+      return turndown.turndown(html);
+    } catch (error) {
+      throw new Error(
+        `Failed to get markdown: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async getScreenshot(): Promise<Buffer> {

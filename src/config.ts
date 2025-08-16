@@ -31,6 +31,7 @@ export interface SparkConfig {
   vision?: boolean;
   max_iterations?: number;
   max_validation_attempts?: number;
+  reasoning_effort?: "none" | "low" | "medium" | "high";
 
   // Playwright Configuration
   pw_endpoint?: string;
@@ -144,6 +145,9 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_MAX_VALIDATION_ATTEMPTS && {
         max_validation_attempts: parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10),
+      }),
+      ...(process.env.SPARK_REASONING_EFFORT && {
+        reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
       }),
 
       // Playwright Configuration
@@ -297,6 +301,8 @@ export class ConfigManager {
       env.max_iterations = parseInt(process.env.SPARK_MAX_ITERATIONS, 10);
     if (process.env.SPARK_MAX_VALIDATION_ATTEMPTS)
       env.max_validation_attempts = parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10);
+    if (process.env.SPARK_REASONING_EFFORT)
+      env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
 
     // Playwright Configuration
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;

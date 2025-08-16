@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { PlaywrightBrowser } from "../src/browser/playwrightBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
 
@@ -108,7 +108,7 @@ describe("PlaywrightBrowser", () => {
     it("should throw error for page info methods when not started", async () => {
       await expect(browser.getUrl()).rejects.toThrow("Browser not started");
       await expect(browser.getTitle()).rejects.toThrow("Browser not started");
-      await expect(browser.getText()).rejects.toThrow("Browser not started");
+      await expect(browser.getTreeWithRefs()).rejects.toThrow("Browser not started");
       await expect(browser.getScreenshot()).rejects.toThrow("Browser not started");
     });
 
@@ -159,7 +159,7 @@ describe("PlaywrightBrowser", () => {
         headless: true,
         bypassCSP: false,
         blockAds: true,
-        blockResources: ["image"] as const,
+        blockResources: ["image"] as ("image" | "stylesheet" | "font" | "media" | "manifest")[],
         pwEndpoint: "ws://localhost:9222",
       };
 
@@ -197,9 +197,7 @@ describe("PlaywrightBrowser", () => {
             "--disable-web-security",
             "",
             "--no-sandbox",
-            null,
             "--disable-features=VizDisplayCompositor",
-            undefined,
           ],
         },
       });
@@ -218,7 +216,7 @@ describe("PlaywrightBrowser", () => {
     it("should handle launch options with only empty args", () => {
       const browser = new PlaywrightBrowser({
         launchOptions: {
-          args: ["", null, undefined],
+          args: [""],
         },
       });
       expect(browser).toBeDefined();
@@ -246,15 +244,7 @@ describe("PlaywrightBrowser", () => {
     it("should preserve valid args while filtering empty ones", () => {
       const browser = new PlaywrightBrowser({
         launchOptions: {
-          args: [
-            "--valid-arg",
-            "",
-            "--another-valid",
-            null,
-            "--third-valid",
-            undefined,
-            "--fourth-valid",
-          ],
+          args: ["--valid-arg", "", "--another-valid", "--third-valid", "--fourth-valid"],
         },
       });
       expect(browser).toBeDefined();

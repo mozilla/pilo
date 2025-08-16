@@ -3,7 +3,12 @@ import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { config } from "./config.js";
-import { getEnv } from "./env.js";
+import { getEnv } from "./utils/env.js";
+
+export interface ProviderConfig {
+  model: LanguageModel;
+  providerOptions?: any;
+}
 
 /**
  * Creates and configures an AI language model based on the current configuration
@@ -16,9 +21,11 @@ export function createAIProvider(overrides?: {
   openrouter_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
-}): LanguageModel {
+  reasoning_effort?: "none" | "low" | "medium" | "high";
+}): ProviderConfig {
   const currentConfig = config.getConfig();
   const provider = overrides?.provider || currentConfig.provider || "openai";
+  const reasoningEffort = overrides?.reasoning_effort || currentConfig.reasoning_effort || "none";
 
   // Create temporary config with overrides
   const configWithOverrides = {
@@ -32,7 +39,13 @@ export function createAIProvider(overrides?: {
   // Get API key and model
   const { apiKey, model } = getProviderConfig(provider, configWithOverrides, overrides?.model);
 
-  return createProviderFromConfig(provider, { apiKey, model, configWithOverrides });
+  const languageModel = createProviderFromConfig(provider, { apiKey, model, configWithOverrides });
+  const providerOptions = buildProviderOptions(provider, reasoningEffort);
+
+  return {
+    model: languageModel,
+    providerOptions,
+  };
 }
 
 /**
@@ -79,8 +92,8 @@ export function createProviderFromConfig(
  */
 function getProviderConfig(provider: string, currentConfig: any, modelOverride?: string) {
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
   };
 
@@ -164,14 +177,70 @@ Run 'spark config --show' to check your current configuration.`,
 }
 
 /**
+ * Convert effort level to token count for providers that need it
+ */
+function effortToTokens(effort: "low" | "medium" | "high"): number {
+  const tokenMapping = {
+    low: 1024, // 1K tokens for low effort
+    medium: 2048, // 2K tokens for medium effort
+    high: 4096, // 4K tokens for high effort
+  } as const;
+
+  return tokenMapping[effort];
+}
+
+/**
+ * Build provider-specific options based on reasoning effort
+ */
+function buildProviderOptions(
+  provider: string,
+  reasoningEffort: "none" | "low" | "medium" | "high",
+): any {
+  if (reasoningEffort === "none") {
+    return undefined;
+  }
+
+  switch (provider) {
+    case "openai":
+      return {
+        openai: {
+          reasoningEffort,
+        },
+      };
+
+    case "openrouter":
+      return {
+        openrouter: {
+          reasoning: {
+            max_tokens: effortToTokens(reasoningEffort as "low" | "medium" | "high"),
+          },
+        },
+      };
+
+    case "vertex":
+      return {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: effortToTokens(reasoningEffort as "low" | "medium" | "high"),
+          },
+        },
+      };
+
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Get the current AI provider configuration details
  */
 export function getAIProviderInfo() {
   const currentConfig = config.getConfig();
   const provider = currentConfig.provider || "openai";
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
   };
   const model = currentConfig.model || defaultModels[provider as keyof typeof defaultModels];

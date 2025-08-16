@@ -2,19 +2,16 @@ import { WebAgentEventType, WebAgentEventEmitter } from "../events.js";
 import type {
   ActionExecutionEventData,
   ActionResultEventData,
+  AgentStepEventData,
   CompressionDebugEventData,
-  CurrentStepEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
-  NetworkTimeoutEventData,
-  NetworkWaitingEventData,
-  ObservationEventData,
   PageNavigationEventData,
+  ReasoningEventData,
   StatusMessageEventData,
   TaskCompleteEventData,
   TaskSetupEventData,
   TaskStartEventData,
-  ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
   ProcessingEventData,
@@ -47,16 +44,14 @@ export class ConsoleLogger implements Logger {
 
     // Browser events
     emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
     emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
-    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-    emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
     emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
     emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
     emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -82,19 +77,17 @@ export class ConsoleLogger implements Logger {
 
       // Browser events
       this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
       this.emitter.offEvent(
         WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
         this.handleScreenshotCaptured,
       );
 
       // Agent reasoning events
-      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-      this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
       this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
       this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
       this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -173,19 +166,13 @@ export class ConsoleLogger implements Logger {
     console.log("📍 Current Page:", truncatedTitle);
   };
 
-  private handleCurrentStep = (data: CurrentStepEventData): void => {
-    console.log("🎯 Agent Step:");
-    console.log("   " + data.currentStep);
+  private handleAgentStep = (data: AgentStepEventData): void => {
+    console.log(`\n🔄 Iteration ${data.currentIteration} [${data.iterationId}]`);
   };
 
-  private handleObservation = (data: ObservationEventData): void => {
-    console.log("👁️ Agent Observed:");
-    console.log("   " + data.observation);
-  };
-
-  private handleThought = (data: ThoughtEventData): void => {
+  private handleReasoning = (data: ReasoningEventData): void => {
     console.log("\n🧠 Agent Reasoned:");
-    console.log("   " + data.thought);
+    console.log("   " + data.reasoning);
   };
 
   private handleExtractedData = (data: ExtractedDataEventData): void => {
@@ -193,14 +180,16 @@ export class ConsoleLogger implements Logger {
     console.log("   " + data.extractedData);
   };
 
-  private handleActionExecution = (data: ActionExecutionEventData): void => {
-    console.log("\n🎯 Planned Action:");
+  private handleAgentAction = (data: ActionExecutionEventData): void => {
     console.log(
-      `   1. ${data.action.toUpperCase()}`,
+      "\n🎯 Agent Action:",
+      data.action.toUpperCase(),
       data.ref ? `ref: ${data.ref}` : "",
       data.value ? `value: "${data.value}"` : "",
     );
+  };
 
+  private handleBrowserAction = (data: ActionExecutionEventData): void => {
     console.log(
       "\n🤖 Browser Executing:",
       data.action.toUpperCase(),
@@ -232,24 +221,14 @@ export class ConsoleLogger implements Logger {
     console.log(`⏳ Agent Waiting ${data.seconds} second${data.seconds !== 1 ? "s" : ""}...`);
   };
 
-  private handleNetworkWaiting = (data: NetworkWaitingEventData): void => {
-    console.log(`   🌐 Browser Network Waiting after "${data.action}"...`);
-  };
-
-  private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
-    console.log(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`);
-  };
-
   private handleScreenshotCaptured = (data: ScreenshotCapturedEventData): void => {
     const sizeKB = Math.round(data.size / 1024);
     console.log(`   📸 Screenshot captured (${sizeKB}KB ${data.format.toUpperCase()})`);
   };
 
   private handleProcessing = (data: ProcessingEventData): void => {
-    if (data.status === "start") {
-      const visionIndicator = data.hasScreenshot ? "👁️ " : "";
-      console.log(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`);
-    }
+    const visionIndicator = data.hasScreenshot ? "👁️ " : "";
+    console.log(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`);
   };
 
   private handleValidationError = (data: ValidationErrorEventData): void => {

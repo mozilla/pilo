@@ -1,17 +1,50 @@
-import { buildPromptTemplate } from "./templateUtils.js";
+import { buildPromptTemplate } from "./utils/template.js";
 
+/** Base AI persona for web automation tasks. */
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.
 You have deep knowledge of the web and use only the highest quality sources.
 You focus on the task at hand and complete one step at a time.
 You adapt to situations and find creative ways to complete tasks without getting stuck.
 
-IMPORTANT: You can see the entire page content through the accessibility tree snapshot. You do not need to scroll or click links to navigate within a page - all content is visible to you. Focus on the elements you need to interact with directly.
+IMPORTANT:
+- You can see the entire page content through the accessibility tree snapshot.
+- You do not need to scroll or click links to navigate within a page - all content is visible to you.
+- Focus on the elements you need to interact with directly.
 `.trim();
 
-const jsonOnlyInstruction =
-  "IMPORTANT: You must respond with valid JSON only. Do not include any text before or after the JSON.";
+/** Available browser action tools with JSON syntax examples. */
+const toolExamples = `
+- click({"ref": "s1e33"}) - Click on an element
+- fill({"ref": "s1e33", "value": "text"}) - Enter text into a field
+- fill_and_enter({"ref": "s1e33", "value": "text"}) - Fill and press Enter
+- select({"ref": "s1e33", "value": "option"}) - Select from dropdown
+- hover({"ref": "s1e33"}) - Hover over element
+- check({"ref": "s1e33"}) - Check checkbox
+- uncheck({"ref": "s1e33"}) - Uncheck checkbox
+- focus({"ref": "s1e33"}) - Focus on element
+- enter({"ref": "s1e33"}) - Press Enter key
+- wait({"seconds": 3}) - Wait for specified time
+- goto({"url": "https://example.com"}) - Navigate to URL (only previously seen URLs)
+- back() - Go to previous page
+- forward() - Go to next page
+- extract({"description": "data to extract"}) - Extract specific data from current page for later reference
+- done({"result": "your final answer"}) - Complete the task
+- abort({"description": "what was tried and why it failed"}) - Abort when task cannot be completed
+`.trim();
 
+/** Standard tool calling instruction. */
+const toolCallInstruction = `
+You MUST use exactly one tool with the required parameters.
+Use valid JSON format for all arguments.
+CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool call multiple times.
+`.trim();
+
+/**
+ * Planning prompt - converts tasks into structured execution plans.
+ * Generates: create_plan_with_url() or create_plan() tool calls.
+ * Used by: planTask() in WebAgent during planning phase.
+ */
 const planPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
@@ -31,16 +64,18 @@ Best Practices:
 {% if startingUrl %}- Use the provided starting URL as your starting point for the task.{% endif %}
 {% if guardrails %}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{% endif %}
 
-${jsonOnlyInstruction}
+{% if includeUrl %}
+Call create_plan_with_url() with:
+- explanation: Restate the task concisely in your own words, focusing on the core objective
+- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
+- url: Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query
+{% else %}
+Call create_plan() with:
+- explanation: Restate the task concisely in your own words, focusing on the core objective
+- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
+{% endif %}
 
-Respond with a JSON object matching this exact structure:
-\`\`\`json
-{
-  "explanation": "Restate the task concisely in your own words, focusing on the core objective.",
-  "plan": "Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features."{% if includeUrl %},
-  "url": "Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query"{% endif %}
-}
-\`\`\`
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -61,90 +96,75 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
     guardrails,
   });
 
-const actionLoopResponseFormatTemplate = buildPromptTemplate(`{
-  "currentStep": "Status (Starting/Working on/Completing) Step #: [exact step text from plan]",
-  "extractedData": "REQUIRED: Extract any data that helps with your task. For navigation/action tasks: navigation options, form fields, error messages, loading states, menu items, search suggestions, requirements, restrictions. For research tasks: capture detailed information like facts, figures, quotes, sources, dates, prices, specifications, comparisons, pros/cons - enough detail to provide a comprehensive final answer. Create a concise markdown summary with headings and bullet points. Aim for 3-5 key items for navigation tasks, more detail for research tasks. If no task-related data is available, use: 'No task related data.'",
-  "observation": "Brief assessment of previous step's outcome. Was it a success or failure? Comment on any important data that should be extracted from the current page state.",
-  "observationStatusMessage": "REQUIRED: Short, friendly message (3-8 words) about what you observed. Examples: 'Found search form', 'Page loaded successfully', 'Login required first', 'Checking page content'.",
-  "thought": "Reasoning for your next action. Continue working through your plan step-by-step. Only use 'done' when you have completely finished the ENTIRE task and have all the information needed for your final answer. Completing one step or visiting one source is NOT the end of the task.{% if hasGuardrails %} Your actions MUST COMPLY with the provided guardrails.{% endif %} If the previous action failed, retry once then try an alternative approach.",
-  "action": {
-    "action": "REQUIRED: One of these exact values: click, hover, fill, focus, check, uncheck, select, enter, wait, goto, back, forward, done",
-    "ref": "CONDITIONAL: Required for click/hover/fill/focus/check/uncheck/select/enter actions. Format: s1e23 (not needed for wait/goto/back/forward/done)",
-    "value": "CONDITIONAL: Required for fill/select/goto/wait/done actions. Text for fill/select, URL for goto, seconds for wait, plain text final answer for done"
-  },
-  "actionStatusMessage": "REQUIRED: A short, friendly status update (3-8 words) for the user about what action you're taking. Examples: 'Clicking search button', 'Filling departure city', 'Selecting flight option'"
-}`);
-
-const actionLoopPromptTemplate = buildPromptTemplate(
+/**
+ * Action system prompt - guides AI browser interactions during execution.
+ * Generates: All web action tool calls (click, fill, done, abort, etc.).
+ * Used by: initializeConversation() as the system message.
+ */
+const actionLoopSystemPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
-For each step, assess the current state and decide on the next action to take.
-Consider the outcome of previous actions and explain your reasoning.
+
+Analyze the current page state and determine your next action based on previous outcomes.
+
+**Available Tools:**
+{{ toolExamples }}
+
+**Core Rules:**
+1. Use element refs from page snapshot (e.g., s1e33)
+2. Execute EXACTLY ONE tool per turn
+3. Complete ALL planned steps before using done()
+4. done() indicates ENTIRE task completion with comprehensive results
+5. goto() only accepts URLs from earlier in conversation
+6. Use wait() for page loads, animations, or dynamic content
+{% if hasGuardrails %}7. ALL actions MUST comply with provided guardrails{% endif %}
+
+**CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
+- done(result) if task is complete
+- abort(description) if task cannot be completed due to site issues, blocking, or missing data
+- Appropriate action tool if work remains
+- extract() if you need more information
+
+**Best Practices:**
+- Full page content is visible - no scrolling needed
+- Clear obstructing modals/popups first
+- Prefer click() over goto() for page navigation
+- Submit forms via enter() or submit button after filling
+- Find alternative elements if primary ones aren't available
+- Adapt your approach based on what's actually available
+- Use abort() only when you have exhausted reasonable alternatives and the task truly cannot be completed (site down, access blocked, required data unavailable)
+- For research: Use extract() immediately when finding relevant data
+{% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
+
+**When using done():**
+Your result should:
+- Summarize completed steps
+- Confirm careful adherence to user's request
+- Include all requested information thoroughly
+- Reference specific criteria met (if applicable)
+
 {% if hasGuardrails %}
-🚨 CRITICAL: Your actions MUST COMPLY with the provided guardrails. Any action that violates the guardrails is FORBIDDEN.
+🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
 {% endif %}
 
-Actions:
-- "select": Select option from dropdown (ref=element reference, value=option)
-- "fill": Enter text into field (ref=element reference, value=text)
-- "click": Click element (ref=element reference)
-- "hover": Hover over element (ref=element reference)
-- "check": Check checkbox (ref=element reference)
-- "uncheck": Uncheck checkbox (ref=element reference)
-- "enter": Press Enter key on element (ref=element reference) - useful for submitting forms
-- "wait": Wait for specified time (value=seconds)
-- "goto": Navigate to a PREVIOUSLY SEEN URL (value=URL)
-- "back": Go to previous page
-- "forward": Go to next page
-- "done": The ENTIRE task is complete - ONLY use when you have fully completed the task and are ready to provide a comprehensive final answer that synthesizes ALL the data you extracted during this session. This is NOT for marking individual steps complete.
-
-Rules:
-1. Use refs from page snapshot (e.g., [ref=s1e33])
-2. Perform only one action per step
-3. After each action, you'll receive an updated page snapshot
-4. You MUST complete ALL steps in your plan before using "done" - continue working through each step
-5. "done" means the ENTIRE task is finished - see FINAL ANSWER REQUIREMENTS below
-6. Use "wait" for page loads, animations, or dynamic content
-7. The "goto" action can ONLY be used with a URL that has already appeared in the conversation history (either the starting URL or a URL visited during the task). Do NOT invent new URLs.
-{% if hasGuardrails %}8. ALL ACTIONS MUST BE CHECKED AGAINST THE GUARDRAILS BEFORE EXECUTION{% endif %}
-
-Best Practices:
-- You can see the entire page content - do not scroll or click links just to navigate within the page
-- Always close any open modals, popups, or overlays that might obstruct your view or task completion
-- Use click instead of goto whenever possible, especially for navigation elements on the page
-- For forms, click the submit button after filling all fields
-- If an element isn't found, try looking for alternative elements
-- Focus on direct interaction with elements needed for your task
-{% if hasGuardrails %}- Before taking any action, verify it does not violate the guardrails{% endif %}
-
-**FINAL ANSWER REQUIREMENTS (for "done" action):**
-When you use the "done" action, your value field MUST contain a comprehensive final answer that:
-- Is written in plain text format
-- Synthesizes ALL data you extracted during this session
-- Uses ONLY information you actually found and recorded on the pages you visited
-- Provides clear results based on the data you collected
-- Includes relevant details from your web interactions and observations
-- Does NOT include external knowledge or assumptions beyond what you found during the task
-- Should be written as if responding directly to the user's original task request
-
-${jsonOnlyInstruction}
-
-Respond with a JSON object matching this exact structure:
-\`\`\`json
-{{ actionLoopResponseFormat }}
-\`\`\`
+${toolCallInstruction}
 `.trim(),
 );
 
-const buildActionLoopPrompt = (hasGuardrails: boolean) =>
-  actionLoopPromptTemplate({
+/** Build action system prompt with optional guardrails. */
+const buildActionLoopSystemPrompt = (hasGuardrails: boolean) =>
+  actionLoopSystemPromptTemplate({
     hasGuardrails,
-    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
+    toolExamples,
   });
 
-export const actionLoopPrompt = buildActionLoopPrompt(false);
-export { buildActionLoopPrompt };
+export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false);
+export { buildActionLoopSystemPrompt };
 
+/**
+ * Task context prompt - provides task, plan, and data to AI.
+ * Used by: initializeConversation() as the first user message.
+ */
 const taskAndPlanTemplate = buildPromptTemplate(
   `
 Task: {{ task }}
@@ -183,10 +203,13 @@ export const buildTaskAndPlanPrompt = (
     guardrails,
   });
 
+/**
+ * Page snapshot prompt - shows current page state to AI.
+ * Used by: updateConversation() before each action generation.
+ * Includes: Accessibility tree, title, URL, optional screenshot.
+ */
 const pageSnapshotTemplate = buildPromptTemplate(
   `
-This is a complete accessibility tree snapshot of the current page in the browser showing ALL page content.{% if hasScreenshot %} A screenshot is also provided to help you understand the visual layout.{% endif %}
-
 Title: {{ title }}
 URL: {{ url }}
 
@@ -194,12 +217,17 @@ URL: {{ url }}
 {{ snapshot }}
 \`\`\`
 
-The snapshot above contains the entire page content - you can see everything without scrolling or navigating within the page.
-Assess the current state and choose your next action.
-Focus on the most relevant elements that help complete your task.
-If content appears dynamic or paginated, consider waiting or exploring navigation options.
-If an action has failed twice, try something else or move on.
-{% if hasScreenshot %}Use the screenshot to better understand the page layout and identify elements that may not be fully captured in the text snapshot.{% endif %}
+This accessibility tree shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
+
+**Your task:**
+- Analyze the current state and select your next action
+- Target the most relevant elements for your objective
+- If an action fails, adapt immediately—don't repeat failed attempts
+- Find alternative approaches when planned steps aren't viable
+{% if hasScreenshot %}- Use the screenshot to understand layout and identify elements missed in the text{% endif %}
+- Follow all guardrails
+
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -216,75 +244,58 @@ export const buildPageSnapshotPrompt = (
     hasScreenshot,
   });
 
-const stepValidationFeedbackTemplate = buildPromptTemplate(
+/**
+ * Error feedback prompt - informs AI when actions fail.
+ * Used by: Validator.giveFeedback() after failures.
+ */
+const stepErrorFeedbackTemplate = buildPromptTemplate(
   `
-Your previous response did not match the required format. Here are the validation errors:
+# Error Occurred
+{{ error }}
 
-{{ validationErrors }}
-
-Please correct your response to match this exact format:
-\`\`\`json
-{{ actionLoopResponseFormat }}
-\`\`\`
-
-Remember:
-- "actionStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "observationStatusMessage" is REQUIRED and must be a short, user friendly status update (3-8 words)
-- "extractedData" is REQUIRED - extract actionable information from every page. For navigation tasks: UI elements, options, requirements. For research tasks: detailed facts, figures, quotes, sources, specifications - capture enough detail for a comprehensive final answer. If no task-related data is available, use: 'No task related data.'
-- For "select", "fill", "click", "hover", "check", "uncheck", "enter" actions, you MUST provide a "ref"
-- For "fill", "select", "goto" actions, you MUST provide a "value"
-- For "wait" action, you MUST provide a "value" with the number of seconds
-- For "done" action, you MUST provide a "value" with a plain text final answer following the FINAL ANSWER REQUIREMENTS
-- For "back" and "forward" actions, you must NOT provide a "ref" or "value"
 {% if hasGuardrails %}
-- ALL ACTIONS MUST COMPLY WITH THE PROVIDED GUARDRAILS
+CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
+
+${toolCallInstruction}
 `.trim(),
 );
 
-export const buildStepValidationFeedbackPrompt = (
-  validationErrors: string,
-  hasGuardrails: boolean = false,
-) =>
-  stepValidationFeedbackTemplate({
-    validationErrors,
-    actionLoopResponseFormat: actionLoopResponseFormatTemplate({ hasGuardrails }),
+export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boolean = false) =>
+  stepErrorFeedbackTemplate({
+    error,
     hasGuardrails,
+    toolExamples,
   });
 
+/**
+ * Task validation prompt - evaluates completion quality.
+ * Generates: validate_task() tool call.
+ * Used by: validateCompletion() when AI calls done().
+ * Returns: Quality rating (failed/partial/complete/excellent) and feedback.
+ */
 const taskValidationTemplate = buildPromptTemplate(
   `
-Review the task completion and determine if it was successful by analyzing both the final answer and the conversation that led to it.
+Evaluate how well the task result accomplishes what the user requested. Focus on task completion, not process.
+Be concise in your response.
 
 Task: {{ task }}
-Final Answer: {{ finalAnswer }}
-
-Conversation History:
-{{ conversationHistory }}
-
-Analyze the task completion using these quality levels:
-- **failed**: Task not completed or completed incorrectly
-- **partial**: Some objectives met but task incomplete or has significant issues  
-- **complete**: Task fully completed as requested with acceptable approach
-- **excellent**: Task completed efficiently with optimal approach and high quality result
+Result: {{ finalAnswer }}
 
 Evaluation criteria:
-1. Does the final answer directly address the task?
-2. Is the answer complete and specific enough?
-3. Did the agent perform the requested action or provide the requested information?
-4. Was the approach reasonable and efficient?
-5. Are there any significant errors or omissions?
+- **failed**: Task not completed or result doesn't accomplish what was requested
+- **partial**: Task partially completed but result is missing key elements
+- **complete**: Task fully completed and result accomplishes what was requested
+- **excellent**: Task completed exceptionally well with valuable additional elements
 
-${jsonOnlyInstruction}
+Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
 
-Respond with a JSON object matching this exact structure:
-\`\`\`json
-{
-  "observation": "Analyze how the agent approached the task: sequence of actions taken, appropriateness of actions, reasoning quality, and whether the agent worked efficiently toward the goal or got sidetracked.",
-  "completionQuality": "failed|partial|complete|excellent",
-  "feedback": "If quality is not 'complete' or 'excellent', provide specific, actionable guidance on what the agent should do to fix or improve the current task. Give concrete steps, strategies, or approaches the agent should take right now to complete the task successfully. Focus on actionable improvements for the current situation, not just what could have been better. If quality is 'complete' or 'excellent', this field is optional."
-}
-\`\`\`
+Call validate_task() with:
+- taskAssessment: Does the result accomplish what the user requested? Focus on task completion, not how it was done
+- completionQuality: Choose from "failed", "partial", "complete", or "excellent" based on evaluation criteria above
+- feedback: Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done
+
+${toolCallInstruction}
 `.trim(),
 );
 
@@ -299,6 +310,34 @@ export const buildTaskValidationPrompt = (
     conversationHistory,
   });
 
+/**
+ * Data extraction prompt - extracts specific data from pages.
+ * Used by: executeAction() when AI calls extract() tool.
+ * Input: Page markdown content and extraction description.
+ */
+const extractionPromptTemplate = buildPromptTemplate(
+  `
+Extract this data from the page content:
+{{ extractionDescription }}
+
+Page Content (Markdown):
+{{ markdown }}
+
+Instructions:
+- Include all relevant details that match the extraction request
+- Present the data in well-structured markdown format
+
+Return only the extracted data – no other text or commentary.
+`.trim(),
+);
+
+export const buildExtractionPrompt = (extractionDescription: string, markdown: string): string =>
+  extractionPromptTemplate({
+    extractionDescription,
+    markdown,
+  });
+
+/** Get current date in "MMM D, YYYY" format. */
 function getCurrentFormattedDate() {
   const date = new Date();
   return date.toLocaleDateString("en-US", {

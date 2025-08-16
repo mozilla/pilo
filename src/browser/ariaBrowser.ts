@@ -15,13 +15,16 @@ export enum PageAction {
   Uncheck = "uncheck",
   Select = "select",
   Enter = "enter",
+  FillAndEnter = "fill_and_enter",
 
   // Navigation and workflow
   Wait = "wait",
   Goto = "goto",
   Back = "back",
   Forward = "forward",
+  Extract = "extract",
   Done = "done",
+  Abort = "abort",
 }
 
 /**
@@ -58,8 +61,11 @@ export interface AriaBrowser {
   /** Returns the title of the current page */
   getTitle(): Promise<string>;
 
-  /** Returns the accessible text content of the current page */
-  getText(): Promise<string>;
+  /** Returns the accessible tree with refs as YAML string */
+  getTreeWithRefs(): Promise<string>;
+
+  /** Returns the page content as clean markdown */
+  getMarkdown(): Promise<string>;
 
   /** Captures and returns a screenshot of the current page */
   getScreenshot(): Promise<Buffer>;
