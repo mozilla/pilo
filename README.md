@@ -10,7 +10,7 @@ AI-powered web automation that lets you control browsers using natural language.
 # Install globally
 npm install -g https://github.com/Mozilla-Ocho/spark.git
 
-# Setup AI provider (choose OpenAI or OpenRouter)
+# Setup AI provider
 spark config --init
 
 # Run your first task
@@ -44,7 +44,11 @@ spark run "search hotels in Tokyo" --guardrails "browse only, don't book anythin
 - 🛡️ **Safety First**: Provide guardrails to prevent unintended actions
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
 
-## Installation Options
+## Installation
+
+### Global Installation (Recommended)
+
+See [Quick Start](#quick-start) above.
 
 ### Development Setup
 
@@ -76,6 +80,7 @@ spark run "<task description>" [options]
 - `--headless` - Run without visible browser window
 - `--debug` - Show detailed logs and page snapshots
 - `--vision` - Enable vision capabilities with full-page screenshots
+- `--reasoning-effort <level>` - AI reasoning effort (none, low, medium, high) for complex tasks
 - `--proxy <url>` - Proxy server URL (http://host:port, https://host:port, socks5://host:port)
 - `--proxy-username <username>` - Proxy authentication username
 - `--proxy-password <password>` - Proxy authentication password
@@ -177,6 +182,9 @@ spark run "complex automation task" --debug
 # Vision mode for complex visual layouts
 spark run "fill out complex form" --vision
 
+# Enhanced reasoning for complex tasks
+spark run "research and compare insurance plans" --reasoning-effort high
+
 # Combined options
 spark run "test signup flow" \
   --url https://app.com \
@@ -224,9 +232,18 @@ spark config --set openai_api_key=sk-your-key
 spark config --set provider=openrouter
 spark config --set openrouter_api_key=sk-or-your-key
 
+# Or use local AI providers
+spark config --set provider=ollama
+spark config --set model=llama3.2
+
+spark config --set provider=lmstudio
+spark config --set model=your-loaded-model
+
 # Set defaults
 spark config --set browser=chrome
 spark config --set headless=true
+spark config --set vision=true
+spark config --set reasoning_effort=medium
 
 # View settings
 spark config --show
@@ -234,6 +251,14 @@ spark config --show
 # Reset everything
 spark config --reset
 ```
+
+**Available AI Providers:**
+
+- **OpenAI** (default) - Requires API key from [platform.openai.com](https://platform.openai.com/api-keys)
+- **OpenRouter** - Requires API key from [openrouter.ai](https://openrouter.ai/keys)
+- **Ollama** - Local models, requires [Ollama](https://ollama.ai) running locally
+- **LM Studio** - Local models, requires [LM Studio](https://lmstudio.ai) server running on port 1234
+- **Vertex AI** - Google Cloud AI, requires project setup and authentication
 
 **Configuration priority:**
 
@@ -244,9 +269,12 @@ spark config --reset
 ## Requirements
 
 - **Node.js 20+**
-- **AI Provider API key:**
-  - [OpenAI API key](https://platform.openai.com/api-keys) (default), or
-  - [OpenRouter API key](https://openrouter.ai/keys) (alternative)
+- **AI Provider (one of):**
+  - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
+  - [OpenRouter API key](https://openrouter.ai/keys) (cloud)
+  - [Ollama](https://ollama.ai) running locally (local)
+  - [LM Studio](https://lmstudio.ai) server (local)
+  - Google Cloud project with Vertex AI enabled
 - **Browsers:** Automatically installed by Playwright (Firefox, Chrome, Safari, Edge)
 
 ## API Reference
