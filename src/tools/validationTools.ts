@@ -6,22 +6,18 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { TOOL_STRINGS } from "../prompts.js";
 
 export function createValidationTools() {
   return {
     validate_task: tool({
-      description: "Validate if the task has been completed successfully",
+      description: TOOL_STRINGS.validation.validate_task.description,
       inputSchema: z.object({
-        taskAssessment: z.string().describe("Brief assessment of how well the task was completed"),
+        taskAssessment: z.string().describe(TOOL_STRINGS.validation.validate_task.taskAssessment),
         completionQuality: z
           .enum(["failed", "partial", "complete", "excellent"])
-          .describe(
-            "Quality of task completion: failed (not done), partial (incomplete), complete (done adequately), excellent (done very well)",
-          ),
-        feedback: z
-          .string()
-          .optional()
-          .describe("Specific feedback on what needs improvement (if not complete/excellent)"),
+          .describe(TOOL_STRINGS.validation.validate_task.completionQuality),
+        feedback: z.string().optional().describe(TOOL_STRINGS.validation.validate_task.feedback),
       }),
       execute: async ({ taskAssessment, completionQuality, feedback }) => {
         return { taskAssessment, completionQuality, feedback };

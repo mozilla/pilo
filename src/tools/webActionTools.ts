@@ -9,7 +9,7 @@ import { tool, generateText } from "ai";
 import { z } from "zod";
 import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
-import { buildExtractionPrompt } from "../prompts.js";
+import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 
@@ -103,9 +103,9 @@ async function performActionWithValidation(
 export function createWebActionTools(context: WebActionContext) {
   return {
     click: tool({
-      description: "Click on an element on the page",
+      description: TOOL_STRINGS.webActions.click.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Click, context, ref);
@@ -113,10 +113,10 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     fill: tool({
-      description: "Fill text into an input field",
+      description: TOOL_STRINGS.webActions.fill.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
-        value: z.string().describe("Text to enter into the field"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
+        value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
         return await performActionWithValidation(PageAction.Fill, context, ref, value);
@@ -124,10 +124,10 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     select: tool({
-      description: "Select an option from a dropdown",
+      description: TOOL_STRINGS.webActions.select.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
-        value: z.string().describe("Option to select"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
+        value: z.string().describe(TOOL_STRINGS.webActions.select.value),
       }),
       execute: async ({ ref, value }) => {
         return await performActionWithValidation(PageAction.Select, context, ref, value);
@@ -135,9 +135,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     hover: tool({
-      description: "Hover over an element",
+      description: TOOL_STRINGS.webActions.hover.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Hover, context, ref);
@@ -145,9 +145,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     check: tool({
-      description: "Check a checkbox",
+      description: TOOL_STRINGS.webActions.check.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Check, context, ref);
@@ -155,9 +155,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     uncheck: tool({
-      description: "Uncheck a checkbox",
+      description: TOOL_STRINGS.webActions.uncheck.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Uncheck, context, ref);
@@ -165,9 +165,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     focus: tool({
-      description: "Focus on an element",
+      description: TOOL_STRINGS.webActions.focus.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Focus, context, ref);
@@ -175,9 +175,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     enter: tool({
-      description: "Press Enter key on an element (useful for form submission)",
+      description: TOOL_STRINGS.webActions.enter.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
         return await performActionWithValidation(PageAction.Enter, context, ref);
@@ -185,10 +185,10 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     fill_and_enter: tool({
-      description: "Fill text into an input field and press Enter (useful for search boxes)",
+      description: TOOL_STRINGS.webActions.fill_and_enter.description,
       inputSchema: z.object({
-        ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
-        value: z.string().describe("Text to enter into the field"),
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
+        value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
         return await performActionWithValidation(PageAction.FillAndEnter, context, ref, value);
@@ -196,9 +196,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     wait: tool({
-      description: "Wait for a specified number of seconds",
+      description: TOOL_STRINGS.webActions.wait.description,
       inputSchema: z.object({
-        seconds: z.number().min(0).max(30).describe("Number of seconds to wait (0-30)"),
+        seconds: z.number().min(0).max(30).describe(TOOL_STRINGS.webActions.wait.seconds),
       }),
       execute: async ({ seconds }) => {
         // Wait uses browser.performAction which expects value as string
@@ -218,9 +218,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     goto: tool({
-      description: "Navigate to a URL that was previously seen in the conversation",
+      description: TOOL_STRINGS.webActions.goto.description,
       inputSchema: z.object({
-        url: z.url().describe("URL to navigate to (must be previously seen)"),
+        url: z.url().describe(TOOL_STRINGS.webActions.goto.url),
       }),
       execute: async ({ url }) => {
         const result = await performActionWithValidation(PageAction.Goto, context, undefined, url);
@@ -243,7 +243,7 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     back: tool({
-      description: "Go back to the previous page",
+      description: TOOL_STRINGS.webActions.back.description,
       inputSchema: z.object({}),
       execute: async () => {
         const result = await performActionWithValidation(PageAction.Back, context);
@@ -262,7 +262,7 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     forward: tool({
-      description: "Go forward to the next page",
+      description: TOOL_STRINGS.webActions.forward.description,
       inputSchema: z.object({}),
       execute: async () => {
         const result = await performActionWithValidation(PageAction.Forward, context);
@@ -281,11 +281,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     extract: tool({
-      description: "Extract specific data from the current page for later reference",
+      description: TOOL_STRINGS.webActions.extract.description,
       inputSchema: z.object({
-        description: z
-          .string()
-          .describe("Precise description of the data to extract. DO NOT use `ref` values."),
+        description: z.string().describe(TOOL_STRINGS.webActions.extract.dataDescription),
       }),
       execute: async ({ description }) => {
         // Extract doesn't use browser.performAction - it's a special AI operation
@@ -323,14 +321,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     done: tool({
-      description:
-        "Mark the entire task as complete with final results that directly address ALL parts of the original task",
+      description: TOOL_STRINGS.webActions.done.description,
       inputSchema: z.object({
-        result: z
-          .string()
-          .describe(
-            "A summary of the steps you took to complete the task and the final results that directly address ALL parts of the original task",
-          ),
+        result: z.string().describe(TOOL_STRINGS.webActions.done.result),
       }),
       execute: async ({ result }) => {
         // Done is a terminal action - doesn't interact with browser
@@ -343,14 +336,9 @@ export function createWebActionTools(context: WebActionContext) {
     }),
 
     abort: tool({
-      description:
-        "Abort the task when it cannot be completed due to site issues, blocking, or missing data",
+      description: TOOL_STRINGS.webActions.abort.description,
       inputSchema: z.object({
-        description: z
-          .string()
-          .describe(
-            "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
-          ),
+        description: z.string().describe(TOOL_STRINGS.webActions.abort.reason),
       }),
       execute: async ({ description }) => {
         // Abort is a terminal action - doesn't interact with browser

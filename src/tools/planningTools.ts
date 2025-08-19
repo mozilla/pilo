@@ -6,14 +6,15 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { TOOL_STRINGS } from "../prompts.js";
 
 export function createPlanningTools() {
   return {
     create_plan: tool({
-      description: "Create a step-by-step plan for completing the task",
+      description: TOOL_STRINGS.planning.create_plan.description,
       inputSchema: z.object({
-        explanation: z.string().describe("Task explanation in agent's own words"),
-        plan: z.string().describe("Step-by-step plan for the task"),
+        explanation: z.string().describe(TOOL_STRINGS.planning.common.explanation),
+        plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
       }),
       execute: async ({ explanation, plan }) => {
         return { explanation, plan };
@@ -21,11 +22,11 @@ export function createPlanningTools() {
     }),
 
     create_plan_with_url: tool({
-      description: "Create a step-by-step plan and determine the best starting URL",
+      description: TOOL_STRINGS.planning.create_plan_with_url.description,
       inputSchema: z.object({
-        explanation: z.string().describe("Task explanation in agent's own words"),
-        plan: z.string().describe("Step-by-step plan for the task"),
-        url: z.string().describe("Starting URL for the task"),
+        explanation: z.string().describe(TOOL_STRINGS.planning.common.explanation),
+        plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
+        url: z.string().describe(TOOL_STRINGS.planning.create_plan_with_url.url),
       }),
       execute: async ({ explanation, plan, url }) => {
         return { explanation, plan, url };

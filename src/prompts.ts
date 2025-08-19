@@ -1,5 +1,114 @@
 import { buildPromptTemplate } from "./utils/template.js";
 
+/**
+ * Centralized tool descriptions and schema definitions.
+ * Organized by tool category for better maintainability.
+ */
+export const TOOL_STRINGS = {
+  /**
+   * Web action tools - browser automation actions
+   */
+  webActions: {
+    /** Common parameter descriptions used across multiple tools */
+    common: {
+      elementRef: "Element reference from page snapshot (e.g., s1e23)",
+      textValue: "Text to enter into the field",
+    },
+    /** Individual tool descriptions */
+    click: {
+      description: "Click on an element on the page",
+    },
+    fill: {
+      description: "Fill text into an input field",
+    },
+    select: {
+      description: "Select an option from a dropdown",
+      value: "Option to select",
+    },
+    hover: {
+      description: "Hover over an element",
+    },
+    check: {
+      description: "Check a checkbox",
+    },
+    uncheck: {
+      description: "Uncheck a checkbox",
+    },
+    focus: {
+      description: "Focus on an element",
+    },
+    enter: {
+      description: "Press Enter key on an element (useful for form submission)",
+    },
+    fill_and_enter: {
+      description: "Fill text into an input field and press Enter (useful for search boxes)",
+    },
+    wait: {
+      description: "Wait for a specified number of seconds",
+      seconds: "Number of seconds to wait (0-30)",
+    },
+    goto: {
+      description: "Navigate to a URL that was previously seen in the conversation",
+      url: "URL to navigate to (must be previously seen)",
+    },
+    back: {
+      description: "Go back to the previous page",
+    },
+    forward: {
+      description: "Go forward to the next page",
+    },
+    extract: {
+      description: "Extract specific data from the current page for later reference",
+      dataDescription: "Precise description of the data to extract. DO NOT use `ref` values.",
+    },
+    done: {
+      description:
+        "Mark the entire task as complete with final results that directly address ALL parts of the original task",
+      result:
+        "A summary of the steps you took to complete the task and the final results that directly address ALL parts of the original task",
+    },
+    abort: {
+      description:
+        "Abort the task when it cannot be completed due to site issues, blocking, or missing data",
+      reason:
+        "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
+    },
+  },
+
+  /**
+   * Planning tools - task planning and URL determination
+   */
+  planning: {
+    /** Common parameter descriptions */
+    common: {
+      explanation: "Task explanation in agent's own words",
+      plan: "Step-by-step plan for the task",
+    },
+    /** Individual tool descriptions */
+    create_plan: {
+      description: "Create a step-by-step plan for completing the task",
+    },
+    create_plan_with_url: {
+      description: "Create a step-by-step plan and determine the best starting URL",
+      url: "Starting URL for the task",
+    },
+  },
+
+  /**
+   * Validation tools - task completion quality assessment
+   */
+  validation: {
+    /** Individual tool descriptions */
+    validate_task: {
+      description: "Validate if the task has been completed successfully",
+      taskAssessment: "Brief assessment of how well the task was completed",
+      completionQuality:
+        "Quality of task completion: failed (not done), partial (incomplete), complete (done adequately), excellent (done very well)",
+      feedback: "Specific feedback on what needs improvement (if not complete/excellent)",
+    },
+  },
+} as const;
+
 /** Base AI persona for web automation tasks. */
 const youArePrompt = `
 You are an expert at completing tasks using a web browser.
