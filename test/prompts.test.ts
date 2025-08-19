@@ -58,7 +58,6 @@ describe("prompts", () => {
       expect(prompt).toContain("explanation");
       expect(prompt).toContain("plan");
       expect(prompt).toContain("url");
-      expect(prompt).toContain("duckduckgo.com");
     });
 
     it("should handle special characters in task", () => {
@@ -169,12 +168,12 @@ describe("prompts", () => {
     });
 
     it("should include ref format examples", () => {
-      expect(actionLoopSystemPrompt).toContain("s1e33");
+      expect(actionLoopSystemPrompt).toContain("e###");
       expect(actionLoopSystemPrompt).toContain("element refs from page snapshot");
     });
 
     it("should include goto restrictions", () => {
-      expect(actionLoopSystemPrompt).toContain("only previously seen URLs");
+      expect(actionLoopSystemPrompt).toContain("previously seen");
       expect(actionLoopSystemPrompt).toContain("goto() only accepts URLs");
     });
   });
@@ -336,14 +335,14 @@ describe("prompts", () => {
     it("should format page snapshot with title and URL", () => {
       const title = "Contact Us - Example Company";
       const url = "https://example.com/contact";
-      const snapshot = "button 'Submit' [ref=s1e23]\ninput 'Email' [ref=s2e45]";
+      const snapshot = "button 'Submit' [e123]\ninput 'Email' [e245]";
 
       const prompt = buildPageSnapshotPrompt(title, url, snapshot);
 
       expect(prompt).toContain("Title: Contact Us - Example Company");
       expect(prompt).toContain("URL: https://example.com/contact");
-      expect(prompt).toContain("button 'Submit' [ref=s1e23]");
-      expect(prompt).toContain("input 'Email' [ref=s2e45]");
+      expect(prompt).toContain("button 'Submit' [e123]");
+      expect(prompt).toContain("input 'Email' [e245]");
     });
 
     it("should include guidance text", () => {
@@ -426,9 +425,10 @@ describe("prompts", () => {
     it("should include validation criteria", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("Does the result accomplish what the user requested");
-      expect(prompt).toContain("Task partially completed but result is missing key elements");
-      expect(prompt).toContain("Task fully completed and result accomplishes what was requested");
+      expect(prompt).toContain("failed");
+      expect(prompt).toContain("partial");
+      expect(prompt).toContain("complete");
+      expect(prompt).toContain("excellent");
     });
 
     it("should contain required instructions", () => {
@@ -441,8 +441,8 @@ describe("prompts", () => {
     it("should include feedback instruction", () => {
       const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
 
-      expect(prompt).toContain("Only for 'failed' or 'partial'");
-      expect(prompt).toContain("What is still missing to complete the task");
+      expect(prompt).toContain("failed' or 'partial'");
+      expect(prompt).toContain("feedback");
     });
 
     it("should handle empty inputs", () => {

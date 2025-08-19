@@ -14,6 +14,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^2.0.15
         version: 2.0.15(zod@4.0.17)
+      '@ai-sdk/openai-compatible':
+        specifier: ^1.0.7
+        version: 1.0.7(zod@4.0.17)
       '@ghostery/adblocker-playwright':
         specifier: ^2.11.3
         version: 2.11.3(playwright@1.53.0)
@@ -47,6 +50,9 @@ importers:
       nanoid:
         specifier: ^5.1.5
         version: 5.1.5
+      ollama-ai-provider-v2:
+        specifier: ^1.1.1
+        version: 1.1.1(zod@4.0.17)
       playwright:
         specifier: 1.53.0
         version: 1.53.0
@@ -108,8 +114,20 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
+  '@ai-sdk/openai-compatible@1.0.7':
+    resolution: {integrity: sha512-mH+0yoJCvPQZBwwyw8ALil0cA40dQAPc+YhaANFxpjDJKqtATpHXPxq7u2SiMNkbqV26jO92etHPM+EP2+p2VA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
   '@ai-sdk/openai@2.0.15':
     resolution: {integrity: sha512-/IUyQ9ck4uUTtGojvQamcUWpNWkwpL/P1F6LYRxpQGj07H00oJEBH/VUizrIq0ZvW/vkuK6c6X4UJS9PrdYyxA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
+  '@ai-sdk/provider-utils@3.0.1':
+    resolution: {integrity: sha512-/iP1sKc6UdJgGH98OCly7sWJKv+J9G47PnTjIj40IJMUQKwDrUMyf7zOOfRtPwSuNifYhSoJQ4s1WltI65gJ/g==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -1076,6 +1094,12 @@ packages:
   nwsapi@2.2.21:
     resolution: {integrity: sha512-o6nIY3qwiSXl7/LuOU0Dmuctd34Yay0yeuZRLFmDPrrdHpXKFndPj3hM+YEPVHYC5fx2otBx4Ilc/gyYSAUaIA==}
 
+  ollama-ai-provider-v2@1.1.1:
+    resolution: {integrity: sha512-HOYiMaEFbBpcS9myCE9PfUeYFqN0RrCEfBWSS5PKay9PUrawyNwrT92BE0QlHjL08MHXVo2Cjtcp7tEo6ur3xQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^4.0.16
+
   onetime@6.0.0:
     resolution: {integrity: sha512-1FlR+gjXK7X+AsAHso35MnyN5KqGwJRi/31ft6x0M194ht7S+rWAvd7PHss9xSKMzE0asv1pyIHaJYq+BbacAQ==}
     engines: {node: '>=12'}
@@ -1465,11 +1489,25 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
 
+  '@ai-sdk/openai-compatible@1.0.7(zod@4.0.17)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
+      zod: 4.0.17
+
   '@ai-sdk/openai@2.0.15(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
+
+  '@ai-sdk/provider-utils@3.0.1(zod@4.0.17)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.3
+      zod: 4.0.17
+      zod-to-json-schema: 3.24.6(zod@4.0.17)
 
   '@ai-sdk/provider-utils@3.0.3(zod@4.0.17)':
     dependencies:
@@ -2334,6 +2372,12 @@ snapshots:
       path-key: 4.0.0
 
   nwsapi@2.2.21: {}
+
+  ollama-ai-provider-v2@1.1.1(zod@4.0.17):
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.1(zod@4.0.17)
+      zod: 4.0.17
 
   onetime@6.0.0:
     dependencies:

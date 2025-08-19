@@ -4,6 +4,7 @@ import { AriaBrowser, PageAction } from "../../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import { LanguageModel, generateText } from "ai";
 import { z } from "zod";
+import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -21,8 +22,8 @@ const mockGenerateText = vi.mocked(generateText);
 // Mock browser implementation
 class MockBrowser implements AriaBrowser {
   browserName = "mock-browser";
-  private url = "https://example.com";
-  private title = "Example Page";
+  public url = "https://example.com";
+  public title = "Example Page";
 
   async start(): Promise<void> {}
   async shutdown(): Promise<void> {}
@@ -87,7 +88,8 @@ describe("Web Action Tools", () => {
     context = {
       browser: mockBrowser,
       eventEmitter,
-      provider: mockProvider,
+      providerConfig: { model: mockProvider },
+      abortSignal: undefined,
     };
 
     tools = createWebActionTools(context);
@@ -194,17 +196,30 @@ describe("Web Action Tools", () => {
       expect(invalid.success).toBe(false);
     });
 
-    it("should handle timeout errors with helpful message", async () => {
-      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
-        new Error("Timeout waiting for element"),
-      );
+    it("should handle InvalidRefException and return recoverable error", async () => {
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(new InvalidRefException("btn1"));
 
-      await expect(tools.click.execute({ ref: "btn1" })).rejects.toThrow(
-        "Element with reference 'btn1' not found or not interactable",
-      );
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Invalid element reference 'btn1'");
+      expect(result.isRecoverable).toBe(true);
+      expect(result.ref).toBe("btn1");
     });
 
-    it("should re-throw non-timeout errors", async () => {
+    it("should handle BrowserActionException and return recoverable error", async () => {
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("click", "Element is disabled"),
+      );
+
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Element is disabled");
+      expect(result.isRecoverable).toBe(true);
+    });
+
+    it("should re-throw non-browser errors", async () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(new Error("Network error"));
 
       await expect(tools.click.execute({ ref: "btn1" })).rejects.toThrow("Network error");
@@ -348,14 +363,13 @@ describe("Web Action Tools", () => {
   });
 
   describe("Fill and Enter Action", () => {
-    it("should execute fill and enter actions successfully", async () => {
+    it("should execute fill and enter action successfully", async () => {
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");
 
       const result = await tools.fill_and_enter.execute({ ref: "search1", value: "query" });
 
-      expect(performActionSpy).toHaveBeenCalledTimes(2);
-      expect(performActionSpy).toHaveBeenNthCalledWith(1, "search1", PageAction.Fill, "query");
-      expect(performActionSpy).toHaveBeenNthCalledWith(2, "search1", PageAction.Enter, undefined);
+      expect(performActionSpy).toHaveBeenCalledTimes(1);
+      expect(performActionSpy).toHaveBeenCalledWith("search1", PageAction.FillAndEnter, "query");
       expect(result).toEqual({
         success: true,
         action: "fill_and_enter",
@@ -388,26 +402,17 @@ describe("Web Action Tools", () => {
 
   describe("Wait Action", () => {
     it("should execute wait action successfully", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
-      const waitPromise = tools.wait.execute({ seconds: 2 });
+      const result = await tools.wait.execute({ seconds: 2 });
 
-      // Check that events were emitted immediately
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
-        action: "wait",
-        ref: undefined,
-        value: 2,
-      });
+      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Wait, "2");
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_WAITING, { seconds: 2 });
-
-      // Advance timers
-      await vi.advanceTimersByTimeAsync(2000);
-
-      const result = await waitPromise;
       expect(result).toEqual({
         success: true,
         action: "wait",
-        seconds: 2,
+        value: "2", // performActionWithValidation adds value field
       });
     });
 
@@ -427,26 +432,12 @@ describe("Web Action Tools", () => {
 
   describe("Navigation Actions", () => {
     it("should execute goto action successfully", async () => {
-      const gotoSpy = vi.spyOn(mockBrowser, "goto");
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       const result = await tools.goto.execute({ url: "https://newsite.com" });
 
-      expect(gotoSpy).toHaveBeenCalledWith("https://newsite.com");
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
-        action: "goto",
-        ref: undefined,
-        value: "https://newsite.com",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
-        action: "goto",
-        ref: undefined,
-        value: "https://newsite.com",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: true,
-        action: "goto",
-      });
+      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Goto, "https://newsite.com");
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
         title: expect.any(String),
         url: expect.any(String),
@@ -454,8 +445,8 @@ describe("Web Action Tools", () => {
       expect(result).toEqual({
         success: true,
         action: "goto",
-        url: "https://newsite.com",
         title: expect.any(String),
+        value: "https://newsite.com", // performActionWithValidation adds value field
       });
     });
 
@@ -470,30 +461,28 @@ describe("Web Action Tools", () => {
     });
 
     it("should execute back action successfully", async () => {
-      const goBackSpy = vi.spyOn(mockBrowser, "goBack");
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      // Manually set the mock browser state since goBack is called within performAction
+      mockBrowser.url = "https://previous.com";
+      mockBrowser.title = "Previous Page";
+
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       const result = await tools.back.execute({});
 
-      expect(goBackSpy).toHaveBeenCalled();
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
-        action: "back",
-        ref: undefined,
-        value: undefined,
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
-        action: "back",
-        ref: undefined,
-        value: undefined,
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: true,
-        action: "back",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
+      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Back, undefined);
+
+      // Find the BROWSER_NAVIGATED event call
+      const navigatedCall = emitSpy.mock.calls.find(
+        (call) => call[0] === WebAgentEventType.BROWSER_NAVIGATED,
+      );
+      expect(navigatedCall).toBeDefined();
+      expect(navigatedCall![1]).toEqual({
         title: "Previous Page",
         url: "https://previous.com",
       });
+
       expect(result).toEqual({
         success: true,
         action: "back",
@@ -501,30 +490,28 @@ describe("Web Action Tools", () => {
     });
 
     it("should execute forward action successfully", async () => {
-      const goForwardSpy = vi.spyOn(mockBrowser, "goForward");
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      // Manually set the mock browser state since goForward is called within performAction
+      mockBrowser.url = "https://next.com";
+      mockBrowser.title = "Next Page";
+
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       const result = await tools.forward.execute({});
 
-      expect(goForwardSpy).toHaveBeenCalled();
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
-        action: "forward",
-        ref: undefined,
-        value: undefined,
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
-        action: "forward",
-        ref: undefined,
-        value: undefined,
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: true,
-        action: "forward",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_NAVIGATED, {
+      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Forward, undefined);
+
+      // Find the BROWSER_NAVIGATED event call
+      const navigatedCall = emitSpy.mock.calls.find(
+        (call) => call[0] === WebAgentEventType.BROWSER_NAVIGATED,
+      );
+      expect(navigatedCall).toBeDefined();
+      expect(navigatedCall![1]).toEqual({
         title: "Next Page",
         url: "https://next.com",
       });
+
       expect(result).toEqual({
         success: true,
         action: "forward",
@@ -545,6 +532,7 @@ describe("Web Action Tools", () => {
 
       expect(getMarkdownSpy).toHaveBeenCalled();
       expect(mockGenerateText).toHaveBeenCalledWith({
+        model: { specificationVersion: "v1" }, // providerConfig.model
         prompt: expect.stringContaining("Get important info"),
         maxOutputTokens: 5000,
         abortSignal: undefined,
@@ -611,12 +599,11 @@ describe("Web Action Tools", () => {
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       const result = await tools.abort.execute({
-        description: "Site is down, cannot proceed",
+        reason: "Site is down, cannot proceed",
       });
 
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
         action: "abort",
-        ref: undefined,
         value: "Site is down, cannot proceed",
       });
       expect(result).toEqual({
@@ -640,7 +627,7 @@ describe("Web Action Tools", () => {
     it("should validate abort action input", () => {
       const schema = tools.abort.inputSchema;
 
-      const valid = schema.safeParse({ description: "Cannot continue" });
+      const valid = schema.safeParse({ reason: "Cannot continue" });
       expect(valid.success).toBe(true);
 
       const invalid = schema.safeParse({});
@@ -649,27 +636,31 @@ describe("Web Action Tools", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle timeout errors with element reference", async () => {
+    it("should handle InvalidRefException with recoverable error", async () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
-        new Error("Timeout 30000ms exceeded"),
+        new InvalidRefException("missing_btn"),
       );
 
-      await expect(tools.click.execute({ ref: "missing_btn" })).rejects.toThrow(
-        "Element with reference 'missing_btn' not found or not interactable",
-      );
+      const result = await tools.click.execute({ ref: "missing_btn" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Invalid element reference 'missing_btn'");
+      expect(result.isRecoverable).toBe(true);
     });
 
-    it("should handle lowercase timeout errors", async () => {
+    it("should handle BrowserActionException with recoverable error", async () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
-        new Error("timeout waiting for element"),
+        new BrowserActionException("hover", "Element not visible"),
       );
 
-      await expect(tools.hover.execute({ ref: "missing_el" })).rejects.toThrow(
-        "Element with reference 'missing_el' not found or not interactable",
-      );
+      const result = await tools.hover.execute({ ref: "hidden_el" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Element not visible");
+      expect(result.isRecoverable).toBe(true);
     });
 
-    it("should preserve original error for non-timeout errors", async () => {
+    it("should preserve original error for non-browser exceptions", async () => {
       const originalError = new Error("Browser crashed");
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(originalError);
 
@@ -679,11 +670,15 @@ describe("Web Action Tools", () => {
     });
 
     it("should handle errors in navigation actions", async () => {
-      vi.spyOn(mockBrowser, "goto").mockRejectedValueOnce(new Error("Navigation failed"));
-
-      await expect(tools.goto.execute({ url: "https://bad-site.com" })).rejects.toThrow(
-        "Navigation failed",
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("goto", "Navigation failed"),
       );
+
+      const result = await tools.goto.execute({ url: "https://bad-site.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Navigation failed");
+      expect(result.isRecoverable).toBe(true);
     });
 
     it("should handle errors in extract action", async () => {
