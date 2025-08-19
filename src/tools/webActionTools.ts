@@ -11,6 +11,7 @@ import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
+import { BrowserException } from "../errors.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -20,62 +21,86 @@ interface WebActionContext {
 }
 
 /**
- * Helper function to perform an action with better error handling
- * @param ref The element reference
- * @param action The action to perform
- * @param browser The browser instance
- * @param value Optional value for actions like fill
- * @returns The result of the action
+ * Tool output structure for browser actions
+ * This structure is guaranteed to be consistent for easy error checking:
+ * - success: always present, indicates if action succeeded
+ * - action: always present, the action that was attempted
+ * - error: present when success is false, contains error message
+ * - isRecoverable: present when error is recoverable (browser exceptions)
+ * - ref/value: present when provided as input
+ */
+type ActionResult = {
+  success: boolean;
+  action: string;
+  ref?: string;
+  value?: string | number;
+  error?: string;
+  isRecoverable?: boolean;
+};
+
+/**
+ * Helper function to perform an action with full error handling and logging
+ * Handles browser exceptions and converts them to recoverable errors for the agent
+ *
+ * IMPORTANT: When this returns an error (success: false), the error is already
+ * included in the tool result that the LLM sees. The agent layer should NOT
+ * add a duplicate user message for these errors.
  */
 async function performActionWithValidation(
-  ref: string,
   action: PageAction,
-  browser: AriaBrowser,
+  context: WebActionContext,
+  ref?: string,
   value?: string,
-): Promise<void> {
+): Promise<ActionResult> {
   try {
-    await browser.performAction(ref, action, value);
-  } catch (error: any) {
-    // Check if it's a timeout error (element not found)
-    if (error.message?.includes("Timeout") || error.message?.includes("timeout")) {
-      throw new Error(
-        `Element with reference '${ref}' not found or not interactable. The element may have been removed from the page or the reference may be invalid. Please check the current page snapshot.`,
-      );
-    }
-    // Re-throw other errors as-is
-    throw error;
-  }
-}
-
-export function createWebActionTools(context: WebActionContext) {
-  // Helper functions that have access to context
-  const emitAgentAction = (action: string, ref?: string, value?: string | number) => {
+    // Emit action started events
     context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
       action,
       ref,
       value,
     });
-  };
 
-  const emitBrowserActionStarted = (action: string, ref?: string, value?: string) => {
-    // First emit the agent action
-    emitAgentAction(action, ref, value);
-
-    // Then emit browser action started
     context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
       action,
       ref,
       value,
     });
-  };
 
-  const emitBrowserActionCompleted = (action: string, success: boolean = true) => {
+    // Perform the action
+    await context.browser.performAction(ref || "", action, value);
+
+    // Emit success
     context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-      success,
+      success: true,
       action,
     });
-  };
 
+    return { success: true, action, ...(ref && { ref }), ...(value !== undefined && { value }) };
+  } catch (error) {
+    // Emit failure
+    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+      success: false,
+      action,
+    });
+
+    // For browser exceptions, return error info with recoverable flag
+    if (error instanceof BrowserException) {
+      return {
+        success: false,
+        action,
+        ...(ref && { ref }),
+        ...(value !== undefined && { value }),
+        error: error.message,
+        isRecoverable: true,
+      };
+    }
+
+    // Re-throw non-browser errors
+    throw error;
+  }
+}
+
+export function createWebActionTools(context: WebActionContext) {
   return {
     click: tool({
       description: "Click on an element on the page",
@@ -83,10 +108,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("click", ref);
-        await performActionWithValidation(ref, PageAction.Click, context.browser);
-        emitBrowserActionCompleted("click");
-        return { success: true, action: "click", ref };
+        return await performActionWithValidation(PageAction.Click, context, ref);
       },
     }),
 
@@ -97,10 +119,7 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe("Text to enter into the field"),
       }),
       execute: async ({ ref, value }) => {
-        emitBrowserActionStarted("fill", ref, value);
-        await performActionWithValidation(ref, PageAction.Fill, context.browser, value);
-        emitBrowserActionCompleted("fill");
-        return { success: true, action: "fill", ref, value };
+        return await performActionWithValidation(PageAction.Fill, context, ref, value);
       },
     }),
 
@@ -111,10 +130,7 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe("Option to select"),
       }),
       execute: async ({ ref, value }) => {
-        emitBrowserActionStarted("select", ref, value);
-        await performActionWithValidation(ref, PageAction.Select, context.browser, value);
-        emitBrowserActionCompleted("select");
-        return { success: true, action: "select", ref, value };
+        return await performActionWithValidation(PageAction.Select, context, ref, value);
       },
     }),
 
@@ -124,10 +140,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("hover", ref);
-        await performActionWithValidation(ref, PageAction.Hover, context.browser);
-        emitBrowserActionCompleted("hover");
-        return { success: true, action: "hover", ref };
+        return await performActionWithValidation(PageAction.Hover, context, ref);
       },
     }),
 
@@ -137,10 +150,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("check", ref);
-        await performActionWithValidation(ref, PageAction.Check, context.browser);
-        emitBrowserActionCompleted("check");
-        return { success: true, action: "check", ref };
+        return await performActionWithValidation(PageAction.Check, context, ref);
       },
     }),
 
@@ -150,10 +160,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("uncheck", ref);
-        await performActionWithValidation(ref, PageAction.Uncheck, context.browser);
-        emitBrowserActionCompleted("uncheck");
-        return { success: true, action: "uncheck", ref };
+        return await performActionWithValidation(PageAction.Uncheck, context, ref);
       },
     }),
 
@@ -163,10 +170,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("focus", ref);
-        await performActionWithValidation(ref, PageAction.Focus, context.browser);
-        emitBrowserActionCompleted("focus");
-        return { success: true, action: "focus", ref };
+        return await performActionWithValidation(PageAction.Focus, context, ref);
       },
     }),
 
@@ -176,10 +180,7 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe("Element reference from page snapshot (e.g., s1e23)"),
       }),
       execute: async ({ ref }) => {
-        emitBrowserActionStarted("enter", ref);
-        await performActionWithValidation(ref, PageAction.Enter, context.browser);
-        emitBrowserActionCompleted("enter");
-        return { success: true, action: "enter", ref };
+        return await performActionWithValidation(PageAction.Enter, context, ref);
       },
     }),
 
@@ -190,11 +191,7 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe("Text to enter into the field"),
       }),
       execute: async ({ ref, value }) => {
-        emitBrowserActionStarted("fill_and_enter", ref, value);
-        await performActionWithValidation(ref, PageAction.Fill, context.browser, value);
-        await performActionWithValidation(ref, PageAction.Enter, context.browser);
-        emitBrowserActionCompleted("fill_and_enter");
-        return { success: true, action: "fill_and_enter", ref, value };
+        return await performActionWithValidation(PageAction.FillAndEnter, context, ref, value);
       },
     }),
 
@@ -204,10 +201,19 @@ export function createWebActionTools(context: WebActionContext) {
         seconds: z.number().min(0).max(30).describe("Number of seconds to wait (0-30)"),
       }),
       execute: async ({ seconds }) => {
-        emitAgentAction("wait", undefined, seconds);
-        context.eventEmitter.emit(WebAgentEventType.AGENT_WAITING, { seconds });
-        await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-        return { success: true, action: "wait", seconds };
+        // Wait uses browser.performAction which expects value as string
+        const result = await performActionWithValidation(
+          PageAction.Wait,
+          context,
+          undefined,
+          String(seconds),
+        );
+
+        if (result.success) {
+          context.eventEmitter.emit(WebAgentEventType.AGENT_WAITING, { seconds });
+        }
+
+        return result;
       },
     }),
 
@@ -217,15 +223,22 @@ export function createWebActionTools(context: WebActionContext) {
         url: z.url().describe("URL to navigate to (must be previously seen)"),
       }),
       execute: async ({ url }) => {
-        emitBrowserActionStarted("goto", undefined, url);
-        await context.browser.goto(url);
-        const [title, currentUrl] = await Promise.all([
-          context.browser.getTitle(),
-          context.browser.getUrl(),
-        ]);
-        emitBrowserActionCompleted("goto");
-        context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url: currentUrl });
-        return { success: true, action: "goto", url, title };
+        const result = await performActionWithValidation(PageAction.Goto, context, undefined, url);
+
+        if (result.success) {
+          // Get page info after navigation
+          const [title, currentUrl] = await Promise.all([
+            context.browser.getTitle(),
+            context.browser.getUrl(),
+          ]);
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, {
+            title,
+            url: currentUrl,
+          });
+          return { ...result, title };
+        }
+
+        return result;
       },
     }),
 
@@ -233,15 +246,18 @@ export function createWebActionTools(context: WebActionContext) {
       description: "Go back to the previous page",
       inputSchema: z.object({}),
       execute: async () => {
-        emitBrowserActionStarted("back");
-        await context.browser.goBack();
-        const [title, url] = await Promise.all([
-          context.browser.getTitle(),
-          context.browser.getUrl(),
-        ]);
-        emitBrowserActionCompleted("back");
-        context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
-        return { success: true, action: "back" };
+        const result = await performActionWithValidation(PageAction.Back, context);
+
+        if (result.success) {
+          // Get page info after navigation
+          const [title, url] = await Promise.all([
+            context.browser.getTitle(),
+            context.browser.getUrl(),
+          ]);
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
+        }
+
+        return result;
       },
     }),
 
@@ -249,15 +265,18 @@ export function createWebActionTools(context: WebActionContext) {
       description: "Go forward to the next page",
       inputSchema: z.object({}),
       execute: async () => {
-        emitBrowserActionStarted("forward");
-        await context.browser.goForward();
-        const [title, url] = await Promise.all([
-          context.browser.getTitle(),
-          context.browser.getUrl(),
-        ]);
-        emitBrowserActionCompleted("forward");
-        context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
-        return { success: true, action: "forward" };
+        const result = await performActionWithValidation(PageAction.Forward, context);
+
+        if (result.success) {
+          // Get page info after navigation
+          const [title, url] = await Promise.all([
+            context.browser.getTitle(),
+            context.browser.getUrl(),
+          ]);
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_NAVIGATED, { title, url });
+        }
+
+        return result;
       },
     }),
 
@@ -269,7 +288,11 @@ export function createWebActionTools(context: WebActionContext) {
           .describe("Precise description of the data to extract. DO NOT use `ref` values."),
       }),
       execute: async ({ description }) => {
-        emitAgentAction("extract", undefined, description);
+        // Extract doesn't use browser.performAction - it's a special AI operation
+        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+          action: "extract",
+          value: description,
+        });
 
         // Get the page markdown content
         const markdown = await context.browser.getMarkdown();
@@ -310,7 +333,11 @@ export function createWebActionTools(context: WebActionContext) {
           ),
       }),
       execute: async ({ result }) => {
-        emitAgentAction("done", undefined, result);
+        // Done is a terminal action - doesn't interact with browser
+        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+          action: "done",
+          value: result,
+        });
         return { success: true, action: "done", result, isTerminal: true };
       },
     }),
@@ -326,7 +353,11 @@ export function createWebActionTools(context: WebActionContext) {
           ),
       }),
       execute: async ({ description }) => {
-        emitAgentAction("abort", undefined, description);
+        // Abort is a terminal action - doesn't interact with browser
+        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+          action: "abort",
+          value: description,
+        });
         return { success: true, action: "abort", reason: description, isTerminal: true };
       },
     }),

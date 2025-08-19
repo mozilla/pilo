@@ -14,6 +14,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
+import { RecoverableError, ToolExecutionError } from "./errors.js";
 import {
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
@@ -216,6 +217,12 @@ export class WebAgent {
     let consecutiveErrors = 0;
     let totalErrors = 0;
 
+    // Helper to track errors consistently
+    const trackError = (): void => {
+      consecutiveErrors++;
+      totalErrors++;
+    };
+
     // Main loop
     while (
       executionState.currentIteration < this.maxIterations &&
@@ -260,8 +267,7 @@ export class WebAgent {
 
         needsPageSnapshot = result.pageChanged;
       } catch (error) {
-        consecutiveErrors++;
-        totalErrors++;
+        trackError();
 
         // Check if we should continue
         if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors, error)) {
@@ -315,6 +321,11 @@ export class WebAgent {
    * Check if an error is non-recoverable (e.g., provider/API errors)
    */
   private isNonRecoverableError(error: unknown): boolean {
+    // RecoverableErrors (including ToolExecutionError) are explicitly recoverable
+    if (error instanceof RecoverableError) {
+      return false;
+    }
+
     if (error instanceof Error) {
       const errorAny = error as any;
 
@@ -335,17 +346,40 @@ export class WebAgent {
 
   /**
    * Add error feedback to the conversation
+   *
+   * IMPORTANT: Tool execution errors (ToolExecutionError) are NOT added as user messages
+   * because the error information is already present in the tool result output.
+   * This prevents duplicate error reporting to the LLM.
    */
   private addErrorFeedback(error: unknown): void {
-    const errorMessage = this.extractErrorMessage(error);
+    // Check if this is a tool execution error
+    if (error instanceof ToolExecutionError) {
+      // Don't add a user message - the error is already in the tool result
+      // The LLM will see the error in the tool output and can retry
+
+      // Still emit the error event for logging/monitoring
+      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+        error: error.message,
+        iterationId: this.currentIterationId,
+        isToolError: true,
+      });
+
+      // Early return - no user message needed
+      return;
+    }
+
+    // For other RecoverableErrors, use the message directly as it's already user-friendly
+    const errorMessage =
+      error instanceof RecoverableError ? error.message : this.extractErrorMessage(error);
 
     // Emit error event for logging
     this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
       error: errorMessage,
       iterationId: this.currentIterationId,
+      isToolError: false,
     });
 
-    // Add error feedback to conversation
+    // Add error feedback to conversation for non-tool errors
     const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, Boolean(this.guardrails));
     this.messages.push({ role: "user", content: errorFeedback });
   }
@@ -561,6 +595,26 @@ export class WebAgent {
       throw new Error("Tool execution failed: missing output property.");
     }
 
+    // Check if the tool returned an error
+    // The tool output structure is guaranteed to have:
+    // - success: boolean
+    // - error?: string (present when success is false)
+    // - isRecoverable?: boolean (present for browser errors)
+    if (!actionOutput.success && actionOutput.error) {
+      // For recoverable tool errors, throw ToolExecutionError
+      // This special error type indicates the error is already in the tool result,
+      // so we don't need to add it as a separate user message
+      if (actionOutput.isRecoverable) {
+        throw new ToolExecutionError(actionOutput.error, {
+          action: actionOutput.action,
+          ref: actionOutput.ref,
+          output: actionOutput, // Store the full output for debugging
+        });
+      }
+      // For non-recoverable errors, throw regular error
+      throw new Error(actionOutput.error);
+    }
+
     // Determine if page changed (most actions change the page, except extract)
     const pageChanged = actionOutput.action !== "extract";
 
@@ -648,7 +702,7 @@ export class WebAgent {
         ...this.providerConfig,
         prompt: validationPrompt,
         tools: validationTools,
-        toolChoice: { type: "tool", toolName: "validate_task" },
+        toolChoice: "required", // Changed from specific tool to "required" for compatibility
         maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
         abortSignal: this.abortSignal || undefined,
       });
@@ -749,13 +803,12 @@ export class WebAgent {
 
     try {
       const planningTools = createPlanningTools();
-      const planningToolName = startingUrl ? "create_plan" : "create_plan_with_url";
 
       const planningResponse = await generateText({
         ...this.providerConfig,
         prompt: planningPrompt,
         tools: planningTools,
-        toolChoice: { type: "tool", toolName: planningToolName },
+        toolChoice: "required", // Changed from specific tool to "required" for compatibility
         maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
       });
 

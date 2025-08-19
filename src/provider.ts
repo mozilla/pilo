@@ -116,7 +116,7 @@ export function createProviderFromConfig(
       if (!baseUrl) {
         throw new Error(
           `OpenAI-compatible provider requires a base URL. To get started:
-          
+
 1. Set the base URL with: spark config --set openai_compatible_base_url=http://localhost:8080/v1
 2. Or set environment variable: export SPARK_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
 
@@ -155,7 +155,7 @@ function getProviderConfig(provider: string, currentConfig: any, modelOverride?:
     if (!apiKey) {
       throw new Error(
         `No OpenRouter API key found. To get started:
-        
+
 1. Get an API key from https://openrouter.ai/keys
 2. Set it with: spark config --set openrouter_api_key=your-key
 3. Or use OpenAI instead: spark config --set provider=openai
@@ -174,7 +174,7 @@ Run 'spark config --show' to check your current configuration.`,
     if (!apiKey) {
       throw new Error(
         `No OpenAI API key found. To get started:
-        
+
 1. Get an API key from https://platform.openai.com/api-keys
 2. Set it with: spark config --set openai_api_key=your-key
 3. Or use OpenRouter instead: spark config --set provider=openrouter
@@ -215,7 +215,7 @@ function getVertexConfig(currentConfig: any) {
   if (!project) {
     throw new Error(
       `No Google Cloud project ID found. To get started:
-      
+
 1. Set your project ID with: spark config --set vertex_project=your-project-id
 2. Or set environment variable: export GOOGLE_VERTEX_PROJECT=your-project-id
 3. When running in Google Cloud (Cloud Run, Compute Engine, etc.), the project should be auto-detected
