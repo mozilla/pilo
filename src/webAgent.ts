@@ -23,6 +23,7 @@ import {
   buildPlanPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
+  buildValidationFeedbackPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
@@ -637,12 +638,13 @@ export class WebAgent {
             actionExecuted: true,
           };
         } else {
-          // Validation failed - continue execution with feedback
+          // Validation failed - the feedback has been added to messages
+          // Don't add a new page snapshot, let the agent respond to feedback
           return {
             isTerminal: false,
             finalAnswer: null,
-            pageChanged: false,
-            actionExecuted: true,
+            pageChanged: false, // Keep false to avoid new snapshot
+            actionExecuted: false, // Don't count as action since we're retrying
           };
         }
       } else if (actionOutput.action === "abort") {
@@ -682,9 +684,9 @@ export class WebAgent {
     // Increment validation attempts
     executionState.validationAttempts++;
 
-    // Emit processing event - validation doesn't use screenshots
+    // Emit processing event with attempt number
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
-      operation: "Validating task completion",
+      operation: `Validating task completion (attempt ${executionState.validationAttempts})`,
       hasScreenshot: false,
       iterationId: this.currentIterationId,
     });
@@ -728,16 +730,37 @@ export class WebAgent {
 
       // If not accepted and we haven't hit max attempts, add feedback to conversation
       if (!isAccepted && executionState.validationAttempts < this.maxValidationAttempts) {
-        // Add feedback to conversation so agent can improve
-        const feedbackMessage = `Task validation result: ${completionQuality}. ${
-          feedback || "Please continue working to complete the task."
-        }`;
+        // Build feedback message using the prompt function
+        const feedbackMessage = buildValidationFeedbackPrompt(
+          executionState.validationAttempts,
+          taskAssessment,
+          feedback,
+        );
+
         this.messages.push({ role: "user", content: feedbackMessage });
+
+        // Emit event for debugging
+        this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+          errors: [`Validation failed: ${completionQuality}`],
+          retryCount: executionState.validationAttempts,
+          feedback: feedbackMessage,
+          iterationId: this.currentIterationId,
+        });
       }
 
       // Accept if quality is good OR we've hit max validation attempts
+      const forceAccept = executionState.validationAttempts >= this.maxValidationAttempts;
+      if (forceAccept && !isAccepted) {
+        // Log warning that we're accepting due to max attempts
+        this.emit(WebAgentEventType.AGENT_STATUS, {
+          message: `Accepting answer after ${executionState.validationAttempts} validation attempts`,
+          finalAnswer,
+          iterationId: this.currentIterationId,
+        });
+      }
+
       return {
-        isAccepted: isAccepted || executionState.validationAttempts >= this.maxValidationAttempts,
+        isAccepted: isAccepted || forceAccept,
       };
     } catch (error) {
       // On validation error, accept the result if we've hit max attempts

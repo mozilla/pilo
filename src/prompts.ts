@@ -421,6 +421,33 @@ export const buildTaskValidationPrompt = (
   });
 
 /**
+ * Validation feedback prompt - sent when task completion is insufficient.
+ * Used by: validateTaskCompletion() when validation fails.
+ */
+const taskValidationFeedbackTemplate = buildPromptTemplate(
+  `
+## Task Incomplete - Attempt {{ attemptNumber }}
+
+{{ taskAssessment }}
+
+**Feedback:** {{ feedback }}
+
+Do not repeat your previous answer. Address the issues identified above.
+`.trim(),
+);
+
+export const buildValidationFeedbackPrompt = (
+  attemptNumber: number,
+  taskAssessment: string,
+  feedback: string | null,
+): string =>
+  taskValidationFeedbackTemplate({
+    attemptNumber,
+    taskAssessment,
+    feedback: feedback || "Please review the task requirements and provide a more complete answer.",
+  });
+
+/**
  * Data extraction prompt - extracts specific data from pages.
  * Used by: executeAction() when AI calls extract() tool.
  * Input: Page markdown content and extraction description.

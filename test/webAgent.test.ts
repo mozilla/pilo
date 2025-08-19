@@ -1685,6 +1685,260 @@ describe("WebAgent", () => {
       expect(completeEvent).toBeDefined();
     });
 
+    it("should add validation feedback message to conversation when validation fails", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        maxValidationAttempts: 2,
+      });
+
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task properly",
+            },
+          },
+        ],
+      } as any);
+
+      // First attempt - done action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Task complete",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Incomplete result",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Task complete",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation response as partial (fail first attempt)
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Validation",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            output: {
+              taskAssessment: "Missing key information",
+              completionQuality: "partial",
+              feedback: "You need to provide more details about X and Y",
+            },
+          },
+        ],
+      } as any);
+
+      // Second attempt - should receive feedback message
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Better completion",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_2",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Complete result with X and Y details",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Better completion",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation response as complete (pass second attempt)
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Complete result with X and Y details");
+
+      // Verify that the feedback message was added to the conversation
+      // Check the messages passed to the second done attempt
+      const secondDoneCall = mockGenerateText.mock.calls[3]; // planning, done1, validation1, done2
+      expect(secondDoneCall).toBeDefined();
+
+      const messages = secondDoneCall[0].messages;
+      expect(messages).toBeDefined();
+
+      // Find the validation feedback message
+      const feedbackMessage = messages?.find(
+        (msg: any) =>
+          msg.role === "user" &&
+          typeof msg.content === "string" &&
+          msg.content.includes("Task Incomplete - Attempt 1"),
+      );
+
+      expect(feedbackMessage).toBeDefined();
+      expect(feedbackMessage?.content).toContain("Missing key information");
+      expect(feedbackMessage?.content).toContain("You need to provide more details about X and Y");
+      expect(feedbackMessage?.content).toContain("Do not repeat your previous answer");
+
+      // Verify validation error event was emitted with the feedback
+      const validationErrorEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_VALIDATION_ERROR,
+      );
+      expect(validationErrorEvent).toBeDefined();
+      expect(validationErrorEvent?.data.feedback).toContain("Task Incomplete - Attempt 1");
+    });
+
+    it("should format validation feedback correctly without emojis", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        maxValidationAttempts: 2,
+      });
+
+      // Mock planning
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // First attempt - done action
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Task complete",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Incomplete",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Task complete",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation response with specific feedback
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Validation",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "validate_1",
+            toolName: "validate_task",
+            output: {
+              taskAssessment: "The answer lacks required details",
+              completionQuality: "failed",
+              feedback: "Include specific examples and explanations",
+            },
+          },
+        ],
+      } as any);
+
+      // Second attempt after feedback
+      mockGenerateText.mockResolvedValueOnce({
+        text: "Improved",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_2",
+            toolName: "done",
+            output: {
+              action: "done",
+              result: "Complete with examples",
+              isTerminal: true,
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Improved",
+            },
+          ],
+        },
+      } as any);
+
+      // Mock validation response as complete
+      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      // Check the feedback message format
+      const secondDoneCall = mockGenerateText.mock.calls[3];
+      expect(secondDoneCall).toBeDefined();
+
+      const messages = secondDoneCall[0].messages;
+      expect(messages).toBeDefined();
+
+      const feedbackMessage = messages?.find(
+        (msg: any) =>
+          msg.role === "user" &&
+          typeof msg.content === "string" &&
+          msg.content.includes("Task Incomplete"),
+      );
+
+      expect(feedbackMessage).toBeDefined();
+
+      // Verify the format matches our prompt template
+      expect(feedbackMessage?.content).toMatch(/^## Task Incomplete - Attempt 1/);
+      expect(feedbackMessage?.content).toContain("The answer lacks required details");
+      expect(feedbackMessage?.content).toContain(
+        "**Feedback:** Include specific examples and explanations",
+      );
+      expect(feedbackMessage?.content).toContain("Do not repeat your previous answer");
+
+      // Ensure no emojis are present
+      expect(feedbackMessage?.content).not.toMatch(/[\u{1F300}-\u{1F9FF}]/u);
+      expect(feedbackMessage?.content).not.toContain("⚠️");
+      expect(feedbackMessage?.content).not.toContain("🔄");
+    });
+
     it("should accept result after max validation attempts even if quality is poor", async () => {
       const webAgent = new WebAgent(mockBrowser, {
         providerConfig: { model: mockProvider },
