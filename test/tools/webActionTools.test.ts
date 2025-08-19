@@ -599,12 +599,11 @@ describe("Web Action Tools", () => {
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       const result = await tools.abort.execute({
-        description: "Site is down, cannot proceed",
+        reason: "Site is down, cannot proceed",
       });
 
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
         action: "abort",
-        ref: undefined,
         value: "Site is down, cannot proceed",
       });
       expect(result).toEqual({
@@ -628,7 +627,7 @@ describe("Web Action Tools", () => {
     it("should validate abort action input", () => {
       const schema = tools.abort.inputSchema;
 
-      const valid = schema.safeParse({ description: "Cannot continue" });
+      const valid = schema.safeParse({ reason: "Cannot continue" });
       expect(valid.success).toBe(true);
 
       const invalid = schema.safeParse({});

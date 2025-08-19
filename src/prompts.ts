@@ -11,7 +11,8 @@ export const TOOL_STRINGS = {
   webActions: {
     /** Common parameter descriptions used across multiple tools */
     common: {
-      elementRef: "Element reference from page snapshot (e.g., s1e23)",
+      elementRefExample: "e###",
+      elementRef: "Element reference from page snapshot (e.g., e###)",
       textValue: "Text to enter into the field",
     },
     /** Individual tool descriptions */
@@ -124,22 +125,22 @@ IMPORTANT:
 
 /** Available browser action tools with JSON syntax examples. */
 const toolExamples = `
-- click({"ref": "s1e33"}) - Click on an element
-- fill({"ref": "s1e33", "value": "text"}) - Enter text into a field
-- fill_and_enter({"ref": "s1e33", "value": "text"}) - Fill and press Enter
-- select({"ref": "s1e33", "value": "option"}) - Select from dropdown
-- hover({"ref": "s1e33"}) - Hover over element
-- check({"ref": "s1e33"}) - Check checkbox
-- uncheck({"ref": "s1e33"}) - Uncheck checkbox
-- focus({"ref": "s1e33"}) - Focus on element
-- enter({"ref": "s1e33"}) - Press Enter key
-- wait({"seconds": 3}) - Wait for specified time
-- goto({"url": "https://example.com"}) - Navigate to URL (only previously seen URLs)
-- back() - Go to previous page
-- forward() - Go to next page
-- extract({"description": "data to extract"}) - Extract specific data from current page for later reference
-- done({"result": "your final answer"}) - Complete the task
-- abort({"description": "what was tried and why it failed"}) - Abort when task cannot be completed
+- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}
+- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}
+- fill_and_enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill_and_enter.description}
+- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}
+- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}
+- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}
+- uncheck({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.uncheck.description}
+- focus({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.focus.description}
+- enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.enter.description}
+- wait({"seconds": 3}) - ${TOOL_STRINGS.webActions.wait.description}
+- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}
+- back() - ${TOOL_STRINGS.webActions.back.description}
+- forward() - ${TOOL_STRINGS.webActions.forward.description}
+- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}
+- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}
+- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}
 `.trim();
 
 /** Standard tool calling instruction. */
@@ -175,13 +176,13 @@ Best Practices:
 
 {% if includeUrl %}
 Call create_plan_with_url() with:
-- explanation: Restate the task concisely in your own words, focusing on the core objective
-- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
-- url: Must be a real top-level domain with no path OR a web search: https://duckduckgo.com/?q=search+query
+- explanation: ${TOOL_STRINGS.planning.common.explanation}
+- plan: ${TOOL_STRINGS.planning.common.plan}
+- url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
 {% else %}
 Call create_plan() with:
-- explanation: Restate the task concisely in your own words, focusing on the core objective
-- plan: Create a high-level, numbered list plan for this web navigation task, with each step on its own line. Focus on general steps without assuming specific page features
+- explanation: ${TOOL_STRINGS.planning.common.explanation}
+- plan: ${TOOL_STRINGS.planning.common.plan}
 {% endif %}
 
 ${toolCallInstruction}
@@ -220,7 +221,7 @@ Analyze the current page state and determine your next action based on previous 
 {{ toolExamples }}
 
 **Core Rules:**
-1. Use element refs from page snapshot (e.g., s1e33)
+1. Use element refs from page snapshot. They are found in square brackets: [${TOOL_STRINGS.webActions.common.elementRefExample}].
 2. Execute EXACTLY ONE tool per turn
 3. Complete ALL planned steps before using done()
 4. done() indicates ENTIRE task completion with comprehensive results
@@ -230,7 +231,7 @@ Analyze the current page state and determine your next action based on previous 
 
 **CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
 - done(result) if task is complete
-- abort(description) if task cannot be completed due to site issues, blocking, or missing data
+- abort(reason) if task cannot be completed due to site issues, blocking, or missing data
 - Appropriate action tool if work remains
 - extract() if you need more information
 
@@ -400,9 +401,9 @@ Evaluation criteria:
 Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
 
 Call validate_task() with:
-- taskAssessment: Does the result accomplish what the user requested? Focus on task completion, not how it was done
-- completionQuality: Choose from "failed", "partial", "complete", or "excellent" based on evaluation criteria above
-- feedback: Only for 'failed' or 'partial': What is still missing to complete the task? Focus on what the user needs to consider the task done
+- taskAssessment: ${TOOL_STRINGS.validation.validate_task.taskAssessment}
+- completionQuality: ${TOOL_STRINGS.validation.validate_task.completionQuality}
+- feedback: ${TOOL_STRINGS.validation.validate_task.feedback}
 
 ${toolCallInstruction}
 `.trim(),

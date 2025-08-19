@@ -338,15 +338,15 @@ export function createWebActionTools(context: WebActionContext) {
     abort: tool({
       description: TOOL_STRINGS.webActions.abort.description,
       inputSchema: z.object({
-        description: z.string().describe(TOOL_STRINGS.webActions.abort.reason),
+        reason: z.string().describe(TOOL_STRINGS.webActions.abort.reason),
       }),
-      execute: async ({ description }) => {
+      execute: async ({ reason }) => {
         // Abort is a terminal action - doesn't interact with browser
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "abort",
-          value: description,
+          value: reason,
         });
-        return { success: true, action: "abort", reason: description, isTerminal: true };
+        return { success: true, action: "abort", reason, isTerminal: true };
       },
     }),
   };
