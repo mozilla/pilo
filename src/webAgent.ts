@@ -704,7 +704,7 @@ export class WebAgent {
         ...this.providerConfig,
         prompt: validationPrompt,
         tools: validationTools,
-        toolChoice: "required", // Changed from specific tool to "required" for compatibility
+        toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
         maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
         abortSignal: this.abortSignal || undefined,
       });
@@ -831,7 +831,7 @@ export class WebAgent {
         ...this.providerConfig,
         prompt: planningPrompt,
         tools: planningTools,
-        toolChoice: "required", // Changed from specific tool to "required" for compatibility
+        toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
         maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
       });
 

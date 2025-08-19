@@ -60,7 +60,7 @@ import { config } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
-import { ollama, createOllama } from "ollama-ai-provider-v2";
+import { createOllama } from "ollama-ai-provider-v2";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 const mockConfig = vi.mocked(config);
@@ -68,7 +68,6 @@ const mockOpenai = vi.mocked(openai);
 const mockCreateOpenAI = vi.mocked(createOpenAI);
 const mockCreateOpenRouter = vi.mocked(createOpenRouter);
 const mockCreateVertex = vi.mocked(createVertex);
-const mockOllama = vi.mocked(ollama);
 const mockCreateOllama = vi.mocked(createOllama);
 const mockCreateOpenAICompatible = vi.mocked(createOpenAICompatible);
 
@@ -376,7 +375,9 @@ describe("Provider", () => {
 
       createAIProvider();
 
-      expect(mockOllama).toHaveBeenCalledWith("llama3.2");
+      expect(mockCreateOllama).toHaveBeenCalledWith({
+        baseURL: "http://localhost:11434/api",
+      });
     });
 
     it("should create Ollama provider with custom model", () => {
@@ -387,7 +388,9 @@ describe("Provider", () => {
 
       createAIProvider();
 
-      expect(mockOllama).toHaveBeenCalledWith("phi3");
+      expect(mockCreateOllama).toHaveBeenCalledWith({
+        baseURL: "http://localhost:11434/api",
+      });
     });
 
     it("should create Ollama provider with custom base URL", () => {

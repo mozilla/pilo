@@ -3,7 +3,7 @@ import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { ollama, createOllama } from "ollama-ai-provider-v2";
+import { createOllama } from "ollama-ai-provider-v2";
 import { config } from "./config.js";
 import { getEnv } from "./utils/env.js";
 
@@ -96,13 +96,9 @@ export function createProviderFromConfig(
 
     case "ollama":
       const ollamaBaseUrl = configWithOverrides?.ollama_base_url || "http://localhost:11434/api";
-      // Create Ollama instance if custom URL, otherwise use default
-      if (configWithOverrides?.ollama_base_url) {
-        return createOllama({
-          baseURL: ollamaBaseUrl,
-        })(model);
-      }
-      return ollama(model);
+      return createOllama({
+        baseURL: ollamaBaseUrl,
+      })(model);
 
     case "lmstudio":
       // LM Studio is a preconfigured openai-compatible provider
@@ -116,7 +112,7 @@ export function createProviderFromConfig(
       if (!baseUrl) {
         throw new Error(
           `OpenAI-compatible provider requires a base URL. To get started:
-
+          
 1. Set the base URL with: spark config --set openai_compatible_base_url=http://localhost:8080/v1
 2. Or set environment variable: export SPARK_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
 

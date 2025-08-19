@@ -1701,6 +1701,7 @@ describe("WebAgent", () => {
             type: "tool-result",
             toolCallId: "plan_1",
             toolName: "create_plan",
+            input: {},
             output: {
               explanation: "Test task",
               plan: "1. Complete task properly",
@@ -1717,6 +1718,7 @@ describe("WebAgent", () => {
             type: "tool-result",
             toolCallId: "done_1",
             toolName: "done",
+            input: {},
             output: {
               action: "done",
               result: "Incomplete result",
@@ -1725,6 +1727,9 @@ describe("WebAgent", () => {
           },
         ],
         response: {
+          id: "test-id",
+          timestamp: new Date(),
+          modelId: "test-model",
           messages: [
             {
               role: "assistant",
@@ -1742,6 +1747,7 @@ describe("WebAgent", () => {
             type: "tool-result",
             toolCallId: "validate_1",
             toolName: "validate_task",
+            input: {},
             output: {
               taskAssessment: "Missing key information",
               completionQuality: "partial",
@@ -1759,6 +1765,7 @@ describe("WebAgent", () => {
             type: "tool-result",
             toolCallId: "done_2",
             toolName: "done",
+            input: {},
             output: {
               action: "done",
               result: "Complete result with X and Y details",
@@ -1767,6 +1774,9 @@ describe("WebAgent", () => {
           },
         ],
         response: {
+          id: "test-id",
+          timestamp: new Date(),
+          modelId: "test-model",
           messages: [
             {
               role: "assistant",
