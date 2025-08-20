@@ -11,7 +11,7 @@ services:
       - MAX_QUEUE_LENGTH=10
 
   spark:
-    image: chapnickman/spark-server:latest
+    image: lmorchard/spark-server:latest
     build:
       context: ..
       dockerfile: server/Dockerfile
