@@ -1,4 +1,15 @@
 services:
+  browserless:
+    image: ghcr.io/browserless/firefox:latest
+    container_name: spark-browserless
+    ports:
+      - "3001:3000" # Map browserless port to avoid conflict with spark server
+    environment:
+      - DEBUG=browserless*
+      - MAX_CONCURRENT_SESSIONS=5
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=10
+
   spark:
     build:
       context: ..
@@ -13,17 +24,8 @@ services:
       - SPARK_MODEL=gpt-5-mini
       - SPARK_REASONING_EFFORT=low
       - SPARK_BROWSER=firefox
-
-  browserless:
-    image: ghcr.io/browserless/firefox:latest
-    container_name: spark-browserless
-    ports:
-      - "3001:3000" # Map browserless port to avoid conflict with spark server
-    environment:
-      - DEBUG=browserless*
-      - MAX_CONCURRENT_SESSIONS=5
-      - CONNECTION_TIMEOUT=60000
-      - MAX_QUEUE_LENGTH=10
+    depends_on:
+      - browserless
 
 networks:
   default:
