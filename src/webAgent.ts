@@ -15,6 +15,7 @@ import { SnapshotCompressor } from "./snapshotCompressor.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import { RecoverableError, ToolExecutionError } from "./errors.js";
+import { generateTextWithRetry } from "./utils/retry.js";
 import {
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
@@ -745,19 +746,25 @@ export class WebAgent {
 
       // Call validation tool
       const validationTools = createValidationTools();
-      const validationStream = await streamText({
-        ...this.providerConfig,
-        prompt: validationPrompt,
-        tools: validationTools,
-        toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
-        maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
-        abortSignal: this.abortSignal || undefined,
-      });
-
-      // Wait for validation to complete
-      const validationResponse = {
-        toolResults: await validationStream.toolResults,
-      };
+      const validationResponse = await generateTextWithRetry(
+        {
+          ...this.providerConfig,
+          prompt: validationPrompt,
+          tools: validationTools,
+          toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
+          maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
+          abortSignal: this.abortSignal || undefined,
+        },
+        {
+          maxAttempts: 2,
+          onRetry: (attempt, error) => {
+            this.emit(WebAgentEventType.AGENT_STATUS, {
+              message: `Validation retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
+              iterationId: this.currentIterationId,
+            });
+          },
+        },
+      );
 
       if (!validationResponse.toolResults?.[0]) {
         throw new Error("Failed to validate task completion");
@@ -877,18 +884,24 @@ export class WebAgent {
     try {
       const planningTools = createPlanningTools();
 
-      const planningStream = await streamText({
-        ...this.providerConfig,
-        prompt: planningPrompt,
-        tools: planningTools,
-        toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
-        maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
-      });
-
-      // Wait for planning to complete
-      const planningResponse = {
-        toolResults: await planningStream.toolResults,
-      };
+      const planningResponse = await generateTextWithRetry(
+        {
+          ...this.providerConfig,
+          prompt: planningPrompt,
+          tools: planningTools,
+          toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
+          maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
+        },
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            this.emit(WebAgentEventType.AGENT_STATUS, {
+              message: `Planning retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
+              iterationId: this.currentIterationId || "planning",
+            });
+          },
+        },
+      );
 
       if (!planningResponse.toolResults?.[0]) {
         throw new Error("Failed to generate plan");

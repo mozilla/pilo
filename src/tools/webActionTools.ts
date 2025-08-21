@@ -5,13 +5,14 @@
  * Each tool includes description, inputSchema, and execute function.
  */
 
-import { tool, generateText } from "ai";
+import { tool } from "ai";
 import { z } from "zod";
 import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
+import { generateTextWithRetry } from "../utils/retry.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -298,13 +299,23 @@ export function createWebActionTools(context: WebActionContext) {
         // Build extraction prompt
         const prompt = buildExtractionPrompt(description, markdown);
 
-        // Use the provider to extract the data
-        const extractResponse = await generateText({
-          ...context.providerConfig,
-          prompt,
-          maxOutputTokens: 5000,
-          abortSignal: context.abortSignal,
-        });
+        // Use the provider to extract the data with retry
+        const extractResponse = await generateTextWithRetry(
+          {
+            ...context.providerConfig,
+            prompt,
+            maxOutputTokens: 5000,
+            abortSignal: context.abortSignal,
+          },
+          {
+            maxAttempts: 3,
+            onRetry: (attempt, error) => {
+              context.eventEmitter.emit(WebAgentEventType.AGENT_STATUS, {
+                message: `Extract retry attempt ${attempt} after error: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            },
+          },
+        );
 
         // Emit the extracted data event
         context.eventEmitter.emit(WebAgentEventType.AGENT_EXTRACTED, {

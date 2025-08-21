@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createWebActionTools } from "../../src/tools/webActionTools.js";
 import { AriaBrowser, PageAction } from "../../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
-import { LanguageModel, generateText } from "ai";
+import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
+import { generateTextWithRetry } from "../../src/utils/retry.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -17,7 +18,12 @@ vi.mock("ai", () => ({
   generateText: vi.fn(),
 }));
 
-const mockGenerateText = vi.mocked(generateText);
+// Mock the retry module to bypass retry logic in tests
+vi.mock("../../src/utils/retry.js", () => ({
+  generateTextWithRetry: vi.fn(),
+}));
+
+const mockGenerateTextWithRetry = vi.mocked(generateTextWithRetry);
 
 // Mock browser implementation
 class MockBrowser implements AriaBrowser {
@@ -524,19 +530,24 @@ describe("Web Action Tools", () => {
       const getMarkdownSpy = vi.spyOn(mockBrowser, "getMarkdown");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
-      mockGenerateText.mockResolvedValueOnce({
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
         text: "Extracted data: Important info",
       } as any);
 
       const result = await tools.extract.execute({ description: "Get important info" });
 
       expect(getMarkdownSpy).toHaveBeenCalled();
-      expect(mockGenerateText).toHaveBeenCalledWith({
-        model: { specificationVersion: "v1" }, // providerConfig.model
-        prompt: expect.stringContaining("Get important info"),
-        maxOutputTokens: 5000,
-        abortSignal: undefined,
-      });
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledWith(
+        {
+          model: { specificationVersion: "v1" }, // providerConfig.model
+          prompt: expect.stringContaining("Get important info"),
+          maxOutputTokens: 5000,
+          abortSignal: undefined,
+        },
+        expect.objectContaining({
+          maxAttempts: 3,
+        }),
+      );
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
         action: "extract",
         ref: undefined,
@@ -558,7 +569,7 @@ describe("Web Action Tools", () => {
       const contextWithAbort = { ...context, abortSignal: controller.signal };
       const toolsWithAbort = createWebActionTools(contextWithAbort);
 
-      mockGenerateText.mockResolvedValueOnce({
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
         text: "Extracted",
       } as any);
 
@@ -566,10 +577,11 @@ describe("Web Action Tools", () => {
         await toolsWithAbort.extract.execute({ description: "Test" }, {} as any);
       }
 
-      expect(mockGenerateText).toHaveBeenCalledWith(
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledWith(
         expect.objectContaining({
           abortSignal: controller.signal,
         }),
+        expect.any(Object),
       );
     });
   });
@@ -682,7 +694,7 @@ describe("Web Action Tools", () => {
     });
 
     it("should handle errors in extract action", async () => {
-      mockGenerateText.mockRejectedValueOnce(new Error("AI service unavailable"));
+      mockGenerateTextWithRetry.mockRejectedValueOnce(new Error("AI service unavailable"));
 
       await expect(tools.extract.execute({ description: "Get data" })).rejects.toThrow(
         "AI service unavailable",
