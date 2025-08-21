@@ -1987,7 +1987,7 @@ describe("WebAgent", () => {
 
       // Verify that the feedback message was added to the conversation
       // Check the messages passed to the second done attempt
-      const secondDoneCall = mockStreamText.mock.calls[1]; // done1 is [0], done2 is [1]
+      const secondDoneCall = mockStreamText.mock.calls[1]; // Second done attempt (planning uses mockGenerateTextWithRetry)
       expect(secondDoneCall).toBeDefined();
 
       const messages = secondDoneCall[0].messages;
@@ -2115,7 +2115,7 @@ describe("WebAgent", () => {
       await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
       // Check the feedback message format
-      const secondDoneCall = mockStreamText.mock.calls[1]; // done1 is [0], done2 is [1]
+      const secondDoneCall = mockStreamText.mock.calls[1]; // Second done attempt (planning uses mockGenerateTextWithRetry)
       expect(secondDoneCall).toBeDefined();
 
       const messages = secondDoneCall[0].messages;

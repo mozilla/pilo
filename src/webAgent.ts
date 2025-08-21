@@ -110,7 +110,7 @@ export class WebAgent {
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
-  private abortSignal: AbortSignal | null = null;
+  private abortSignal: AbortSignal | undefined = undefined;
 
   // === Services ===
   private compressor: SnapshotCompressor;
@@ -212,7 +212,7 @@ export class WebAgent {
       browser: this.browser,
       eventEmitter: this.eventEmitter,
       providerConfig: this.providerConfig,
-      abortSignal: this.abortSignal || undefined,
+      abortSignal: this.abortSignal,
     });
 
     let needsPageSnapshot = true;
@@ -545,7 +545,7 @@ export class WebAgent {
         tools: webActionTools,
         toolChoice: "required",
         maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
-        abortSignal: this.abortSignal || undefined,
+        abortSignal: this.abortSignal,
       });
 
       // Process the full stream to capture reasoning before tool execution
@@ -753,7 +753,7 @@ export class WebAgent {
           tools: validationTools,
           toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
           maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
-          abortSignal: this.abortSignal || undefined,
+          abortSignal: this.abortSignal,
         },
         {
           maxAttempts: 2,
@@ -1003,7 +1003,7 @@ export class WebAgent {
   private async initializeBrowserAndState(task: string, options: ExecuteOptions): Promise<void> {
     this.clearInternalState();
     this.data = options.data || null;
-    this.abortSignal = options.abortSignal || null;
+    this.abortSignal = options.abortSignal || undefined;
 
     this.emit(WebAgentEventType.TASK_SETUP, {
       task,
@@ -1110,7 +1110,7 @@ export class WebAgent {
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;
-    this.abortSignal = null;
+    this.abortSignal = undefined;
   }
 
   private initializeExecutionState(): ExecutionState {
