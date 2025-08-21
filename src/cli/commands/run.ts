@@ -62,6 +62,11 @@ export function createRunCommand(): Command {
       String(config.get("max_validation_attempts") || 3),
     )
     .option(
+      "--max-repeated-actions <number>",
+      "Maximum times an action can be repeated before warning/aborting",
+      String(config.get("max_repeated_actions") || 2),
+    )
+    .option(
       "--reasoning-effort <effort>",
       "Reasoning effort level (none, low, medium, high)",
       config.get("reasoning_effort") || "none",
@@ -174,6 +179,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxIterations: options.maxIterations ? parseInt(options.maxIterations) : undefined,
       maxValidationAttempts: options.maxValidationAttempts
         ? parseInt(options.maxValidationAttempts)
+        : undefined,
+      maxRepeatedActions: options.maxRepeatedActions
+        ? parseInt(options.maxRepeatedActions)
         : undefined,
       providerConfig,
       logger,

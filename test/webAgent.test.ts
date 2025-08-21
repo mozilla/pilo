@@ -3156,5 +3156,226 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("Network timeout");
       expect(result.finalAnswer).not.toContain("[");
     });
+
+    it("should detect and handle repeated actions", async () => {
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Click button repeatedly",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock the same click action being repeated 5 times
+      const repeatedClickResponse = createMockStreamResponse({
+        text: "Click",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "click_1",
+            toolName: "click",
+            input: { ref: "btn1" },
+            output: {
+              success: true,
+              action: "click",
+              ref: "btn1",
+            },
+          },
+        ],
+        response: {
+          messages: [
+            {
+              role: "assistant",
+              content: "Click button",
+            },
+          ],
+        },
+      });
+
+      // First 3 clicks are allowed (initial + 2 repeats = maxRepeatedActions default)
+      for (let i = 0; i < 3; i++) {
+        mockStreamText.mockReturnValueOnce(repeatedClickResponse as any);
+      }
+
+      // 4th click triggers warning (adds user message, forces new snapshot)
+      mockStreamText.mockReturnValueOnce(repeatedClickResponse as any);
+
+      // After warning, agent tries again (5th click) - this should abort
+      mockStreamText.mockReturnValueOnce(repeatedClickResponse as any);
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+      expect(result.finalAnswer).toContain("click");
+      expect(result.finalAnswer).toContain("stuck in a loop");
+
+      // Check that warning was added to messages before abort
+      const messages = mockStreamText.mock.calls
+        .flatMap((call) => call[0]?.messages || [])
+        .filter((msg: any) => msg.role === "user");
+
+      const warningMessage = messages.find(
+        (msg: any) =>
+          msg.content?.includes("repeated the same action") &&
+          msg.content?.includes("different approach"),
+      );
+      expect(warningMessage).toBeDefined();
+    });
+
+    it("should reset repeat counter for different actions", async () => {
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              explanation: "Test task",
+              plan: "1. Click and fill alternately",
+            },
+          },
+        ],
+      } as any);
+
+      // Alternate between click and fill actions
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                success: true,
+                action: "click",
+                ref: "btn1",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Click" }],
+          },
+        }) as any,
+      );
+
+      // Same click again
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_2",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                success: true,
+                action: "click",
+                ref: "btn1",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Click" }],
+          },
+        }) as any,
+      );
+
+      // Different action (fill) - should reset counter
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Fill",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "fill_1",
+              toolName: "fill",
+              input: { ref: "input1", value: "test" },
+              output: {
+                success: true,
+                action: "fill",
+                ref: "input1",
+                value: "test",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Fill" }],
+          },
+        }) as any,
+      );
+
+      // Click again - counter should be reset, so this is fine
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_3",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                success: true,
+                action: "click",
+                ref: "btn1",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Click" }],
+          },
+        }) as any,
+      );
+
+      // Finally done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Completed" },
+              output: {
+                action: "done",
+                result: "Completed",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      // Mock validation
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Completed");
+      expect(result.stats.actions).toBe(4); // 2 clicks + 1 fill + 1 done
+    });
   });
 });

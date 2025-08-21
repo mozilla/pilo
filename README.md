@@ -346,6 +346,7 @@ Built with TypeScript, Playwright, and the Vercel AI SDK.
 | `--block-resources <list>`      | Resources to block (comma-separated)                       | media,manifest   | `--block-resources image,font`          |
 | `--max-iterations <n>`          | Maximum task iterations                                    | 50               | `--max-iterations 100`                  |
 | `--max-validation-attempts <n>` | Maximum validation attempts                                | 3                | `--max-validation-attempts 5`           |
+| `--max-repeated-actions <n>`    | Maximum action repetitions before warning/aborting         | 2                | `--max-repeated-actions 3`              |
 | `--reasoning-effort <level>`    | Reasoning effort (none, low, medium, high)                 | none             | `--reasoning-effort high`               |
 | `--proxy <url>`                 | Proxy server URL                                           | -                | `--proxy http://proxy:8080`             |
 | `--proxy-username <user>`       | Proxy authentication username                              | -                | `--proxy-username myuser`               |
@@ -391,6 +392,7 @@ All configuration options can be set via environment variables. Environment vari
 | `SPARK_VISION`                     | Enable vision (true/false)                                 | `--vision`                  |
 | `SPARK_MAX_ITERATIONS`             | Maximum iterations                                         | `--max-iterations`          |
 | `SPARK_MAX_VALIDATION_ATTEMPTS`    | Maximum validation attempts                                | `--max-validation-attempts` |
+| `SPARK_MAX_REPEATED_ACTIONS`       | Maximum action repetitions                                 | `--max-repeated-actions`    |
 | `SPARK_REASONING_EFFORT`           | Reasoning effort level                                     | `--reasoning-effort`        |
 | **Playwright Configuration**       |                                                            |                             |
 | `SPARK_PW_ENDPOINT`                | Playwright endpoint URL                                    | `--pw-endpoint`             |
