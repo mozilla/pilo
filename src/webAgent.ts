@@ -39,6 +39,7 @@ const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
 const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
 const DEFAULT_MAX_TOTAL_ERRORS = 15;
 const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
+const DEFAULT_MAX_REPEATED_ACTIONS = 2;
 
 // === Type Definitions ===
 
@@ -63,6 +64,8 @@ export interface WebAgentOptions {
   logger?: Logger;
   /** Maximum validation attempts when task completion quality is insufficient */
   maxValidationAttempts?: number;
+  /** Maximum times an action can be repeated before warning/aborting */
+  maxRepeatedActions?: number;
 }
 
 export interface ExecuteOptions {
@@ -95,6 +98,7 @@ interface ExecutionState {
   startTime: number;
   finalAnswer: string | null;
   lastAction?: string;
+  actionRepeatCount: number;
   validationAttempts: number;
 }
 
@@ -125,6 +129,7 @@ export class WebAgent {
   private readonly maxConsecutiveErrors: number;
   private readonly maxTotalErrors: number;
   private readonly maxValidationAttempts: number;
+  private readonly maxRepeatedActions: number;
   private readonly guardrails: string | null;
 
   constructor(
@@ -139,6 +144,7 @@ export class WebAgent {
     this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
     this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
     this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
+    this.maxRepeatedActions = options.maxRepeatedActions ?? DEFAULT_MAX_REPEATED_ACTIONS;
     this.guardrails = options.guardrails ?? null;
 
     // Initialize services
@@ -710,6 +716,12 @@ export class WebAgent {
       }
     }
 
+    // Check for repeated actions on non-terminal actions
+    const repetitionResult = this.checkAndHandleRepeatedAction(actionOutput, executionState);
+    if (repetitionResult) {
+      return repetitionResult; // Early return if intervention needed
+    }
+
     // Regular action executed successfully
     return {
       isTerminal: false,
@@ -717,6 +729,88 @@ export class WebAgent {
       pageChanged,
       actionExecuted: true,
     };
+  }
+
+  /**
+   * Check for repeated actions and handle accordingly
+   * @returns Action result if intervention is needed, null otherwise
+   */
+  private checkAndHandleRepeatedAction(
+    actionOutput: any,
+    executionState: ExecutionState,
+  ): {
+    isTerminal: boolean;
+    finalAnswer: string | null;
+    pageChanged: boolean;
+    actionExecuted: boolean;
+  } | null {
+    // Define explicit thresholds for warning and abort
+    const REPETITION_WARNING_THRESHOLD = this.maxRepeatedActions + 1;
+    const REPETITION_ABORT_THRESHOLD = this.maxRepeatedActions + 2;
+
+    // Create signature for current action
+    const currentActionSignature = this.createActionSignature(
+      actionOutput.action,
+      actionOutput.ref,
+      actionOutput.value,
+    );
+
+    // Check if this is the same action as the last one
+    if (executionState.lastAction === currentActionSignature) {
+      executionState.actionRepeatCount++;
+
+      // Check if we've exceeded the repetition limit
+      if (executionState.actionRepeatCount > this.maxRepeatedActions) {
+        // First time over limit: add warning message
+        if (executionState.actionRepeatCount === REPETITION_WARNING_THRESHOLD) {
+          const warningMessage = `You have repeated the same action (${actionOutput.action}) ${executionState.actionRepeatCount} times. Please try a different approach or action to make progress on the task.`;
+          this.messages.push({ role: "user", content: warningMessage });
+
+          // Emit warning event
+          this.emit(WebAgentEventType.AGENT_STATUS, {
+            message: `Warning: Repeated action detected - ${currentActionSignature}`,
+            repeatCount: executionState.actionRepeatCount,
+            iterationId: this.currentIterationId,
+          });
+
+          // Return intervention result - force new snapshot to let agent see the warning
+          return {
+            isTerminal: false,
+            finalAnswer: null,
+            pageChanged: true, // Force new snapshot so agent sees the warning
+            actionExecuted: false, // Don't count this as a successful action
+          };
+        }
+
+        // Second time over limit: abort the task
+        if (executionState.actionRepeatCount >= REPETITION_ABORT_THRESHOLD) {
+          const abortReason = `Excessive repetition of action '${actionOutput.action}' (${executionState.actionRepeatCount} times). The agent appears to be stuck in a loop.`;
+          const abortMessage = `Aborted: ${abortReason}`;
+
+          // Emit abort event
+          this.emit(WebAgentEventType.TASK_ABORTED, {
+            reason: abortReason,
+            finalAnswer: abortMessage,
+            iterationId: this.currentIterationId,
+          });
+
+          // Return terminal result
+          return {
+            isTerminal: true,
+            finalAnswer: abortMessage,
+            pageChanged: false,
+            actionExecuted: false,
+          };
+        }
+      }
+    } else {
+      // Different action - reset counter and update last action
+      executionState.actionRepeatCount = 0;
+      executionState.lastAction = currentActionSignature;
+    }
+
+    // No intervention needed
+    return null;
   }
 
   /**
@@ -932,6 +1026,13 @@ export class WebAgent {
   // === Helper Methods ===
 
   /**
+   * Create a signature for an action to track repetitions
+   */
+  private createActionSignature(action: string, ref?: string, value?: string | number): string {
+    return `${action}:${ref || ""}:${value || ""}`;
+  }
+
+  /**
    * Extract error message from unknown error type
    */
   private extractErrorMessage(error: unknown): string {
@@ -1119,6 +1220,7 @@ export class WebAgent {
       actionCount: 0,
       startTime: Date.now(),
       finalAnswer: null,
+      actionRepeatCount: 0,
       validationAttempts: 0,
     };
   }
