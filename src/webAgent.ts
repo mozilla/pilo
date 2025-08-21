@@ -744,6 +744,10 @@ export class WebAgent {
     pageChanged: boolean;
     actionExecuted: boolean;
   } | null {
+    // Define explicit thresholds for warning and abort
+    const REPETITION_WARNING_THRESHOLD = this.maxRepeatedActions + 1;
+    const REPETITION_ABORT_THRESHOLD = this.maxRepeatedActions + 2;
+
     // Create signature for current action
     const currentActionSignature = this.createActionSignature(
       actionOutput.action,
@@ -758,7 +762,7 @@ export class WebAgent {
       // Check if we've exceeded the repetition limit
       if (executionState.actionRepeatCount > this.maxRepeatedActions) {
         // First time over limit: add warning message
-        if (executionState.actionRepeatCount === this.maxRepeatedActions + 1) {
+        if (executionState.actionRepeatCount === REPETITION_WARNING_THRESHOLD) {
           const warningMessage = `You have repeated the same action (${actionOutput.action}) ${executionState.actionRepeatCount} times. Please try a different approach or action to make progress on the task.`;
           this.messages.push({ role: "user", content: warningMessage });
 
@@ -779,7 +783,7 @@ export class WebAgent {
         }
 
         // Second time over limit: abort the task
-        if (executionState.actionRepeatCount >= this.maxRepeatedActions + 2) {
+        if (executionState.actionRepeatCount >= REPETITION_ABORT_THRESHOLD) {
           const abortReason = `Excessive repetition of action '${actionOutput.action}' (${executionState.actionRepeatCount} times). The agent appears to be stuck in a loop.`;
           const abortMessage = `Aborted: ${abortReason}`;
 

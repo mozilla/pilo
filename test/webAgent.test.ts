@@ -3158,6 +3158,9 @@ describe("WebAgent", () => {
     });
 
     it("should detect and handle repeated actions", async () => {
+      // Define test constant for default max repeated actions
+      const DEFAULT_MAX_REPEATED_ACTIONS = 2;
+
       // Mock planning
       mockGenerateTextWithRetry.mockResolvedValueOnce({
         text: "Plan",
@@ -3200,8 +3203,8 @@ describe("WebAgent", () => {
         },
       });
 
-      // First 3 clicks are allowed (initial + 2 repeats = maxRepeatedActions default)
-      for (let i = 0; i < 3; i++) {
+      // First 3 clicks are allowed (initial + DEFAULT_MAX_REPEATED_ACTIONS repeats)
+      for (let i = 0; i < DEFAULT_MAX_REPEATED_ACTIONS + 1; i++) {
         mockStreamText.mockReturnValueOnce(repeatedClickResponse as any);
       }
 
