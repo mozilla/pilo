@@ -41,7 +41,11 @@ export function createRunCommand(): Command {
       "Comma-separated list of resources to block",
       config.get("block_resources") || "media,manifest",
     )
-    .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option(
+      "--pw-endpoint <endpoint>",
+      "Playwright endpoint URL to connect to remote browser",
+      config.get("pw_endpoint"),
+    )
     .option(
       "--pw-cdp-endpoint <endpoint>",
       "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
