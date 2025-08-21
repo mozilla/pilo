@@ -1,7 +1,7 @@
 services:
   browserless:
     image: ghcr.io/browserless/firefox:latest
-    # container_name: spark-browserless
+    container_name: spark-browserless
     ports:
       - "3001:3000" # Map browserless port to avoid conflict with spark server
     environment:
@@ -15,7 +15,7 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
-    # container_name: spark-server
+    container_name: spark-server
     ports:
       - "3000:3000"
     environment:
