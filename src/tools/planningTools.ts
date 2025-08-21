@@ -13,23 +13,23 @@ export function createPlanningTools() {
     create_plan: tool({
       description: TOOL_STRINGS.planning.create_plan.description,
       inputSchema: z.object({
-        explanation: z.string().describe(TOOL_STRINGS.planning.common.explanation),
+        successCriteria: z.string().describe(TOOL_STRINGS.planning.common.successCriteria),
         plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
       }),
-      execute: async ({ explanation, plan }) => {
-        return { explanation, plan };
+      execute: async ({ successCriteria, plan }) => {
+        return { successCriteria, plan };
       },
     }),
 
     create_plan_with_url: tool({
       description: TOOL_STRINGS.planning.create_plan_with_url.description,
       inputSchema: z.object({
-        explanation: z.string().describe(TOOL_STRINGS.planning.common.explanation),
+        successCriteria: z.string().describe(TOOL_STRINGS.planning.common.successCriteria),
         plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
         url: z.string().describe(TOOL_STRINGS.planning.create_plan_with_url.url),
       }),
-      execute: async ({ explanation, plan, url }) => {
-        return { explanation, plan, url };
+      execute: async ({ successCriteria, plan, url }) => {
+        return { successCriteria, plan, url };
       },
     }),
   };

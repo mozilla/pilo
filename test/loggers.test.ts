@@ -101,7 +101,7 @@ describe("ConsoleLogger", () => {
         timestamp: Date.now(),
         iterationId: "test-1",
         task: "Complete a web form",
-        explanation: "Fill out and submit a contact form on the website",
+        successCriteria: "Fill out and submit a contact form on the website",
         plan: "1. Navigate to contact page\n2. Fill required fields\n3. Submit form",
         url: "https://example.com/contact",
       };
@@ -596,7 +596,7 @@ describe("ConsoleLogger", () => {
         timestamp: Date.now(),
         iterationId: "test-1",
         task: "Test task",
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
         url: "https://example.com",
       };
@@ -727,7 +727,7 @@ describe("JSONConsoleLogger", () => {
         timestamp: Date.now(),
         iterationId: "test-1",
         task: "Test task",
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
         url: "https://example.com",
       };
@@ -746,7 +746,7 @@ describe("JSONConsoleLogger", () => {
       const parsed = JSON.parse(output);
       expect(parsed.event).toBe(WebAgentEventType.TASK_STARTED);
       expect(parsed.data.task).toBe("Test task");
-      expect(parsed.data.explanation).toBe("Test explanation");
+      expect(parsed.data.successCriteria).toBe("Test successCriteria");
       expect(parsed.data.plan).toBe("Test plan");
       expect(parsed.data.url).toBe("https://example.com");
     });

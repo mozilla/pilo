@@ -28,7 +28,7 @@ describe("WebAgentEventEmitter", () => {
         timestamp: Date.now(),
         iterationId: "test-id",
         task: "Test task",
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
         url: "https://example.com",
       };
@@ -156,7 +156,7 @@ describe("WebAgentEventEmitter", () => {
             timestamp: Date.now(),
             iterationId: "test-1",
             task: "test",
-            explanation: "test",
+            successCriteria: "test",
             plan: "test",
             url: "test",
           },
@@ -267,7 +267,7 @@ describe("WebAgentEventEmitter", () => {
         timestamp: 1234567890,
         iterationId: "test-1",
         task: "Complete a web form",
-        explanation: "Fill out and submit a contact form",
+        successCriteria: "Fill out and submit a contact form",
         plan: "1. Navigate to form\n2. Fill fields\n3. Submit",
         url: "https://example.com/contact",
       };

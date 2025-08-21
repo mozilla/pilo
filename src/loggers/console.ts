@@ -124,8 +124,8 @@ export class ConsoleLogger implements Logger {
 
   private handleTaskStart = (data: TaskStartEventData): void => {
     console.log("\n🎯 Task: ", data.task);
-    console.log("\n💡 Explanation:");
-    console.log(data.explanation);
+    console.log("\n💡 Success Criteria:");
+    console.log(data.successCriteria);
     console.log("\n📋 Plan:");
     console.log(data.plan);
     console.log("🌐 Starting URL: ", data.url);

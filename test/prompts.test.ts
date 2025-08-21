@@ -31,7 +31,7 @@ describe("prompts", () => {
       expect(prompt).toContain("Book a flight from NYC to Paris");
       expect(prompt).toContain("Jan 15, 2024");
       expect(prompt).toContain("create_plan_with_url()");
-      expect(prompt).toContain("step-by-step plan, and starting URL");
+      expect(prompt).toContain("step-by-step plan and starting URL");
     });
 
     it("should contain required instructions", () => {
@@ -55,7 +55,7 @@ describe("prompts", () => {
       const task = "Search for hotels";
       const prompt = buildPlanAndUrlPrompt(task);
 
-      expect(prompt).toContain("explanation");
+      expect(prompt).toContain("successCriteria");
       expect(prompt).toContain("plan");
       expect(prompt).toContain("url");
     });
@@ -98,7 +98,7 @@ describe("prompts", () => {
 
       expect(prompt).toContain("Submit feedback form");
       expect(prompt).toContain("Starting URL: https://example.com/feedback");
-      expect(prompt).toContain("Use the provided starting URL");
+      expect(prompt).toContain("Begin from the provided URL");
     });
 
     it("should not include starting URL when not provided", () => {
@@ -106,14 +106,14 @@ describe("prompts", () => {
       const prompt = buildPlanPrompt(task);
 
       expect(prompt).not.toContain("Starting URL:");
-      expect(prompt).not.toContain("Use the provided starting URL");
+      expect(prompt).not.toContain("Begin from the provided URL");
     });
 
     it("should include JSON schema for plan without URL", () => {
       const task = "Update profile information";
       const prompt = buildPlanPrompt(task);
 
-      expect(prompt).toContain("explanation");
+      expect(prompt).toContain("successCriteria");
       expect(prompt).toContain("plan");
       expect(prompt).toContain("create_plan()");
     });
@@ -179,15 +179,15 @@ describe("prompts", () => {
   });
 
   describe("buildTaskAndPlanPrompt", () => {
-    it("should combine task, explanation, and plan", () => {
+    it("should combine task, successCriteria, and plan", () => {
       const task = "Book a hotel room";
-      const explanation = "Find and reserve accommodation for travel";
+      const successCriteria = "Find and reserve accommodation for travel";
       const plan = "1. Search hotels\n2. Compare prices\n3. Make reservation";
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan);
 
       expect(prompt).toContain("Task: Book a hotel room");
-      expect(prompt).toContain("Explanation: Find and reserve accommodation");
+      expect(prompt).toContain("Success Criteria: Find and reserve accommodation");
       expect(prompt).toContain("Plan: 1. Search hotels");
       expect(prompt).toContain("Today's Date: Jan 15, 2024");
     });
@@ -210,14 +210,14 @@ describe("prompts", () => {
       const prompt = buildTaskAndPlanPrompt("", "", "");
 
       expect(prompt).toContain("Task: ");
-      expect(prompt).toContain("Explanation: ");
+      expect(prompt).toContain("Success Criteria: ");
       expect(prompt).toContain("Plan: ");
       expect(prompt).toContain("Today's Date: Jan 15, 2024");
     });
 
     it("should include data when provided", () => {
       const task = "Book a flight";
-      const explanation = "Reserve airline tickets";
+      const successCriteria = "Reserve airline tickets";
       const plan = "1. Search flights\n2. Select flight\n3. Book";
       const data = {
         departure: "NYC",
@@ -226,7 +226,7 @@ describe("prompts", () => {
         passengers: 2,
       };
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, data);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
 
       expect(prompt).toContain("Input Data:");
       expect(prompt).toContain("```json");
@@ -261,7 +261,7 @@ describe("prompts", () => {
 
     it("should handle complex nested data objects", () => {
       const task = "Complete booking";
-      const explanation = "Finalize reservation";
+      const successCriteria = "Finalize reservation";
       const plan = "1. Review\n2. Pay\n3. Confirm";
       const data = {
         booking: {
@@ -281,7 +281,7 @@ describe("prompts", () => {
         ],
       };
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, data);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
 
       expect(prompt).toContain("Input Data:");
       expect(prompt).toContain("```json");
@@ -294,7 +294,7 @@ describe("prompts", () => {
 
     it("should format data with proper JSON indentation", () => {
       const task = "Test task";
-      const explanation = "Test explanation";
+      const successCriteria = "Test successCriteria";
       const plan = "Test plan";
       const data = {
         level1: {
@@ -304,7 +304,7 @@ describe("prompts", () => {
         },
       };
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, data);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
 
       // Check that JSON is properly indented (2 spaces)
       expect(prompt).toContain(
@@ -314,7 +314,7 @@ describe("prompts", () => {
 
     it("should handle data with special characters", () => {
       const task = "Special chars test";
-      const explanation = "Test special characters";
+      const successCriteria = "Test special characters";
       const plan = "Handle special chars";
       const data = {
         message: 'Hello "world" & <test>',
@@ -322,7 +322,7 @@ describe("prompts", () => {
         unicode: "café naïve résumé",
       };
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, data);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
 
       expect(prompt).toContain("Input Data:");
       expect(prompt).toContain('"Hello \\"world\\" & <test>"');
@@ -415,15 +415,25 @@ describe("prompts", () => {
       const task = "Submit contact form";
       const finalAnswer = "Form submitted successfully with ID: 12345";
 
-      const prompt = buildTaskValidationPrompt(task, finalAnswer, "conversation history");
+      const prompt = buildTaskValidationPrompt(
+        task,
+        "success criteria",
+        finalAnswer,
+        "conversation history",
+      );
 
       expect(prompt).toContain("Evaluate how well the task result accomplishes");
       expect(prompt).toContain("Task: Submit contact form");
-      expect(prompt).toContain("Result: Form submitted successfully with ID: 12345");
+      expect(prompt).toContain("Result:");
     });
 
     it("should include validation criteria", () => {
-      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
+      const prompt = buildTaskValidationPrompt(
+        "test task",
+        "success criteria",
+        "test answer",
+        "conversation history",
+      );
 
       expect(prompt).toContain("failed");
       expect(prompt).toContain("partial");
@@ -432,21 +442,31 @@ describe("prompts", () => {
     });
 
     it("should contain required instructions", () => {
-      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
+      const prompt = buildTaskValidationPrompt(
+        "test task",
+        "success criteria",
+        "test answer",
+        "conversation history",
+      );
 
       // Verify tool call instruction is included
       expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
     });
 
     it("should include feedback instruction", () => {
-      const prompt = buildTaskValidationPrompt("test task", "test answer", "conversation history");
+      const prompt = buildTaskValidationPrompt(
+        "test task",
+        "success criteria",
+        "test answer",
+        "conversation history",
+      );
 
       expect(prompt).toContain("failed' or 'partial'");
       expect(prompt).toContain("feedback");
     });
 
     it("should handle empty inputs", () => {
-      const prompt = buildTaskValidationPrompt("", "", "");
+      const prompt = buildTaskValidationPrompt("", "", "", "");
 
       expect(prompt).toContain("Task: ");
       expect(prompt).toContain("Result: ");
@@ -456,7 +476,12 @@ describe("prompts", () => {
       const task = 'Find "best price" for product & purchase';
       const finalAnswer = "Found item for $29.99 & completed checkout";
 
-      const prompt = buildTaskValidationPrompt(task, finalAnswer, "conversation history");
+      const prompt = buildTaskValidationPrompt(
+        task,
+        "success criteria",
+        finalAnswer,
+        "conversation history",
+      );
 
       expect(prompt).toContain('Find "best price" for product & purchase');
       expect(prompt).toContain("Found item for $29.99 & completed checkout");
@@ -499,10 +524,10 @@ describe("prompts", () => {
         buildPlanPrompt("test"),
         buildPlanAndUrlPrompt("test"),
         actionLoopSystemPrompt,
-        buildTaskAndPlanPrompt("test", "explanation", "plan"),
+        buildTaskAndPlanPrompt("test", "successCriteria", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
         buildStepErrorFeedbackPrompt("errors"),
-        buildTaskValidationPrompt("task", "answer", "conversation history"),
+        buildTaskValidationPrompt("task", "success criteria", "answer", "conversation history"),
       ];
 
       // All prompts should be non-empty strings
