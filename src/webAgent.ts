@@ -7,7 +7,7 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { generateText, ModelMessage } from "ai";
+import { streamText, ModelMessage } from "ai";
 import type { ProviderConfig } from "./provider.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
@@ -537,8 +537,8 @@ export class WebAgent {
     let generationError: Error | null = null;
 
     try {
-      // Generate AI response
-      aiResponse = await generateText({
+      // Generate AI response using streamText
+      const streamResult = streamText({
         ...this.providerConfig,
         messages: this.messages,
         tools: webActionTools,
@@ -546,6 +546,60 @@ export class WebAgent {
         maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
         abortSignal: this.abortSignal || undefined,
       });
+
+      // Process the full stream to capture reasoning before tool execution
+      let reasoningText = "";
+      let reasoningEmitted = false;
+
+      for await (const part of streamResult.fullStream) {
+        switch (part.type) {
+          case "reasoning-start":
+            // Start accumulating reasoning
+            reasoningText = "";
+            reasoningEmitted = false;
+            break;
+
+          case "reasoning-delta":
+            // Accumulate reasoning text
+            if ("text" in part) {
+              reasoningText += part.text;
+            }
+            break;
+
+          case "tool-input-start":
+          case "tool-call":
+          case "reasoning-end":
+            // Emit reasoning when we're about to execute a tool or when reasoning ends
+            if (reasoningText && !reasoningEmitted) {
+              this.emit(WebAgentEventType.AGENT_REASONED, {
+                reasoning: reasoningText.trim(),
+                iterationId: this.currentIterationId,
+              });
+              reasoningEmitted = true;
+            }
+            break;
+        }
+      }
+
+      // Await only the properties we actually need
+      const [toolResults, response, finishReason, usage, warnings, providerMetadata] =
+        await Promise.all([
+          streamResult.toolResults,
+          streamResult.response,
+          streamResult.finishReason,
+          streamResult.usage,
+          streamResult.warnings,
+          streamResult.providerMetadata,
+        ]);
+
+      aiResponse = {
+        toolResults,
+        response,
+        finishReason,
+        usage,
+        warnings,
+        providerMetadata,
+      };
     } catch (error) {
       // Preserve original error
       generationError = error instanceof Error ? error : new Error(String(error));
@@ -573,15 +627,6 @@ export class WebAgent {
     // Re-throw if generation failed
     if (generationError) {
       throw generationError;
-    }
-
-    // Emit reasoning if present
-    const reasoning = this.extractReasoningText(aiResponse);
-    if (reasoning) {
-      this.emit(WebAgentEventType.AGENT_REASONED, {
-        reasoning,
-        iterationId: this.currentIterationId,
-      });
     }
 
     // Process tool results
@@ -700,7 +745,7 @@ export class WebAgent {
 
       // Call validation tool
       const validationTools = createValidationTools();
-      const validationResponse = await generateText({
+      const validationStream = await streamText({
         ...this.providerConfig,
         prompt: validationPrompt,
         tools: validationTools,
@@ -708,6 +753,11 @@ export class WebAgent {
         maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
         abortSignal: this.abortSignal || undefined,
       });
+
+      // Wait for validation to complete
+      const validationResponse = {
+        toolResults: await validationStream.toolResults,
+      };
 
       if (!validationResponse.toolResults?.[0]) {
         throw new Error("Failed to validate task completion");
@@ -827,13 +877,18 @@ export class WebAgent {
     try {
       const planningTools = createPlanningTools();
 
-      const planningResponse = await generateText({
+      const planningStream = await streamText({
         ...this.providerConfig,
         prompt: planningPrompt,
         tools: planningTools,
         toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
         maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
       });
+
+      // Wait for planning to complete
+      const planningResponse = {
+        toolResults: await planningStream.toolResults,
+      };
 
       if (!planningResponse.toolResults?.[0]) {
         throw new Error("Failed to generate plan");
@@ -873,19 +928,6 @@ export class WebAgent {
     const status = e.statusCode || e.status;
 
     return status ? `[${status}] ${error.message}` : error.message;
-  }
-
-  /**
-   * Extract reasoning text from AI response
-   * Prioritizes reasoning over plain text field
-   */
-  private extractReasoningText(aiResponse: any): string | undefined {
-    const reasoningText = aiResponse.reasoning
-      ?.map((r: { type: string; text: string }) => r.text)
-      .join("")
-      .trim();
-
-    return reasoningText || aiResponse.text?.trim();
   }
 
   /**

@@ -2,25 +2,103 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
 import { AriaBrowser, PageAction } from "../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
-import { LanguageModel, generateText } from "ai";
+import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 
 // Mock the AI module
 vi.mock("ai", () => ({
-  generateText: vi.fn(),
+  streamText: vi.fn(),
   tool: vi.fn((schema: any) => ({
     description: schema.description,
     parameters: schema.parameters,
   })),
 }));
 
-const mockGenerateText = vi.mocked(generateText);
+const mockStreamText = vi.mocked(streamText);
+
+// Helper to create a mock stream response that mimics AI SDK's streamText
+function createMockStreamResponse(response: any): any {
+  // Create the fullStream async iterator that emits events in the correct order
+  const fullStream = {
+    async *[Symbol.asyncIterator]() {
+      // Start events
+      yield { type: "start" };
+      yield { type: "start-step" };
+
+      // Emit reasoning events if reasoning is present
+      if (response.reasoning) {
+        yield { type: "reasoning-start" };
+        for (const r of response.reasoning) {
+          yield { type: "reasoning-delta", text: r.text };
+        }
+        yield { type: "reasoning-end" };
+      }
+
+      // Emit tool events if tool results are present
+      if (response.toolResults) {
+        for (const result of response.toolResults) {
+          yield { type: "tool-call", toolName: result.toolName };
+          yield { type: "tool-result", toolName: result.toolName };
+        }
+      }
+
+      // End events
+      yield { type: "finish-step" };
+      yield { type: "finish" };
+    },
+  };
+
+  // Create empty async iterators for unused streams
+  const emptyAsyncIterator = { [Symbol.asyncIterator]: async function* () {} };
+
+  // Return mock StreamTextResult with only required properties
+  return {
+    // The main stream we use for capturing reasoning
+    fullStream,
+
+    // Required promise properties that webAgent.ts awaits
+    text: Promise.resolve(response.text || ""),
+    reasoning: Promise.resolve(response.reasoning || []),
+    toolResults: Promise.resolve(response.toolResults || []),
+    response: Promise.resolve(response.response || { messages: [] }),
+    finishReason: Promise.resolve(response.finishReason || "stop"),
+    usage: Promise.resolve(response.usage || {}),
+    warnings: Promise.resolve(response.warnings || []),
+    providerMetadata: Promise.resolve(response.providerMetadata || {}),
+
+    // Additional promises required by StreamTextResult type
+    content: Promise.resolve([]),
+    reasoningText: Promise.resolve(""),
+    files: Promise.resolve([]),
+    sources: Promise.resolve([]),
+    toolCalls: Promise.resolve([]),
+    request: Promise.resolve({}),
+    totalUsage: Promise.resolve({}),
+    steps: Promise.resolve([]),
+    experimental_output: Promise.resolve(undefined),
+
+    // Empty stream iterators (required by type but unused)
+    contentStream: emptyAsyncIterator,
+    textStream: emptyAsyncIterator,
+    reasoningStream: emptyAsyncIterator,
+    fileStream: emptyAsyncIterator,
+    sourceStream: emptyAsyncIterator,
+
+    // Response transform functions (required by type but unused)
+    toDataStreamResponse: () => new Response(),
+    toUIMessageStreamResponse: () => new Response(),
+    toTextStreamResponse: () => new Response(),
+    pipeDataStreamToResponse: () => {},
+    pipeUIMessageStreamToResponse: () => {},
+    pipeTextStreamToResponse: () => {},
+  };
+}
 
 // Helper to mock validation response
 function mockValidationResponse(
   quality: "failed" | "partial" | "complete" | "excellent" = "complete",
 ) {
-  return {
+  return createMockStreamResponse({
     text: "Validation",
     toolResults: [
       {
@@ -41,7 +119,7 @@ function mockValidationResponse(
         },
       },
     ],
-  } as any;
+  });
 }
 
 // Mock browser implementation
@@ -191,105 +269,111 @@ describe("WebAgent", () => {
       const task = "Click the button";
 
       // Mock planning response with proper tool result structure
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Need to click button",
-              plan: "1. Find button\n2. Click it",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Need to click button",
+                plan: "1. Find button\n2. Click it",
+              },
+              output: {
+                explanation: "Need to click button",
+                plan: "1. Find button\n2. Click it",
+              },
             },
-            output: {
-              explanation: "Need to click button",
-              plan: "1. Find button\n2. Click it",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Mock action generation - click action with proper tool result structure
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Clicking button",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Clicking button",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking button",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "click_1",
-                  toolName: "click",
-                  output: { action: "click", ref: "btn1" },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking button",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "click_1",
+                    toolName: "click",
+                    output: { action: "click", ref: "btn1" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock done action with proper tool result structure
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Button clicked successfully" },
-            output: {
-              action: "done",
-              result: "Button clicked successfully",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: {
-                    action: "done",
-                    result: "Button clicked successfully",
-                    isTerminal: true,
-                  },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Button clicked successfully" },
+              output: {
+                action: "done",
+                result: "Button clicked successfully",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: {
+                      action: "done",
+                      result: "Button clicked successfully",
+                      isTerminal: true,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute(task, { startingUrl: "https://example.com" });
 
@@ -304,64 +388,68 @@ describe("WebAgent", () => {
       const data = { name: "John", email: "john@example.com" };
 
       // Mock planning with proper tool result structure
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Fill form with provided data",
-              plan: "1. Use provided data to fill form",
-            },
-            output: {
-              explanation: "Fill form with provided data",
-              plan: "1. Use provided data to fill form",
-            },
-          },
-        ],
-      } as any);
-
-      // Mock done action with proper tool result structure
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Form filled" },
-            output: {
-              action: "done",
-              result: "Form filled",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Complete",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Form filled", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Fill form with provided data",
+                plan: "1. Use provided data to fill form",
+              },
+              output: {
+                explanation: "Fill form with provided data",
+                plan: "1. Use provided data to fill form",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Mock done action with proper tool result structure
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Form filled" },
+              output: {
+                action: "done",
+                result: "Form filled",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Complete",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Form filled", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute(task, {
         startingUrl: "https://example.com",
@@ -375,7 +463,7 @@ describe("WebAgent", () => {
       const controller = new AbortController();
 
       // Mock planning that will be aborted
-      mockGenerateText.mockImplementationOnce(async () => {
+      mockStreamText.mockImplementationOnce(() => {
         controller.abort();
         throw new Error("Aborted");
       });
@@ -392,63 +480,67 @@ describe("WebAgent", () => {
 
   describe("planning", () => {
     it("should generate plan with URL when not provided", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan_with_url",
-            input: {
-              explanation: "Search for flights",
-              plan: "1. Go to travel site\n2. Search flights",
-              url: "https://travel.example.com",
-            },
-            output: {
-              explanation: "Search for flights",
-              plan: "1. Go to travel site\n2. Search flights",
-              url: "https://travel.example.com",
-            },
-          },
-        ],
-      } as any);
-
-      // Mock done for quick completion
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan_with_url",
+              input: {
+                explanation: "Search for flights",
+                plan: "1. Go to travel site\n2. Search flights",
+                url: "https://travel.example.com",
+              },
+              output: {
+                explanation: "Search for flights",
+                plan: "1. Go to travel site\n2. Search flights",
+                url: "https://travel.example.com",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Mock done for quick completion
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await webAgent.execute("Book a flight to Paris");
 
@@ -460,61 +552,65 @@ describe("WebAgent", () => {
     it("should use provided starting URL in plan", async () => {
       const startingUrl = "https://specific-site.com";
 
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Navigate and interact",
-              plan: "1. Use the page\n2. Complete task",
-            },
-            output: {
-              explanation: "Navigate and interact",
-              plan: "1. Use the page\n2. Complete task",
-            },
-          },
-        ],
-      } as any);
-
-      // Mock done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Navigate and interact",
+                plan: "1. Use the page\n2. Complete task",
+              },
+              output: {
+                explanation: "Navigate and interact",
+                plan: "1. Use the page\n2. Complete task",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Mock done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await webAgent.execute("Do something", { startingUrl });
 
@@ -525,10 +621,12 @@ describe("WebAgent", () => {
     });
 
     it("should fail if planning doesn't generate tool result", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "No tool result",
-        toolResults: [],
-      } as any);
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "No tool result",
+          toolResults: [],
+        }) as any,
+      );
 
       await expect(
         webAgent.execute("Test task", { startingUrl: "https://example.com" }),
@@ -539,101 +637,107 @@ describe("WebAgent", () => {
   describe("action generation and execution", () => {
     beforeEach(() => {
       // Setup default planning mock
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
     });
 
     it("should execute click action", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Click",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "click_1",
-                  toolName: "click",
-                  output: { action: "click", ref: "btn1" },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Click",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "click_1",
+                    toolName: "click",
+                    output: { action: "click", ref: "btn1" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Clicked" },
-            output: {
-              action: "done",
-              result: "Clicked",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Clicked", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Clicked" },
+              output: {
+                action: "done",
+                result: "Clicked",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Clicked", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Click button", { startingUrl: "https://example.com" });
 
@@ -642,41 +746,43 @@ describe("WebAgent", () => {
     });
 
     it("should handle abort action", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Abort",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "abort_1",
-            toolName: "abort",
-            input: { reason: "Cannot complete task" },
-            output: {
-              action: "abort",
-              reason: "Cannot complete task",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Abort",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Abort",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "abort_1",
-                  toolName: "abort",
-                  output: { action: "abort", reason: "Cannot complete task", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "abort_1",
+              toolName: "abort",
+              input: { reason: "Cannot complete task" },
+              output: {
+                action: "abort",
+                reason: "Cannot complete task",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Abort",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "abort_1",
+                    toolName: "abort",
+                    output: { action: "abort", reason: "Cannot complete task", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       const result = await webAgent.execute("Impossible task", {
         startingUrl: "https://example.com",
@@ -693,80 +799,84 @@ describe("WebAgent", () => {
     });
 
     it("should handle extract action", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Extract",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "extract_1",
-            toolName: "extract",
-            input: { description: "Get page title" },
-            output: {
-              action: "extract",
-              description: "Get page title",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Extract",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Extract",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "extract_1",
-                  toolName: "extract",
-                  output: { action: "extract", description: "Get page title" },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "extract_1",
+              toolName: "extract",
+              input: { description: "Get page title" },
+              output: {
+                action: "extract",
+                description: "Get page title",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Extract",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "extract_1",
+                    toolName: "extract",
+                    output: { action: "extract", description: "Get page title" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Extracted" },
-            output: {
-              action: "done",
-              result: "Extracted",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Extracted", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Extracted" },
+              output: {
+                action: "done",
+                result: "Extracted",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Extracted", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Extract title", {
         startingUrl: "https://example.com",
@@ -779,69 +889,75 @@ describe("WebAgent", () => {
   describe("error handling", () => {
     beforeEach(() => {
       // Setup default planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
     });
 
     it("should handle AI generation errors and retry", async () => {
       // First call throws error
-      mockGenerateText.mockRejectedValueOnce(new Error("AI error"));
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("AI error");
+      });
 
       // Second call succeeds with done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Recovered" },
-            output: {
-              action: "done",
-              result: "Recovered",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Recovered", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Recovered" },
+              output: {
+                action: "done",
+                result: "Recovered",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Recovered", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test error", { startingUrl: "https://example.com" });
 
@@ -869,28 +985,34 @@ describe("WebAgent", () => {
       const limitedAgent = new WebAgent(mockBrowser, options);
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Three consecutive errors
-      mockGenerateText.mockRejectedValueOnce(new Error("Error 1"));
-      mockGenerateText.mockRejectedValueOnce(new Error("Error 2"));
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("Error 1");
+      });
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("Error 2");
+      });
 
       const result = await limitedAgent.execute("Test consecutive errors", {
         startingUrl: "https://example.com",
@@ -914,77 +1036,89 @@ describe("WebAgent", () => {
       const limitedAgent = new WebAgent(mockBrowser, options);
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Error, success, error, success, error (total 3 errors)
-      mockGenerateText.mockRejectedValueOnce(new Error("Error 1"));
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("Error 1");
+      });
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Click",
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
-      mockGenerateText.mockRejectedValueOnce(new Error("Error 2"));
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_2",
-            toolName: "click",
-            input: { ref: "btn2" },
-            output: {
-              action: "click",
-              ref: "btn2",
-              isTerminal: false,
-            },
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Click",
+              },
+            ],
           },
-        ],
-        response: {
-          messages: [
+        }) as any,
+      );
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("Error 2");
+      });
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Click",
+              type: "tool-result",
+              toolCallId: "click_2",
+              toolName: "click",
+              input: { ref: "btn2" },
+              output: {
+                action: "click",
+                ref: "btn2",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
-      mockGenerateText.mockRejectedValueOnce(new Error("Error 3"));
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Click",
+              },
+            ],
+          },
+        }) as any,
+      );
+      mockStreamText.mockImplementationOnce(() => {
+        throw new Error("Error 3");
+      });
 
       const result = await limitedAgent.execute("Test total errors", {
         startingUrl: "https://example.com",
@@ -1007,33 +1141,259 @@ describe("WebAgent", () => {
       const limitedAgent = new WebAgent(mockBrowser, options);
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Keep generating non-terminal actions
       for (let i = 0; i < 5; i++) {
-        mockGenerateText.mockResolvedValueOnce({
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Click",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `click_${i}`,
+                toolName: "click",
+                input: { ref: "btn1" },
+                output: {
+                  action: "click",
+                  ref: "btn1",
+                  isTerminal: false,
+                },
+              },
+            ],
+            response: {
+              messages: [
+                {
+                  role: "assistant",
+                  content: "Click",
+                },
+                {
+                  role: "tool",
+                  content: [
+                    {
+                      type: "tool-result",
+                      toolCallId: `click_${i}`,
+                      toolName: "click",
+                      output: { action: "click", ref: "btn1" },
+                    },
+                  ],
+                },
+              ],
+            },
+          }) as any,
+        );
+      }
+
+      const result = await limitedAgent.execute("Long task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Maximum iterations reached");
+
+      await limitedAgent.close();
+    });
+
+    it("should handle missing tool results", async () => {
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "No tools used",
+          toolResults: [],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "No tools used",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Provide valid action after error
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Mock validation response
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+
+      // Check that error event was emitted
+      const errorEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+      );
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent?.data.error).toContain("You must use exactly one tool");
+    });
+
+    it("should handle tool result without output property", async () => {
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
           text: "Click",
           toolResults: [
             {
               type: "tool-result",
-              toolCallId: `click_${i}`,
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              // Missing output property
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Click",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Provide valid action after error
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Mock validation response
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+
+      // Check that error event was emitted
+      const errorEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+      );
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent?.data.error).toContain("Tool execution failed: missing output property");
+    });
+  });
+
+  describe("event emission", () => {
+    it("should emit all expected events during execution", async () => {
+      // Plan
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+            },
+          ],
+        }) as any,
+      );
+
+      // Action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_1",
               toolName: "click",
               input: { ref: "btn1" },
               output: {
@@ -1054,7 +1414,7 @@ describe("WebAgent", () => {
                 content: [
                   {
                     type: "tool-result",
-                    toolCallId: `click_${i}`,
+                    toolCallId: "click_1",
                     toolName: "click",
                     output: { action: "click", ref: "btn1" },
                   },
@@ -1062,255 +1422,47 @@ describe("WebAgent", () => {
               },
             ],
           },
-        } as any);
-      }
-
-      const result = await limitedAgent.execute("Long task", {
-        startingUrl: "https://example.com",
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.finalAnswer).toContain("Maximum iterations reached");
-
-      await limitedAgent.close();
-    });
-
-    it("should handle missing tool results", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "No tools used",
-        toolResults: [],
-        response: {
-          messages: [
-            {
-              role: "assistant",
-              content: "No tools used",
-            },
-          ],
-        },
-      } as any);
-
-      // Provide valid action after error
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
-            {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
-            },
-          ],
-        },
-      } as any);
-
-      // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
-
-      const result = await webAgent.execute("Test", { startingUrl: "https://example.com" });
-
-      expect(result.success).toBe(true);
-
-      // Check that error event was emitted
-      const errorEvent = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+        }) as any,
       );
-      expect(errorEvent).toBeDefined();
-      expect(errorEvent?.data.error).toContain("You must use exactly one tool");
-    });
-
-    it("should handle tool result without output property", async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            // Missing output property
-          },
-        ],
-        response: {
-          messages: [
-            {
-              role: "assistant",
-              content: "Click",
-            },
-          ],
-        },
-      } as any);
-
-      // Provide valid action after error
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
-            {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
-            },
-          ],
-        },
-      } as any);
-
-      // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
-
-      const result = await webAgent.execute("Test", { startingUrl: "https://example.com" });
-
-      expect(result.success).toBe(true);
-
-      // Check that error event was emitted
-      const errorEvent = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
-      );
-      expect(errorEvent).toBeDefined();
-      expect(errorEvent?.data.error).toContain("Tool execution failed: missing output property");
-    });
-  });
-
-  describe("event emission", () => {
-    it("should emit all expected events during execution", async () => {
-      // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
-
-      // Action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
-            {
-              role: "assistant",
-              content: "Click",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "click_1",
-                  toolName: "click",
-                  output: { action: "click", ref: "btn1" },
-                },
-              ],
-            },
-          ],
-        },
-      } as any);
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await webAgent.execute("Test events", { startingUrl: "https://example.com" });
 
@@ -1326,102 +1478,108 @@ describe("WebAgent", () => {
 
     it("should emit AGENT_REASONED event with reasoning text", async () => {
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Action with reasoning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "I'm clicking the button to proceed",
-        reasoning: [
-          { type: "thinking", text: "I need to click the button" },
-          { type: "thinking", text: " to proceed with the task" },
-        ],
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "I'm clicking the button to proceed",
+          reasoning: [
+            { type: "thinking", text: "I need to click the button" },
+            { type: "thinking", text: " to proceed with the task" },
+          ],
+          toolResults: [
             {
-              role: "assistant",
-              content: "I'm clicking the button to proceed",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "click_1",
-                  toolName: "click",
-                  output: { action: "click", ref: "btn1" },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "I'm clicking the button to proceed",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "click_1",
+                    toolName: "click",
+                    output: { action: "click", ref: "btn1" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task is complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task is complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task is complete",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task is complete",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await webAgent.execute("Test reasoning", { startingUrl: "https://example.com" });
 
@@ -1438,61 +1596,65 @@ describe("WebAgent", () => {
 
     it("should emit AGENT_PROCESSING events", async () => {
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-            output: {
-              explanation: "Test",
-              plan: "1. Test",
-            },
-          },
-        ],
-      } as any);
-
-      // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
+              output: {
+                explanation: "Test",
+                plan: "1. Test",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await webAgent.execute("Test processing events", { startingUrl: "https://example.com" });
 
@@ -1533,48 +1695,52 @@ describe("WebAgent", () => {
       });
 
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
-            },
-          },
-        ],
-      } as any);
-
-      // Mock done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Task completed",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Mock done action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Task completed",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as complete
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -1597,76 +1763,82 @@ describe("WebAgent", () => {
       });
 
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task properly",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task properly",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // First attempt - done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Incomplete result",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Incomplete result",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as partial (fail first attempt)
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("partial"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("partial"));
 
       // Second attempt - improved done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Better completion",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_2",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Complete result",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Better completion",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Better completion",
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Complete result",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Better completion",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as complete (pass second attempt)
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -1694,100 +1866,108 @@ describe("WebAgent", () => {
       });
 
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {},
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task properly",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {},
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task properly",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // First attempt - done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: {},
-            output: {
-              action: "done",
-              result: "Incomplete result",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          id: "test-id",
-          timestamp: new Date(),
-          modelId: "test-model",
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: {},
+              output: {
+                action: "done",
+                result: "Incomplete result",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            id: "test-id",
+            timestamp: new Date(),
+            modelId: "test-model",
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as partial (fail first attempt)
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Validation",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "validate_1",
-            toolName: "validate_task",
-            input: {},
-            output: {
-              taskAssessment: "Missing key information",
-              completionQuality: "partial",
-              feedback: "You need to provide more details about X and Y",
-            },
-          },
-        ],
-      } as any);
-
-      // Second attempt - should receive feedback message
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Better completion",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_2",
-            toolName: "done",
-            input: {},
-            output: {
-              action: "done",
-              result: "Complete result with X and Y details",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          id: "test-id",
-          timestamp: new Date(),
-          modelId: "test-model",
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Validation",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Better completion",
+              type: "tool-result",
+              toolCallId: "validate_1",
+              toolName: "validate_task",
+              input: {},
+              output: {
+                taskAssessment: "Missing key information",
+                completionQuality: "partial",
+                feedback: "You need to provide more details about X and Y",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Second attempt - should receive feedback message
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Better completion",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              input: {},
+              output: {
+                action: "done",
+                result: "Complete result with X and Y details",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            id: "test-id",
+            timestamp: new Date(),
+            modelId: "test-model",
+            messages: [
+              {
+                role: "assistant",
+                content: "Better completion",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as complete (pass second attempt)
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -1796,7 +1976,7 @@ describe("WebAgent", () => {
 
       // Verify that the feedback message was added to the conversation
       // Check the messages passed to the second done attempt
-      const secondDoneCall = mockGenerateText.mock.calls[3]; // planning, done1, validation1, done2
+      const secondDoneCall = mockStreamText.mock.calls[3]; // planning, done1, validation1, done2
       expect(secondDoneCall).toBeDefined();
 
       const messages = secondDoneCall[0].messages;
@@ -1832,95 +2012,103 @@ describe("WebAgent", () => {
       });
 
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // First attempt - done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Incomplete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Incomplete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response with specific feedback
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Validation",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "validate_1",
-            toolName: "validate_task",
-            output: {
-              taskAssessment: "The answer lacks required details",
-              completionQuality: "failed",
-              feedback: "Include specific examples and explanations",
-            },
-          },
-        ],
-      } as any);
-
-      // Second attempt after feedback
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Improved",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_2",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Complete with examples",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Validation",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Improved",
+              type: "tool-result",
+              toolCallId: "validate_1",
+              toolName: "validate_task",
+              output: {
+                taskAssessment: "The answer lacks required details",
+                completionQuality: "failed",
+                feedback: "Include specific examples and explanations",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Second attempt after feedback
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Improved",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Complete with examples",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Improved",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as complete
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
       // Check the feedback message format
-      const secondDoneCall = mockGenerateText.mock.calls[3];
+      const secondDoneCall = mockStreamText.mock.calls[3];
       expect(secondDoneCall).toBeDefined();
 
       const messages = secondDoneCall[0].messages;
@@ -1958,48 +2146,52 @@ describe("WebAgent", () => {
       });
 
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
-            },
-          },
-        ],
-      } as any);
-
-      // Mock done action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Poor result",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Task complete",
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Mock done action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Poor result",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response as failed but should accept due to max attempts
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("failed"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("failed"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -2027,101 +2219,107 @@ describe("WebAgent", () => {
       });
 
       // Plan should include guardrails
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning with guardrails",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Click buttons only",
-              plan: "1. Only click buttons per guardrails",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning with guardrails",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Click buttons only",
+                plan: "1. Only click buttons per guardrails",
+              },
+              output: {
+                explanation: "Click buttons only",
+                plan: "1. Only click buttons per guardrails",
+              },
             },
-            output: {
-              explanation: "Click buttons only",
-              plan: "1. Only click buttons per guardrails",
-            },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Click action (allowed)
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Click",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Click",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Click",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "click_1",
-                  toolName: "click",
-                  output: { action: "click", ref: "btn1" },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Click",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "click_1",
+                    toolName: "click",
+                    output: { action: "click", ref: "btn1" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation response
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await guardedAgent.execute("Interact with page", {
         startingUrl: "https://example.com",
@@ -2147,61 +2345,65 @@ describe("WebAgent", () => {
       });
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            input: {
-              explanation: "Visual task",
-              plan: "1. Use vision",
-            },
-            output: {
-              explanation: "Visual task",
-              plan: "1. Use vision",
-            },
-          },
-        ],
-      } as any);
-
-      // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            input: { result: "Complete" },
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "done_1",
-                  toolName: "done",
-                  output: { action: "done", result: "Complete", isTerminal: true },
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              input: {
+                explanation: "Visual task",
+                plan: "1. Use vision",
+              },
+              output: {
+                explanation: "Visual task",
+                plan: "1. Use vision",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
 
       await visionAgent.execute("Visual task", { startingUrl: "https://example.com" });
 
@@ -2226,74 +2428,80 @@ describe("WebAgent", () => {
       });
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Visual task",
-              plan: "1. Analyze visual elements",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Visual task",
+                plan: "1. Analyze visual elements",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Action that requires page snapshot
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Analyzing page with vision",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            input: { ref: "btn1" },
-            output: {
-              action: "click",
-              ref: "btn1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Analyzing page with vision",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking button",
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: {
+                action: "click",
+                ref: "btn1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking button",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Task complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Visual analysis complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Visual analysis complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       await visionAgent.execute("Analyze visual elements", { startingUrl: "https://example.com" });
 
@@ -2312,7 +2520,7 @@ describe("WebAgent", () => {
       expect(firstScreenshotEvent?.data.format).toBe("jpeg");
 
       // Verify messages include multimodal content with screenshots
-      const callArgs = mockGenerateText.mock.calls;
+      const callArgs = mockStreamText.mock.calls;
       const actionCall = callArgs.find(
         (call) =>
           call[0].messages &&
@@ -2341,48 +2549,52 @@ describe("WebAgent", () => {
       });
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Task",
-              plan: "1. Do something",
-            },
-          },
-        ],
-      } as any);
-
-      // Done immediately
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Task",
+                plan: "1. Do something",
+              },
             },
           ],
-        },
-      } as any);
+        }) as any,
+      );
+
+      // Done immediately
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       await visionAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -2402,7 +2614,7 @@ describe("WebAgent", () => {
       expect(screenshotEvents.length).toBe(0);
 
       // Verify messages are text-only (no multimodal content)
-      const callArgs = mockGenerateText.mock.calls;
+      const callArgs = mockStreamText.mock.calls;
       const hasMultimodalContent = callArgs.some(
         (call) =>
           call[0].messages &&
@@ -2421,104 +2633,112 @@ describe("WebAgent", () => {
   describe("snapshot truncation", () => {
     it("should truncate old snapshots to keep context size down", async () => {
       // Plan with URL
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Navigate through pages",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Navigate through pages",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // First action - navigate
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Navigating",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            output: {
-              action: "click",
-              ref: "button-1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Navigating",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking button",
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              output: {
+                action: "click",
+                ref: "button-1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking button",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Second action - another navigation
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Navigating further",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_2",
-            toolName: "click",
-            output: {
-              action: "click",
-              ref: "link-2",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Navigating further",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking link",
+              type: "tool-result",
+              toolCallId: "click_2",
+              toolName: "click",
+              output: {
+                action: "click",
+                ref: "link-2",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking link",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Task complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Task complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       await webAgent.execute("Navigate through pages", { startingUrl: "https://example.com" });
 
       // Check the messages passed to generateText in the later calls
       // The first snapshot should be clipped
-      const callArgs = mockGenerateText.mock.calls;
+      const callArgs = mockStreamText.mock.calls;
 
       // Find the second action call (after first navigation)
       const secondActionCall = callArgs[2]; // Plan, First action, Second action
@@ -2576,103 +2796,111 @@ describe("WebAgent", () => {
       });
 
       // Plan
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Planning",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Visual task",
-              plan: "1. Analyze images",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Planning",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Visual task",
+                plan: "1. Analyze images",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // First action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Analyzing",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_1",
-            toolName: "click",
-            output: {
-              action: "click",
-              ref: "image-1",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Analyzing",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking image",
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              output: {
+                action: "click",
+                ref: "image-1",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking image",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Second action
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Continuing",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "click_2",
-            toolName: "click",
-            output: {
-              action: "click",
-              ref: "image-2",
-              isTerminal: false,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Continuing",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Clicking another image",
+              type: "tool-result",
+              toolCallId: "click_2",
+              toolName: "click",
+              output: {
+                action: "click",
+                ref: "image-2",
+                isTerminal: false,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking another image",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Done
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Complete",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Visual analysis complete",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Complete",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Visual analysis complete",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       await visionAgent.execute("Analyze visual elements", { startingUrl: "https://example.com" });
 
       // Check that old screenshots are clipped
-      const callArgs = mockGenerateText.mock.calls;
+      const callArgs = mockStreamText.mock.calls;
 
       // By the third action call, earlier screenshots should be clipped
       const thirdActionCall = callArgs[3];
@@ -2714,26 +2942,30 @@ describe("WebAgent", () => {
   describe("enhanced error handling", () => {
     it("should extract detailed error messages from provider errors", async () => {
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Plan",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Create an error with AI SDK properties
       const providerError = new Error("Provider returned error") as any;
       providerError.statusCode = 422;
 
-      mockGenerateText.mockRejectedValueOnce(providerError);
+      mockStreamText.mockImplementationOnce(() => {
+        throw providerError;
+      });
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -2744,145 +2976,161 @@ describe("WebAgent", () => {
 
     it("should fail immediately on 4xx provider errors", async () => {
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Plan",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Create a 401 error (non-recoverable)
       const authError = new Error("Unauthorized") as any;
       authError.statusCode = 401;
 
-      mockGenerateText.mockRejectedValueOnce(authError);
+      mockStreamText.mockImplementationOnce(() => {
+        throw authError;
+      });
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
       expect(result.success).toBe(false);
       expect(result.finalAnswer).toContain("Task failed:");
       // Should fail immediately, not after retries
-      expect(mockGenerateText).toHaveBeenCalledTimes(2); // 1 for planning, 1 for first action attempt
+      expect(mockStreamText).toHaveBeenCalledTimes(2); // 1 for planning, 1 for first action attempt
     });
 
     it("should retry on 429 rate limit errors", async () => {
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Plan",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Create a 429 error (recoverable)
       const rateLimitError = new Error("Rate limit exceeded") as any;
       rateLimitError.statusCode = 429;
 
       // First attempt fails with 429
-      mockGenerateText.mockRejectedValueOnce(rateLimitError);
+      mockStreamText.mockImplementationOnce(() => {
+        throw rateLimitError;
+      });
 
       // Second attempt succeeds
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Task completed",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Task completed",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Task completed");
-      expect(mockGenerateText).toHaveBeenCalledTimes(4); // planning, failed attempt, successful attempt, validation
+      expect(mockStreamText).toHaveBeenCalledTimes(4); // planning, failed attempt, successful attempt, validation
     });
 
     it("should retry on 5xx server errors", async () => {
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Plan",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Create a 500 error (recoverable)
       const serverError = new Error("Internal server error") as any;
       serverError.statusCode = 500;
 
       // First attempt fails with 500
-      mockGenerateText.mockRejectedValueOnce(serverError);
+      mockStreamText.mockImplementationOnce(() => {
+        throw serverError;
+      });
 
       // Second attempt succeeds
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Done",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "done_1",
-            toolName: "done",
-            output: {
-              action: "done",
-              result: "Task completed",
-              isTerminal: true,
-            },
-          },
-        ],
-        response: {
-          messages: [
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
             {
-              role: "assistant",
-              content: "Done",
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Task completed",
+                isTerminal: true,
+              },
             },
           ],
-        },
-      } as any);
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock validation
-      mockGenerateText.mockResolvedValueOnce(mockValidationResponse("complete"));
+      mockStreamText.mockReturnValueOnce(mockValidationResponse("complete"));
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
 
@@ -2892,27 +3140,31 @@ describe("WebAgent", () => {
 
     it("should handle errors without status codes", async () => {
       // Mock planning
-      mockGenerateText.mockResolvedValueOnce({
-        text: "Plan",
-        toolResults: [
-          {
-            type: "tool-result",
-            toolCallId: "plan_1",
-            toolName: "create_plan",
-            output: {
-              explanation: "Test task",
-              plan: "1. Complete task",
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_1",
+              toolName: "create_plan",
+              output: {
+                explanation: "Test task",
+                plan: "1. Complete task",
+              },
             },
-          },
-        ],
-      } as any);
+          ],
+        }) as any,
+      );
 
       // Create a regular error without status
       const regularError = new Error("Network timeout");
 
       // First 5 attempts fail with the error
       for (let i = 0; i < 5; i++) {
-        mockGenerateText.mockRejectedValueOnce(regularError);
+        mockStreamText.mockImplementationOnce(() => {
+          throw regularError;
+        });
       }
 
       const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
