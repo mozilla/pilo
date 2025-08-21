@@ -329,73 +329,73 @@ Built with TypeScript, Playwright, and the Vercel AI SDK.
 
 ### Complete CLI Options
 
-| Option | Description | Default | Example |
-|--------|-------------|---------|---------|
-| `--url <url>` | Starting URL for the task | - | `--url https://example.com` |
-| `--data <json>` | JSON data to provide context | - | `--data '{"name":"John"}'` |
-| `--guardrails <text>` | Safety constraints for execution | - | `--guardrails "browse only"` |
-| `--provider <provider>` | AI provider (openai, openrouter, vertex, ollama, lmstudio) | openai | `--provider openrouter` |
-| `--model <model>` | AI model to use | Provider default | `--model gpt-4o` |
-| `--openai-api-key <key>` | OpenAI API key | - | `--openai-api-key sk-...` |
-| `--openrouter-api-key <key>` | OpenRouter API key | - | `--openrouter-api-key sk-or-...` |
-| `--browser <browser>` | Browser (firefox, chrome, chromium, safari, webkit, edge) | firefox | `--browser chrome` |
-| `--headless` | Run browser in headless mode | false | `--headless` |
-| `--debug` | Enable debug mode with snapshots | false | `--debug` |
-| `--vision` | Enable vision capabilities | false | `--vision` |
-| `--no-block-ads` | Disable ad blocking | false | `--no-block-ads` |
-| `--block-resources <list>` | Resources to block (comma-separated) | media,manifest | `--block-resources image,font` |
-| `--max-iterations <n>` | Maximum task iterations | 50 | `--max-iterations 100` |
-| `--max-validation-attempts <n>` | Maximum validation attempts | 3 | `--max-validation-attempts 5` |
-| `--reasoning-effort <level>` | Reasoning effort (none, low, medium, high) | none | `--reasoning-effort high` |
-| `--proxy <url>` | Proxy server URL | - | `--proxy http://proxy:8080` |
-| `--proxy-username <user>` | Proxy authentication username | - | `--proxy-username myuser` |
-| `--proxy-password <pass>` | Proxy authentication password | - | `--proxy-password mypass` |
-| `--logger <type>` | Logger type (console, json) | console | `--logger json` |
-| `--pw-endpoint <url>` | Playwright endpoint for remote browser | - | `--pw-endpoint ws://localhost:9222` |
-| `--pw-cdp-endpoint <url>` | Chrome DevTools Protocol endpoint | - | `--pw-cdp-endpoint ws://localhost:9222` |
-| `--bypass-csp` | Bypass Content Security Policy | false | `--bypass-csp` |
+| Option                          | Description                                                | Default          | Example                                 |
+| ------------------------------- | ---------------------------------------------------------- | ---------------- | --------------------------------------- |
+| `--url <url>`                   | Starting URL for the task                                  | -                | `--url https://example.com`             |
+| `--data <json>`                 | JSON data to provide context                               | -                | `--data '{"name":"John"}'`              |
+| `--guardrails <text>`           | Safety constraints for execution                           | -                | `--guardrails "browse only"`            |
+| `--provider <provider>`         | AI provider (openai, openrouter, vertex, ollama, lmstudio) | openai           | `--provider openrouter`                 |
+| `--model <model>`               | AI model to use                                            | Provider default | `--model gpt-4o`                        |
+| `--openai-api-key <key>`        | OpenAI API key                                             | -                | `--openai-api-key sk-...`               |
+| `--openrouter-api-key <key>`    | OpenRouter API key                                         | -                | `--openrouter-api-key sk-or-...`        |
+| `--browser <browser>`           | Browser (firefox, chrome, chromium, safari, webkit, edge)  | firefox          | `--browser chrome`                      |
+| `--headless`                    | Run browser in headless mode                               | false            | `--headless`                            |
+| `--debug`                       | Enable debug mode with snapshots                           | false            | `--debug`                               |
+| `--vision`                      | Enable vision capabilities                                 | false            | `--vision`                              |
+| `--no-block-ads`                | Disable ad blocking                                        | false            | `--no-block-ads`                        |
+| `--block-resources <list>`      | Resources to block (comma-separated)                       | media,manifest   | `--block-resources image,font`          |
+| `--max-iterations <n>`          | Maximum task iterations                                    | 50               | `--max-iterations 100`                  |
+| `--max-validation-attempts <n>` | Maximum validation attempts                                | 3                | `--max-validation-attempts 5`           |
+| `--reasoning-effort <level>`    | Reasoning effort (none, low, medium, high)                 | none             | `--reasoning-effort high`               |
+| `--proxy <url>`                 | Proxy server URL                                           | -                | `--proxy http://proxy:8080`             |
+| `--proxy-username <user>`       | Proxy authentication username                              | -                | `--proxy-username myuser`               |
+| `--proxy-password <pass>`       | Proxy authentication password                              | -                | `--proxy-password mypass`               |
+| `--logger <type>`               | Logger type (console, json)                                | console          | `--logger json`                         |
+| `--pw-endpoint <url>`           | Playwright endpoint for remote browser                     | -                | `--pw-endpoint ws://localhost:9222`     |
+| `--pw-cdp-endpoint <url>`       | Chrome DevTools Protocol endpoint                          | -                | `--pw-cdp-endpoint ws://localhost:9222` |
+| `--bypass-csp`                  | Bypass Content Security Policy                             | false            | `--bypass-csp`                          |
 
 ### Environment Variables
 
 All configuration options can be set via environment variables. Environment variables take precedence over config file settings.
 
-| Environment Variable | Description | CLI Equivalent |
-|---------------------|-------------|----------------|
-| **AI Configuration** | | |
-| `SPARK_PROVIDER` | AI provider (openai, openrouter, vertex, ollama, lmstudio) | `--provider` |
-| `SPARK_MODEL` | AI model to use | `--model` |
-| `OPENAI_API_KEY` | OpenAI API key | `--openai-api-key` |
-| `OPENROUTER_API_KEY` | OpenRouter API key | `--openrouter-api-key` |
-| `GOOGLE_VERTEX_PROJECT` | Google Cloud project for Vertex AI | - |
-| `GOOGLE_CLOUD_PROJECT` | Alternative for Vertex project | - |
-| `GCP_PROJECT` | Alternative for Vertex project | - |
-| `GOOGLE_VERTEX_LOCATION` | Vertex AI location/region | - |
-| `GOOGLE_CLOUD_REGION` | Alternative for Vertex location | - |
-| **Local AI Providers** | | |
-| `SPARK_OLLAMA_BASE_URL` | Ollama server base URL | - |
-| `SPARK_OPENAI_COMPATIBLE_BASE_URL` | OpenAI-compatible API base URL | - |
-| `SPARK_OPENAI_COMPATIBLE_NAME` | OpenAI-compatible provider name | - |
-| **Browser Configuration** | | |
-| `SPARK_BROWSER` | Browser to use | `--browser` |
-| `SPARK_HEADLESS` | Run headless (true/false) | `--headless` |
-| `SPARK_BLOCK_ADS` | Block ads (true/false) | `--no-block-ads` |
-| `SPARK_BLOCK_RESOURCES` | Resources to block (comma-separated) | `--block-resources` |
-| **Proxy Configuration** | | |
-| `SPARK_PROXY` | Proxy server URL | `--proxy` |
-| `SPARK_PROXY_USERNAME` | Proxy username | `--proxy-username` |
-| `SPARK_PROXY_PASSWORD` | Proxy password | `--proxy-password` |
-| **Logging Configuration** | | |
-| `SPARK_LOGGER` | Logger type (console, json) | `--logger` |
-| **WebAgent Configuration** | | |
-| `SPARK_DEBUG` | Enable debug mode (true/false) | `--debug` |
-| `SPARK_VISION` | Enable vision (true/false) | `--vision` |
-| `SPARK_MAX_ITERATIONS` | Maximum iterations | `--max-iterations` |
-| `SPARK_MAX_VALIDATION_ATTEMPTS` | Maximum validation attempts | `--max-validation-attempts` |
-| `SPARK_REASONING_EFFORT` | Reasoning effort level | `--reasoning-effort` |
-| **Playwright Configuration** | | |
-| `SPARK_PW_ENDPOINT` | Playwright endpoint URL | `--pw-endpoint` |
-| `SPARK_PW_CDP_ENDPOINT` | CDP endpoint URL | `--pw-cdp-endpoint` |
-| `SPARK_BYPASS_CSP` | Bypass CSP (true/false) | `--bypass-csp` |
+| Environment Variable               | Description                                                | CLI Equivalent              |
+| ---------------------------------- | ---------------------------------------------------------- | --------------------------- |
+| **AI Configuration**               |                                                            |                             |
+| `SPARK_PROVIDER`                   | AI provider (openai, openrouter, vertex, ollama, lmstudio) | `--provider`                |
+| `SPARK_MODEL`                      | AI model to use                                            | `--model`                   |
+| `OPENAI_API_KEY`                   | OpenAI API key                                             | `--openai-api-key`          |
+| `OPENROUTER_API_KEY`               | OpenRouter API key                                         | `--openrouter-api-key`      |
+| `GOOGLE_VERTEX_PROJECT`            | Google Cloud project for Vertex AI                         | -                           |
+| `GOOGLE_CLOUD_PROJECT`             | Alternative for Vertex project                             | -                           |
+| `GCP_PROJECT`                      | Alternative for Vertex project                             | -                           |
+| `GOOGLE_VERTEX_LOCATION`           | Vertex AI location/region                                  | -                           |
+| `GOOGLE_CLOUD_REGION`              | Alternative for Vertex location                            | -                           |
+| **Local AI Providers**             |                                                            |                             |
+| `SPARK_OLLAMA_BASE_URL`            | Ollama server base URL                                     | -                           |
+| `SPARK_OPENAI_COMPATIBLE_BASE_URL` | OpenAI-compatible API base URL                             | -                           |
+| `SPARK_OPENAI_COMPATIBLE_NAME`     | OpenAI-compatible provider name                            | -                           |
+| **Browser Configuration**          |                                                            |                             |
+| `SPARK_BROWSER`                    | Browser to use                                             | `--browser`                 |
+| `SPARK_HEADLESS`                   | Run headless (true/false)                                  | `--headless`                |
+| `SPARK_BLOCK_ADS`                  | Block ads (true/false)                                     | `--no-block-ads`            |
+| `SPARK_BLOCK_RESOURCES`            | Resources to block (comma-separated)                       | `--block-resources`         |
+| **Proxy Configuration**            |                                                            |                             |
+| `SPARK_PROXY`                      | Proxy server URL                                           | `--proxy`                   |
+| `SPARK_PROXY_USERNAME`             | Proxy username                                             | `--proxy-username`          |
+| `SPARK_PROXY_PASSWORD`             | Proxy password                                             | `--proxy-password`          |
+| **Logging Configuration**          |                                                            |                             |
+| `SPARK_LOGGER`                     | Logger type (console, json)                                | `--logger`                  |
+| **WebAgent Configuration**         |                                                            |                             |
+| `SPARK_DEBUG`                      | Enable debug mode (true/false)                             | `--debug`                   |
+| `SPARK_VISION`                     | Enable vision (true/false)                                 | `--vision`                  |
+| `SPARK_MAX_ITERATIONS`             | Maximum iterations                                         | `--max-iterations`          |
+| `SPARK_MAX_VALIDATION_ATTEMPTS`    | Maximum validation attempts                                | `--max-validation-attempts` |
+| `SPARK_REASONING_EFFORT`           | Reasoning effort level                                     | `--reasoning-effort`        |
+| **Playwright Configuration**       |                                                            |                             |
+| `SPARK_PW_ENDPOINT`                | Playwright endpoint URL                                    | `--pw-endpoint`             |
+| `SPARK_PW_CDP_ENDPOINT`            | CDP endpoint URL                                           | `--pw-cdp-endpoint`         |
+| `SPARK_BYPASS_CSP`                 | Bypass CSP (true/false)                                    | `--bypass-csp`              |
 
 ### Configuration Priority
 
