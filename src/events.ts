@@ -68,7 +68,7 @@ export interface TaskSetupEventData extends WebAgentEventData {
  */
 export interface TaskStartEventData extends WebAgentEventData {
   task: string;
-  explanation: string;
+  successCriteria: string;
   plan: string;
   url: string;
 }

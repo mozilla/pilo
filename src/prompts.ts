@@ -82,7 +82,8 @@ export const TOOL_STRINGS = {
   planning: {
     /** Common parameter descriptions */
     common: {
-      explanation: "Task explanation in agent's own words",
+      successCriteria:
+        "Clear criteria describing what a successful, high-quality answer must include and accomplish",
       plan: "Step-by-step plan for the task",
     },
     /** Individual tool descriptions */
@@ -159,7 +160,8 @@ const planPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 Create a plan for this web navigation task.
-Provide a clear explanation{% if includeUrl %}, step-by-step plan, and starting URL{% else %} and step-by-step plan{% endif %}.
+First, define clear success criteria for what a high-quality answer must include.
+Then provide a{% if includeUrl %} step-by-step plan and starting URL{% else %} step-by-step plan{% endif %}.
 Focus on general steps and goals rather than specific page features or UI elements.
 
 Today's Date: {{ currentDate }}
@@ -167,21 +169,57 @@ Task: {{ task }}
 {% if startingUrl %}Starting URL: {{ startingUrl }}{% endif %}
 {% if guardrails %}Guardrails: {{ guardrails }}{% endif %}
 
-Best Practices:
-- When explaining the task, make sure to expand all dates to include the year.
-- For booking tasks, all dates must be in the future.
-- Avoid assumptions about specific UI layouts that may change.
-{% if startingUrl %}- Use the provided starting URL as your starting point for the task.{% endif %}
-{% if guardrails %}- Consider the guardrails when creating your plan to ensure all steps comply with the given limitations.{% endif %}
+PART 1: SUCCESS CRITERIA
+Define what an exceptional final answer must include:
+
+1. **Required Information**
+- List ALL essential information the answer must contain
+- Specify the depth and detail needed for each element
+- Include both primary objectives and valuable supplementary details
+
+2. **Quality Standards**
+- Level of accuracy and verification required
+- Comparisons or analysis that should be included
+- What distinguishes an excellent answer from an adequate one
+
+3. **Answer Format**
+- How information should be structured and organized
+- Key highlights or summaries needed
+- Appropriate level of technical detail for the audience
+
+PART 2: NAVIGATION PLAN
+{% if includeUrl %}Provide a strategic plan starting from the given URL.{% else %}Provide a strategic plan for accomplishing the task.{% endif %}
+
+Your plan should:
+
+1. **Start with Overall Strategy**
+- Define the general approach before listing individual steps
+- Identify whether this is a search, comparison, booking, research, or verification task
+- Note if you'll need to gather information from multiple sources
+
+2. **Focus on Information Goals**
+- Write steps that describe what information to find, not specific UI elements
+- Keep steps general enough to work even if page layouts change
+
+3. **Be Clear and Sequential**
+- List concrete steps in logical order
+- Indicate what information to gather at each major step
+- Note when to compare multiple options or dig deeper
+
+4. **Follow Constraints**
+{% if startingUrl %}- Begin from the provided URL{% endif %}
+{% if guardrails %}- Ensure every step complies with the stated limitations{% endif %}
+- All dates must include the year
+- Booking dates must be in the future
 
 {% if includeUrl %}
 Call create_plan_with_url() with:
-- explanation: ${TOOL_STRINGS.planning.common.explanation}
+- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
 - url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
 {% else %}
 Call create_plan() with:
-- explanation: ${TOOL_STRINGS.planning.common.explanation}
+- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
 {% endif %}
 
@@ -278,7 +316,7 @@ export { buildActionLoopSystemPrompt };
 const taskAndPlanTemplate = buildPromptTemplate(
   `
 Task: {{ task }}
-Explanation: {{ explanation }}
+Success Criteria: {{ successCriteria }}
 Plan: {{ plan }}
 Today's Date: {{ currentDate }}
 {% if data %}
@@ -299,14 +337,14 @@ These guardrails are ABSOLUTE REQUIREMENTS that you MUST follow at all times. An
 
 export const buildTaskAndPlanPrompt = (
   task: string,
-  explanation: string,
+  successCriteria: string,
   plan: string,
   data?: any,
   guardrails?: string | null,
 ) =>
   taskAndPlanTemplate({
     task,
-    explanation,
+    successCriteria,
     plan,
     currentDate: getCurrentFormattedDate(),
     data: data ? JSON.stringify(data, null, 2) : null,
@@ -390,15 +428,22 @@ Evaluate how well the task result accomplishes what the user requested. Focus on
 Be concise in your response.
 
 Task: {{ task }}
+Success Criteria: {{ successCriteria }}
 Result: {{ finalAnswer }}
 
-Evaluation criteria:
-- **failed**: Task not completed or result doesn't accomplish what was requested
-- **partial**: Task partially completed but result is missing key elements
-- **complete**: Task fully completed and result accomplishes what was requested
-- **excellent**: Task completed exceptionally well with valuable additional elements
+Evaluation approach:
+1. Compare the result against the success criteria defined above
+2. Check if all required information is included
+3. Verify the answer meets the specified format and detail level
+4. Assess if key requirements are satisfied
 
-Only use 'failed' or 'partial' when the result genuinely fails to accomplish the task. The process doesn't matter if the task is completed successfully.
+Quality ratings:
+- **failed**: Result doesn't meet the success criteria or task not completed
+- **partial**: Some success criteria met but missing key elements
+- **complete**: All success criteria met and task accomplished
+- **excellent**: Exceeds success criteria with valuable additional elements
+
+Only use 'failed' or 'partial' when the result genuinely fails to meet the success criteria. The process doesn't matter if the criteria are satisfied.
 
 Call validate_task() with:
 - taskAssessment: ${TOOL_STRINGS.validation.validate_task.taskAssessment}
@@ -411,11 +456,13 @@ ${toolCallInstruction}
 
 export const buildTaskValidationPrompt = (
   task: string,
+  successCriteria: string,
   finalAnswer: string,
   conversationHistory: string,
 ): string =>
   taskValidationTemplate({
     task,
+    successCriteria,
     finalAnswer,
     conversationHistory,
   });

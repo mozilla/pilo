@@ -48,7 +48,7 @@ describe("Planning Tools", () => {
 
       // Test valid input
       const validInput = {
-        explanation: "I need to search for information",
+        successCriteria: "I need to search for information",
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
       };
 
@@ -66,7 +66,7 @@ describe("Planning Tools", () => {
 
       // Test valid input
       const validInput = {
-        explanation: "I need to search for flights",
+        successCriteria: "I need to search for flights",
         plan: "1. Go to travel site\n2. Enter dates\n3. Search flights",
         url: "https://travel-site.com",
       };
@@ -81,7 +81,7 @@ describe("Planning Tools", () => {
 
       // Missing required fields
       const invalidInput = {
-        explanation: "Test",
+        successCriteria: "Test",
         // missing plan
       };
 
@@ -95,7 +95,7 @@ describe("Planning Tools", () => {
 
       // Missing required fields
       const invalidInput = {
-        explanation: "Test",
+        successCriteria: "Test",
         plan: "1. Do something",
         // missing url
       };
@@ -108,14 +108,14 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       const input = {
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
       };
 
       const result = await tools.create_plan.execute!(input, {} as any);
 
       expect(result).toEqual(input);
-      expect((result as any).explanation).toBe("Test explanation");
+      expect((result as any).successCriteria).toBe("Test successCriteria");
       expect((result as any).plan).toBe("Test plan");
     });
 
@@ -123,7 +123,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       const input = {
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
         url: "https://example.com",
       };
@@ -131,7 +131,7 @@ describe("Planning Tools", () => {
       const result = await tools.create_plan_with_url.execute!(input, {} as any);
 
       expect(result).toEqual(input);
-      expect((result as any).explanation).toBe("Test explanation");
+      expect((result as any).successCriteria).toBe("Test successCriteria");
       expect((result as any).plan).toBe("Test plan");
       expect((result as any).url).toBe("https://example.com");
     });
@@ -140,14 +140,14 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       const input = {
-        explanation: "",
+        successCriteria: "",
         plan: "",
       };
 
       const result = await tools.create_plan.execute!(input, {} as any);
 
       expect(result).toEqual(input);
-      expect((result as any).explanation).toBe("");
+      expect((result as any).successCriteria).toBe("");
       expect((result as any).plan).toBe("");
     });
 
@@ -165,7 +165,7 @@ describe("Planning Tools", () => {
       `.trim();
 
       const input = {
-        explanation: "Complex task requiring multiple steps",
+        successCriteria: "Complex task requiring multiple steps",
         plan: longPlan,
       };
 
@@ -178,7 +178,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       const input = {
-        explanation: "Search task",
+        successCriteria: "Search task",
         plan: "1. Search for item",
         url: "https://example.com/search?q=test&filter=true&page=1",
       };
@@ -192,14 +192,14 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       const input = {
-        explanation: "Tâche en français",
+        successCriteria: "Tâche en français",
         plan: "1. Étape un\n2. Étape deux\n3. 完成任务",
         url: "https://example.com/fr",
       };
 
       const result = await tools.create_plan_with_url.execute!(input, {} as any);
 
-      expect((result as any).explanation).toBe("Tâche en français");
+      expect((result as any).successCriteria).toBe("Tâche en français");
       expect((result as any).plan).toContain("Étape");
       expect((result as any).plan).toContain("完成任务");
     });

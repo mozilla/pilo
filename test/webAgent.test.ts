@@ -284,11 +284,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Need to click button",
+              successCriteria: "Need to click button",
               plan: "1. Find button\n2. Click it",
             },
             output: {
-              explanation: "Need to click button",
+              successCriteria: "Need to click button",
               plan: "1. Find button\n2. Click it",
             },
           },
@@ -401,11 +401,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Fill form with provided data",
+              successCriteria: "Fill form with provided data",
               plan: "1. Use provided data to fill form",
             },
             output: {
-              explanation: "Fill form with provided data",
+              successCriteria: "Fill form with provided data",
               plan: "1. Use provided data to fill form",
             },
           },
@@ -491,12 +491,12 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan_with_url",
             input: {
-              explanation: "Search for flights",
+              successCriteria: "Search for flights",
               plan: "1. Go to travel site\n2. Search flights",
               url: "https://travel.example.com",
             },
             output: {
-              explanation: "Search for flights",
+              successCriteria: "Search for flights",
               plan: "1. Go to travel site\n2. Search flights",
               url: "https://travel.example.com",
             },
@@ -561,11 +561,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Navigate and interact",
+              successCriteria: "Navigate and interact",
               plan: "1. Use the page\n2. Complete task",
             },
             output: {
-              explanation: "Navigate and interact",
+              successCriteria: "Navigate and interact",
               plan: "1. Use the page\n2. Complete task",
             },
           },
@@ -642,11 +642,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -892,11 +892,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -986,11 +986,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1035,11 +1035,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1138,11 +1138,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1211,7 +1211,7 @@ describe("WebAgent", () => {
             toolName: "create_plan",
             input: {},
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -1300,7 +1300,7 @@ describe("WebAgent", () => {
             toolName: "create_plan",
             input: {},
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -1398,11 +1398,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1509,11 +1509,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1625,11 +1625,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
             output: {
-              explanation: "Test",
+              successCriteria: "Test",
               plan: "1. Test",
             },
           },
@@ -1722,7 +1722,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -1788,7 +1788,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task properly",
             },
           },
@@ -1890,7 +1890,7 @@ describe("WebAgent", () => {
             toolName: "create_plan",
             input: {},
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task properly",
             },
           },
@@ -2031,7 +2031,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -2161,7 +2161,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -2232,11 +2232,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Click buttons only",
+              successCriteria: "Click buttons only",
               plan: "1. Only click buttons per guardrails",
             },
             output: {
-              explanation: "Click buttons only",
+              successCriteria: "Click buttons only",
               plan: "1. Only click buttons per guardrails",
             },
           },
@@ -2356,11 +2356,11 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             input: {
-              explanation: "Visual task",
+              successCriteria: "Visual task",
               plan: "1. Use vision",
             },
             output: {
-              explanation: "Visual task",
+              successCriteria: "Visual task",
               plan: "1. Use vision",
             },
           },
@@ -2437,7 +2437,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Visual task",
+              successCriteria: "Visual task",
               plan: "1. Analyze visual elements",
             },
           },
@@ -2556,7 +2556,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Task",
+              successCriteria: "Task",
               plan: "1. Do something",
             },
           },
@@ -2638,7 +2638,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Navigate through pages",
             },
           },
@@ -2799,7 +2799,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Visual task",
+              successCriteria: "Visual task",
               plan: "1. Analyze images",
             },
           },
@@ -2943,7 +2943,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -2975,7 +2975,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -3008,7 +3008,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -3071,7 +3071,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -3133,7 +3133,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Complete task",
             },
           },
@@ -3170,7 +3170,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Click button repeatedly",
             },
           },
@@ -3246,7 +3246,7 @@ describe("WebAgent", () => {
             toolCallId: "plan_1",
             toolName: "create_plan",
             output: {
-              explanation: "Test task",
+              successCriteria: "Test task",
               plan: "1. Click and fill alternately",
             },
           },

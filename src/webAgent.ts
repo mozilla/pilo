@@ -110,7 +110,7 @@ export class WebAgent {
   private plan: string = "";
   private url: string = "";
   private messages: ModelMessage[] = [];
-  private taskExplanation: string = "";
+  private successCriteria: string = "";
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
@@ -836,7 +836,12 @@ export class WebAgent {
       const conversationHistory = this.formatConversationHistory();
 
       // Build validation prompt
-      const validationPrompt = buildTaskValidationPrompt(task, finalAnswer, conversationHistory);
+      const validationPrompt = buildTaskValidationPrompt(
+        task,
+        this.successCriteria,
+        finalAnswer,
+        conversationHistory,
+      );
 
       // Call validation tool
       const validationTools = createValidationTools();
@@ -1001,10 +1006,10 @@ export class WebAgent {
         throw new Error("Failed to generate plan");
       }
 
-      const { plan, explanation, url } = this.extractPlanOutput(planningResponse);
+      const { plan, successCriteria, url } = this.extractPlanOutput(planningResponse);
 
       this.plan = plan;
-      this.taskExplanation = explanation;
+      this.successCriteria = successCriteria;
 
       if (!startingUrl && url) {
         this.url = url;
@@ -1015,7 +1020,7 @@ export class WebAgent {
       this.emit(WebAgentEventType.AGENT_STATUS, {
         message: "Task plan created",
         plan: this.plan,
-        explanation: this.taskExplanation,
+        successCriteria: this.successCriteria,
         url: this.url,
       });
     } catch (error) {
@@ -1078,7 +1083,7 @@ export class WebAgent {
    */
   private extractPlanOutput(planningResponse: any): {
     plan: string;
-    explanation: string;
+    successCriteria: string;
     url?: string;
   } {
     const firstToolResult = planningResponse.toolResults[0] as any;
@@ -1086,7 +1091,7 @@ export class WebAgent {
 
     return {
       plan: planOutput.plan || "",
-      explanation: planOutput.explanation || "",
+      successCriteria: planOutput.successCriteria || "",
       url: planOutput.url,
     };
   }
@@ -1131,7 +1136,7 @@ export class WebAgent {
 
     this.emit(WebAgentEventType.TASK_STARTED, {
       task: task,
-      explanation: this.taskExplanation,
+      successCriteria: this.successCriteria,
       plan: this.plan,
       url: this.url,
       title: this.currentPage.title,
@@ -1150,7 +1155,7 @@ export class WebAgent {
         role: "user",
         content: buildTaskAndPlanPrompt(
           task,
-          this.taskExplanation,
+          this.successCriteria,
           this.plan,
           this.data,
           this.guardrails,
@@ -1207,7 +1212,7 @@ export class WebAgent {
     this.plan = "";
     this.url = "";
     this.messages = [];
-    this.taskExplanation = "";
+    this.successCriteria = "";
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;

@@ -126,8 +126,8 @@ export class ChalkConsoleLogger implements Logger {
 
   private handleTaskStart = (data: TaskStartEventData): void => {
     console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(data.task));
-    console.log(chalk.yellow.bold("\n💡 Explanation:"));
-    console.log(chalk.whiteBright(data.explanation));
+    console.log(chalk.yellow.bold("\n💡 Success Criteria:"));
+    console.log(chalk.whiteBright(data.successCriteria));
     console.log(chalk.magenta.bold("\n📋 Plan:"));
     console.log(chalk.whiteBright(data.plan));
     console.log(chalk.blue.bold("🌐 Starting URL: "), chalk.blue.underline(data.url));
