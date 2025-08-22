@@ -66,14 +66,32 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
+  '@ai-sdk/openai-compatible@1.0.11':
+    resolution: {integrity: sha512-eRD6dZviy31KYz4YvxAR/c6UEYx3p4pCiWZeDdYdAHj0rn8xZlGVxtQRs1qynhz6IYGOo4aLBf9zVW5w0tI/Uw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
   '@ai-sdk/openai@2.0.15':
     resolution: {integrity: sha512-/IUyQ9ck4uUTtGojvQamcUWpNWkwpL/P1F6LYRxpQGj07H00oJEBH/VUizrIq0ZvW/vkuK6c6X4UJS9PrdYyxA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
 
+  '@ai-sdk/provider-utils@3.0.1':
+    resolution: {integrity: sha512-/iP1sKc6UdJgGH98OCly7sWJKv+J9G47PnTjIj40IJMUQKwDrUMyf7zOOfRtPwSuNifYhSoJQ4s1WltI65gJ/g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
   '@ai-sdk/provider-utils@3.0.3':
     resolution: {integrity: sha512-kAxIw1nYmFW1g5TvE54ZB3eNtgZna0RnLjPUp1ltz1+t9xkXJIuDT4atrwfau9IbS0BOef38wqrI8CjFfQrxhw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
+  '@ai-sdk/provider-utils@3.0.5':
+    resolution: {integrity: sha512-HliwB/yzufw3iwczbFVE2Fiwf1XqROB/I6ng8EKUsPM5+2wnIa8f4VbljZcDx+grhFrPV+PnRZH7zBqi8WZM7Q==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -833,6 +851,12 @@ packages:
     resolution: {integrity: sha512-ppwTtiJZq0O/ai0z7yfudtBpWIoxM8yE6nHi1X47eFR2EWORqfbu6CnPlNsjeN683eT0qG6H/Pyf9fCcvjnnnQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  ollama-ai-provider-v2@1.1.2:
+    resolution: {integrity: sha512-M7mI9OGGarFYGuL5r2pvJiOyN84EvEYAbHqk/YeOmaXX8Enb+E+5QIqPGWsgA1CJFulofsdEGEkJFDMEut8QyQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^4.0.16
+
   onetime@6.0.0:
     resolution: {integrity: sha512-1FlR+gjXK7X+AsAHso35MnyN5KqGwJRi/31ft6x0M194ht7S+rWAvd7PHss9xSKMzE0asv1pyIHaJYq+BbacAQ==}
     engines: {node: '>=12'}
@@ -1108,13 +1132,35 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
 
+  '@ai-sdk/openai-compatible@1.0.11(zod@4.0.17)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.5(zod@4.0.17)
+      zod: 4.0.17
+
   '@ai-sdk/openai@2.0.15(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.3(zod@4.0.17)
       zod: 4.0.17
 
+  '@ai-sdk/provider-utils@3.0.1(zod@4.0.17)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.3
+      zod: 4.0.17
+      zod-to-json-schema: 3.24.6(zod@4.0.17)
+
   '@ai-sdk/provider-utils@3.0.3(zod@4.0.17)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.3
+      zod: 4.0.17
+      zod-to-json-schema: 3.24.6(zod@4.0.17)
+
+  '@ai-sdk/provider-utils@3.0.5(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -1742,6 +1788,12 @@ snapshots:
     dependencies:
       path-key: 4.0.0
 
+  ollama-ai-provider-v2@1.1.2(zod@4.0.17):
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.1(zod@4.0.17)
+      zod: 4.0.17
+
   onetime@6.0.0:
     dependencies:
       mimic-fn: 4.0.0
@@ -1838,6 +1890,7 @@ snapshots:
     dependencies:
       '@ai-sdk/google-vertex': 3.0.9(zod@4.0.17)
       '@ai-sdk/openai': 2.0.15(zod@4.0.17)
+      '@ai-sdk/openai-compatible': 1.0.11(zod@4.0.17)
       '@ghostery/adblocker-playwright': 2.11.3(playwright@1.53.0)
       '@openrouter/ai-sdk-provider': 1.1.2(ai@5.0.15(zod@4.0.17))(zod@4.0.17)
       '@types/turndown': 5.0.5
@@ -1849,6 +1902,7 @@ snapshots:
       eventemitter3: 5.0.1
       liquidjs: 10.21.1
       nanoid: 5.1.5
+      ollama-ai-provider-v2: 1.1.2(zod@4.0.17)
       playwright: 1.53.0
       turndown: 7.2.1
       zod: 4.0.17

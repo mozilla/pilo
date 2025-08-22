@@ -348,7 +348,7 @@ describe("prompts", () => {
     it("should include guidance text", () => {
       const prompt = buildPageSnapshotPrompt("Test", "https://test.com", "content");
 
-      expect(prompt).toContain("This accessibility tree shows the complete current page content");
+      expect(prompt).toContain("This shows the complete current page content");
       expect(prompt).toContain("Analyze the current state");
       expect(prompt).toContain("most relevant elements");
       expect(prompt).toContain("If an action fails, adapt immediately");
@@ -422,7 +422,7 @@ describe("prompts", () => {
         "conversation history",
       );
 
-      expect(prompt).toContain("Evaluate how well the task result accomplishes");
+      expect(prompt).toContain("Evaluate if the task result gives the user what they requested");
       expect(prompt).toContain("Task: Submit contact form");
       expect(prompt).toContain("Result:");
     });
@@ -461,7 +461,8 @@ describe("prompts", () => {
         "conversation history",
       );
 
-      expect(prompt).toContain("failed' or 'partial'");
+      expect(prompt).toContain("failed");
+      expect(prompt).toContain("partial");
       expect(prompt).toContain("feedback");
     });
 

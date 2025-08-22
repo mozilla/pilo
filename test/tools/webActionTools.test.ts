@@ -149,7 +149,7 @@ describe("Web Action Tools", () => {
       expect(tools.extract.description).toBe(
         "Extract specific data from the current page for later reference",
       );
-      expect(tools.done.description).toContain("Mark the entire task as complete");
+      expect(tools.done.description).toBe("Complete the task with your final answer");
       expect(tools.abort.description).toContain("Abort the task when it cannot be completed");
     });
   });
