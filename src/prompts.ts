@@ -82,7 +82,7 @@ export const TOOL_STRINGS = {
   planning: {
     /** Common parameter descriptions */
     common: {
-      successCriteria: "Brief description of what the user needs to accomplish their goal",
+      successCriteria: "What would make a great response - key information and detail level needed",
       plan: "Step-by-step plan for the task",
     },
     /** Individual tool descriptions */
@@ -169,7 +169,7 @@ Task: {{ task }}
 {% if guardrails %}Guardrails: {{ guardrails }}{% endif %}
 
 PART 1: SUCCESS CRITERIA
-What does the user need? State the key information required to complete their task.
+What does the user need? Describe what a great response would include - the key information and level of detail that would fully satisfy their request.
 
 PART 2: NAVIGATION PLAN
 {% if includeUrl %}Provide a strategic plan starting from the given URL.{% else %}Provide a strategic plan for accomplishing the task.{% endif %}
