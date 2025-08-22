@@ -43,12 +43,31 @@ vi.mock("../../../src/cli/utils.js", () => ({
   parseResourcesList: vi.fn((resources) => resources.split(",")),
 }));
 
+// Mock fs module
+vi.mock("fs", () => ({
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}));
+
+// Mock WebAgentEventEmitter
+vi.mock("../../../src/events.js", () => ({
+  WebAgentEventType: {
+    AI_GENERATION: "ai:generation",
+  },
+  WebAgentEventEmitter: vi.fn().mockImplementation(() => ({
+    onEvent: vi.fn(),
+    emit: vi.fn(),
+  })),
+}));
+
 import { WebAgent } from "../../../src/webAgent.js";
 import { PlaywrightBrowser } from "../../../src/browser/playwrightBrowser.js";
 import { config } from "../../../src/config.js";
 import { createAIProvider } from "../../../src/provider.js";
 import { ChalkConsoleLogger } from "../../../src/loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "../../../src/loggers/json.js";
+import { WebAgentEventEmitter } from "../../../src/events.js";
+import * as fs from "fs";
 
 const mockWebAgent = vi.mocked(WebAgent);
 const mockPlaywrightBrowser = vi.mocked(PlaywrightBrowser);
@@ -65,8 +84,8 @@ describe("CLI Run Command", () => {
   beforeEach(() => {
     // Mock process.exit to prevent tests from actually exiting
     originalExit = process.exit;
-    mockExit = vi.fn() as any;
-    process.exit = mockExit;
+    mockExit = vi.fn<Parameters<typeof process.exit>, never>() as any;
+    process.exit = mockExit as any;
 
     command = createRunCommand();
     vi.clearAllMocks();
@@ -191,7 +210,10 @@ describe("CLI Run Command", () => {
         proxyPassword: undefined,
       });
 
-      expect(mockCreateAIProvider).toHaveBeenCalledWith({ provider: "openai" });
+      expect(mockCreateAIProvider).toHaveBeenCalledWith({
+        provider: "openai",
+        reasoning_effort: "none",
+      });
       expect(mockWebAgent).toHaveBeenCalled();
     });
 
@@ -215,6 +237,7 @@ describe("CLI Run Command", () => {
         model: "anthropic/claude-3-sonnet",
         openai_api_key: "sk-test123",
         openrouter_api_key: "sk-or-test123",
+        reasoning_effort: "none",
       });
     });
 
@@ -269,6 +292,76 @@ describe("CLI Run Command", () => {
         maxIterations: 30,
         maxValidationAttempts: 2,
       });
+    });
+
+    it("should set up generation logging when debug flag is enabled", async () => {
+      const mockFs = vi.mocked(fs);
+      const mockEventEmitter = vi.mocked(WebAgentEventEmitter);
+
+      // Clear mocks before test
+      mockFs.mkdirSync.mockClear();
+      mockFs.writeFileSync.mockClear();
+      mockEventEmitter.mockClear();
+
+      const args = ["--debug", "test task"];
+      await command.parseAsync(args, { from: "user" });
+
+      // Should create debug/generations directory
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith(expect.stringContaining("debug/generations"), {
+        recursive: true,
+      });
+
+      // Should create event emitter and set up listener
+      expect(mockEventEmitter).toHaveBeenCalled();
+      const emitterInstance = mockEventEmitter.mock.results[0].value;
+      expect(emitterInstance.onEvent).toHaveBeenCalledWith("ai:generation", expect.any(Function));
+
+      // Should pass the event emitter to WebAgent
+      const webAgentCall = mockWebAgent.mock.calls[0];
+      expect(webAgentCall[1]).toMatchObject({
+        debug: true,
+        eventEmitter: emitterInstance,
+      });
+
+      // Test that the listener writes to file when called
+      const listener = emitterInstance.onEvent.mock.calls[0][1];
+      const mockData = {
+        messages: [{ role: "user", content: "test" }],
+        usage: { totalTokens: 100 },
+        finishReason: "stop",
+        object: { type: "action", action: "click" },
+      };
+
+      listener(mockData);
+
+      // Should write generation data to file
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/debug\/generations\/.*\.json$/),
+        JSON.stringify(mockData, null, 2),
+      );
+    });
+
+    it("should not set up generation logging when debug flag is not enabled", async () => {
+      const mockFs = vi.mocked(fs);
+      const mockEventEmitter = vi.mocked(WebAgentEventEmitter);
+
+      // Clear mocks before test
+      mockFs.mkdirSync.mockClear();
+      mockEventEmitter.mockClear();
+
+      const args = ["test task"];
+      await command.parseAsync(args, { from: "user" });
+
+      // Should not create debug directory
+      expect(mockFs.mkdirSync).not.toHaveBeenCalled();
+
+      // Event emitter should still be created but no AI_GENERATION listener
+      expect(mockEventEmitter).toHaveBeenCalled();
+      const emitterInstance = mockEventEmitter.mock.results[0].value;
+      expect(emitterInstance.onEvent).not.toHaveBeenCalledWith(
+        "ai:generation",
+        expect.any(Function),
+      );
     });
 
     it("should pass proxy options correctly", async () => {

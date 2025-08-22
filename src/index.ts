@@ -20,3 +20,4 @@ export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 export { config, ConfigManager } from "./config.js";
 export type { SparkConfig } from "./config.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
+export type { ProviderConfig } from "./provider.js";

@@ -79,9 +79,9 @@ describe("Config Integration", () => {
 
     it("should list config sources", () => {
       const mockSources = {
-        global: { provider: "openai" },
-        env: { browser: "chrome" },
-        merged: { provider: "openai", browser: "chrome" },
+        global: { provider: "openai" as const },
+        env: { browser: "chrome" as const },
+        merged: { provider: "openai" as const, browser: "chrome" as const },
       };
 
       mockConfig.listSources.mockReturnValue(mockSources);

@@ -6,20 +6,12 @@ import {
   TaskStartEventData,
   TaskCompleteEventData,
   PageNavigationEventData,
-  CurrentStepEventData,
-  ObservationEventData,
-  ThoughtEventData,
-  ExtractedDataEventData,
+  AgentStepEventData,
+  ReasoningEventData,
   ActionExecutionEventData,
   ActionResultEventData,
-  CompressionDebugEventData,
-  MessagesDebugEventData,
-  WaitingEventData,
-  NetworkWaitingEventData,
-  NetworkTimeoutEventData,
   TaskValidationEventData,
   StatusMessageEventData,
-  WEB_AGENT_EVENT_TYPES,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -36,7 +28,7 @@ describe("WebAgentEventEmitter", () => {
         timestamp: Date.now(),
         iterationId: "test-id",
         task: "Test task",
-        explanation: "Test explanation",
+        successCriteria: "Test successCriteria",
         plan: "Test plan",
         url: "https://example.com",
       };
@@ -55,6 +47,7 @@ describe("WebAgentEventEmitter", () => {
       const listener = vi.fn();
       const eventData: TaskCompleteEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         finalAnswer: "Test answer",
       };
 
@@ -76,6 +69,7 @@ describe("WebAgentEventEmitter", () => {
       const listener = vi.fn();
       const eventData: PageNavigationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         title: "Test Page",
         url: "https://example.com",
       };
@@ -93,9 +87,10 @@ describe("WebAgentEventEmitter", () => {
     it("should handle multiple listeners for the same event", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      const eventData: CurrentStepEventData = {
+      const eventData: AgentStepEventData = {
         timestamp: Date.now(),
-        currentStep: "Step 1",
+        iterationId: "test-1",
+        currentIteration: 1,
       };
 
       emitter.onEvent(WebAgentEventType.AGENT_STEP, listener1);
@@ -119,12 +114,13 @@ describe("WebAgentEventEmitter", () => {
         "task:setup",
         "task:started",
         "task:completed",
+        "task:aborted",
         "task:validated",
         "task:validation_error",
         "ai:generation",
         "ai:generation:error",
+        "agent:action",
         "agent:step",
-        "agent:observed",
         "agent:reasoned",
         "agent:extracted",
         "agent:processing",
@@ -133,8 +129,6 @@ describe("WebAgentEventEmitter", () => {
         "browser:action_started",
         "browser:action_completed",
         "browser:navigated",
-        "browser:network_waiting",
-        "browser:network_timeout",
         "browser:screenshot_captured",
         "system:debug_compression",
         "system:debug_message",
@@ -160,48 +154,51 @@ describe("WebAgentEventEmitter", () => {
           type: WebAgentEventType.TASK_STARTED,
           data: {
             timestamp: Date.now(),
+            iterationId: "test-1",
             task: "test",
-            explanation: "test",
+            successCriteria: "test",
             plan: "test",
             url: "test",
           },
         },
         {
           type: WebAgentEventType.TASK_COMPLETED,
-          data: { timestamp: Date.now(), finalAnswer: "test" },
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            success: true,
+            finalAnswer: "test",
+          },
         },
         {
           type: WebAgentEventType.BROWSER_NAVIGATED,
-          data: { timestamp: Date.now(), title: "test", url: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", title: "test", url: "test" },
         },
         {
           type: WebAgentEventType.AGENT_STEP,
-          data: { timestamp: Date.now(), currentStep: "test" },
-        },
-        {
-          type: WebAgentEventType.AGENT_OBSERVED,
-          data: { timestamp: Date.now(), observation: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", currentIteration: 0 },
         },
         {
           type: WebAgentEventType.AGENT_REASONED,
-          data: { timestamp: Date.now(), thought: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", reasoning: "test" },
         },
         {
           type: WebAgentEventType.AGENT_EXTRACTED,
-          data: { timestamp: Date.now(), extractedData: "test" },
+          data: { timestamp: Date.now(), iterationId: "test-1", extractedData: "test" },
         },
         {
           type: WebAgentEventType.BROWSER_ACTION_STARTED,
-          data: { timestamp: Date.now(), action: "click", ref: "s1e23" },
+          data: { timestamp: Date.now(), iterationId: "test-1", action: "click", ref: "s1e23" },
         },
         {
           type: WebAgentEventType.BROWSER_ACTION_COMPLETED,
-          data: { timestamp: Date.now(), success: true },
+          data: { timestamp: Date.now(), iterationId: "test-1", success: true },
         },
         {
           type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION,
           data: {
             timestamp: Date.now(),
+            iterationId: "test-1",
             originalSize: 1000,
             compressedSize: 500,
             compressionPercent: 50,
@@ -209,24 +206,17 @@ describe("WebAgentEventEmitter", () => {
         },
         {
           type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
-          data: { timestamp: Date.now(), messages: [] },
+          data: { timestamp: Date.now(), iterationId: "test-1", messages: [] },
         },
         {
           type: WebAgentEventType.AGENT_WAITING,
-          data: { timestamp: Date.now(), seconds: 5 },
-        },
-        {
-          type: WebAgentEventType.BROWSER_NETWORK_WAITING,
-          data: { timestamp: Date.now(), action: "click" },
-        },
-        {
-          type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT,
-          data: { timestamp: Date.now(), action: "click" },
+          data: { timestamp: Date.now(), iterationId: "test-1", seconds: 5 },
         },
         {
           type: WebAgentEventType.TASK_VALIDATED,
           data: {
             timestamp: Date.now(),
+            iterationId: "test-1",
             observation: "test observation",
             completionQuality: "complete" as const,
             feedback: "test",
@@ -237,6 +227,7 @@ describe("WebAgentEventEmitter", () => {
           type: WebAgentEventType.AGENT_STATUS,
           data: {
             timestamp: Date.now(),
+            iterationId: "test-1",
             message: "Processing data",
           },
         },
@@ -244,6 +235,7 @@ describe("WebAgentEventEmitter", () => {
           type: WebAgentEventType.TASK_VALIDATION_ERROR,
           data: {
             timestamp: Date.now(),
+            iterationId: "test-1",
             errors: ["Test error"],
             retryCount: 1,
             rawResponse: {},
@@ -253,8 +245,9 @@ describe("WebAgentEventEmitter", () => {
           type: WebAgentEventType.AGENT_PROCESSING,
           data: {
             timestamp: Date.now(),
-            status: "start" as const,
+            iterationId: "test-1",
             operation: "test operation",
+            hasScreenshot: false,
           },
         },
       ];
@@ -272,8 +265,9 @@ describe("WebAgentEventEmitter", () => {
       const listener = vi.fn();
       const eventData: TaskStartEventData = {
         timestamp: 1234567890,
+        iterationId: "test-1",
         task: "Complete a web form",
-        explanation: "Fill out and submit a contact form",
+        successCriteria: "Fill out and submit a contact form",
         plan: "1. Navigate to form\n2. Fill fields\n3. Submit",
         url: "https://example.com/contact",
       };
@@ -293,6 +287,7 @@ describe("WebAgentEventEmitter", () => {
       // Test with all fields
       const fullEventData: ActionExecutionEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "fill",
         ref: "s1e23",
         value: "test@example.com",
@@ -309,6 +304,7 @@ describe("WebAgentEventEmitter", () => {
       // Test with minimal fields
       const minimalEventData: ActionExecutionEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         action: "back",
       };
 
@@ -327,6 +323,7 @@ describe("WebAgentEventEmitter", () => {
       // Test success case
       const successData: ActionResultEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         success: true,
       };
 
@@ -341,6 +338,7 @@ describe("WebAgentEventEmitter", () => {
       // Test error case
       const errorData: ActionResultEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         success: false,
         error: "Element not found",
       };
@@ -360,6 +358,7 @@ describe("WebAgentEventEmitter", () => {
       // Test with feedback
       const withFeedback: TaskValidationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         observation: "Task incomplete, missing confirmation step",
         completionQuality: "partial",
         feedback: "Task incomplete, missing confirmation step",
@@ -377,6 +376,7 @@ describe("WebAgentEventEmitter", () => {
       // Test without feedback
       const withoutFeedback: TaskValidationEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         observation: "Task completed successfully",
         completionQuality: "complete",
         finalAnswer: "Task completed successfully",
@@ -395,6 +395,7 @@ describe("WebAgentEventEmitter", () => {
       const listener = vi.fn();
       const eventData: StatusMessageEventData = {
         timestamp: Date.now(),
+        iterationId: "test-1",
         message: "Analyzing search results",
       };
 
@@ -416,18 +417,19 @@ describe("WebAgentEventEmitter", () => {
       });
       const successListener = vi.fn();
 
-      const eventData: ObservationEventData = {
+      const eventData: ReasoningEventData = {
         timestamp: Date.now(),
-        observation: "Test observation",
+        iterationId: "test-1",
+        reasoning: "Test reasoning",
       };
 
-      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, errorListener);
-      emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, successListener);
+      emitter.onEvent(WebAgentEventType.AGENT_REASONED, errorListener);
+      emitter.onEvent(WebAgentEventType.AGENT_REASONED, successListener);
 
       // EventEmitter will throw when a listener throws, but both listeners should be called
       expect(() => {
         emitter.emitEvent({
-          type: WebAgentEventType.AGENT_OBSERVED,
+          type: WebAgentEventType.AGENT_REASONED,
           data: eventData,
         });
       }).toThrow("Listener error");

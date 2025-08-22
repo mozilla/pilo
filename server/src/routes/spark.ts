@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser, createAIProvider, getAIProviderInfo } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
-import { createAIProvider, getAIProviderInfo } from "../provider.js";
 import { config } from "../config.js";
 
 interface ErrorResponse {
@@ -34,10 +33,13 @@ interface SparkTaskRequest {
   guardrails?: string;
 
   // AI configuration overrides
-  provider?: "openai" | "openrouter";
+  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
   model?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
+  ollamaBaseUrl?: string;
+  openaiCompatibleBaseUrl?: string;
+  openaiCompatibleName?: string;
 
   // Browser configuration overrides
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
@@ -153,16 +155,19 @@ spark.post("/run", async (c) => {
         });
 
         // Create AI provider with potential overrides
-        const provider = createAIProvider({
+        const providerConfig = createAIProvider({
           provider: body.provider,
           model: body.model,
           openai_api_key: body.openaiApiKey,
           openrouter_api_key: body.openrouterApiKey,
+          ollama_base_url: body.ollamaBaseUrl,
+          openai_compatible_base_url: body.openaiCompatibleBaseUrl,
+          openai_compatible_name: body.openaiCompatibleName,
         });
 
         agent = new WebAgent(browser, {
           ...webAgentConfig,
-          provider,
+          providerConfig,
           logger,
         });
 

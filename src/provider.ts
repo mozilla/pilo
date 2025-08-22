@@ -2,8 +2,15 @@ import { LanguageModel } from "ai";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createVertex } from "@ai-sdk/google-vertex";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOllama } from "ollama-ai-provider-v2";
 import { config } from "./config.js";
-import { getEnv } from "./env.js";
+import { getEnv } from "./utils/env.js";
+
+export interface ProviderConfig {
+  model: LanguageModel;
+  providerOptions?: any;
+}
 
 /**
  * Creates and configures an AI language model based on the current configuration
@@ -16,9 +23,14 @@ export function createAIProvider(overrides?: {
   openrouter_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
-}): LanguageModel {
+  ollama_base_url?: string;
+  openai_compatible_base_url?: string;
+  openai_compatible_name?: string;
+  reasoning_effort?: "none" | "low" | "medium" | "high";
+}): ProviderConfig {
   const currentConfig = config.getConfig();
   const provider = overrides?.provider || currentConfig.provider || "openai";
+  const reasoningEffort = overrides?.reasoning_effort || currentConfig.reasoning_effort || "none";
 
   // Create temporary config with overrides
   const configWithOverrides = {
@@ -27,12 +39,25 @@ export function createAIProvider(overrides?: {
     ...(overrides?.openrouter_api_key && { openrouter_api_key: overrides.openrouter_api_key }),
     ...(overrides?.vertex_project && { vertex_project: overrides.vertex_project }),
     ...(overrides?.vertex_location && { vertex_location: overrides.vertex_location }),
+    ...(overrides?.ollama_base_url && { ollama_base_url: overrides.ollama_base_url }),
+    ...(overrides?.openai_compatible_base_url && {
+      openai_compatible_base_url: overrides.openai_compatible_base_url,
+    }),
+    ...(overrides?.openai_compatible_name && {
+      openai_compatible_name: overrides.openai_compatible_name,
+    }),
   };
 
   // Get API key and model
   const { apiKey, model } = getProviderConfig(provider, configWithOverrides, overrides?.model);
 
-  return createProviderFromConfig(provider, { apiKey, model, configWithOverrides });
+  const languageModel = createProviderFromConfig(provider, { apiKey, model, configWithOverrides });
+  const providerOptions = buildProviderOptions(provider, reasoningEffort);
+
+  return {
+    model: languageModel,
+    providerOptions,
+  };
 }
 
 /**
@@ -69,6 +94,36 @@ export function createProviderFromConfig(
         location,
       })(model);
 
+    case "ollama":
+      const ollamaBaseUrl = configWithOverrides?.ollama_base_url || "http://localhost:11434/api";
+      return createOllama({
+        baseURL: ollamaBaseUrl,
+      })(model);
+
+    case "lmstudio":
+      // LM Studio is a preconfigured openai-compatible provider
+      return createOpenAICompatible({
+        name: "lmstudio",
+        baseURL: "http://localhost:1234/v1",
+      })(model);
+
+    case "openai-compatible":
+      const baseUrl = configWithOverrides?.openai_compatible_base_url;
+      if (!baseUrl) {
+        throw new Error(
+          `OpenAI-compatible provider requires a base URL. To get started:
+          
+1. Set the base URL with: spark config --set openai_compatible_base_url=http://localhost:8080/v1
+2. Or set environment variable: export SPARK_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
+
+Run 'spark config --show' to check your current configuration.`,
+        );
+      }
+      return createOpenAICompatible({
+        name: configWithOverrides?.openai_compatible_name || "openai-compatible",
+        baseURL: baseUrl,
+      })(model);
+
     default:
       throw new Error(`Unsupported AI provider: ${provider}`);
   }
@@ -79,9 +134,12 @@ export function createProviderFromConfig(
  */
 function getProviderConfig(provider: string, currentConfig: any, modelOverride?: string) {
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
+    ollama: "llama3.2",
+    lmstudio: "local-model",
+    "openai-compatible": "gpt-4",
   };
 
   const model =
@@ -93,7 +151,7 @@ function getProviderConfig(provider: string, currentConfig: any, modelOverride?:
     if (!apiKey) {
       throw new Error(
         `No OpenRouter API key found. To get started:
-        
+
 1. Get an API key from https://openrouter.ai/keys
 2. Set it with: spark config --set openrouter_api_key=your-key
 3. Or use OpenAI instead: spark config --set provider=openai
@@ -104,12 +162,15 @@ Run 'spark config --show' to check your current configuration.`,
   } else if (provider === "vertex") {
     // Vertex AI uses Application Default Credentials, no API key needed
     apiKey = undefined;
+  } else if (provider === "ollama" || provider === "lmstudio" || provider === "openai-compatible") {
+    // Local providers don't need API keys
+    apiKey = undefined;
   } else {
     apiKey = currentConfig.openai_api_key;
     if (!apiKey) {
       throw new Error(
         `No OpenAI API key found. To get started:
-        
+
 1. Get an API key from https://platform.openai.com/api-keys
 2. Set it with: spark config --set openai_api_key=your-key
 3. Or use OpenRouter instead: spark config --set provider=openrouter
@@ -150,7 +211,7 @@ function getVertexConfig(currentConfig: any) {
   if (!project) {
     throw new Error(
       `No Google Cloud project ID found. To get started:
-      
+
 1. Set your project ID with: spark config --set vertex_project=your-project-id
 2. Or set environment variable: export GOOGLE_VERTEX_PROJECT=your-project-id
 3. When running in Google Cloud (Cloud Run, Compute Engine, etc.), the project should be auto-detected
@@ -164,15 +225,74 @@ Run 'spark config --show' to check your current configuration.`,
 }
 
 /**
+ * Convert effort level to token count for providers that need it
+ */
+function effortToTokens(effort: "low" | "medium" | "high"): number {
+  const tokenMapping = {
+    low: 1024, // 1K tokens for low effort
+    medium: 2048, // 2K tokens for medium effort
+    high: 4096, // 4K tokens for high effort
+  } as const;
+
+  return tokenMapping[effort];
+}
+
+/**
+ * Build provider-specific options based on reasoning effort
+ */
+function buildProviderOptions(
+  provider: string,
+  reasoningEffort: "none" | "low" | "medium" | "high",
+): any {
+  if (reasoningEffort === "none") {
+    return undefined;
+  }
+
+  switch (provider) {
+    case "openai":
+      return {
+        openai: {
+          reasoningEffort,
+        },
+      };
+
+    case "openrouter":
+      return {
+        openrouter: {
+          reasoning: {
+            max_tokens: effortToTokens(reasoningEffort as "low" | "medium" | "high"),
+          },
+        },
+      };
+
+    case "vertex":
+      return {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: effortToTokens(reasoningEffort as "low" | "medium" | "high"),
+          },
+        },
+      };
+
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Get the current AI provider configuration details
  */
 export function getAIProviderInfo() {
   const currentConfig = config.getConfig();
   const provider = currentConfig.provider || "openai";
   const defaultModels = {
-    openai: "gpt-4.1",
-    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1-mini",
+    openrouter: "openai/gpt-4.1-mini",
     vertex: "gemini-2.5-flash",
+    ollama: "llama3.2",
+    lmstudio: "local-model",
+    "openai-compatible": "gpt-4",
   };
   const model = currentConfig.model || defaultModels[provider as keyof typeof defaultModels];
 
@@ -199,6 +319,16 @@ export function getAIProviderInfo() {
     if (hasProject) {
       hasApiKey = true;
       keySource = "adc";
+    }
+  } else if (provider === "ollama" || provider === "lmstudio") {
+    // Local providers are always considered available
+    hasApiKey = true;
+    keySource = "global";
+  } else if (provider === "openai-compatible") {
+    // Check if base URL is configured
+    if (currentConfig.openai_compatible_base_url || getEnv("SPARK_OPENAI_COMPATIBLE_BASE_URL")) {
+      hasApiKey = true;
+      keySource = currentConfig.openai_compatible_base_url ? "global" : "env";
     }
   } else {
     if (getEnv("OPENAI_API_KEY")) {

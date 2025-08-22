@@ -8,10 +8,13 @@ import {
   LaunchOptions,
   BrowserContextOptions,
   ConnectOptions,
+  Locator,
 } from "playwright";
 import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
+import TurndownService from "turndown";
+import { InvalidRefException, BrowserActionException } from "../errors.js";
 
 // Type extension for Playwright's private AI snapshot function
 type PageEx = Page & {
@@ -305,9 +308,52 @@ export class PlaywrightBrowser implements AriaBrowser {
     return this.page.title();
   }
 
-  async getText(): Promise<string> {
+  async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
     return await (this.page as PageEx)._snapshotForAI();
+  }
+
+  /**
+   * Gets simplified HTML with noise elements removed in browser context
+   * Reduces payload size by removing elements we don't need
+   */
+  async getSimpleHtml(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+
+    return await this.page.evaluate(() => {
+      const body = document.body || document.documentElement;
+      if (!body) return "";
+
+      const clone = body.cloneNode(true) as Element;
+
+      // Remove noise elements in browser context to reduce wire transfer
+      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+
+      return clone.innerHTML;
+    });
+  }
+
+  async getMarkdown(): Promise<string> {
+    if (!this.page) throw new Error("Browser not started");
+
+    try {
+      // Get simplified HTML (noise removed in browser context)
+      const html = await this.getSimpleHtml();
+
+      // Convert HTML to markdown using turndown
+      const turndown = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+        emDelimiter: "*",
+        strongDelimiter: "**",
+      });
+
+      return turndown.turndown(html);
+    } catch (error) {
+      throw new Error(
+        `Failed to get markdown: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async getScreenshot(): Promise<Buffer> {
@@ -329,45 +375,82 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
   }
 
+  /**
+   * Validates that an element reference exists on the current page
+   * @param ref The element reference to validate
+   * @returns The locator for the valid element
+   * @throws InvalidRefException if the element doesn't exist
+   */
+  private async validateElementRef(ref: string): Promise<Locator> {
+    if (!this.page) throw new Error("Browser not started");
+
+    const locator = this.page.locator(`aria-ref=${ref}`);
+    const count = await locator.count();
+
+    if (count === 0) {
+      throw new InvalidRefException(ref);
+    }
+
+    if (count > 1) {
+      // This shouldn't happen with aria-ref, but let's be defensive
+      throw new InvalidRefException(
+        ref,
+        `Multiple elements found with reference '${ref}'. This may indicate a page structure issue.`,
+      );
+    }
+
+    return locator;
+  }
+
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
 
     try {
-      // Create a locator for the element
-      const locator = this.page.locator(`aria-ref=${ref}`);
+      // Always validate ref for any action that uses it
+      // This ensures consistent error messages and early validation
+      let locator: Locator | null = null;
+
+      // Check if this action requires an element ref
+      const requiresElement = this.actionRequiresElement(action);
+
+      if (requiresElement) {
+        // Validate and get the locator
+        locator = await this.validateElementRef(ref);
+      }
 
       switch (action) {
         // Element interactions
         case PageAction.Click:
-          await locator.click({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.click({ timeout: this.ACTION_TIMEOUT_MS });
           // Ensure page is usable after click that may cause navigation
           await this.ensureOptimizedPageLoad();
           break;
 
         case PageAction.Hover:
-          await locator.hover({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.hover({ timeout: this.ACTION_TIMEOUT_MS });
           break;
 
         case PageAction.Fill:
-          if (!value) throw new Error("Value required for fill action");
-          await locator.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
+          if (!value) throw new BrowserActionException("fill", "Value required for fill action");
+          await locator!.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
           break;
 
         case PageAction.Focus:
-          await locator.focus({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.focus({ timeout: this.ACTION_TIMEOUT_MS });
           break;
 
         case PageAction.Check:
-          await locator.check({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.check({ timeout: this.ACTION_TIMEOUT_MS });
           break;
 
         case PageAction.Uncheck:
-          await locator.uncheck({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.uncheck({ timeout: this.ACTION_TIMEOUT_MS });
           break;
 
         case PageAction.Select:
-          if (!value) throw new Error("Value required for select action");
-          await locator.selectOption(value, {
+          if (!value)
+            throw new BrowserActionException("select", "Value required for select action");
+          await locator!.selectOption(value, {
             timeout: this.ACTION_TIMEOUT_MS,
           });
           // Forms might trigger page reloads on select
@@ -375,24 +458,39 @@ export class PlaywrightBrowser implements AriaBrowser {
           break;
 
         case PageAction.Enter:
-          await locator.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
           // Forms might trigger page reloads on enter
           await this.ensureOptimizedPageLoad();
           break;
 
-        // Navigation and workflow
+        case PageAction.FillAndEnter:
+          if (!value)
+            throw new BrowserActionException(
+              "fill_and_enter",
+              "Value required for fill_and_enter action",
+            );
+          await locator!.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
+          // Forms might trigger page reloads on enter
+          await this.ensureOptimizedPageLoad();
+          break;
+
+        // Navigation and workflow (these don't need element refs)
         case PageAction.Wait:
-          if (!value) throw new Error("Value required for wait action");
+          if (!value) throw new BrowserActionException("wait", "Value required for wait action");
           const seconds = parseInt(value, 10);
           if (isNaN(seconds) || seconds < 0) {
-            throw new Error(`Invalid wait time: ${value}. Must be a positive number.`);
+            throw new BrowserActionException(
+              "wait",
+              `Invalid wait time: ${value}. Must be a positive number.`,
+            );
           }
           await this.page.waitForTimeout(seconds * 1000);
           break;
 
         case PageAction.Goto:
-          if (!value) throw new Error("URL required for goto action");
-          if (!value.trim()) throw new Error("URL cannot be empty");
+          if (!value) throw new BrowserActionException("goto", "URL required for goto action");
+          if (!value.trim()) throw new BrowserActionException("goto", "URL cannot be empty");
           await this.goto(value.trim());
           // Note: goto already calls ensureOptimizedPageLoad internally
           break;
@@ -407,18 +505,55 @@ export class PlaywrightBrowser implements AriaBrowser {
           // Note: goForward already calls ensureOptimizedPageLoad internally
           break;
 
+        case PageAction.Extract:
+          // Extract is handled at a higher level in the automation flow
+          // The browser implementation doesn't need to do anything
+          break;
+
+        case PageAction.Abort:
+          // Abort is handled at a higher level in the automation flow
+          // The browser implementation doesn't need to do anything
+          break;
+
         case PageAction.Done:
           // This is a no-op in the browser implementation
           // It's handled at a higher level in the automation flow
           break;
 
         default:
-          throw new Error(`Unsupported action: ${action}`);
+          throw new BrowserActionException(String(action), `Unsupported action: ${action}`);
       }
     } catch (error) {
-      throw new Error(
+      // Re-throw browser exceptions as-is
+      if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new BrowserActionException(
+        String(action),
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
+        { originalError: error },
       );
     }
+  }
+
+  /**
+   * Check if an action requires an element reference
+   */
+  private actionRequiresElement(action: PageAction): boolean {
+    const elementActions = [
+      PageAction.Click,
+      PageAction.Hover,
+      PageAction.Fill,
+      PageAction.Focus,
+      PageAction.Check,
+      PageAction.Uncheck,
+      PageAction.Select,
+      PageAction.Enter,
+      PageAction.FillAndEnter,
+    ];
+
+    return elementActions.includes(action);
   }
 }

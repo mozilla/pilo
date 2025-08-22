@@ -10,6 +10,8 @@ services:
     environment:
       - NODE_ENV=development
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SPARK_MODEL=gpt-5-nano
+      - SPARK_REASONING_EFFORT=low
     volumes:
       # Mount server source code for hot reloading
       - ./src:/app/server/src
