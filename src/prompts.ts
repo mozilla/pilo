@@ -60,13 +60,13 @@ export const TOOL_STRINGS = {
     },
     extract: {
       description: "Extract specific data from the current page for later reference",
-      dataDescription: "Precise description of the data to extract. DO NOT use `ref` values.",
+      dataDescription:
+        "Describe what information to extract. Focus on content, not element references.",
     },
     done: {
-      description:
-        "Mark the entire task as complete with final results that directly address ALL parts of the original task",
+      description: "Complete the task with your final answer",
       result:
-        "A summary of the steps you took to complete the task and the final results that directly address ALL parts of the original task",
+        "The complete, standalone deliverable that fulfills the user's request. Be concise. This will be used on its own.",
     },
     abort: {
       description:
@@ -82,8 +82,7 @@ export const TOOL_STRINGS = {
   planning: {
     /** Common parameter descriptions */
     common: {
-      successCriteria:
-        "Clear criteria describing what a successful, high-quality answer must include and accomplish",
+      successCriteria: "Brief description of what the user needs to accomplish their goal",
       plan: "Step-by-step plan for the task",
     },
     /** Individual tool descriptions */
@@ -160,9 +159,9 @@ const planPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 Create a plan for this web navigation task.
-First, define clear success criteria for what a high-quality answer must include.
+First, briefly identify what the user needs from this task.
 Then provide a{% if includeUrl %} step-by-step plan and starting URL{% else %} step-by-step plan{% endif %}.
-Focus on general steps and goals rather than specific page features or UI elements.
+Keep plans concise and high-level, focusing on goals not specific UI elements.
 
 Today's Date: {{ currentDate }}
 Task: {{ task }}
@@ -170,22 +169,7 @@ Task: {{ task }}
 {% if guardrails %}Guardrails: {{ guardrails }}{% endif %}
 
 PART 1: SUCCESS CRITERIA
-Define what an exceptional final answer must include:
-
-1. **Required Information**
-- List ALL essential information the answer must contain
-- Specify the depth and detail needed for each element
-- Include both primary objectives and valuable supplementary details
-
-2. **Quality Standards**
-- Level of accuracy and verification required
-- Comparisons or analysis that should be included
-- What distinguishes an excellent answer from an adequate one
-
-3. **Answer Format**
-- How information should be structured and organized
-- Key highlights or summaries needed
-- Appropriate level of technical detail for the audience
+What does the user need? State the key information required to complete their task.
 
 PART 2: NAVIGATION PLAN
 {% if includeUrl %}Provide a strategic plan starting from the given URL.{% else %}Provide a strategic plan for accomplishing the task.{% endif %}
@@ -261,8 +245,8 @@ Analyze the current page state and determine your next action based on previous 
 **Core Rules:**
 1. Use element refs from page snapshot. They are found in square brackets: [${TOOL_STRINGS.webActions.common.elementRefExample}].
 2. Execute EXACTLY ONE tool per turn
-3. Complete ALL planned steps before using done()
-4. done() indicates ENTIRE task completion with comprehensive results
+3. Complete planned steps before using done()
+4. done() provides your final answer to the user
 5. goto() only accepts URLs from earlier in conversation
 6. Use wait() for page loads, animations, or dynamic content
 {% if hasGuardrails %}7. ALL actions MUST comply with provided guardrails{% endif %}
@@ -280,16 +264,17 @@ Analyze the current page state and determine your next action based on previous 
 - Submit forms via enter() or submit button after filling
 - Find alternative elements if primary ones aren't available
 - Adapt your approach based on what's actually available
-- Use abort() only when you have exhausted reasonable alternatives and the task truly cannot be completed (site down, access blocked, required data unavailable)
+- Use abort() only after trying reasonable alternatives (site down, access blocked, required data unavailable)
 - For research: Use extract() immediately when finding relevant data
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
 
 **When using done():**
-Your result should:
-- Summarize completed steps
-- Confirm careful adherence to user's request
-- Include all requested information thoroughly
-- Reference specific criteria met (if applicable)
+Provide your final answer:
+- Think of this as a final deliverable, not part of a conversation
+- Match the depth to the task (brief for simple queries, detailed for research)
+- Write naturally and informatively
+- Include all requested information
+- Use a format that's easy to read and use
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
@@ -365,7 +350,14 @@ URL: {{ url }}
 {{ snapshot }}
 \`\`\`
 
-This accessibility tree shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
+The above accessibility tree shows page elements in a hierarchical text format. Each line represents an element with:
+- Element type (button, link, textbox, generic, etc.)
+- Text content in quotes or description
+- Reference ID in brackets like [e###] - use these exact IDs when interacting with elements
+- Properties like [cursor=pointer] or [disabled]
+Example: button "Submit Form" [e455] [cursor=pointer]
+
+This shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
 
 **Your task:**
 - Analyze the current state and select your next action
@@ -424,7 +416,7 @@ export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boole
  */
 const taskValidationTemplate = buildPromptTemplate(
   `
-Evaluate how well the task result accomplishes what the user requested. Focus on task completion, not process.
+Evaluate if the task result gives the user what they requested.
 Be concise in your response.
 
 Task: {{ task }}
@@ -438,12 +430,12 @@ Evaluation approach:
 4. Assess if key requirements are satisfied
 
 Quality ratings:
-- **failed**: Result doesn't meet the success criteria or task not completed
-- **partial**: Some success criteria met but missing key elements
-- **complete**: All success criteria met and task accomplished
-- **excellent**: Exceeds success criteria with valuable additional elements
+- **failed**: Task not completed or result doesn't address the request
+- **partial**: Some requirements met but missing key elements
+- **complete**: Task accomplished with all requested information
+- **excellent**: Goes beyond requirements with particularly useful additions
 
-Only use 'failed' or 'partial' when the result genuinely fails to meet the success criteria. The process doesn't matter if the criteria are satisfied.
+Focus on whether the user received what they needed in a clear, usable format.
 
 Call validate_task() with:
 - taskAssessment: ${TOOL_STRINGS.validation.validate_task.taskAssessment}
