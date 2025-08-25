@@ -95,19 +95,44 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       // Attempt the generateText call
-      return await generateText(params);
+      const result = await generateText(params);
+
+      // Simple validation: if toolChoice is "required", we must have tool results
+      if (params.toolChoice === "required" && !result.toolResults?.length) {
+        throw new Error("Tool call was required but model did not call any tools");
+      }
+
+      return result;
     } catch (error) {
       lastError = error;
 
+      // Extract error details for logging
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorAny = error as any;
+      const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
+
       // Check if error is retryable
       if (!isRetryableError(error)) {
+        console.error(`[Retry] Non-retryable error encountered:`, {
+          message: errorMessage,
+          statusCode,
+          attempt,
+        });
         throw error;
       }
 
       // Check if we have more attempts
       if (attempt === maxAttempts) {
+        console.error(`[Retry] Max attempts (${maxAttempts}) reached`);
         break;
       }
+
+      // Log the retry attempt
+      console.warn(`⚠️ [Retry] AI call failed (attempt ${attempt}/${maxAttempts}):`, {
+        message: errorMessage,
+        statusCode,
+        retrying: true,
+      });
 
       // Call retry callback if provided
       if (onRetry) {
@@ -116,13 +141,25 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
 
       // Wait with exponential backoff and jitter
       const waitTime = Math.min(addJitter(delay), maxDelay);
+      console.log(`[Retry] Waiting ${Math.round(waitTime)}ms before retry...`);
       await sleep(waitTime);
 
       // Increase delay for next attempt
       delay = Math.min(delay * backoffFactor, maxDelay);
+      console.log(`[Retry] Retrying (attempt ${attempt + 1}/${maxAttempts})...`);
     }
   }
 
   // All retries exhausted
+  const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+  const errorAny = lastError as any;
+  const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
+
+  console.error(`❌ [Retry] AI call failed after ${maxAttempts} attempts:`, {
+    message: errorMessage,
+    statusCode,
+    willThrow: true,
+  });
+
   throw lastError;
 }

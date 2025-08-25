@@ -238,6 +238,7 @@ export class WebAgent {
     ) {
       // Check abort signal once at the start of each iteration
       if (this.abortSignal?.aborted) {
+        console.warn("[WebAgent] Task aborted by user signal");
         return { success: false, finalAnswer: "Task aborted by user" };
       }
 
@@ -281,6 +282,16 @@ export class WebAgent {
         if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors, error)) {
           const isNonRecoverable = this.isNonRecoverableError(error);
           const errorMessage = this.extractErrorMessage(error);
+
+          if (isNonRecoverable) {
+            console.error(`[WebAgent] Non-recoverable error, stopping execution:`, errorMessage);
+          } else {
+            console.error(
+              `[WebAgent] Too many errors (${consecutiveErrors} consecutive, ${totalErrors} total), stopping:`,
+              errorMessage,
+            );
+          }
+
           return {
             success: false,
             finalAnswer: isNonRecoverable
@@ -304,6 +315,9 @@ export class WebAgent {
     }
 
     // Max iterations reached
+    console.error(
+      `[WebAgent] Max iterations (${this.maxIterations}) reached without completing task`,
+    );
     return {
       success: false,
       finalAnswer: "Maximum iterations reached without completing the task.",
@@ -638,6 +652,7 @@ export class WebAgent {
 
     // Process tool results
     if (!aiResponse.toolResults?.length) {
+      console.error("[WebAgent] No tools called in action generation");
       throw new Error("You must use exactly one tool. Please use one of the available tools.");
     }
 
@@ -994,8 +1009,10 @@ export class WebAgent {
         {
           maxAttempts: 3,
           onRetry: (attempt, error) => {
+            const errorMsg = this.extractErrorMessage(error);
+            console.warn(`[WebAgent] Planning retry attempt ${attempt}/3 after error:`, errorMsg);
             this.emit(WebAgentEventType.AGENT_STATUS, {
-              message: `Planning retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
+              message: `Planning retry attempt ${attempt} after error: ${errorMsg}`,
               iterationId: this.currentIterationId || "planning",
             });
           },
@@ -1003,7 +1020,7 @@ export class WebAgent {
       );
 
       if (!planningResponse.toolResults?.[0]) {
-        throw new Error("Failed to generate plan");
+        throw new Error("No tool results returned from planning");
       }
 
       const { plan, successCriteria, url } = this.extractPlanOutput(planningResponse);
@@ -1024,7 +1041,15 @@ export class WebAgent {
         url: this.url,
       });
     } catch (error) {
-      throw new Error(`Failed to generate plan: ${this.extractErrorMessage(error)}`);
+      const errorMsg = this.extractErrorMessage(error);
+      console.error(`[WebAgent] Failed to generate plan:`, errorMsg);
+
+      // Check if the error message already contains "Failed to generate plan" to avoid double-wrapping
+      if (errorMsg.includes("Failed to generate plan")) {
+        throw new Error(errorMsg);
+      } else {
+        throw new Error(`Failed to generate plan: ${errorMsg}`);
+      }
     }
   }
 
