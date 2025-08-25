@@ -10,7 +10,7 @@ services:
       - NODE_ENV=production
       - SPARK_PW_ENDPOINT=ws://browserless:3000/playwright/chromium
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SPARK_MODEL=gpt-5-nano
+      - SPARK_MODEL=gpt-5-mini
       - SPARK_REASONING_EFFORT=low
       - SPARK_BROWSER=chromium
 
