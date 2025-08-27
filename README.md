@@ -7,31 +7,38 @@ AI-powered web automation that lets you control browsers using natural language.
 ### Installation
 
 ```bash
-# Install globally
-npm install -g https://github.com/Mozilla-Ocho/spark.git
+# Clone the repository
+git clone https://github.com/Mozilla-Ocho/spark.git
+cd spark
+
+# Install dependencies
+pnpm install
+
+# Install browsers for automation
+pnpm playwright install
 
 # Setup AI provider
-spark config --init
+pnpm spark config --init
 
 # Run your first task
-spark run "what's the weather in Tokyo?"
+pnpm spark run "what's the weather in Tokyo?"
 ```
 
 ### Basic Usage
 
 ```bash
 # Simple web queries
-spark run "find the latest news on Reuters"
-spark run "what's the current price of AAPL stock?"
+pnpm spark run "find the latest news on Reuters"
+pnpm spark run "what's the current price of AAPL stock?"
 
 # With specific starting URL
-spark run "find flight deals to Paris" --url https://booking.com/
+pnpm spark run "find flight deals to Paris" --url https://booking.com/
 
 # With structured data
-spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+pnpm spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
 
 # With safety constraints
-spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
+pnpm spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
 ```
 
 ## Features
@@ -46,20 +53,7 @@ spark run "search hotels in Tokyo" --guardrails "browse only, don't book anythin
 
 ## Installation
 
-### Global Installation (Recommended)
-
-See [Quick Start](#quick-start) above.
-
-### Development Setup
-
-```bash
-git clone https://github.com/Mozilla-Ocho/spark.git
-cd spark
-pnpm install
-pnpm playwright install
-pnpm spark config --init
-pnpm spark run "test task"
-```
+See [Quick Start](#quick-start) above for installation instructions.
 
 ## Usage
 
@@ -68,7 +62,7 @@ pnpm spark run "test task"
 **Basic syntax:**
 
 ```bash
-spark run "<task description>" [options]
+pnpm spark run "<task description>" [options]
 ```
 
 See [Configuration Reference](#configuration-reference) for all available options.
@@ -76,9 +70,9 @@ See [Configuration Reference](#configuration-reference) for all available option
 **Configuration:**
 
 ```bash
-spark config --init     # Setup wizard
-spark config --show     # View current settings
-spark config --reset    # Clear all settings
+pnpm spark config --init     # Setup wizard
+pnpm spark config --show     # View current settings
+pnpm spark config --reset    # Clear all settings
 ```
 
 ### Programmatic Usage
@@ -111,23 +105,23 @@ try {
 ### Simple Tasks
 
 ```bash
-spark run "is it raining in London?"
-spark run "what's trending on Hacker News?"
-spark run "find the contact email for example.com"
+pnpm spark run "is it raining in London?"
+pnpm spark run "what's trending on Hacker News?"
+pnpm spark run "find the contact email for example.com"
 ```
 
 ### With URLs
 
 ```bash
-spark run "find flight deals" --url https://kayak.com
-spark run "check if items are in stock" --url https://store.com
+pnpm spark run "find flight deals" --url https://kayak.com
+pnpm spark run "check if items are in stock" --url https://store.com
 ```
 
 ### With Structured Data
 
 ```bash
 # Hotel search
-spark run "find hotels" --url https://booking.com --data '{
+pnpm spark run "find hotels" --url https://booking.com --data '{
   "location": "Paris",
   "checkIn": "2024-12-20",
   "checkOut": "2024-12-22",
@@ -135,7 +129,7 @@ spark run "find hotels" --url https://booking.com --data '{
 }'
 
 # Form filling
-spark run "submit contact form" --url https://company.com/contact --data '{
+pnpm spark run "submit contact form" --url https://company.com/contact --data '{
   "name": "John Doe",
   "email": "john@example.com",
   "message": "Hello world"
@@ -146,35 +140,35 @@ spark run "submit contact form" --url https://company.com/contact --data '{
 
 ```bash
 # Browse-only mode
-spark run "research product prices" --guardrails "only browse, don't buy anything"
+pnpm spark run "research product prices" --guardrails "only browse, don't buy anything"
 
 # Domain restrictions
-spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
+pnpm spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
 
 # Form restrictions
-spark run "check shipping costs" --guardrails "don't submit any payment forms"
+pnpm spark run "check shipping costs" --guardrails "don't submit any payment forms"
 ```
 
 ### Advanced Options
 
 ```bash
 # Chrome browser testing
-spark run "test checkout flow" --browser chrome --headless
+pnpm spark run "test checkout flow" --browser chrome --headless
 
 # Headless automation
-spark run "get daily stock prices" --headless --browser firefox
+pnpm spark run "get daily stock prices" --headless --browser firefox
 
 # Debug mode
-spark run "complex automation task" --debug
+pnpm spark run "complex automation task" --debug
 
 # Vision mode for complex visual layouts
-spark run "fill out complex form" --vision
+pnpm spark run "fill out complex form" --vision
 
 # Enhanced reasoning for complex tasks
-spark run "research and compare insurance plans" --reasoning-effort high
+pnpm spark run "research and compare insurance plans" --reasoning-effort high
 
 # Combined options
-spark run "test signup flow" \
+pnpm spark run "test signup flow" \
   --url https://app.com \
   --browser safari \
   --headless \
@@ -186,16 +180,16 @@ spark run "test signup flow" \
 
 ```bash
 # Using an HTTP proxy
-spark run "search for products" --proxy http://proxy.company.com:8080
+pnpm spark run "search for products" --proxy http://proxy.company.com:8080
 
 # Using authenticated proxy
-spark run "access internal site" \
+pnpm spark run "access internal site" \
   --proxy http://proxy.company.com:8080 \
   --proxy-username myuser \
   --proxy-password mypass
 
 # Using SOCKS5 proxy
-spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+pnpm spark run "secure browsing" --proxy socks5://127.0.0.1:1080
 ```
 
 ## Configuration
@@ -204,34 +198,34 @@ Spark supports multiple AI providers and stores configuration globally:
 
 ```bash
 # Setup wizard (recommended for first use)
-spark config --init
+pnpm spark config --init
 
 # Manual configuration
-spark config --set provider=openai
-spark config --set openai_api_key=sk-your-key
+pnpm spark config --set provider=openai
+pnpm spark config --set openai_api_key=sk-your-key
 
 # Or use OpenRouter
-spark config --set provider=openrouter
-spark config --set openrouter_api_key=sk-or-your-key
+pnpm spark config --set provider=openrouter
+pnpm spark config --set openrouter_api_key=sk-or-your-key
 
 # Or use local AI providers
-spark config --set provider=ollama
-spark config --set model=llama3.2
+pnpm spark config --set provider=ollama
+pnpm spark config --set model=llama3.2
 
-spark config --set provider=lmstudio
-spark config --set model=your-loaded-model
+pnpm spark config --set provider=lmstudio
+pnpm spark config --set model=your-loaded-model
 
 # Set defaults
-spark config --set browser=chrome
-spark config --set headless=true
-spark config --set vision=true
-spark config --set reasoning_effort=medium
+pnpm spark config --set browser=chrome
+pnpm spark config --set headless=true
+pnpm spark config --set vision=true
+pnpm spark config --set reasoning_effort=medium
 
 # View settings
-spark config --show
+pnpm spark config --show
 
 # Reset everything
-spark config --reset
+pnpm spark config --reset
 ```
 
 **Available AI Providers:**
@@ -309,9 +303,6 @@ new PlaywrightBrowser({
 ## Development
 
 ```bash
-# Install dependencies
-pnpm install
-
 # Run tests
 pnpm test
 pnpm run test:watch
@@ -405,14 +396,14 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 1. **Command-line options** - Directly passed to the command
 2. **Environment variables** - Set in your shell or `.env` file
-3. **Local `.env` file** - For development environments
-4. **Global config file** - Set via `spark config --set`
+3. **Local `.env` file** - In your project directory
+4. **Global config file** - Set via `pnpm spark config --set`
 
 ### Examples
 
 ```bash
 # Using CLI options
-spark run "search for flights" \
+pnpm spark run "search for flights" \
   --url https://airline.com \
   --browser chrome \
   --headless \
@@ -424,17 +415,17 @@ export SPARK_PROVIDER=openrouter
 export SPARK_MODEL=claude-3.5-sonnet
 export SPARK_BROWSER=firefox
 export SPARK_HEADLESS=true
-spark run "book a hotel"
+pnpm spark run "book a hotel"
 
 # Mixed usage (CLI options override environment variables)
 export SPARK_BROWSER=firefox
-spark run "search products" --browser chrome  # Will use chrome
+pnpm spark run "search products" --browser chrome  # Will use chrome
 
 # Setting defaults via config
-spark config --set browser=chrome
-spark config --set headless=true
-spark config --set vision=true
-spark run "test task"  # Uses configured defaults
+pnpm spark config --set browser=chrome
+pnpm spark config --set headless=true
+pnpm spark config --set vision=true
+pnpm spark run "test task"  # Uses configured defaults
 ```
 
 ## License
