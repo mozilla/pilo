@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "engines": {
+    "node": "^22.0.0"
+  },
   "bin": {
     "spark": "./dist/cli.js"
   },
