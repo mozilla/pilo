@@ -165,16 +165,16 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.16.0
-        version: 1.17.1(hono@4.8.9)
+        version: 1.17.1(hono@4.9.6)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.8.9)
+        version: 1.2.2(hono@4.9.6)
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
       hono:
-        specifier: ^4.8.5
-        version: 4.8.9
+        specifier: ^4.9.6
+        version: 4.9.6
       spark:
         specifier: file:..
         version: 'file:'
@@ -343,6 +343,10 @@ packages:
 
   '@babel/runtime@7.28.2':
     resolution: {integrity: sha512-KHp2IflsnGywDjBWDkR9iEqiWSpc8GIi0lgTT3mOElT0PP1tG26P4tmFI2YvAdzgq9RGyoHZQEIEdZy6Ec5xCA==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@7.28.4':
+    resolution: {integrity: sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.27.2':
@@ -1973,8 +1977,8 @@ packages:
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
 
-  hono@4.8.9:
-    resolution: {integrity: sha512-ERIxkXMRhUxGV7nS/Af52+j2KL60B1eg+k6cPtgzrGughS+espS9KQ7QO0SMnevtmRlBfAcN0mf1jKtO6j/doA==}
+  hono@4.9.6:
+    resolution: {integrity: sha512-doVjXhSFvYZ7y0dNokjwwSahcrAfdz+/BCLvAMa/vHLzjj8+CFyV5xteThGUsKdkaasgN+gF2mUxao+SGLpUeA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -3710,6 +3714,8 @@ snapshots:
 
   '@babel/runtime@7.28.2': {}
 
+  '@babel/runtime@7.28.4': {}
+
   '@babel/template@7.27.2':
     dependencies:
       '@babel/code-frame': 7.27.1
@@ -3943,13 +3949,13 @@ snapshots:
     dependencies:
       tldts-experimental: 7.0.13
 
-  '@hono/node-server@1.17.1(hono@4.8.9)':
+  '@hono/node-server@1.17.1(hono@4.9.6)':
     dependencies:
-      hono: 4.8.9
+      hono: 4.9.6
 
-  '@hono/sentry@1.2.2(hono@4.8.9)':
+  '@hono/sentry@1.2.2(hono@4.9.6)':
     dependencies:
-      hono: 4.8.9
+      hono: 4.9.6
       toucan-js: 4.1.1
 
   '@isaacs/balanced-match@4.0.1': {}
@@ -4181,7 +4187,7 @@ snapshots:
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.27.1
-      '@babel/runtime': 7.28.2
+      '@babel/runtime': 7.28.4
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
@@ -5248,7 +5254,7 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
-  hono@4.8.9: {}
+  hono@4.9.6: {}
 
   hookable@5.5.3: {}
 
