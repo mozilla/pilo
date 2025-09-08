@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": "^20.0.0"
+    "node": "^22.0.0"
   },
   "scripts": {
     "dev:chrome": "wxt -b chrome",
