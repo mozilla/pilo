@@ -5,12 +5,17 @@ import { config as loadDotenv } from "dotenv";
 
 export interface SparkConfig {
   // AI Configuration
-  provider?: "openai" | "openrouter" | "vertex";
+  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
+
+  // Local AI Provider Configuration
+  ollama_base_url?: string;
+  openai_compatible_base_url?: string;
+  openai_compatible_name?: string;
 
   // Browser Configuration
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
@@ -31,6 +36,8 @@ export interface SparkConfig {
   vision?: boolean;
   max_iterations?: number;
   max_validation_attempts?: number;
+  max_repeated_actions?: number;
+  reasoning_effort?: "none" | "low" | "medium" | "high";
 
   // Playwright Configuration
   pw_endpoint?: string;
@@ -102,6 +109,17 @@ export class ConfigManager {
         vertex_location: process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION,
       }),
 
+      // Local AI Provider Configuration
+      ...(process.env.SPARK_OLLAMA_BASE_URL && {
+        ollama_base_url: process.env.SPARK_OLLAMA_BASE_URL,
+      }),
+      ...(process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL && {
+        openai_compatible_base_url: process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL,
+      }),
+      ...(process.env.SPARK_OPENAI_COMPATIBLE_NAME && {
+        openai_compatible_name: process.env.SPARK_OPENAI_COMPATIBLE_NAME,
+      }),
+
       // Browser Configuration
       ...(process.env.SPARK_BROWSER && {
         browser: process.env.SPARK_BROWSER as SparkConfig["browser"],
@@ -144,6 +162,12 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_MAX_VALIDATION_ATTEMPTS && {
         max_validation_attempts: parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10),
+      }),
+      ...(process.env.SPARK_MAX_REPEATED_ACTIONS && {
+        max_repeated_actions: parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10),
+      }),
+      ...(process.env.SPARK_REASONING_EFFORT && {
+        reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
       }),
 
       // Playwright Configuration
@@ -297,6 +321,10 @@ export class ConfigManager {
       env.max_iterations = parseInt(process.env.SPARK_MAX_ITERATIONS, 10);
     if (process.env.SPARK_MAX_VALIDATION_ATTEMPTS)
       env.max_validation_attempts = parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10);
+    if (process.env.SPARK_MAX_REPEATED_ACTIONS)
+      env.max_repeated_actions = parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10);
+    if (process.env.SPARK_REASONING_EFFORT)
+      env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
 
     // Playwright Configuration
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;

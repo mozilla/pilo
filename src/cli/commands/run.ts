@@ -7,6 +7,9 @@ import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } 
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "../../loggers/json.js";
+import { WebAgentEventType, WebAgentEventEmitter } from "../../events.js";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -41,7 +44,11 @@ export function createRunCommand(): Command {
       "Comma-separated list of resources to block",
       config.get("block_resources") || "media,manifest",
     )
-    .option("--pw-endpoint <endpoint>", "Playwright endpoint URL to connect to remote browser")
+    .option(
+      "--pw-endpoint <endpoint>",
+      "Playwright endpoint URL to connect to remote browser",
+      config.get("pw_endpoint"),
+    )
     .option(
       "--pw-cdp-endpoint <endpoint>",
       "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
@@ -57,6 +64,16 @@ export function createRunCommand(): Command {
       "--max-validation-attempts <number>",
       "Maximum validation attempts",
       String(config.get("max_validation_attempts") || 3),
+    )
+    .option(
+      "--max-repeated-actions <number>",
+      "Maximum times an action can be repeated before warning/aborting",
+      String(config.get("max_repeated_actions") || 2),
+    )
+    .option(
+      "--reasoning-effort <effort>",
+      "Reasoning effort level (none, low, medium, high)",
+      config.get("reasoning_effort") || "none",
     )
     .option(
       "--proxy <url>",
@@ -132,8 +149,31 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     if (options.model) providerOverrides.model = options.model;
     if (options.openaiApiKey) providerOverrides.openai_api_key = options.openaiApiKey;
     if (options.openrouterApiKey) providerOverrides.openrouter_api_key = options.openrouterApiKey;
+    if (options.reasoningEffort) providerOverrides.reasoning_effort = options.reasoningEffort;
 
-    const aiProvider = createAIProvider(providerOverrides);
+    const providerConfig = createAIProvider(providerOverrides);
+
+    // Create event emitter for handling events
+    const eventEmitter = new WebAgentEventEmitter();
+
+    // Set up generation logging if debug mode is enabled
+    if (options.debug) {
+      // Create debug/generations directory if it doesn't exist
+      const debugDir = path.join(process.cwd(), "debug", "generations");
+      fs.mkdirSync(debugDir, { recursive: true });
+
+      console.log(chalk.gray(`📝 Generation logs will be written to: ${debugDir}`));
+
+      // Listen for AI generation events
+      eventEmitter.onEvent(WebAgentEventType.AI_GENERATION, (data) => {
+        // Create a timestamped file for this generation
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const generationLogPath = path.join(debugDir, `${timestamp}.json`);
+
+        // Write the exact data object to file
+        fs.writeFileSync(generationLogPath, JSON.stringify(data, null, 2));
+      });
+    }
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
@@ -144,8 +184,12 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxValidationAttempts: options.maxValidationAttempts
         ? parseInt(options.maxValidationAttempts)
         : undefined,
-      provider: aiProvider,
+      maxRepeatedActions: options.maxRepeatedActions
+        ? parseInt(options.maxRepeatedActions)
+        : undefined,
+      providerConfig,
       logger,
+      eventEmitter,
     });
 
     // Execute the task

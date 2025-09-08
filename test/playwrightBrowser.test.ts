@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PlaywrightBrowser } from "../src/browser/playwrightBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
+import { InvalidRefException, BrowserActionException } from "../src/errors.js";
 
 describe("PlaywrightBrowser", () => {
   describe("constructor and options", () => {
@@ -108,7 +109,7 @@ describe("PlaywrightBrowser", () => {
     it("should throw error for page info methods when not started", async () => {
       await expect(browser.getUrl()).rejects.toThrow("Browser not started");
       await expect(browser.getTitle()).rejects.toThrow("Browser not started");
-      await expect(browser.getText()).rejects.toThrow("Browser not started");
+      await expect(browser.getTreeWithRefs()).rejects.toThrow("Browser not started");
       await expect(browser.getScreenshot()).rejects.toThrow("Browser not started");
     });
 
@@ -159,7 +160,7 @@ describe("PlaywrightBrowser", () => {
         headless: true,
         bypassCSP: false,
         blockAds: true,
-        blockResources: ["image"] as const,
+        blockResources: ["image"] as ("image" | "stylesheet" | "font" | "media" | "manifest")[],
         pwEndpoint: "ws://localhost:9222",
       };
 
@@ -197,9 +198,7 @@ describe("PlaywrightBrowser", () => {
             "--disable-web-security",
             "",
             "--no-sandbox",
-            null,
             "--disable-features=VizDisplayCompositor",
-            undefined,
           ],
         },
       });
@@ -218,7 +217,7 @@ describe("PlaywrightBrowser", () => {
     it("should handle launch options with only empty args", () => {
       const browser = new PlaywrightBrowser({
         launchOptions: {
-          args: ["", null, undefined],
+          args: [""],
         },
       });
       expect(browser).toBeDefined();
@@ -246,15 +245,7 @@ describe("PlaywrightBrowser", () => {
     it("should preserve valid args while filtering empty ones", () => {
       const browser = new PlaywrightBrowser({
         launchOptions: {
-          args: [
-            "--valid-arg",
-            "",
-            "--another-valid",
-            null,
-            "--third-valid",
-            undefined,
-            "--fourth-valid",
-          ],
+          args: ["--valid-arg", "", "--another-valid", "--third-valid", "--fourth-valid"],
         },
       });
       expect(browser).toBeDefined();
@@ -342,6 +333,248 @@ describe("PlaywrightBrowser", () => {
       });
       expect(browser).toBeDefined();
       expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+  });
+
+  describe("element ref validation and error handling", () => {
+    let browser: PlaywrightBrowser;
+
+    beforeEach(() => {
+      browser = new PlaywrightBrowser();
+    });
+
+    describe("validateElementRef", () => {
+      it("should throw InvalidRefException when element doesn't exist", async () => {
+        // Mock the page and locator
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(0),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("nonexistent")).rejects.toThrow(
+          InvalidRefException,
+        );
+        await expect((browser as any).validateElementRef("nonexistent")).rejects.toThrow(
+          "Invalid element reference 'nonexistent'",
+        );
+      });
+
+      it("should throw InvalidRefException when multiple elements match", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(2),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("duplicate")).rejects.toThrow(
+          InvalidRefException,
+        );
+        await expect((browser as any).validateElementRef("duplicate")).rejects.toThrow(
+          "Multiple elements found with reference 'duplicate'",
+        );
+      });
+
+      it("should return locator when element exists", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        const result = await (browser as any).validateElementRef("valid");
+        expect(result).toBe(mockLocator);
+        expect(mockPage.locator).toHaveBeenCalledWith("aria-ref=valid");
+      });
+    });
+
+    describe("actionRequiresElement", () => {
+      it("should return true for element actions", () => {
+        const elementActions = [
+          PageAction.Click,
+          PageAction.Hover,
+          PageAction.Fill,
+          PageAction.Focus,
+          PageAction.Check,
+          PageAction.Uncheck,
+          PageAction.Select,
+          PageAction.Enter,
+          PageAction.FillAndEnter,
+        ];
+
+        elementActions.forEach((action) => {
+          expect((browser as any).actionRequiresElement(action)).toBe(true);
+        });
+      });
+
+      it("should return false for non-element actions", () => {
+        const nonElementActions = [
+          PageAction.Wait,
+          PageAction.Goto,
+          PageAction.Back,
+          PageAction.Forward,
+          PageAction.Done,
+        ];
+
+        nonElementActions.forEach((action) => {
+          expect((browser as any).actionRequiresElement(action)).toBe(false);
+        });
+      });
+    });
+
+    describe("performAction error handling", () => {
+      it("should throw BrowserActionException for missing value in Fill action", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          fill: vi.fn(),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("ref1", PageAction.Fill)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("ref1", PageAction.Fill)).rejects.toThrow(
+          "Value required for fill action",
+        );
+      });
+
+      it("should throw BrowserActionException for missing value in Select action", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          selectOption: vi.fn(),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("ref1", PageAction.Select)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("ref1", PageAction.Select)).rejects.toThrow(
+          "Value required for select action",
+        );
+      });
+
+      it("should throw BrowserActionException for missing value in FillAndEnter action", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          fill: vi.fn(),
+          press: vi.fn(),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          waitForTimeout: vi.fn(),
+          waitForLoadState: vi.fn(),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("ref1", PageAction.FillAndEnter)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("ref1", PageAction.FillAndEnter)).rejects.toThrow(
+          "Value required for fill_and_enter action",
+        );
+      });
+
+      it("should throw BrowserActionException for invalid wait time", async () => {
+        const mockPage = {
+          waitForTimeout: vi.fn(),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("", PageAction.Wait, "invalid")).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("", PageAction.Wait, "-5")).rejects.toThrow(
+          "Invalid wait time",
+        );
+      });
+
+      it("should throw BrowserActionException for missing URL in Goto action", async () => {
+        const mockPage = {
+          goto: vi.fn(),
+        };
+        (browser as any).page = mockPage;
+
+        // Test missing URL (undefined)
+        await expect(browser.performAction("", PageAction.Goto)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("", PageAction.Goto)).rejects.toThrow(
+          "URL required for goto action",
+        );
+
+        // Test empty URL - also caught by first check since !value is true for empty string
+        await expect(browser.performAction("", PageAction.Goto, "")).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("", PageAction.Goto, "")).rejects.toThrow(
+          "URL required for goto action",
+        );
+      });
+
+      it("should wrap unexpected errors in BrowserActionException", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          click: vi.fn().mockRejectedValue(new Error("Network error")),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          waitForTimeout: vi.fn(),
+          waitForLoadState: vi.fn(),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("ref1", PageAction.Click)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("ref1", PageAction.Click)).rejects.toThrow(
+          "Failed to perform action: Network error",
+        );
+      });
+
+      it("should re-throw InvalidRefException as-is", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(0),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        const error = await browser.performAction("missing", PageAction.Click).catch((e) => e);
+        expect(error).toBeInstanceOf(InvalidRefException);
+        expect(error.ref).toBe("missing");
+      });
+
+      it("should handle FillAndEnter action correctly", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          fill: vi.fn().mockResolvedValue(undefined),
+          press: vi.fn().mockResolvedValue(undefined),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          waitForTimeout: vi.fn().mockResolvedValue(undefined),
+          waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        };
+        (browser as any).page = mockPage;
+
+        await browser.performAction("search", PageAction.FillAndEnter, "query text");
+
+        expect(mockLocator.fill).toHaveBeenCalledWith("query text", { timeout: 20000 });
+        expect(mockLocator.press).toHaveBeenCalledWith("Enter", { timeout: 20000 });
+      });
     });
   });
 });

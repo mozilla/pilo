@@ -3,19 +3,16 @@ import { WebAgentEventType, WebAgentEventEmitter } from "../events.js";
 import type {
   ActionExecutionEventData,
   ActionResultEventData,
+  AgentStepEventData,
   CompressionDebugEventData,
-  CurrentStepEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
-  NetworkTimeoutEventData,
-  NetworkWaitingEventData,
-  ObservationEventData,
   PageNavigationEventData,
+  ReasoningEventData,
   StatusMessageEventData,
   TaskCompleteEventData,
   TaskSetupEventData,
   TaskStartEventData,
-  ThoughtEventData,
   WaitingEventData,
   TaskValidationEventData,
   ProcessingEventData,
@@ -48,16 +45,14 @@ export class ChalkConsoleLogger implements Logger {
 
     // Browser events
     emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+    emitter.onEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+    emitter.onEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
     emitter.onEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-    emitter.onEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
     emitter.onEvent(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, this.handleScreenshotCaptured);
 
     // Agent reasoning events
-    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-    emitter.onEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+    emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+    emitter.onEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
     emitter.onEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
     emitter.onEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
     emitter.onEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -83,19 +78,17 @@ export class ChalkConsoleLogger implements Logger {
 
       // Browser events
       this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleActionExecution);
+      this.emitter.offEvent(WebAgentEventType.AGENT_ACTION, this.handleAgentAction);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_STARTED, this.handleBrowserAction);
       this.emitter.offEvent(WebAgentEventType.BROWSER_ACTION_COMPLETED, this.handleActionResult);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_WAITING, this.handleNetworkWaiting);
-      this.emitter.offEvent(WebAgentEventType.BROWSER_NETWORK_TIMEOUT, this.handleNetworkTimeout);
       this.emitter.offEvent(
         WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
         this.handleScreenshotCaptured,
       );
 
       // Agent reasoning events
-      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleCurrentStep);
-      this.emitter.offEvent(WebAgentEventType.AGENT_OBSERVED, this.handleObservation);
-      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleThought);
+      this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
+      this.emitter.offEvent(WebAgentEventType.AGENT_REASONED, this.handleReasoning);
       this.emitter.offEvent(WebAgentEventType.AGENT_EXTRACTED, this.handleExtractedData);
       this.emitter.offEvent(WebAgentEventType.AGENT_PROCESSING, this.handleProcessing);
       this.emitter.offEvent(WebAgentEventType.AGENT_STATUS, this.handleStatusMessage);
@@ -133,8 +126,8 @@ export class ChalkConsoleLogger implements Logger {
 
   private handleTaskStart = (data: TaskStartEventData): void => {
     console.log(chalk.cyan.bold("\n🎯 Task: "), chalk.whiteBright(data.task));
-    console.log(chalk.yellow.bold("\n💡 Explanation:"));
-    console.log(chalk.whiteBright(data.explanation));
+    console.log(chalk.yellow.bold("\n💡 Success Criteria:"));
+    console.log(chalk.whiteBright(data.successCriteria));
     console.log(chalk.magenta.bold("\n📋 Plan:"));
     console.log(chalk.whiteBright(data.plan));
     console.log(chalk.blue.bold("🌐 Starting URL: "), chalk.blue.underline(data.url));
@@ -183,19 +176,13 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.blue.bold("📍 Current Page:"), chalk.blue(truncatedTitle));
   };
 
-  private handleCurrentStep = (data: CurrentStepEventData): void => {
-    console.log(chalk.magenta.bold("🎯 Agent Step:"));
-    console.log(chalk.whiteBright("   " + data.currentStep));
+  private handleAgentStep = (data: AgentStepEventData): void => {
+    console.log(chalk.cyan(`\n🔄 Iteration ${data.currentIteration} [${data.iterationId}]`));
   };
 
-  private handleObservation = (data: ObservationEventData): void => {
-    console.log(chalk.yellow.bold("👁️ Agent Observed:"));
-    console.log(chalk.whiteBright("   " + data.observation));
-  };
-
-  private handleThought = (data: ThoughtEventData): void => {
+  private handleReasoning = (data: ReasoningEventData): void => {
     console.log(chalk.yellow.bold("\n🧠 Agent Reasoned:"));
-    console.log(chalk.whiteBright("   " + data.thought));
+    console.log(chalk.whiteBright("   " + data.reasoning));
   };
 
   private handleExtractedData = (data: ExtractedDataEventData): void => {
@@ -203,14 +190,16 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.whiteBright("   " + data.extractedData));
   };
 
-  private handleActionExecution = (data: ActionExecutionEventData): void => {
-    console.log(chalk.yellow.bold("\n🎯 Planned Action:"));
+  private handleAgentAction = (data: ActionExecutionEventData): void => {
     console.log(
-      chalk.whiteBright(`   1. ${data.action.toUpperCase()}`),
+      chalk.yellow.bold("\n🎯 Agent Action:"),
+      chalk.whiteBright(data.action.toUpperCase()),
       data.ref ? chalk.cyan(`ref: ${data.ref}`) : "",
       data.value ? chalk.green(`value: "${data.value}"`) : "",
     );
+  };
 
+  private handleBrowserAction = (data: ActionExecutionEventData): void => {
     console.log(
       chalk.cyan.bold("\n🤖 Browser Executing:"),
       chalk.whiteBright(data.action.toUpperCase()),
@@ -249,24 +238,14 @@ export class ChalkConsoleLogger implements Logger {
     );
   };
 
-  private handleNetworkWaiting = (data: NetworkWaitingEventData): void => {
-    console.log(chalk.gray(`   🌐 Browser Network Waiting after "${data.action}"...`));
-  };
-
-  private handleNetworkTimeout = (data: NetworkTimeoutEventData): void => {
-    console.log(chalk.gray(`   ⚠️ Browser Network Timeout for "${data.action}", continuing...`));
-  };
-
   private handleScreenshotCaptured = (data: ScreenshotCapturedEventData): void => {
     const sizeKB = Math.round(data.size / 1024);
     console.log(chalk.gray(`   📸 Screenshot captured (${sizeKB}KB ${data.format.toUpperCase()})`));
   };
 
   private handleProcessing = (data: ProcessingEventData): void => {
-    if (data.status === "start") {
-      const visionIndicator = data.hasScreenshot ? "👁️ " : "";
-      console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
-    }
+    const visionIndicator = data.hasScreenshot ? "👁️ " : "";
+    console.log(chalk.cyan.bold(`\n🧮 ${visionIndicator}Agent Processing: ${data.operation}...`));
   };
 
   private handleValidationError = (data: ValidationErrorEventData): void => {

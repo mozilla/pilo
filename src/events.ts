@@ -8,6 +8,7 @@ export enum WebAgentEventType {
   TASK_SETUP = "task:setup",
   TASK_STARTED = "task:started",
   TASK_COMPLETED = "task:completed",
+  TASK_ABORTED = "task:aborted",
   TASK_VALIDATED = "task:validated",
   TASK_VALIDATION_ERROR = "task:validation_error",
 
@@ -16,8 +17,8 @@ export enum WebAgentEventType {
   AI_GENERATION_ERROR = "ai:generation:error",
 
   // Agent reasoning and status
+  AGENT_ACTION = "agent:action",
   AGENT_STEP = "agent:step",
-  AGENT_OBSERVED = "agent:observed",
   AGENT_REASONED = "agent:reasoned",
   AGENT_EXTRACTED = "agent:extracted",
   AGENT_PROCESSING = "agent:processing",
@@ -28,8 +29,6 @@ export enum WebAgentEventType {
   BROWSER_ACTION_STARTED = "browser:action_started",
   BROWSER_ACTION_COMPLETED = "browser:action_completed",
   BROWSER_NAVIGATED = "browser:navigated",
-  BROWSER_NETWORK_WAITING = "browser:network_waiting",
-  BROWSER_NETWORK_TIMEOUT = "browser:network_timeout",
   BROWSER_SCREENSHOT_CAPTURED = "browser:screenshot_captured",
 
   // System/Debug
@@ -69,7 +68,7 @@ export interface TaskSetupEventData extends WebAgentEventData {
  */
 export interface TaskStartEventData extends WebAgentEventData {
   task: string;
-  explanation: string;
+  successCriteria: string;
   plan: string;
   url: string;
 }
@@ -79,6 +78,15 @@ export interface TaskStartEventData extends WebAgentEventData {
  */
 export interface TaskCompleteEventData extends WebAgentEventData {
   finalAnswer: string | null;
+  success?: boolean;
+}
+
+/**
+ * Event data when a task is aborted
+ */
+export interface TaskAbortedEventData extends WebAgentEventData {
+  reason: string;
+  finalAnswer: string;
 }
 
 /**
@@ -119,24 +127,18 @@ export interface PageNavigationEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for current step tracking
+ * Event data for agent step tracking (each loop iteration)
  */
-export interface CurrentStepEventData extends WebAgentEventData {
-  currentStep: string;
+export interface AgentStepEventData extends WebAgentEventData {
+  iterationId: string;
+  currentIteration: number;
 }
 
 /**
- * Event data for agent observations
+ * Event data for agent reasoning
  */
-export interface ObservationEventData extends WebAgentEventData {
-  observation: string;
-}
-
-/**
- * Event data for agent thoughts
- */
-export interface ThoughtEventData extends WebAgentEventData {
-  thought: string;
+export interface ReasoningEventData extends WebAgentEventData {
+  reasoning: string;
 }
 
 /**
@@ -147,12 +149,11 @@ export interface ExtractedDataEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for processing status
+ * Event data for when the agent is waiting for model generation
  */
 export interface ProcessingEventData extends WebAgentEventData {
-  status: "start" | "end";
   operation: string;
-  hasScreenshot?: boolean;
+  hasScreenshot: boolean;
 }
 
 /**
@@ -196,20 +197,6 @@ export interface WaitingEventData extends WebAgentEventData {
 }
 
 /**
- * Event data for network waiting notification
- */
-export interface NetworkWaitingEventData extends WebAgentEventData {
-  action: string;
-}
-
-/**
- * Event data for network timeout notification
- */
-export interface NetworkTimeoutEventData extends WebAgentEventData {
-  action: string;
-}
-
-/**
  * Event data for screenshot capture
  */
 export interface ScreenshotCapturedEventData extends WebAgentEventData {
@@ -250,13 +237,14 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_SETUP; data: TaskSetupEventData }
   | { type: WebAgentEventType.TASK_STARTED; data: TaskStartEventData }
   | { type: WebAgentEventType.TASK_COMPLETED; data: TaskCompleteEventData }
+  | { type: WebAgentEventType.TASK_ABORTED; data: TaskAbortedEventData }
   | { type: WebAgentEventType.TASK_VALIDATED; data: TaskValidationEventData }
   | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
   | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
-  | { type: WebAgentEventType.AGENT_STEP; data: CurrentStepEventData }
-  | { type: WebAgentEventType.AGENT_OBSERVED; data: ObservationEventData }
-  | { type: WebAgentEventType.AGENT_REASONED; data: ThoughtEventData }
+  | { type: WebAgentEventType.AGENT_ACTION; data: ActionExecutionEventData }
+  | { type: WebAgentEventType.AGENT_STEP; data: AgentStepEventData }
+  | { type: WebAgentEventType.AGENT_REASONED; data: ReasoningEventData }
   | { type: WebAgentEventType.AGENT_EXTRACTED; data: ExtractedDataEventData }
   | { type: WebAgentEventType.AGENT_PROCESSING; data: ProcessingEventData }
   | { type: WebAgentEventType.AGENT_STATUS; data: StatusMessageEventData }
@@ -264,8 +252,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.BROWSER_ACTION_STARTED; data: ActionExecutionEventData }
   | { type: WebAgentEventType.BROWSER_ACTION_COMPLETED; data: ActionResultEventData }
   | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
-  | { type: WebAgentEventType.BROWSER_NETWORK_WAITING; data: NetworkWaitingEventData }
-  | { type: WebAgentEventType.BROWSER_NETWORK_TIMEOUT; data: NetworkTimeoutEventData }
+  | { type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED; data: ScreenshotCapturedEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };
 
