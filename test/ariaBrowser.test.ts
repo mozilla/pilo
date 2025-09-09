@@ -13,7 +13,6 @@ describe("AriaBrowser interface", () => {
         "uncheck",
         "select",
         "enter",
-        "fill_and_enter",
         "wait",
         "goto",
         "back",
@@ -41,7 +40,6 @@ describe("AriaBrowser interface", () => {
       expect(PageAction.Uncheck).toBe("uncheck");
       expect(PageAction.Select).toBe("select");
       expect(PageAction.Enter).toBe("enter");
-      expect(PageAction.FillAndEnter).toBe("fill_and_enter");
       expect(PageAction.Wait).toBe("wait");
       expect(PageAction.Goto).toBe("goto");
       expect(PageAction.Back).toBe("back");
@@ -62,7 +60,6 @@ describe("AriaBrowser interface", () => {
         PageAction.Uncheck,
         PageAction.Select,
         PageAction.Enter,
-        PageAction.FillAndEnter,
       ];
 
       // Navigation actions
@@ -204,7 +201,6 @@ describe("AriaBrowser interface", () => {
         expect(action).toBe(action.toLowerCase());
         expect(action).not.toContain(" ");
         expect(action).not.toContain("-");
-        // Underscores are allowed for compound actions like fill_and_enter
       });
 
       // LoadState values should be lowercase

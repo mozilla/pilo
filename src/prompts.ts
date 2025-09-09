@@ -41,9 +41,6 @@ export const TOOL_STRINGS = {
     enter: {
       description: "Press Enter key on an element (useful for form submission)",
     },
-    fill_and_enter: {
-      description: "Fill text into an input field and press Enter (useful for search boxes)",
-    },
     wait: {
       description: "Wait for a specified number of seconds",
       seconds: "Number of seconds to wait (0-30)",
@@ -127,7 +124,6 @@ IMPORTANT:
 const toolExamples = `
 - click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}
 - fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}
-- fill_and_enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill_and_enter.description}
 - select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}
 - hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}
 - check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}

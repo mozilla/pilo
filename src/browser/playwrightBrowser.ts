@@ -463,18 +463,6 @@ export class PlaywrightBrowser implements AriaBrowser {
           await this.ensureOptimizedPageLoad();
           break;
 
-        case PageAction.FillAndEnter:
-          if (!value)
-            throw new BrowserActionException(
-              "fill_and_enter",
-              "Value required for fill_and_enter action",
-            );
-          await locator!.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
-          await locator!.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
-          // Forms might trigger page reloads on enter
-          await this.ensureOptimizedPageLoad();
-          break;
-
         // Navigation and workflow (these don't need element refs)
         case PageAction.Wait:
           if (!value) throw new BrowserActionException("wait", "Value required for wait action");
@@ -551,7 +539,6 @@ export class PlaywrightBrowser implements AriaBrowser {
       PageAction.Uncheck,
       PageAction.Select,
       PageAction.Enter,
-      PageAction.FillAndEnter,
     ];
 
     return elementActions.includes(action);

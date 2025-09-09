@@ -165,16 +165,16 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.16.0
-        version: 1.17.1(hono@4.8.9)
+        version: 1.17.1(hono@4.9.6)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.8.9)
+        version: 1.2.2(hono@4.9.6)
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
       hono:
-        specifier: ^4.8.5
-        version: 4.8.9
+        specifier: ^4.9.6
+        version: 4.9.6
       spark:
         specifier: file:..
         version: 'file:'
@@ -1973,8 +1973,8 @@ packages:
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
 
-  hono@4.8.9:
-    resolution: {integrity: sha512-ERIxkXMRhUxGV7nS/Af52+j2KL60B1eg+k6cPtgzrGughS+espS9KQ7QO0SMnevtmRlBfAcN0mf1jKtO6j/doA==}
+  hono@4.9.6:
+    resolution: {integrity: sha512-doVjXhSFvYZ7y0dNokjwwSahcrAfdz+/BCLvAMa/vHLzjj8+CFyV5xteThGUsKdkaasgN+gF2mUxao+SGLpUeA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -2952,6 +2952,7 @@ packages:
 
   'spark@file:':
     resolution: {directory: '', type: directory}
+    engines: {node: ^22.0.0}
     hasBin: true
 
   spawn-sync@1.0.15:
@@ -3943,13 +3944,13 @@ snapshots:
     dependencies:
       tldts-experimental: 7.0.13
 
-  '@hono/node-server@1.17.1(hono@4.8.9)':
+  '@hono/node-server@1.17.1(hono@4.9.6)':
     dependencies:
-      hono: 4.8.9
+      hono: 4.9.6
 
-  '@hono/sentry@1.2.2(hono@4.8.9)':
+  '@hono/sentry@1.2.2(hono@4.9.6)':
     dependencies:
-      hono: 4.8.9
+      hono: 4.9.6
       toucan-js: 4.1.1
 
   '@isaacs/balanced-match@4.0.1': {}
@@ -5248,7 +5249,7 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
-  hono@4.8.9: {}
+  hono@4.9.6: {}
 
   hookable@5.5.3: {}
 
