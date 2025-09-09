@@ -1,7 +1,9 @@
 import browser from "webextension-polyfill";
 import type { AriaBrowser } from "spark/core";
+import { PageAction, LoadState } from "spark/core";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "./utils/logger";
+import TurndownService from "turndown";
 
 interface ActionResult {
   success: boolean;
@@ -105,9 +107,9 @@ export class ExtensionBrowser implements AriaBrowser {
     return tab.title || "";
   }
 
-  async getText(): Promise<string> {
+  async getTreeWithRefs(): Promise<string> {
     const tab = await this.getActiveTab();
-    this.logger.info("getText() called", { tabId: tab.id, url: tab.url });
+    this.logger.info("getTreeWithRefs() called", { tabId: tab.id, url: tab.url });
 
     try {
       this.logger.debug("checking content script availability...", { tabId: tab.id });
@@ -161,11 +163,77 @@ export class ExtensionBrowser implements AriaBrowser {
       // Script succeeded, return the rendered text
       const snapshotData = result as { renderedText: string };
       this.logger.debug("ARIA tree generated and aria-ref attributes set", { tabId: tab.id });
-      this.logger.info("getText() completed successfully", { tabId: tab.id });
+      this.logger.info("getTreeWithRefs() completed successfully", { tabId: tab.id });
       return snapshotData.renderedText;
     } catch (error) {
-      this.logger.error("getText execution error", { tabId: tab.id }, error);
+      this.logger.error("getTreeWithRefs execution error", { tabId: tab.id }, error);
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to analyze page content.`;
+    }
+  }
+
+  /**
+   * Gets simplified HTML with noise elements removed in browser context
+   * Reduces payload size by removing elements we don't need
+   */
+  async getSimpleHtml(): Promise<string> {
+    const tab = await this.getActiveTab();
+    this.logger.info("getSimpleHtml() called", { tabId: tab.id, url: tab.url });
+
+    try {
+      await this.ensureContentScript();
+    } catch (error) {
+      this.logger.warn("content script not available", { tabId: tab.id }, error);
+      return "";
+    }
+
+    try {
+      const [{ result }] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: () => {
+          const body = document.body || document.documentElement;
+          if (!body) return "";
+
+          const clone = body.cloneNode(true) as Element;
+
+          // Remove noise elements in browser context to reduce wire transfer
+          clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+
+          return clone.innerHTML;
+        },
+      });
+
+      return result as string;
+    } catch (error) {
+      this.logger.error("getSimpleHtml execution error", { tabId: tab.id }, error);
+      return "";
+    }
+  }
+
+  async getMarkdown(): Promise<string> {
+    const tab = await this.getActiveTab();
+    this.logger.info("getMarkdown() called", { tabId: tab.id, url: tab.url });
+
+    try {
+      // Get simplified HTML (noise removed in browser context)
+      const html = await this.getSimpleHtml();
+
+      if (!html) {
+        return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nContent not available.`;
+      }
+
+      // Convert HTML to markdown using turndown
+      const turndown = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+        emDelimiter: "*",
+        strongDelimiter: "**",
+      });
+
+      this.logger.info("getMarkdown() completed successfully", { tabId: tab.id });
+      return turndown.turndown(html);
+    } catch (error) {
+      this.logger.error("getMarkdown execution error", { tabId: tab.id }, error);
+      return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to convert page content to markdown.`;
     }
   }
 
@@ -180,10 +248,7 @@ export class ExtensionBrowser implements AriaBrowser {
     return Buffer.from(base64Data, "base64");
   }
 
-  async waitForLoadState(
-    state: "networkidle" | "domcontentloaded" | "load",
-    options?: { timeout?: number },
-  ): Promise<void> {
+  async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
     const tab = await this.getActiveTab();
     const timeout = options?.timeout || this.ACTION_TIMEOUT_MS;
 
@@ -232,14 +297,14 @@ export class ExtensionBrowser implements AriaBrowser {
     }
   }
 
-  async performAction(ref: string, action: string, value?: string): Promise<void> {
+  async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     console.log(
       `ExtensionBrowser: performAction() called with ref: ${ref}, action: ${action}, value: ${value}`,
     );
     try {
       // Handle non-element actions first
       switch (action) {
-        case "wait":
+        case PageAction.Wait:
           if (!value) throw new Error("Value required for wait action");
           const seconds = parseInt(value, 10);
           if (isNaN(seconds) || seconds < 0) {
@@ -248,24 +313,24 @@ export class ExtensionBrowser implements AriaBrowser {
           await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
           return;
 
-        case "goto":
+        case PageAction.Goto:
           if (!value) throw new Error("URL required for goto action");
           if (!value.trim()) throw new Error("URL cannot be empty");
           await this.goto(value.trim());
           // Note: goto already calls ensureOptimizedPageLoad internally
           return;
 
-        case "back":
+        case PageAction.Back:
           await this.goBack();
           // Note: goBack already calls ensureOptimizedPageLoad internally
           return;
 
-        case "forward":
+        case PageAction.Forward:
           await this.goForward();
           // Note: goForward already calls ensureOptimizedPageLoad internally
           return;
 
-        case "done":
+        case PageAction.Done:
           // This is a no-op in the browser implementation
           // It's handled at a higher level in the automation flow
           return;
@@ -403,15 +468,15 @@ export class ExtensionBrowser implements AriaBrowser {
       }
 
       // Element interactions that may cause navigation
-      if (action === "click") {
+      if (action === PageAction.Click) {
         console.log(`DEBUG: About to handle page transition after click`);
         // Handle potential page transition after click
         await this.handlePageTransition();
         console.log(`DEBUG: Page transition handling complete`);
-      } else if (action === "select") {
+      } else if (action === PageAction.Select) {
         // Handle potential page transition after select
         await this.handlePageTransition();
-      } else if (action === "enter") {
+      } else if (action === PageAction.Enter) {
         // Handle potential page transition after enter
         await this.handlePageTransition();
       }
@@ -427,7 +492,7 @@ export class ExtensionBrowser implements AriaBrowser {
   private async ensureOptimizedPageLoad(): Promise<void> {
     try {
       // 1. Wait for DOM to be ready - this is critical for interactivity
-      await this.waitForLoadState("domcontentloaded");
+      await this.waitForLoadState(LoadState.DOMContentLoaded);
     } catch (error) {
       // Still continue since we might be able to interact with what's loaded
     }
@@ -435,7 +500,7 @@ export class ExtensionBrowser implements AriaBrowser {
     // 2. Try to wait for full load, but cap at ACTION_TIMEOUT_MS
     // We catch and ignore timeout errors since the page is usable after domcontentloaded
     try {
-      await this.waitForLoadState("load", {
+      await this.waitForLoadState(LoadState.Load, {
         timeout: this.ACTION_TIMEOUT_MS,
       });
     } catch (error) {

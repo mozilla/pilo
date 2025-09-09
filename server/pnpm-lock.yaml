@@ -10,16 +10,16 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.16.0
-        version: 1.16.0(hono@4.8.5)
+        version: 1.16.0(hono@4.9.6)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.8.5)
+        version: 1.2.2(hono@4.9.6)
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
       hono:
-        specifier: ^4.8.5
-        version: 4.8.5
+        specifier: ^4.9.6
+        version: 4.9.6
       spark:
         specifier: file:..
         version: file:..
@@ -762,8 +762,8 @@ packages:
     resolution: {integrity: sha512-pCcEwRi+TKpMlxAQObHDQ56KawURgyAf6jtIY046fJ5tIv3zDe/LEIubckAO8fj6JnAxLdmWkUfNyulQ2iKdEw==}
     engines: {node: '>=14.0.0'}
 
-  hono@4.8.5:
-    resolution: {integrity: sha512-Up2cQbtNz1s111qpnnECdTGqSIUIhZJMLikdKkshebQSEBcoUKq6XJayLGqSZWidiH0zfHRCJqFu062Mz5UuRA==}
+  hono@4.9.6:
+    resolution: {integrity: sha512-doVjXhSFvYZ7y0dNokjwwSahcrAfdz+/BCLvAMa/vHLzjj8+CFyV5xteThGUsKdkaasgN+gF2mUxao+SGLpUeA==}
     engines: {node: '>=16.9.0'}
 
   https-proxy-agent@7.0.6:
@@ -1346,13 +1346,13 @@ snapshots:
     dependencies:
       tldts-experimental: 7.0.10
 
-  '@hono/node-server@1.16.0(hono@4.8.5)':
+  '@hono/node-server@1.16.0(hono@4.9.6)':
     dependencies:
-      hono: 4.8.5
+      hono: 4.9.6
 
-  '@hono/sentry@1.2.2(hono@4.8.5)':
+  '@hono/sentry@1.2.2(hono@4.9.6)':
     dependencies:
-      hono: 4.8.5
+      hono: 4.9.6
       toucan-js: 4.1.1
 
   '@jest/schemas@29.6.3':
@@ -1710,7 +1710,7 @@ snapshots:
       - encoding
       - supports-color
 
-  hono@4.8.5: {}
+  hono@4.9.6: {}
 
   https-proxy-agent@7.0.6:
     dependencies:

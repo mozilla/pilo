@@ -405,7 +405,6 @@ describe("PlaywrightBrowser", () => {
           PageAction.Uncheck,
           PageAction.Select,
           PageAction.Enter,
-          PageAction.FillAndEnter,
         ];
 
         elementActions.forEach((action) => {
@@ -477,13 +476,6 @@ describe("PlaywrightBrowser", () => {
           waitForLoadState: vi.fn(),
         };
         (browser as any).page = mockPage;
-
-        await expect(browser.performAction("ref1", PageAction.FillAndEnter)).rejects.toThrow(
-          BrowserActionException,
-        );
-        await expect(browser.performAction("ref1", PageAction.FillAndEnter)).rejects.toThrow(
-          "Value required for fill_and_enter action",
-        );
       });
 
       it("should throw BrowserActionException for invalid wait time", async () => {
@@ -555,25 +547,6 @@ describe("PlaywrightBrowser", () => {
         const error = await browser.performAction("missing", PageAction.Click).catch((e) => e);
         expect(error).toBeInstanceOf(InvalidRefException);
         expect(error.ref).toBe("missing");
-      });
-
-      it("should handle FillAndEnter action correctly", async () => {
-        const mockLocator = {
-          count: vi.fn().mockResolvedValue(1),
-          fill: vi.fn().mockResolvedValue(undefined),
-          press: vi.fn().mockResolvedValue(undefined),
-        };
-        const mockPage = {
-          locator: vi.fn().mockReturnValue(mockLocator),
-          waitForTimeout: vi.fn().mockResolvedValue(undefined),
-          waitForLoadState: vi.fn().mockResolvedValue(undefined),
-        };
-        (browser as any).page = mockPage;
-
-        await browser.performAction("search", PageAction.FillAndEnter, "query text");
-
-        expect(mockLocator.fill).toHaveBeenCalledWith("query text", { timeout: 20000 });
-        expect(mockLocator.press).toHaveBeenCalledWith("Enter", { timeout: 20000 });
       });
     });
   });

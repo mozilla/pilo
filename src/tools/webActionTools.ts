@@ -185,17 +185,6 @@ export function createWebActionTools(context: WebActionContext) {
       },
     }),
 
-    fill_and_enter: tool({
-      description: TOOL_STRINGS.webActions.fill_and_enter.description,
-      inputSchema: z.object({
-        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
-        value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
-      }),
-      execute: async ({ ref, value }) => {
-        return await performActionWithValidation(PageAction.FillAndEnter, context, ref, value);
-      },
-    }),
-
     wait: tool({
       description: TOOL_STRINGS.webActions.wait.description,
       inputSchema: z.object({

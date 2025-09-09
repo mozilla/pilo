@@ -116,7 +116,6 @@ describe("Web Action Tools", () => {
       expect(tools.uncheck).toBeDefined();
       expect(tools.focus).toBeDefined();
       expect(tools.enter).toBeDefined();
-      expect(tools.fill_and_enter).toBeDefined();
       expect(tools.wait).toBeDefined();
       expect(tools.goto).toBeDefined();
       expect(tools.back).toBeDefined();
@@ -136,9 +135,6 @@ describe("Web Action Tools", () => {
       expect(tools.focus.description).toBe("Focus on an element");
       expect(tools.enter.description).toBe(
         "Press Enter key on an element (useful for form submission)",
-      );
-      expect(tools.fill_and_enter.description).toBe(
-        "Fill text into an input field and press Enter (useful for search boxes)",
       );
       expect(tools.wait.description).toBe("Wait for a specified number of seconds");
       expect(tools.goto.description).toBe(
@@ -364,44 +360,6 @@ describe("Web Action Tools", () => {
         success: true,
         action: "enter",
         ref: "form1",
-      });
-    });
-  });
-
-  describe("Fill and Enter Action", () => {
-    it("should execute fill and enter action successfully", async () => {
-      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
-
-      const result = await tools.fill_and_enter.execute({ ref: "search1", value: "query" });
-
-      expect(performActionSpy).toHaveBeenCalledTimes(1);
-      expect(performActionSpy).toHaveBeenCalledWith("search1", PageAction.FillAndEnter, "query");
-      expect(result).toEqual({
-        success: true,
-        action: "fill_and_enter",
-        ref: "search1",
-        value: "query",
-      });
-    });
-
-    it("should emit browser action events", async () => {
-      const emitSpy = vi.spyOn(eventEmitter, "emit");
-
-      await tools.fill_and_enter.execute({ ref: "search1", value: "query" });
-
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
-        action: "fill_and_enter",
-        ref: "search1",
-        value: "query",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_STARTED, {
-        action: "fill_and_enter",
-        ref: "search1",
-        value: "query",
-      });
-      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: true,
-        action: "fill_and_enter",
       });
     });
   });
