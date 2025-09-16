@@ -36,8 +36,12 @@ export function createRunCommand(): Command {
       config.get("browser") || "firefox",
     )
     .option("--headless", "Run browser in headless mode", config.get("headless") || false)
-    .option("--debug", "Enable debug mode with page snapshots", false)
-    .option("--vision", "Enable vision capabilities to include screenshots", false)
+    .option("--debug", "Enable debug mode with page snapshots", config.get("debug") || false)
+    .option(
+      "--vision",
+      "Enable vision capabilities to include screenshots",
+      config.get("vision") || false,
+    )
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
@@ -132,7 +136,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Create browser instance
     const browser = new PlaywrightBrowser({
       browser: options.browser,
-      blockAds: options.blockAds,
+      blockAds: options.blockAds ?? config.get("block_ads") ?? true,
       blockResources,
       pwEndpoint: options.pwEndpoint,
       pwCdpEndpoint: options.pwCdpEndpoint,
