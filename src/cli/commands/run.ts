@@ -107,11 +107,11 @@ export function createRunCommand(): Command {
  */
 async function executeRunCommand(task: string, options: any): Promise<void> {
   try {
-    // Parse data if provided
-    let data = null;
+    // Parse JSON data if provided
+    let parsedData = null;
     if (options.data) {
       try {
-        data = parseJsonData(options.data);
+        parsedData = parseJsonData(options.data);
       } catch (error) {
         console.error(chalk.red.bold("❌ Error: Invalid JSON in --data option"));
         console.log(chalk.gray(`Data: ${options.data}`));
@@ -130,13 +130,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Validate browser option
     if (!validateBrowser(options.browser)) {
       console.error(chalk.red.bold("❌ Error: Invalid browser option"));
+      console.log(chalk.gray(`Browser: ${options.browser}`));
       console.log(chalk.gray(`Valid browsers: ${getValidBrowsers().join(", ")}`));
       process.exit(1);
     }
 
     // Create logger
-    const loggerType = options.logger ?? config.get("logger", "console");
-    const logger = loggerType === "json" ? new JSONConsoleLogger() : new ChalkConsoleLogger();
+    const logger = options.logger === "json" ? new JSONConsoleLogger() : new ChalkConsoleLogger();
 
     // Create browser instance
     const browser = new PlaywrightBrowser({
@@ -145,22 +145,30 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       blockResources,
       pwEndpoint: options.pwEndpoint,
       pwCdpEndpoint: options.pwCdpEndpoint,
-      headless: options.headless ?? config.get("headless", false),
-      bypassCSP: options.bypassCsp ?? config.get("bypass_csp", false),
-      proxyServer: options.proxy ?? config.get("proxy"),
-      proxyUsername: options.proxyUsername ?? config.get("proxy_username"),
-      proxyPassword: options.proxyPassword ?? config.get("proxy_password"),
+      headless: options.headless,
+      bypassCSP: options.bypassCsp,
+      proxyServer: options.proxy,
+      proxyUsername: options.proxyUsername,
+      proxyPassword: options.proxyPassword,
     });
 
     // Create AI provider with CLI overrides
     const providerOverrides: any = {};
-    if (options.provider !== undefined) providerOverrides.provider = options.provider;
-    if (options.model !== undefined) providerOverrides.model = options.model;
-    if (options.openaiApiKey !== undefined) providerOverrides.openai_api_key = options.openaiApiKey;
-    if (options.openrouterApiKey !== undefined)
+    if (options.provider !== undefined) {
+      providerOverrides.provider = options.provider;
+    }
+    if (options.model !== undefined) {
+      providerOverrides.model = options.model;
+    }
+    if (options.openaiApiKey !== undefined) {
+      providerOverrides.openai_api_key = options.openaiApiKey;
+    }
+    if (options.openrouterApiKey !== undefined) {
       providerOverrides.openrouter_api_key = options.openrouterApiKey;
-    if (options.reasoningEffort !== undefined)
+    }
+    if (options.reasoningEffort !== undefined) {
       providerOverrides.reasoning_effort = options.reasoningEffort;
+    }
 
     const providerConfig = createAIProvider(providerOverrides);
 
@@ -188,18 +196,16 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
-      debug: options.debug ?? config.get("debug", false),
-      vision: options.vision ?? config.get("vision", false),
-      guardrails: options.guardrails ?? config.get("guardrails"),
-      maxIterations: options.maxIterations
-        ? parseInt(options.maxIterations)
-        : config.get("max_iterations"),
+      debug: options.debug,
+      vision: options.vision,
+      guardrails: options.guardrails,
+      maxIterations: options.maxIterations ? parseInt(options.maxIterations) : undefined,
       maxValidationAttempts: options.maxValidationAttempts
         ? parseInt(options.maxValidationAttempts)
-        : config.get("max_validation_attempts"),
+        : undefined,
       maxRepeatedActions: options.maxRepeatedActions
         ? parseInt(options.maxRepeatedActions)
-        : config.get("max_repeated_actions"),
+        : undefined,
       providerConfig,
       logger,
       eventEmitter,
@@ -207,13 +213,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Execute the task
     await webAgent.execute(task, {
-      startingUrl: options.url ?? config.get("starting_url"),
-      data:
-        data ??
-        (() => {
-          const configData = config.get("data");
-          return configData ? parseJsonData(configData) : undefined;
-        })(),
+      startingUrl: options.url,
+      data: parsedData,
     });
 
     // Close the browser
