@@ -38,6 +38,9 @@ export interface SparkConfig {
   max_validation_attempts?: number;
   max_repeated_actions?: number;
   reasoning_effort?: "none" | "low" | "medium" | "high";
+  starting_url?: string;
+  data?: string;
+  guardrails?: string;
 
   // Playwright Configuration
   pw_endpoint?: string;
@@ -169,6 +172,15 @@ export class ConfigManager {
       ...(process.env.SPARK_REASONING_EFFORT && {
         reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
       }),
+      ...(process.env.SPARK_STARTING_URL && {
+        starting_url: process.env.SPARK_STARTING_URL,
+      }),
+      ...(process.env.SPARK_DATA && {
+        data: process.env.SPARK_DATA,
+      }),
+      ...(process.env.SPARK_GUARDRAILS && {
+        guardrails: process.env.SPARK_GUARDRAILS,
+      }),
 
       // Playwright Configuration
       ...(process.env.SPARK_PW_ENDPOINT && {
@@ -233,9 +245,9 @@ export class ConfigManager {
   /**
    * Get a specific config value with fallback hierarchy
    */
-  public get<K extends keyof SparkConfig>(key: K): SparkConfig[K] {
+  public get<K extends keyof SparkConfig>(key: K, defaultValue?: SparkConfig[K]): SparkConfig[K] {
     const config = this.getConfig();
-    return config[key];
+    return config[key] ?? defaultValue;
   }
 
   /**
@@ -325,6 +337,9 @@ export class ConfigManager {
       env.max_repeated_actions = parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10);
     if (process.env.SPARK_REASONING_EFFORT)
       env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
+    if (process.env.SPARK_STARTING_URL) env.starting_url = process.env.SPARK_STARTING_URL;
+    if (process.env.SPARK_DATA) env.data = process.env.SPARK_DATA;
+    if (process.env.SPARK_GUARDRAILS) env.guardrails = process.env.SPARK_GUARDRAILS;
 
     // Playwright Configuration
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;

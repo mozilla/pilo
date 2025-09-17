@@ -19,30 +19,38 @@ export function createRunCommand(): Command {
     .alias("r")
     .description("Execute a web automation task")
     .argument("<task>", "Natural language description of the task to perform")
-    .option("-u, --url <url>", "Starting URL for the task")
-    .option("-d, --data <json>", "JSON data to provide context for the task")
-    .option("-g, --guardrails <text>", "Safety constraints for the task execution")
+    .option("-u, --url <url>", "Starting URL for the task", config.get("starting_url"))
+    .option("-d, --data <json>", "JSON data to provide context for the task", config.get("data"))
+    .option(
+      "-g, --guardrails <text>",
+      "Safety constraints for the task execution",
+      config.get("guardrails"),
+    )
     .option(
       "--provider <provider>",
       "AI provider to use (openai, openrouter)",
-      config.get("provider") || "openai",
+      config.get("provider", "openai"),
     )
     .option("--model <model>", "AI model to use", config.get("model"))
-    .option("--openai-api-key <key>", "OpenAI API key")
-    .option("--openrouter-api-key <key>", "OpenRouter API key")
+    .option("--openai-api-key <key>", "OpenAI API key", config.get("openai_api_key"))
+    .option("--openrouter-api-key <key>", "OpenRouter API key", config.get("openrouter_api_key"))
     .option(
       "-b, --browser <browser>",
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
-      config.get("browser") || "firefox",
+      config.get("browser", "firefox"),
     )
-    .option("--headless", "Run browser in headless mode", config.get("headless") || false)
-    .option("--debug", "Enable debug mode with page snapshots", false)
-    .option("--vision", "Enable vision capabilities to include screenshots", false)
+    .option("--headless", "Run browser in headless mode", config.get("headless", false))
+    .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
+    .option(
+      "--vision",
+      "Enable vision capabilities to include screenshots",
+      config.get("vision", false),
+    )
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
       "Comma-separated list of resources to block",
-      config.get("block_resources") || "media,manifest",
+      config.get("block_resources", "media,manifest"),
     )
     .option(
       "--pw-endpoint <endpoint>",
@@ -54,26 +62,26 @@ export function createRunCommand(): Command {
       "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
       config.get("pw_cdp_endpoint"),
     )
-    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp") || false)
+    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp", false))
     .option(
       "--max-iterations <number>",
       "Maximum total iterations to prevent infinite loops",
-      String(config.get("max_iterations") || 50),
+      String(config.get("max_iterations", 50)),
     )
     .option(
       "--max-validation-attempts <number>",
       "Maximum validation attempts",
-      String(config.get("max_validation_attempts") || 3),
+      String(config.get("max_validation_attempts", 3)),
     )
     .option(
       "--max-repeated-actions <number>",
       "Maximum times an action can be repeated before warning/aborting",
-      String(config.get("max_repeated_actions") || 2),
+      String(config.get("max_repeated_actions", 2)),
     )
     .option(
       "--reasoning-effort <effort>",
       "Reasoning effort level (none, low, medium, high)",
-      config.get("reasoning_effort") || "none",
+      config.get("reasoning_effort", "none"),
     )
     .option(
       "--proxy <url>",
@@ -90,7 +98,7 @@ export function createRunCommand(): Command {
       "Proxy authentication password",
       config.get("proxy_password"),
     )
-    .option("--logger <logger>", "Logger to use (console, json)", config.get("logger") || "console")
+    .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
     .action(executeRunCommand);
 }
 
@@ -99,11 +107,11 @@ export function createRunCommand(): Command {
  */
 async function executeRunCommand(task: string, options: any): Promise<void> {
   try {
-    // Parse data if provided
-    let data = null;
+    // Parse JSON data if provided
+    let parsedData = null;
     if (options.data) {
       try {
-        data = parseJsonData(options.data);
+        parsedData = parseJsonData(options.data);
       } catch (error) {
         console.error(chalk.red.bold("❌ Error: Invalid JSON in --data option"));
         console.log(chalk.gray(`Data: ${options.data}`));
@@ -122,6 +130,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Validate browser option
     if (!validateBrowser(options.browser)) {
       console.error(chalk.red.bold("❌ Error: Invalid browser option"));
+      console.log(chalk.gray(`Browser: ${options.browser}`));
       console.log(chalk.gray(`Valid browsers: ${getValidBrowsers().join(", ")}`));
       process.exit(1);
     }
@@ -132,7 +141,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Create browser instance
     const browser = new PlaywrightBrowser({
       browser: options.browser,
-      blockAds: options.blockAds,
+      blockAds: options.blockAds ?? config.get("block_ads", true),
       blockResources,
       pwEndpoint: options.pwEndpoint,
       pwCdpEndpoint: options.pwCdpEndpoint,
@@ -145,11 +154,21 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create AI provider with CLI overrides
     const providerOverrides: any = {};
-    if (options.provider) providerOverrides.provider = options.provider;
-    if (options.model) providerOverrides.model = options.model;
-    if (options.openaiApiKey) providerOverrides.openai_api_key = options.openaiApiKey;
-    if (options.openrouterApiKey) providerOverrides.openrouter_api_key = options.openrouterApiKey;
-    if (options.reasoningEffort) providerOverrides.reasoning_effort = options.reasoningEffort;
+    if (options.provider !== undefined) {
+      providerOverrides.provider = options.provider;
+    }
+    if (options.model !== undefined) {
+      providerOverrides.model = options.model;
+    }
+    if (options.openaiApiKey !== undefined) {
+      providerOverrides.openai_api_key = options.openaiApiKey;
+    }
+    if (options.openrouterApiKey !== undefined) {
+      providerOverrides.openrouter_api_key = options.openrouterApiKey;
+    }
+    if (options.reasoningEffort !== undefined) {
+      providerOverrides.reasoning_effort = options.reasoningEffort;
+    }
 
     const providerConfig = createAIProvider(providerOverrides);
 
@@ -195,7 +214,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Execute the task
     await webAgent.execute(task, {
       startingUrl: options.url,
-      data,
+      data: parsedData,
     });
 
     // Close the browser
