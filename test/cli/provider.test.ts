@@ -30,6 +30,14 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   })),
 }));
 
+vi.mock("@ai-sdk/google", () => ({
+  createGoogleGenerativeAI: vi.fn((options) => (model: string) => ({
+    model,
+    provider: "google",
+    apiKey: options.apiKey,
+  })),
+}));
+
 vi.mock("@ai-sdk/google-vertex", () => ({
   createVertex: vi.fn((options) => (model: string) => ({
     model,
@@ -59,6 +67,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
 import { config } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOllama } from "ollama-ai-provider-v2";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -67,6 +76,7 @@ const mockConfig = vi.mocked(config);
 const mockOpenai = vi.mocked(openai);
 const mockCreateOpenAI = vi.mocked(createOpenAI);
 const mockCreateOpenRouter = vi.mocked(createOpenRouter);
+const mockCreateGoogleGenerativeAI = vi.mocked(createGoogleGenerativeAI);
 const mockCreateVertex = vi.mocked(createVertex);
 const mockCreateOllama = vi.mocked(createOllama);
 const mockCreateOpenAICompatible = vi.mocked(createOpenAICompatible);
@@ -134,6 +144,43 @@ describe("Provider", () => {
           "X-Title": "Spark Web Automation Tool",
         },
       });
+    });
+
+    it("should create Google provider with API key", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+        model: "gemini-2.5-flash",
+        google_generative_ai_api_key: "test-google-key",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateGoogleGenerativeAI).toHaveBeenCalledWith({
+        apiKey: "test-google-key",
+      });
+    });
+
+    it("should create Google provider with default model", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+        google_generative_ai_api_key: "test-google-key",
+      });
+
+      createAIProvider();
+
+      expect(mockCreateGoogleGenerativeAI).toHaveBeenCalledWith({
+        apiKey: "test-google-key",
+      });
+    });
+
+    it("should throw error when Google API key is missing", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+      });
+
+      expect(() => createAIProvider()).toThrow(
+        "No Google Generative AI API key found. To get started:",
+      );
     });
 
     it("should use custom model when specified", () => {
@@ -533,6 +580,55 @@ describe("Provider", () => {
         model: "openai/gpt-4.1-mini",
         hasApiKey: true,
         keySource: "global",
+      });
+    });
+
+    it("should return Google provider info with env key", () => {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google-key";
+
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+        model: "gemini-2.5-flash",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "google",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "env",
+      });
+    });
+
+    it("should return Google provider info with global key", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+        google_generative_ai_api_key: "test-google-key",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "google",
+        model: "gemini-2.5-flash",
+        hasApiKey: true,
+        keySource: "global",
+      });
+    });
+
+    it("should return Google provider info without API key", () => {
+      mockConfig.getConfig.mockReturnValue({
+        provider: "google",
+      });
+
+      const info = getAIProviderInfo();
+
+      expect(info).toEqual({
+        provider: "google",
+        model: "gemini-2.5-flash",
+        hasApiKey: false,
+        keySource: "not_set",
       });
     });
 

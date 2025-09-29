@@ -1,6 +1,7 @@
 import { LanguageModel } from "ai";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOllama } from "ollama-ai-provider-v2";
@@ -21,6 +22,7 @@ export function createAIProvider(overrides?: {
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
+  google_generative_ai_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
   ollama_base_url?: string;
@@ -37,6 +39,9 @@ export function createAIProvider(overrides?: {
     ...currentConfig,
     ...(overrides?.openai_api_key && { openai_api_key: overrides.openai_api_key }),
     ...(overrides?.openrouter_api_key && { openrouter_api_key: overrides.openrouter_api_key }),
+    ...(overrides?.google_generative_ai_api_key && {
+      google_generative_ai_api_key: overrides.google_generative_ai_api_key,
+    }),
     ...(overrides?.vertex_project && { vertex_project: overrides.vertex_project }),
     ...(overrides?.vertex_location && { vertex_location: overrides.vertex_location }),
     ...(overrides?.ollama_base_url && { ollama_base_url: overrides.ollama_base_url }),
@@ -85,6 +90,11 @@ export function createProviderFromConfig(
           "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
           "X-Title": "Spark Web Automation Tool",
         },
+      })(model);
+
+    case "google":
+      return createGoogleGenerativeAI({
+        apiKey,
       })(model);
 
     case "vertex":
@@ -136,6 +146,7 @@ function getProviderConfig(provider: string, currentConfig: any, modelOverride?:
   const defaultModels = {
     openai: "gpt-4.1-mini",
     openrouter: "openai/gpt-4.1-mini",
+    google: "gemini-2.5-flash",
     vertex: "gemini-2.5-flash",
     ollama: "llama3.2",
     lmstudio: "local-model",
@@ -154,6 +165,19 @@ function getProviderConfig(provider: string, currentConfig: any, modelOverride?:
 
 1. Get an API key from https://openrouter.ai/keys
 2. Set it with: spark config --set openrouter_api_key=your-key
+3. Or use OpenAI instead: spark config --set provider=openai
+
+Run 'spark config --show' to check your current configuration.`,
+      );
+    }
+  } else if (provider === "google") {
+    apiKey = currentConfig.google_generative_ai_api_key;
+    if (!apiKey) {
+      throw new Error(
+        `No Google Generative AI API key found. To get started:
+
+1. Get an API key from https://aistudio.google.com/apikey
+2. Set it with: spark config --set google_generative_ai_api_key=your-key
 3. Or use OpenAI instead: spark config --set provider=openai
 
 Run 'spark config --show' to check your current configuration.`,
@@ -289,6 +313,7 @@ export function getAIProviderInfo() {
   const defaultModels = {
     openai: "gpt-4.1-mini",
     openrouter: "openai/gpt-4.1-mini",
+    google: "gemini-2.5-flash",
     vertex: "gemini-2.5-flash",
     ollama: "llama3.2",
     lmstudio: "local-model",
@@ -305,6 +330,14 @@ export function getAIProviderInfo() {
       hasApiKey = true;
       keySource = "env";
     } else if (currentConfig.openrouter_api_key) {
+      hasApiKey = true;
+      keySource = "global";
+    }
+  } else if (provider === "google") {
+    if (getEnv("GOOGLE_GENERATIVE_AI_API_KEY")) {
+      hasApiKey = true;
+      keySource = "env";
+    } else if (currentConfig.google_generative_ai_api_key) {
       hasApiKey = true;
       keySource = "global";
     }

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ai-sdk/google':
+        specifier: ^2.0.17
+        version: 2.0.17(zod@4.1.5)
       '@ai-sdk/google-vertex':
         specifier: ^3.0.9
         version: 3.0.24(zod@4.1.5)
@@ -165,16 +168,16 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.16.0
-        version: 1.17.1(hono@4.9.6)
+        version: 1.17.1(hono@4.9.9)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.9.6)
+        version: 1.2.2(hono@4.9.9)
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
       hono:
-        specifier: ^4.9.6
-        version: 4.9.6
+        specifier: ^4.9.7
+        version: 4.9.9
       spark:
         specifier: file:..
         version: 'file:'
@@ -227,6 +230,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
+  '@ai-sdk/google@2.0.17':
+    resolution: {integrity: sha512-6LyuUrCZuiULg0rUV+kT4T2jG19oUntudorI4ttv1ARkSbwl8A39ue3rA487aDDy6fUScdbGFiV5Yv/o4gidVA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/openai-compatible@1.0.15':
     resolution: {integrity: sha512-i4TzohCxuFzBSdRNPa9eNFW6AYDZ5itbxz+rJa2kpNTMYqHgqKPGzet3X6eLIUVntA10icrqhWT+hUhxXZIS9Q==}
     engines: {node: '>=18'}
@@ -238,6 +247,12 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
+
+  '@ai-sdk/provider-utils@3.0.10':
+    resolution: {integrity: sha512-T1gZ76gEIwffep6MWI0QNy9jgoybUHE7TRaHB5k54K8mF91ciGFlbtCGxDYhMH3nCRergKwYFIDeFF0hJSIQHQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/provider-utils@3.0.8':
     resolution: {integrity: sha512-cDj1iigu7MW2tgAQeBzOiLhjHOUM9vENsgh4oAVitek0d//WdgfPCsKO3euP7m7LyO/j9a1vr/So+BGNdpFXYw==}
@@ -1977,8 +1992,8 @@ packages:
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
 
-  hono@4.9.6:
-    resolution: {integrity: sha512-doVjXhSFvYZ7y0dNokjwwSahcrAfdz+/BCLvAMa/vHLzjj8+CFyV5xteThGUsKdkaasgN+gF2mUxao+SGLpUeA==}
+  hono@4.9.9:
+    resolution: {integrity: sha512-Hxw4wT6zjJGZJdkJzAx9PyBdf7ZpxaTSA0NfxqjLghwMrLBX8p33hJBzoETRakF3UJu6OdNQBZAlNSkGqKFukw==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -3575,6 +3590,12 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.5)
       zod: 4.1.5
 
+  '@ai-sdk/google@2.0.17(zod@4.1.5)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.10(zod@4.1.5)
+      zod: 4.1.5
+
   '@ai-sdk/openai-compatible@1.0.15(zod@4.1.5)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -3585,6 +3606,13 @@ snapshots:
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.5)
+      zod: 4.1.5
+
+  '@ai-sdk/provider-utils@3.0.10(zod@4.1.5)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
       zod: 4.1.5
 
   '@ai-sdk/provider-utils@3.0.8(zod@4.1.5)':
@@ -3950,13 +3978,13 @@ snapshots:
     dependencies:
       tldts-experimental: 7.0.13
 
-  '@hono/node-server@1.17.1(hono@4.9.6)':
+  '@hono/node-server@1.17.1(hono@4.9.9)':
     dependencies:
-      hono: 4.9.6
+      hono: 4.9.9
 
-  '@hono/sentry@1.2.2(hono@4.9.6)':
+  '@hono/sentry@1.2.2(hono@4.9.9)':
     dependencies:
-      hono: 4.9.6
+      hono: 4.9.9
       toucan-js: 4.1.1
 
   '@isaacs/balanced-match@4.0.1': {}
@@ -5255,7 +5283,7 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
-  hono@4.9.6: {}
+  hono@4.9.9: {}
 
   hookable@5.5.3: {}
 
@@ -6207,6 +6235,7 @@ snapshots:
 
   'spark@file:':
     dependencies:
+      '@ai-sdk/google': 2.0.17(zod@4.1.5)
       '@ai-sdk/google-vertex': 3.0.24(zod@4.1.5)
       '@ai-sdk/openai': 2.0.27(zod@4.1.5)
       '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.5)
