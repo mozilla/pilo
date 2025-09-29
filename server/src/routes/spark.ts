@@ -33,7 +33,14 @@ interface SparkTaskRequest {
   guardrails?: string;
 
   // AI configuration overrides
-  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio" | "google";
+  provider?:
+    | "openai"
+    | "openrouter"
+    | "vertex"
+    | "ollama"
+    | "openai-compatible"
+    | "lmstudio"
+    | "google";
   model?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
