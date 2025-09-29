@@ -190,7 +190,7 @@ spark.post("/run", async (c) => {
         // Send final result
         await stream.writeSSE({
           event: "complete",
-          data: JSON.stringify({ success: true, result }),
+          data: JSON.stringify(result),
         });
 
         // Emit done event only on successful completion
