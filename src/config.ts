@@ -5,10 +5,18 @@ import { config as loadDotenv } from "dotenv";
 
 export interface SparkConfig {
   // AI Configuration
-  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
+  provider?:
+    | "openai"
+    | "openrouter"
+    | "vertex"
+    | "ollama"
+    | "openai-compatible"
+    | "lmstudio"
+    | "google";
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
+  google_generative_ai_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
 
@@ -100,6 +108,9 @@ export class ConfigManager {
       ...(process.env.SPARK_MODEL && { model: process.env.SPARK_MODEL }),
       ...(process.env.OPENAI_API_KEY && { openai_api_key: process.env.OPENAI_API_KEY }),
       ...(process.env.OPENROUTER_API_KEY && { openrouter_api_key: process.env.OPENROUTER_API_KEY }),
+      ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY && {
+        google_generative_ai_api_key: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      }),
       ...((process.env.GOOGLE_VERTEX_PROJECT ||
         process.env.GOOGLE_CLOUD_PROJECT ||
         process.env.GCP_PROJECT) && {
@@ -297,6 +308,8 @@ export class ConfigManager {
     if (process.env.SPARK_MODEL) env.model = process.env.SPARK_MODEL;
     if (process.env.OPENAI_API_KEY) env.openai_api_key = process.env.OPENAI_API_KEY;
     if (process.env.OPENROUTER_API_KEY) env.openrouter_api_key = process.env.OPENROUTER_API_KEY;
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+      env.google_generative_ai_api_key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (
       process.env.GOOGLE_VERTEX_PROJECT ||
       process.env.GOOGLE_CLOUD_PROJECT ||

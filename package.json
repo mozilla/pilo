@@ -61,6 +61,7 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.17",
     "@ai-sdk/google-vertex": "^3.0.9",
     "@ai-sdk/openai": "^2.0.15",
     "@ai-sdk/openai-compatible": "^1.0.7",
@@ -78,7 +79,7 @@
     "ollama-ai-provider-v2": "^1.1.1",
     "playwright": "1.53.0",
     "turndown": "^7.2.1",
-    "zod": "^4.0.17"
+    "zod": "^4.1.8"
   },
   "packageManager": "pnpm@9.0.0"
 }
