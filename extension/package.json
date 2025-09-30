@@ -10,6 +10,7 @@
   "scripts": {
     "dev:chrome": "wxt -b chrome",
     "dev:firefox": "wxt -b firefox",
+    "dev:firefox:persist": "WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
     "build:chrome": "wxt build -b chrome",
     "build:firefox": "wxt build -b firefox",
     "zip:chrome": "wxt zip -b chrome",
