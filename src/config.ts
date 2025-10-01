@@ -5,10 +5,18 @@ import { config as loadDotenv } from "dotenv";
 
 export interface SparkConfig {
   // AI Configuration
-  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
+  provider?:
+    | "openai"
+    | "openrouter"
+    | "vertex"
+    | "ollama"
+    | "openai-compatible"
+    | "lmstudio"
+    | "google";
   model?: string;
   openai_api_key?: string;
   openrouter_api_key?: string;
+  google_generative_ai_api_key?: string;
   vertex_project?: string;
   vertex_location?: string;
 
@@ -38,6 +46,9 @@ export interface SparkConfig {
   max_validation_attempts?: number;
   max_repeated_actions?: number;
   reasoning_effort?: "none" | "low" | "medium" | "high";
+  starting_url?: string;
+  data?: string;
+  guardrails?: string;
 
   // Playwright Configuration
   pw_endpoint?: string;
@@ -97,6 +108,9 @@ export class ConfigManager {
       ...(process.env.SPARK_MODEL && { model: process.env.SPARK_MODEL }),
       ...(process.env.OPENAI_API_KEY && { openai_api_key: process.env.OPENAI_API_KEY }),
       ...(process.env.OPENROUTER_API_KEY && { openrouter_api_key: process.env.OPENROUTER_API_KEY }),
+      ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY && {
+        google_generative_ai_api_key: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      }),
       ...((process.env.GOOGLE_VERTEX_PROJECT ||
         process.env.GOOGLE_CLOUD_PROJECT ||
         process.env.GCP_PROJECT) && {
@@ -169,6 +183,15 @@ export class ConfigManager {
       ...(process.env.SPARK_REASONING_EFFORT && {
         reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
       }),
+      ...(process.env.SPARK_STARTING_URL && {
+        starting_url: process.env.SPARK_STARTING_URL,
+      }),
+      ...(process.env.SPARK_DATA && {
+        data: process.env.SPARK_DATA,
+      }),
+      ...(process.env.SPARK_GUARDRAILS && {
+        guardrails: process.env.SPARK_GUARDRAILS,
+      }),
 
       // Playwright Configuration
       ...(process.env.SPARK_PW_ENDPOINT && {
@@ -233,9 +256,9 @@ export class ConfigManager {
   /**
    * Get a specific config value with fallback hierarchy
    */
-  public get<K extends keyof SparkConfig>(key: K): SparkConfig[K] {
+  public get<K extends keyof SparkConfig>(key: K, defaultValue?: SparkConfig[K]): SparkConfig[K] {
     const config = this.getConfig();
-    return config[key];
+    return config[key] ?? defaultValue;
   }
 
   /**
@@ -285,6 +308,8 @@ export class ConfigManager {
     if (process.env.SPARK_MODEL) env.model = process.env.SPARK_MODEL;
     if (process.env.OPENAI_API_KEY) env.openai_api_key = process.env.OPENAI_API_KEY;
     if (process.env.OPENROUTER_API_KEY) env.openrouter_api_key = process.env.OPENROUTER_API_KEY;
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+      env.google_generative_ai_api_key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (
       process.env.GOOGLE_VERTEX_PROJECT ||
       process.env.GOOGLE_CLOUD_PROJECT ||
@@ -325,6 +350,9 @@ export class ConfigManager {
       env.max_repeated_actions = parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10);
     if (process.env.SPARK_REASONING_EFFORT)
       env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
+    if (process.env.SPARK_STARTING_URL) env.starting_url = process.env.SPARK_STARTING_URL;
+    if (process.env.SPARK_DATA) env.data = process.env.SPARK_DATA;
+    if (process.env.SPARK_GUARDRAILS) env.guardrails = process.env.SPARK_GUARDRAILS;
 
     // Playwright Configuration
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;

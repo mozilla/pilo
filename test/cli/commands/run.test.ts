@@ -91,7 +91,7 @@ describe("CLI Run Command", () => {
     vi.clearAllMocks();
 
     // Set up default config mock
-    mockConfig.get.mockImplementation((key: string) => {
+    mockConfig.get.mockImplementation((key: string, defaultValue?: any) => {
       const defaults: Record<string, any> = {
         browser: "firefox",
         headless: false,
@@ -101,7 +101,7 @@ describe("CLI Run Command", () => {
         bypass_csp: false,
         logger: "console",
       };
-      return defaults[key];
+      return defaults[key] ?? defaultValue;
     });
   });
 

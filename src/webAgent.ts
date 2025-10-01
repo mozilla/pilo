@@ -96,6 +96,7 @@ interface ExecutionState {
   currentIteration: number;
   actionCount: number;
   startTime: number;
+  success: boolean;
   finalAnswer: string | null;
   lastAction?: string;
   actionRepeatCount: number;
@@ -265,6 +266,7 @@ export class WebAgent {
 
         // Handle terminal actions
         if (result.isTerminal) {
+          executionState.success = result.success;
           executionState.finalAnswer = result.finalAnswer;
           break;
         }
@@ -310,8 +312,7 @@ export class WebAgent {
 
     // Check final state
     if (executionState.finalAnswer !== null) {
-      const success = !executionState.finalAnswer.startsWith("Aborted:");
-      return { success, finalAnswer: executionState.finalAnswer };
+      return { success: executionState.success, finalAnswer: executionState.finalAnswer };
     }
 
     // Max iterations reached
@@ -543,6 +544,7 @@ export class WebAgent {
     executionState: ExecutionState,
   ): Promise<{
     isTerminal: boolean;
+    success: boolean;
     finalAnswer: string | null;
     pageChanged: boolean;
     actionExecuted: boolean;
@@ -700,6 +702,7 @@ export class WebAgent {
         if (validationResult.isAccepted) {
           return {
             isTerminal: true,
+            success: true,
             finalAnswer: actionOutput.result,
             pageChanged: false,
             actionExecuted: true,
@@ -709,6 +712,7 @@ export class WebAgent {
           // Don't add a new page snapshot, let the agent respond to feedback
           return {
             isTerminal: false,
+            success: false,
             finalAnswer: null,
             pageChanged: false, // Keep false to avoid new snapshot
             actionExecuted: false, // Don't count as action since we're retrying
@@ -724,6 +728,7 @@ export class WebAgent {
 
         return {
           isTerminal: true,
+          success: false,
           finalAnswer: `Aborted: ${actionOutput.reason}`,
           pageChanged: false,
           actionExecuted: true,
@@ -740,6 +745,7 @@ export class WebAgent {
     // Regular action executed successfully
     return {
       isTerminal: false,
+      success: false,
       finalAnswer: null,
       pageChanged,
       actionExecuted: true,
@@ -755,6 +761,7 @@ export class WebAgent {
     executionState: ExecutionState,
   ): {
     isTerminal: boolean;
+    success: boolean;
     finalAnswer: string | null;
     pageChanged: boolean;
     actionExecuted: boolean;
@@ -791,6 +798,7 @@ export class WebAgent {
           // Return intervention result - force new snapshot to let agent see the warning
           return {
             isTerminal: false,
+            success: false,
             finalAnswer: null,
             pageChanged: true, // Force new snapshot so agent sees the warning
             actionExecuted: false, // Don't count this as a successful action
@@ -812,6 +820,7 @@ export class WebAgent {
           // Return terminal result
           return {
             isTerminal: true,
+            success: false,
             finalAnswer: abortMessage,
             pageChanged: false,
             actionExecuted: false,
@@ -1249,6 +1258,7 @@ export class WebAgent {
       currentIteration: 0,
       actionCount: 0,
       startTime: Date.now(),
+      success: false,
       finalAnswer: null,
       actionRepeatCount: 0,
       validationAttempts: 0,

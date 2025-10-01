@@ -33,10 +33,18 @@ interface SparkTaskRequest {
   guardrails?: string;
 
   // AI configuration overrides
-  provider?: "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio";
+  provider?:
+    | "openai"
+    | "openrouter"
+    | "vertex"
+    | "ollama"
+    | "openai-compatible"
+    | "lmstudio"
+    | "google";
   model?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
+  googleApiKey?: string;
   ollamaBaseUrl?: string;
   openaiCompatibleBaseUrl?: string;
   openaiCompatibleName?: string;
@@ -160,6 +168,7 @@ spark.post("/run", async (c) => {
           model: body.model,
           openai_api_key: body.openaiApiKey,
           openrouter_api_key: body.openrouterApiKey,
+          google_generative_ai_api_key: body.googleApiKey,
           ollama_base_url: body.ollamaBaseUrl,
           openai_compatible_base_url: body.openaiCompatibleBaseUrl,
           openai_compatible_name: body.openaiCompatibleName,
@@ -181,7 +190,7 @@ spark.post("/run", async (c) => {
         // Send final result
         await stream.writeSSE({
           event: "complete",
-          data: JSON.stringify({ success: true, result }),
+          data: JSON.stringify(result),
         });
 
         // Emit done event only on successful completion
