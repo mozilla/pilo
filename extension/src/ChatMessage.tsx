@@ -96,7 +96,7 @@ export function ChatMessage({
           </div>
         )}
 
-        {timestamp && (
+        {timestamp && (timestamp instanceof Date) && (
           <div className={`text-xs ${t.text.muted} mt-1`}>{timestamp.toLocaleTimeString()}</div>
         )}
       </div>
