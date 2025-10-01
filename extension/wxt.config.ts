@@ -54,6 +54,14 @@ export default defineConfig({
             128: "icon/128.png",
           },
         },
+        browser_specific_settings: {
+          // XXX need to do the equivalent thing for Chrome
+          gecko: {
+            // Need a stable identifier so wxt doesn't use a random one each
+            // time and break persistence.
+            id: "spark@mozilla.org",
+          },
+        },
       };
     }
 
