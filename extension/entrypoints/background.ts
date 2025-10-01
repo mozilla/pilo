@@ -14,6 +14,7 @@ interface StorageSettings {
   apiKey?: string;
   apiEndpoint?: string;
   model?: string;
+  provider?: "openai" | "openrouter";
 }
 
 export default defineBackground(() => {
@@ -88,6 +89,7 @@ export default defineBackground(() => {
               "apiKey",
               "apiEndpoint",
               "model",
+              "provider",
             ])) as StorageSettings;
 
             if (!settings.apiKey) {
@@ -130,7 +132,8 @@ export default defineBackground(() => {
               const result = await AgentManager.runTask(executeMessage.task, {
                 apiKey: settings.apiKey,
                 apiEndpoint: settings.apiEndpoint,
-                model: settings.model || "gpt-4.1",
+                model: settings.model || "gpt-4.1-mini",
+                provider: settings.provider,
                 logger,
                 tabId: executeMessage.tabId,
                 data: executeMessage.data,

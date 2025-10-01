@@ -37,12 +37,26 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className={`block text-sm font-medium ${t.text.secondary}`}>API Key</label>
+            <label className={`block text-sm font-medium ${t.text.secondary}`}>Provider</label>
+            <select
+              value={settings.provider}
+              onChange={(e) =>
+                updateSettings({ provider: e.target.value as "openai" | "openrouter" })
+              }
+              className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} focus:outline-none ${focusRing}`}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium ${t.text.secondary}`}>Model</label>
             <input
-              type="password"
-              value={settings.apiKey}
-              onChange={(e) => updateSettings({ apiKey: e.target.value })}
-              placeholder="sk-..."
+              type="text"
+              value={settings.model}
+              onChange={(e) => updateSettings({ model: e.target.value })}
+              placeholder="gpt-4.1-mini"
               className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
             />
           </div>
@@ -59,12 +73,12 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
           </div>
 
           <div className="space-y-2">
-            <label className={`block text-sm font-medium ${t.text.secondary}`}>Model</label>
+            <label className={`block text-sm font-medium ${t.text.secondary}`}>API Key</label>
             <input
-              type="text"
-              value={settings.model}
-              onChange={(e) => updateSettings({ model: e.target.value })}
-              placeholder="gpt-4.1-mini"
+              type="password"
+              value={settings.apiKey}
+              onChange={(e) => updateSettings({ apiKey: e.target.value })}
+              placeholder="sk-..."
               className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
             />
           </div>
