@@ -7,7 +7,12 @@
  */
 export function reviver(key: string, value: any): any {
   if (key === 'timestamp' && value != null) {
-    return new Date(value);
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+    // If invalid, return the original value
+    return value;
   }
   return value;
 }
