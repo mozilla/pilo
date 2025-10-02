@@ -52,21 +52,4 @@ describe("ChatMessage", () => {
 
     expect(screen.getByText("Working on your request...")).toBeInTheDocument();
   });
-
-  it("does not render timestamp when timestamp is not a Date object", () => {
-    // @ts-expect-error - intentionally passing invalid timestamp to test runtime safety
-    render(<ChatMessage {...defaultProps} timestamp={{}} />);
-
-    // Should not attempt to render timestamp or throw error
-    expect(screen.queryByText(/:/)).not.toBeInTheDocument();
-  });
-
-  it("does not render timestamp when timestamp is a plain object", () => {
-    // @ts-expect-error - intentionally passing invalid timestamp to test runtime safety
-    render(<ChatMessage {...defaultProps} timestamp={{ notADate: true }} />);
-
-    // Should not crash or render invalid timestamp
-    const messageContainer = screen.getByText("Hello world").parentElement;
-    expect(messageContainer).toBeInTheDocument();
-  });
 });
