@@ -54,7 +54,7 @@ jobs:
         run: pnpm run build
 
       - name: Rebuild workspace links to pick up core build exports for extension
-        run: pnpm install --no-frozen-lockfile spark
+        run: pnpm run install --no-frozen-lockfile spark
 
       - name: Check extension formatting
         working-directory: ./extension
