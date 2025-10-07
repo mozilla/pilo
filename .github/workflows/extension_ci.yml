@@ -58,8 +58,6 @@ jobs:
         run: pnpm run format:check
 
       - name: Run extension type check
-        # gate on earlier success; we need results of core build
-        if: success()
         working-directory: ./extension
         run: pnpm run typecheck
 
