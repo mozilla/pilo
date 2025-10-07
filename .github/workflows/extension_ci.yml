@@ -48,7 +48,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install all dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install
 
       - name: Build core package
         run: pnpm run build
