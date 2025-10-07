@@ -55,7 +55,7 @@ jobs:
 
       - name: Rebuild workspace links to pick up core build exports for extension
         working-directory: ./extension
-        run: pnpm rebuild
+        run: pnpm run build
 
       - name: Check extension formatting
         working-directory: ./extension
