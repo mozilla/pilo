@@ -1,5 +1,10 @@
 import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -7,6 +12,22 @@ export default defineConfig({
   // @ts-ignore - Vite version mismatch between dependencies in CI
   vite: () => ({
     plugins: [tailwindcss()],
+    resolve: {
+      alias: {
+        // Point to the compiled JS file, not source TS
+        // This avoids Vite trying to bundle source dependencies
+        "spark/core": resolve(__dirname, "../dist/core.js"),
+      },
+    },
+    build: {
+      rollupOptions: {
+        // Treat certain imports as external to avoid bundling issues
+        external: (id) => {
+          // Don't try to bundle webextension-polyfill from parent package
+          return id.includes("webextension-polyfill") && !id.includes("node_modules/@wxt-dev");
+        },
+      },
+    },
   }),
   manifest: ({ browser }) => {
     // Common configuration for all browsers
