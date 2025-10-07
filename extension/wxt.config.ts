@@ -23,7 +23,12 @@ export default defineConfig({
         // Treat certain imports as external to avoid bundling issues
         external: (id) => {
           // Don't try to bundle webextension-polyfill from parent package
-          return id.includes("webextension-polyfill") && !id.includes("node_modules/@wxt-dev");
+          // Use exact or prefix match to avoid false positives
+          const moduleName = "@wxt-dev/webextension-polyfill";
+          return (
+            (id === moduleName || id.startsWith(moduleName + "/")) &&
+            !id.includes("node_modules/@wxt-dev")
+          );
         },
       },
     },
