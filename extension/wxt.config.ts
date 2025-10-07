@@ -9,7 +9,6 @@ const __dirname = dirname(__filename);
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
-  // @ts-ignore - Vite version mismatch between dependencies in CI
   vite: () => ({
     plugins: [tailwindcss()],
     resolve: {

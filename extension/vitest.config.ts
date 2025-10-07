@@ -2,7 +2,6 @@ import { defineConfig } from "vitest/config";
 import { WxtVitest } from "wxt/testing";
 
 export default defineConfig({
-  // @ts-ignore - Vite version mismatch between dependencies in CI
   plugins: [WxtVitest()],
   test: {
     globals: true,
