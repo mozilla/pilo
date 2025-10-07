@@ -52,7 +52,7 @@
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
-    "wxt": "0.20.7"
+    "wxt": "0.20.11"
   },
   "packageManager": "pnpm@9.0.0"
 }

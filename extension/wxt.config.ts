@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss() as any],
   }),
   manifest: ({ browser }) => {
     // Common configuration for all browsers

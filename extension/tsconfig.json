@@ -5,9 +5,6 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "spark/core": ["../dist/core.d.ts"]
-    }
+    "jsx": "react-jsx"
   }
 }
