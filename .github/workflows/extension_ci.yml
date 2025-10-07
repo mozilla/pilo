@@ -1,0 +1,79 @@
+name: Extension CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "extension/**"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "extension/**"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+jobs:
+  extension-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install all dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build core package
+        run: pnpm run build
+
+      - name: Rebuild workspace links to pick up core build exports for extension
+        run: pnpm rebuild
+
+      - name: Check extension formatting
+        working-directory: ./extension
+        run: pnpm run format:check
+
+      - name: Run extension type check
+        # gate on earlier success; we need results of core build
+        if: success()
+        working-directory: ./extension
+        run: pnpm run typecheck
+
+      - name: Run extension tests
+        working-directory: ./extension
+        run: pnpm test
+
+      - name: Build extension for Firefox
+        working-directory: ./extension
+        run: pnpm run build:firefox
+
+      - name: Build extension for Chrome
+        working-directory: ./extension
+        run: pnpm run build:chrome

@@ -6,7 +6,7 @@
  * @returns A Date object if the key is 'timestamp' and value is not null/undefined, otherwise the original value
  */
 export function reviver(key: string, value: unknown): unknown {
-  if (key === 'timestamp' && value != null) {
+  if (key === "timestamp" && value != null) {
     const date = new Date(value);
     if (!isNaN(date.getTime())) {
       return date;
