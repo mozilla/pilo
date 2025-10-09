@@ -21,7 +21,7 @@ export function reviver(key: string, value: unknown): unknown {
     // timestamps. We should either refactor all code to use ISO date
     // strings for timestamps (more readable), or standardize on using
     // numbers everywhere (more performant).
-    const date = new Date(value as string | number);
+    const date = new Date(value);
     if (!isNaN(date.getTime())) {
       return date;
     }
