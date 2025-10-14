@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/server_ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
@@ -15,6 +16,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/server_ci.yml"
 
 jobs:
   server-ci:
