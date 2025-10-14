@@ -1,5 +1,6 @@
 // Import ariaSnapshot functionality
 import browser from "webextension-polyfill";
+import { defineContentScript } from "wxt/utils/define-content-script";
 import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot";
 import type {
   ExtensionMessage,

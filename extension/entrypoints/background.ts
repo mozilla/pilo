@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import { defineBackground } from "wxt/utils/define-background";
 import { AgentManager, EventStoreLogger } from "../src/AgentManager";
 import { useConversationStore } from "../src/stores/conversationStore";
 import type {
