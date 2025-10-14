@@ -1,5 +1,5 @@
 import browser from "webextension-polyfill";
-import { GenericLogger } from "spark/core";
+import { GenericLogger } from "../../src/loggers/generic.js";
 import { createLogger } from "./utils/logger";
 
 interface EventData {

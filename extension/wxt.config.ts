@@ -8,27 +8,32 @@ const __dirname = dirname(__filename);
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
+  imports: false,
+  modules: ["@wxt-dev/module-react"],
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      {
+        name: "resolve-wxt-browser",
+        enforce: "pre",
+        resolveId(id) {
+          if (id === "wxt/browser" || id === "@wxt-dev/webextension-polyfill/browser") {
+            return "\0wxt-browser-shim";
+          }
+          return null;
+        },
+        load(id) {
+          if (id === "\0wxt-browser-shim") {
+            // Provide a virtual module that exports browser from webextension-polyfill
+            return `import browser from "webextension-polyfill"; export { browser }; export default browser;`;
+          }
+          return null;
+        },
+      },
+    ],
     resolve: {
       alias: {
-        // Point to the compiled JS file, not source TS
-        // This avoids Vite trying to bundle source dependencies
-        "spark/core": resolve(__dirname, "../dist/core.js"),
-      },
-    },
-    build: {
-      rollupOptions: {
-        // Treat certain imports as external to avoid bundling issues
-        external: (id) => {
-          // Don't try to bundle webextension-polyfill from parent package
-          const moduleName = "@wxt-dev/webextension-polyfill";
-          return (
-            (id === moduleName || id.startsWith(moduleName + "/")) &&
-            !id.includes("node_modules/@wxt-dev")
-          );
-        },
+        "../../src": resolve(__dirname, "../dist"),
       },
     },
   }),

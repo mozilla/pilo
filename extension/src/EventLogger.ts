@@ -1,4 +1,4 @@
-import type { WebAgentEventType } from "spark/core";
+import type { WebAgentEventType } from "../../src/events.js";
 
 export interface LogEvent {
   id: string;

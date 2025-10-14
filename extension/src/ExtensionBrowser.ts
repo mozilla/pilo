@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
-import type { AriaBrowser } from "spark/core";
-import { PageAction, LoadState } from "spark/core";
+import type { AriaBrowser } from "../../src/browser/ariaBrowser.js";
+import { PageAction, LoadState } from "../../src/browser/ariaBrowser.js";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "./utils/logger";
 import TurndownService from "turndown";
