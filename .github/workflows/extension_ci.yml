@@ -60,21 +60,16 @@ jobs:
         run: pnpm run build
 
       - name: Check extension formatting
-        working-directory: ./extension
-        run: pnpm run format:check
+        run: pnpm --filter spark-extension run format:check
 
       - name: Run extension type check
-        working-directory: ./extension
-        run: pnpm run typecheck
+        run: pnpm --filter spark-extension run typecheck
 
       - name: Run extension tests
-        working-directory: ./extension
-        run: pnpm test
+        run: pnpm --filter spark-extension test
 
       - name: Build extension for Firefox
-        working-directory: ./extension
-        run: pnpm run build:firefox
+        run: pnpm --filter spark-extension run build:firefox
 
       - name: Build extension for Chrome
-        working-directory: ./extension
-        run: pnpm run build:chrome
+        run: pnpm --filter spark-extension run build:chrome
