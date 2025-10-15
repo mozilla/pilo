@@ -32,7 +32,12 @@ describe("AgentManager", () => {
     };
     vi.mocked(WebAgent).mockImplementation(() => mockWebAgent);
 
-    vi.mocked(ExtensionBrowser).mockImplementation(() => ({}) as any);
+    vi.mocked(ExtensionBrowser).mockImplementation(
+      () =>
+        ({
+          shutdown: vi.fn().mockResolvedValue(undefined),
+        }) as any,
+    );
   });
 
   afterEach(() => {
