@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/server_ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
@@ -15,6 +16,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/server_ci.yml"
 
 jobs:
   server-ci:
@@ -32,7 +34,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -49,12 +51,12 @@ jobs:
 
       - name: Install root dependencies and build main package
         run: |
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
           pnpm run build
 
       - name: Install server dependencies
         working-directory: ./server
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check server formatting
         working-directory: ./server

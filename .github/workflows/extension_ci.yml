@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/extension_ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
@@ -15,6 +16,7 @@ on:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - ".github/workflows/extension_ci.yml"
 
 jobs:
   extension-ci:
@@ -36,7 +38,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -52,27 +54,22 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install all dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build core package
         run: pnpm run build
 
       - name: Check extension formatting
-        working-directory: ./extension
-        run: pnpm run format:check
+        run: pnpm --filter spark-extension run format:check
 
       - name: Run extension type check
-        working-directory: ./extension
-        run: pnpm run typecheck
+        run: pnpm --filter spark-extension run typecheck
 
       - name: Run extension tests
-        working-directory: ./extension
-        run: pnpm test
+        run: pnpm --filter spark-extension test
 
       - name: Build extension for Firefox
-        working-directory: ./extension
-        run: pnpm run build:firefox
+        run: pnpm --filter spark-extension run build:firefox
 
       - name: Build extension for Chrome
-        working-directory: ./extension
-        run: pnpm run build:chrome
+        run: pnpm --filter spark-extension run build:chrome
