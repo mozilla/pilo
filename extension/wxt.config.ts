@@ -68,4 +68,9 @@ export default defineConfig({
     // Fallback for other browsers
     return baseManifest;
   },
+  webExt: {
+    // Open developer tools on startup (mostly to see the logs) during development
+    // (requires Firefox 106+). Only seems to work in Firefox.
+    openDevtools: true,
+  },
 });
