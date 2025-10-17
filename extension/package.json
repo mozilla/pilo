@@ -10,7 +10,7 @@
   "scripts": {
     "dev:chrome": "wxt -b chrome",
     "dev:firefox": "wxt -b firefox",
-    "dev:firefox:persist": "WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
+    "dev:firefox:persist": "node scripts/mkdirp.js .wxt/firefox-data && WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
     "prebuild:chrome": "cd .. && pnpm build",
     "build:chrome": "wxt build -b chrome",
     "prebuild:firefox": "cd .. && pnpm build",
