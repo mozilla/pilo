@@ -1,5 +1,27 @@
-import { defineConfig } from "wxt";
+import { defineConfig, type WebExtConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
+
+function generateWebExtJSON(): WebExtConfig {
+  const config: WebExtConfig = {
+    // Open developer tools on startup (mostly to see the logs) during development
+    // (requires Firefox 106+). Only seems to work in Firefox.
+    openDevtools: true,
+  };
+
+  // Firefox profile persistence - controlled by environment variables
+  // Set by dev:firefox:persist script to maintain logins, settings, etc.
+  // Uses web-ext's firefoxProfile and keepProfileChanges options
+  const firefoxProfile = process.env.WEB_EXT_FIREFOX_PROFILE;
+  if (firefoxProfile) {
+    config.firefoxProfile = firefoxProfile;
+  }
+
+  if (process.env.WEB_EXT_KEEP_PROFILE_CHANGES === "true") {
+    config.keepProfileChanges = true;
+  }
+
+  return config;
+}
 
 // See https://wxt.dev/api/config.html
 let config = {
@@ -68,21 +90,7 @@ let config = {
     // Fallback for other browsers
     return baseManifest;
   },
-  webExt: {
-    // Open developer tools on startup (mostly to see the logs) during development
-    // (requires Firefox 106+). Only seems to work in Firefox.
-    openDevtools: true,
-
-    // Firefox profile persistence - controlled by environment variables
-    // Set by dev:firefox:persist script to maintain logins, settings, etc.
-    // Uses web-ext's firefoxProfile and keepProfileChanges options
-    ...(process.env.WEB_EXT_FIREFOX_PROFILE && {
-      firefoxProfile: process.env.WEB_EXT_FIREFOX_PROFILE,
-    }),
-    ...(process.env.WEB_EXT_KEEP_PROFILE_CHANGES === "true" && {
-      keepProfileChanges: true,
-    }),
-  },
+  webExt: generateWebExtJSON(),
 };
 
 export default defineConfig(config);
