@@ -72,5 +72,15 @@ export default defineConfig({
     // Open developer tools on startup (mostly to see the logs) during development
     // (requires Firefox 106+). Only seems to work in Firefox.
     openDevtools: true,
+
+    // Firefox profile persistence - controlled by environment variables
+    // Set by dev:firefox:persist script to maintain logins, settings, etc.
+    // Uses web-ext's firefoxProfile and keepProfileChanges options
+    ...(process.env.WEB_EXT_FIREFOX_PROFILE && {
+      firefoxProfile: process.env.WEB_EXT_FIREFOX_PROFILE,
+    }),
+    ...(process.env.WEB_EXT_KEEP_PROFILE_CHANGES === "true" && {
+      keepProfileChanges: true,
+    }),
   },
 });
