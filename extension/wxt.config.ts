@@ -2,12 +2,12 @@ import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 
 // See https://wxt.dev/api/config.html
-export default defineConfig({
+let config = {
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   vite: () => ({
     plugins: [tailwindcss()],
   }),
-  manifest: ({ browser }) => {
+  manifest: ({ browser }: { browser: string }) => {
     // Common configuration for all browsers
     const baseManifest = {
       name: "Spark Extension",
@@ -83,4 +83,6 @@ export default defineConfig({
       keepProfileChanges: true,
     }),
   },
-});
+};
+
+export default defineConfig(config);
