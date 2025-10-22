@@ -9,7 +9,7 @@ function generateWebExtJSON(): WebExtConfig {
   };
 
   // Firefox profile persistence - controlled by environment variables
-  // Set by dev:firefox:persist script to maintain logins, settings, etc.
+  // Set by dev:firefox script to maintain logins, settings, etc.
   // Uses web-ext's firefoxProfile and keepProfileChanges options
   const firefoxProfile = process.env.WEB_EXT_FIREFOX_PROFILE;
   if (firefoxProfile) {
