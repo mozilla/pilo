@@ -32,7 +32,7 @@
     "@types/marked": "^6.0.0",
     "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
-    "marked": "^16.0.0",
+    "marked": "^16.4.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "spark": "file:..",
