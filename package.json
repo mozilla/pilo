@@ -70,7 +70,7 @@
     "@types/turndown": "^5.0.5",
     "ai": "^5.0.15",
     "chalk": "^5.5.0",
-    "commander": "^14.0.0",
+    "commander": "^14.0.1",
     "cross-fetch": "^4.1.0",
     "dotenv": "^16.6.1",
     "eventemitter3": "^5.0.1",
