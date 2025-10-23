@@ -28,7 +28,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.11",
+    "@tailwindcss/vite": "^4.1.16",
     "@types/marked": "^6.0.0",
     "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
