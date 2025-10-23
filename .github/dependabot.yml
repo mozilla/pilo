@@ -1,26 +1,9 @@
 version: 2
 updates:
-  # Root workspace dependencies
+  # Monitor all workspace dependencies from root (includes /, /server, /extension)
+  # This ensures pnpm-lock.yaml is updated correctly when dependencies change
   - package-ecosystem: "npm"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
-    versioning-strategy: increase
-
-  # Server workspace dependencies
-  - package-ecosystem: "npm"
-    directory: "/server"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
-    versioning-strategy: increase
-
-  # Extension workspace dependencies
-  - package-ecosystem: "npm"
-    directory: "/extension"
     schedule:
       interval: "weekly"
       day: "monday"
