@@ -100,8 +100,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       '@types/webextension-polyfill':
-        specifier: ^0.12.3
-        version: 0.12.3
+        specifier: ^0.12.4
+        version: 0.12.4
       '@wxt-dev/webextension-polyfill':
         specifier: ^1.0.0
         version: 1.0.0(webextension-polyfill@0.12.0)(wxt@0.20.11(@types/node@22.18.1)(lightningcss@1.30.1)(rollup@4.44.2))
@@ -1123,8 +1123,8 @@ packages:
   '@types/turndown@5.0.5':
     resolution: {integrity: sha512-TL2IgGgc7B5j78rIccBtlYAnkuv8nUQqhQc+DSYV5j9Be9XOcm/SKOVRuA47xAVI3680Tk9B1d8flK2GWT2+4w==}
 
-  '@types/webextension-polyfill@0.12.3':
-    resolution: {integrity: sha512-F58aDVSeN/MjUGazXo/cPsmR76EvqQhQ1v4x23hFjUX0cfAJYE+JBWwiOGW36/VJGGxoH74sVlRIF3z7SJCKyg==}
+  '@types/webextension-polyfill@0.12.4':
+    resolution: {integrity: sha512-wK8YdSI0pDiaehSLDIvtvonYmLwUUivg4Z6JCJO8rkyssMAG82cFJgwPK/V7NO61mJBLg/tXeoXQL8AFzpXZmQ==}
 
   '@types/whatwg-mimetype@3.0.2':
     resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
@@ -4248,7 +4248,7 @@ snapshots:
 
   '@types/turndown@5.0.5': {}
 
-  '@types/webextension-polyfill@0.12.3': {}
+  '@types/webextension-polyfill@0.12.4': {}
 
   '@types/whatwg-mimetype@3.0.2': {}
 
