@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^2.0.17
-        version: 2.0.17(zod@4.1.11)
+        specifier: ^2.0.23
+        version: 2.0.23(zod@4.1.11)
       '@ai-sdk/google-vertex':
         specifier: ^3.0.9
         version: 3.0.24(zod@4.1.11)
@@ -230,8 +230,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/google@2.0.17':
-    resolution: {integrity: sha512-6LyuUrCZuiULg0rUV+kT4T2jG19oUntudorI4ttv1ARkSbwl8A39ue3rA487aDDy6fUScdbGFiV5Yv/o4gidVA==}
+  '@ai-sdk/google@2.0.23':
+    resolution: {integrity: sha512-VbCnKR+6aWUVLkAiSW5gUEtST7KueEmlt+d6qwDikxlLnFG9pzy59je8MiDVeM5G2tuSXbvZQF78PGIfXDBmow==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -248,8 +248,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/provider-utils@3.0.10':
-    resolution: {integrity: sha512-T1gZ76gEIwffep6MWI0QNy9jgoybUHE7TRaHB5k54K8mF91ciGFlbtCGxDYhMH3nCRergKwYFIDeFF0hJSIQHQ==}
+  '@ai-sdk/provider-utils@3.0.12':
+    resolution: {integrity: sha512-ZtbdvYxdMoria+2SlNarEk6Hlgyf+zzcznlD55EAl+7VZvJaSg2sqPvwArY7L6TfDEDJsnCq0fdhBSkYo0Xqdg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3523,10 +3523,10 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
       zod: 4.1.11
 
-  '@ai-sdk/google@2.0.17(zod@4.1.11)':
+  '@ai-sdk/google@2.0.23(zod@4.1.11)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.10(zod@4.1.11)
+      '@ai-sdk/provider-utils': 3.0.12(zod@4.1.11)
       zod: 4.1.11
 
   '@ai-sdk/openai-compatible@1.0.15(zod@4.1.11)':
@@ -3541,7 +3541,7 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
       zod: 4.1.11
 
-  '@ai-sdk/provider-utils@3.0.10(zod@4.1.11)':
+  '@ai-sdk/provider-utils@3.0.12(zod@4.1.11)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -6103,7 +6103,7 @@ snapshots:
 
   'spark@file:':
     dependencies:
-      '@ai-sdk/google': 2.0.17(zod@4.1.11)
+      '@ai-sdk/google': 2.0.23(zod@4.1.11)
       '@ai-sdk/google-vertex': 3.0.24(zod@4.1.11)
       '@ai-sdk/openai': 2.0.27(zod@4.1.11)
       '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.11)
