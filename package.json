@@ -58,7 +58,7 @@
     "prettier": "^3.6.2",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2",
-    "vitest": "^1.6.1"
+    "vitest": "^4.0.2"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.17",
