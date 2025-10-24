@@ -8,6 +8,7 @@
     "node": "^22.0.0"
   },
   "scripts": {
+    "dev:chrome": "node scripts/mkdirp.js .wxt/chrome-data && WEB_EXT_CHROMIUM_PROFILE=.wxt/chrome-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b chrome",
     "dev:chrome:tmp-profile": "wxt -b chrome",
     "dev:firefox": "node scripts/mkdirp.js .wxt/firefox-data && WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
     "dev:firefox:tmp-profile": "wxt -b firefox",
