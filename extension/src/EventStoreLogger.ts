@@ -32,6 +32,24 @@ export class EventStoreLogger extends GenericLogger {
    * Generic event handler - stores any event that comes through
    */
   private handleEvent = (eventType: string, data: unknown): void => {
+    // Log errors to console BEFORE processing
+    switch (eventType) {
+      case "task:validation_error":
+        console.error("Validation Error:", data);
+        break;
+      case "ai:generation:error":
+        console.error("AI Generation Error:", data);
+        break;
+      case "browser:action_completed":
+        if (data && typeof data === "object" && "success" in data && !data.success) {
+          console.error("Browser Action Failed:", data);
+        }
+        break;
+      case "task:aborted":
+        console.error("Task Aborted:", data);
+        break;
+    }
+
     const event: EventData = {
       type: eventType,
       data,
