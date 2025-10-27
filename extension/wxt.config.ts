@@ -1,5 +1,6 @@
 import { defineConfig, type WebExtConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
+import { resolve } from "node:path";
 
 function generateWebExtJSON(): WebExtConfig {
   const config: WebExtConfig = {
@@ -14,6 +15,14 @@ function generateWebExtJSON(): WebExtConfig {
   const firefoxProfile = process.env.WEB_EXT_FIREFOX_PROFILE;
   if (firefoxProfile) {
     config.firefoxProfile = firefoxProfile;
+  }
+
+  // Chrome/Chromium profile persistence - controlled by environment variables
+  // Set by dev:chrome script to maintain logins, settings, etc.
+  const chromiumProfile = process.env.WEB_EXT_CHROMIUM_PROFILE;
+  if (chromiumProfile) {
+    // Use absolute path for Windows compatibility
+    config.chromiumProfile = resolve(chromiumProfile);
   }
 
   if (process.env.WEB_EXT_KEEP_PROFILE_CHANGES === "true") {
