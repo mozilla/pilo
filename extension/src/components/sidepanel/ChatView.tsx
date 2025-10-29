@@ -493,7 +493,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
 
       {/* Input Area */}
       <div className={`${t.bg.secondary} border-t ${t.border.primary} p-4`}>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <textarea
             value={task}
             onChange={(e) => setTask(e.target.value)}
@@ -506,7 +506,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           {isExecuting ? (
             <button
               onClick={handleCancel}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
             >
               Stop
             </button>
@@ -514,7 +514,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             <button
               onClick={handleExecute}
               disabled={!task.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               Send
             </button>
