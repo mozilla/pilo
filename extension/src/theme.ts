@@ -1,114 +1,295 @@
 export const theme = {
+  // Typography
+  typography: {
+    // Font sizes
+    size: {
+      xs: "text-xs",      // 12px - metadata, timestamps, labels
+      sm: "text-sm",      // 14px - default body text
+      base: "text-base",  // 16px - emphasized body text
+      lg: "text-lg",      // 18px - subheadings, icons
+      xl: "text-xl",      // 20px - section headings
+      "2xl": "text-2xl",  // 24px - page titles
+    },
+    // Font weights - Clean hierarchy
+    weight: {
+      normal: "font-normal",    // 400 - regular text
+      medium: "font-medium",    // 500 - slightly emphasized
+      semibold: "font-semibold", // 600 - headings, labels
+      bold: "font-bold",        // 700 - major headings
+    },
+    // Line heights - For readability
+    leading: {
+      tight: "leading-tight",    // 1.25
+      snug: "leading-snug",      // 1.375
+      normal: "leading-normal",  // 1.5
+      relaxed: "leading-relaxed", // 1.625
+    },
+  },
+
+  // Spacing
+  spacing: {
+    // Padding
+    padding: {
+      "0": "p-0",
+      "1": "p-1",    // 4px - tight spacing
+      "2": "p-2",    // 8px - compact elements
+      "3": "p-3",    // 12px - form inputs
+      "4": "p-4",    // 16px - standard containers
+      "6": "p-6",    // 24px - generous sections
+    },
+    paddingX: {
+      "2": "px-2",   // 8px - inline elements
+      "3": "px-3",   // 12px - buttons, inputs
+      "4": "px-4",   // 16px - cards, bubbles
+    },
+    paddingY: {
+      "1": "py-1",   // 4px - compact vertical
+      "2": "py-2",   // 8px - standard vertical
+      "3": "py-3",   // 12px - generous vertical
+    },
+    // Margins
+    margin: {
+      "0": "m-0",
+      "1": "mt-1",   // 4px - tight spacing
+      "2": "mt-2",   // 8px - standard spacing
+      "3": "mt-3",   // 12px - section spacing
+      "4": "mt-4",   // 16px - major spacing
+    },
+    marginBottom: {
+      "1": "mb-1",   // 4px - between related items
+      "2": "mb-2",   // 8px - between paragraphs
+      "3": "mb-3",   // 12px - between sections
+      "4": "mb-4",   // 16px - between messages
+    },
+    marginTop: {
+      "1": "mt-1",   // 4px - micro spacing
+      "2": "mt-2",   // 8px - standard spacing
+      "3": "mt-3",   // 12px - section spacing
+      "4": "mt-4",   // 16px - major spacing
+    },
+    // Gap (flexbox/grid spacing)
+    gap: {
+      "1": "gap-1",  // 4px - tight grouping
+      "2": "gap-2",  // 8px - standard grouping
+      "3": "gap-3",  // 12px - comfortable spacing
+      "4": "gap-4",  // 16px - generous spacing
+    },
+    // Space (space-between utilities)
+    space: {
+      y: {
+        "2": "space-y-2",  // 8px vertical spacing
+        "4": "space-y-4",  // 16px vertical spacing
+        "6": "space-y-6",  // 24px section spacing
+      },
+    },
+  },
+
+  // Layout - Common layout utilities
+  layout: {
+    maxWidth: {
+      xs: "max-w-xs",      // 320px - compact containers
+      sm: "max-w-sm",      // 384px - small content
+      md: "max-w-md",      // 448px - medium content
+      lg: "max-w-lg",      // 512px - large content
+      "lg:md": "lg:max-w-md", // Responsive sizing
+    },
+    rounded: {
+      none: "rounded-none",
+      sm: "rounded-sm",    // 2px
+      base: "rounded",     // 4px
+      md: "rounded-md",    // 6px
+      lg: "rounded-lg",    // 8px
+    },
+    overflow: {
+      hidden: "overflow-hidden",
+      auto: "overflow-auto",
+      yAuto: "overflow-y-auto",
+      xAuto: "overflow-x-auto",
+    },
+    display: {
+      flex: "flex",
+      block: "block",
+      inline: "inline",
+      inlineBlock: "inline-block",
+      hidden: "hidden",
+    },
+    flexDirection: {
+      row: "flex-row",
+      col: "flex-col",
+    },
+    justifyContent: {
+      start: "justify-start",
+      end: "justify-end",
+      center: "justify-center",
+      between: "justify-between",
+    },
+    alignItems: {
+      start: "items-start",
+      end: "items-end",
+      center: "items-center",
+    },
+    flex: {
+      "1": "flex-1",
+      none: "flex-none",
+      auto: "flex-auto",
+    },
+  },
+
+  // Common utilities
+  utilities: {
+    // Text utilities
+    textAlign: {
+      left: "text-left",
+      center: "text-center",
+      right: "text-right",
+    },
+    whitespace: {
+      normal: "whitespace-normal",
+      nowrap: "whitespace-nowrap",
+      pre: "whitespace-pre",
+      preWrap: "whitespace-pre-wrap",
+    },
+    // Transitions
+    transition: {
+      colors: "transition-colors",
+      all: "transition-all",
+      none: "transition-none",
+    },
+    // Cursor
+    cursor: {
+      pointer: "cursor-pointer",
+      default: "cursor-default",
+      notAllowed: "cursor-not-allowed",
+    },
+    // Opacity
+    opacity: {
+      "0": "opacity-0",
+      "25": "opacity-25",
+      "50": "opacity-50",
+      "75": "opacity-75",
+      "100": "opacity-100",
+    },
+    // Focus
+    focus: {
+      outline: "focus:outline-none",
+      ring: "focus:ring-2",
+      ringBlue: "focus:ring-2 focus:ring-blue-500",
+      ringOffset: "focus:ring-2 focus:ring-offset-2",
+    },
+  },
+
   light: {
     // Backgrounds
     bg: {
-      primary: "bg-white",
-      secondary: "bg-gray-50",
-      tertiary: "bg-gray-100",
+      primary: "bg-[#F5F3EF]",  // Main sidebar background (cream/beige)
+      secondary: "bg-[#FDFCFA]",  // Card/content area background (off-white)
+      tertiary: "bg-[#EBE9E5]",  // Tertiary background (darker cream)
       input: "bg-white",
-      success: "bg-green-100",
-      error: "bg-red-100",
-      warning: "bg-yellow-100",
+      success: "bg-green-50",
+      error: "bg-red-50",
+      warning: "bg-yellow-50",
     },
     // Text colors
     text: {
       primary: "text-gray-900",
-      secondary: "text-gray-600",
-      muted: "text-gray-500",
-      success: "text-green-800",
-      error: "text-red-800",
-      warning: "text-yellow-800",
+      secondary: "text-gray-500",
+      muted: "text-gray-400",
+      success: "text-green-700",
+      error: "text-red-700",
+      warning: "text-yellow-700",
+      accent: "text-[#FF6B35]",  // Orange accent for spark icon
     },
     // Borders
     border: {
-      primary: "border-gray-200",
-      secondary: "border-gray-300",
-      input: "border-gray-300",
-      success: "border-green-300",
-      error: "border-red-300",
-      warning: "border-yellow-300",
+      primary: "border-[#E5E3DF]",  // Very light gray border
+      secondary: "border-[#D8D6D2]",  // Slightly darker border
+      input: "border-[#E5E3DF]",
+      success: "border-green-200",
+      error: "border-red-200",
+      warning: "border-yellow-200",
     },
     // Interactive states
     hover: {
-      primary: "hover:bg-gray-100",
-      secondary: "hover:bg-gray-200",
-      settings: "hover:text-gray-900 hover:bg-gray-200",
+      primary: "hover:bg-[#EBE9E5]",  // Subtle hover on cream
+      secondary: "hover:bg-[#E5E3DF]",  // Slightly darker hover
+      settings: "hover:text-gray-900 hover:bg-[#EBE9E5]",
     },
     // Event log specific colors
     events: {
-      task: "text-yellow-600",
+      task: "text-amber-600",
       explanation: "text-blue-600",
       plan: "text-purple-600",
       url: "text-blue-600",
-      completion: "text-green-600",
+      completion: "text-emerald-600",
       page: "text-indigo-600",
       observation: "text-cyan-600",
       thought: "text-pink-600",
-      action: "text-yellow-600",
+      action: "text-amber-600",
       actionRef: "text-blue-600",
-      actionValue: "text-green-600",
-      success: "text-green-600",
+      actionValue: "text-emerald-600",
+      success: "text-emerald-600",
       failure: "text-red-600",
-      waiting: "text-yellow-600",
-      network: "text-gray-500",
+      waiting: "text-amber-600",
+      network: "text-gray-400",
       processing: "text-blue-600",
       generic: "text-gray-400",
     },
   },
   dark: {
-    // Backgrounds
+    // Backgrounds - Dark mode with warm undertones
     bg: {
-      primary: "bg-gray-900",
-      secondary: "bg-gray-800",
-      tertiary: "bg-gray-700",
-      input: "bg-gray-800",
-      success: "bg-green-900",
-      error: "bg-red-900",
-      warning: "bg-yellow-900",
+      primary: "bg-[#1C1B19]",  // Warm dark background
+      secondary: "bg-[#252422]",  // Slightly lighter dark
+      tertiary: "bg-[#2F2E2B]",  // Tertiary dark
+      input: "bg-[#252422]",  // Input background
+      success: "bg-green-950",
+      error: "bg-red-950",
+      warning: "bg-yellow-950",
     },
-    // Text colors
+    // Text colors - Light text on dark
     text: {
-      primary: "text-white",
+      primary: "text-[#F5F3EF]",  // Light cream text
       secondary: "text-gray-300",
-      muted: "text-gray-400",
-      success: "text-green-200",
-      error: "text-red-200",
-      warning: "text-yellow-200",
+      muted: "text-gray-500",
+      success: "text-green-300",
+      error: "text-red-300",
+      warning: "text-yellow-300",
+      accent: "text-[#FF8C5A]",  // Lighter orange accent for dark mode
     },
-    // Borders
+    // Borders - Subtle borders for dark mode
     border: {
-      primary: "border-gray-700",
-      secondary: "border-gray-600",
-      input: "border-gray-600",
-      success: "border-green-700",
-      error: "border-red-700",
-      warning: "border-yellow-700",
+      primary: "border-[#3A3936]",  // Subtle dark border
+      secondary: "border-[#4A4946]",  // Slightly lighter border
+      input: "border-[#3A3936]",
+      success: "border-green-800",
+      error: "border-red-800",
+      warning: "border-yellow-800",
     },
-    // Interactive states
+    // Interactive states - Subtle hover for dark mode
     hover: {
-      primary: "hover:bg-gray-700",
-      secondary: "hover:bg-gray-600",
-      settings: "hover:text-white hover:bg-gray-700",
+      primary: "hover:bg-[#2F2E2B]",  // Subtle hover
+      secondary: "hover:bg-[#3A3936]",  // Slightly lighter hover
+      settings: "hover:text-[#F5F3EF] hover:bg-[#2F2E2B]",
     },
-    // Event log specific colors
+    // Event log specific colors - Soft pastels for dark mode
     events: {
-      task: "text-yellow-400",
+      task: "text-amber-400",
       explanation: "text-blue-400",
       plan: "text-purple-400",
-      url: "text-blue-300",
-      completion: "text-green-400",
+      url: "text-blue-400",
+      completion: "text-emerald-400",
       page: "text-indigo-400",
       observation: "text-cyan-400",
       thought: "text-pink-400",
-      action: "text-yellow-400",
-      actionRef: "text-blue-300",
-      actionValue: "text-green-300",
-      success: "text-green-400",
+      action: "text-amber-400",
+      actionRef: "text-blue-400",
+      actionValue: "text-emerald-400",
+      success: "text-emerald-400",
       failure: "text-red-400",
-      waiting: "text-yellow-500",
-      network: "text-gray-400",
+      waiting: "text-yellow-400",
+      network: "text-gray-500",
       processing: "text-blue-400",
-      generic: "text-gray-500",
+      generic: "text-gray-600",
     },
   },
 };

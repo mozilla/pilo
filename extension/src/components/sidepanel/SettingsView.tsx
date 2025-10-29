@@ -99,13 +99,13 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
             <button
               onClick={handleSave}
               disabled={!!saveStatus}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="flex-1 px-4 py-2 bg-[#FF6B35] text-white rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               Save Settings
             </button>
             <button
               onClick={onBack}
-              className={`flex-1 px-4 py-2 ${isDark ? "bg-gray-600 hover:bg-gray-700" : "bg-gray-500 hover:bg-gray-600"} text-white rounded-lg transition-colors font-medium`}
+              className={`flex-1 px-4 py-2 ${isDark ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} ${isDark ? "text-gray-100" : "text-gray-900"} rounded-lg transition-colors font-medium`}
             >
               Back to Chat
             </button>
