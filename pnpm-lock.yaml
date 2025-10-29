@@ -42,8 +42,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0
       dotenv:
-        specifier: ^16.6.1
-        version: 16.6.1
+        specifier: ^17.2.3
+        version: 17.2.3
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1
@@ -173,8 +173,8 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2(hono@4.10.3)
       dotenv:
-        specifier: ^16.6.1
-        version: 16.6.1
+        specifier: ^17.2.3
+        version: 17.2.3
       hono:
         specifier: ^4.10.3
         version: 4.10.3
@@ -6124,7 +6124,7 @@ snapshots:
       chalk: 5.6.2
       commander: 14.0.2
       cross-fetch: 4.1.0
-      dotenv: 16.6.1
+      dotenv: 17.2.3
       eventemitter3: 5.0.1
       liquidjs: 10.21.1
       nanoid: 5.1.5
