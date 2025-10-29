@@ -1,6 +1,7 @@
 node_modules
 dist
 .env
+.env.*
 .DS_Store
 *.txt
 CLAUDE.md

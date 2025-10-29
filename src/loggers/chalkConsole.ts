@@ -19,8 +19,13 @@ import type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
   AIGenerationErrorEventData,
+  TaskMetricsEventData,
 } from "../events.js";
 import { Logger } from "./types.js";
+
+export interface ChalkConsoleLoggerOptions {
+  metricsIncremental?: boolean;
+}
 
 /**
  * Console logger that outputs colored text to the console
@@ -28,6 +33,11 @@ import { Logger } from "./types.js";
  */
 export class ChalkConsoleLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
+  private options: ChalkConsoleLoggerOptions;
+
+  constructor(options?: ChalkConsoleLoggerOptions) {
+    this.options = options || {};
+  }
 
   initialize(emitter: WebAgentEventEmitter): void {
     if (this.emitter) {
@@ -42,6 +52,13 @@ export class ChalkConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
     emitter.onEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
     emitter.onEvent(WebAgentEventType.TASK_VALIDATION_ERROR, this.handleValidationError);
+    emitter.onEvent(WebAgentEventType.TASK_METRICS, this.handleTaskMetrics);
+    if (this.options.metricsIncremental) {
+      emitter.onEvent(
+        WebAgentEventType.TASK_METRICS_INCREMENTAL,
+        this.handleTaskMetricsIncremental,
+      );
+    }
 
     // Browser events
     emitter.onEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
@@ -75,6 +92,13 @@ export class ChalkConsoleLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
       this.emitter.offEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidation);
       this.emitter.offEvent(WebAgentEventType.TASK_VALIDATION_ERROR, this.handleValidationError);
+      this.emitter.offEvent(WebAgentEventType.TASK_METRICS, this.handleTaskMetrics);
+      if (this.options.metricsIncremental) {
+        this.emitter.offEvent(
+          WebAgentEventType.TASK_METRICS_INCREMENTAL,
+          this.handleTaskMetricsIncremental,
+        );
+      }
 
       // Browser events
       this.emitter.offEvent(WebAgentEventType.BROWSER_NAVIGATED, this.handlePageNavigation);
@@ -264,5 +288,62 @@ export class ChalkConsoleLogger implements Logger {
 
   private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
     console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
+  };
+
+  private handleTaskMetrics = (data: TaskMetricsEventData): void => {
+    console.log(chalk.cyan.bold("\n📊 Task Metrics Summary"));
+    console.log(chalk.gray("━".repeat(60)));
+
+    // Execution metrics
+    console.log(chalk.yellow.bold("\n🔄 Execution:"));
+    console.log(chalk.gray(`   Steps: ${chalk.whiteBright(data.stepCount)}`));
+    console.log(
+      chalk.gray(
+        `   AI Generations: ${chalk.whiteBright(data.aiGenerationCount)} ${data.aiGenerationErrorCount > 0 ? chalk.red(`(${data.aiGenerationErrorCount} errors)`) : ""}`,
+      ),
+    );
+
+    // Token usage
+    if (data.totalInputTokens > 0 || data.totalOutputTokens > 0) {
+      console.log(chalk.yellow.bold("\n💰 Token Usage:"));
+      console.log(
+        chalk.gray(`   Input:  ${chalk.whiteBright(data.totalInputTokens.toLocaleString())}`),
+      );
+      console.log(
+        chalk.gray(`   Output: ${chalk.whiteBright(data.totalOutputTokens.toLocaleString())}`),
+      );
+      console.log(
+        chalk.gray(
+          `   Total:  ${chalk.whiteBright((data.totalInputTokens + data.totalOutputTokens).toLocaleString())}`,
+        ),
+      );
+    }
+
+    // Event counts - show top events
+    const eventEntries = Object.entries(data.eventCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10); // Show top 10 events
+
+    if (eventEntries.length > 0) {
+      console.log(chalk.yellow.bold("\n📈 Top Events:"));
+      eventEntries.forEach(([eventType, count]) => {
+        // Shorten event type for display
+        const shortType = eventType.replace(/^(task|agent|browser|system|ai):/, "");
+        console.log(chalk.gray(`   ${shortType.padEnd(25)} ${chalk.whiteBright(count)}`));
+      });
+    }
+
+    console.log(chalk.gray("\n" + "━".repeat(60)));
+  };
+
+  private handleTaskMetricsIncremental = (data: TaskMetricsEventData): void => {
+    const totalTokens = data.totalInputTokens + data.totalOutputTokens;
+    const errorIndicator =
+      data.aiGenerationErrorCount > 0 ? chalk.red(` ⚠️${data.aiGenerationErrorCount}`) : "";
+    console.log(
+      chalk.gray(
+        `📊 Steps: ${chalk.whiteBright(data.stepCount)} | AI Gens: ${chalk.whiteBright(data.aiGenerationCount)}${errorIndicator} | Tokens: ${chalk.whiteBright(totalTokens.toLocaleString())}`,
+      ),
+    );
   };
 }
