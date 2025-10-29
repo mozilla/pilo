@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.24
         version: 2.0.24(zod@4.1.11)
       '@ai-sdk/google-vertex':
-        specifier: ^3.0.9
-        version: 3.0.24(zod@4.1.11)
+        specifier: ^3.0.55
+        version: 3.0.55(zod@4.1.11)
       '@ai-sdk/openai':
         specifier: ^2.0.15
         version: 2.0.27(zod@4.1.11)
@@ -206,11 +206,11 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/anthropic@2.0.14':
-    resolution: {integrity: sha512-TTVzYsTO6gwKk5qpqb3bx1G1F/gpvRZDhRumTZsN0obZo2pmTLZhGoLVQSj8pm6S9ofBFMwR0lIjbCq2xMKfdw==}
+  '@ai-sdk/anthropic@2.0.39':
+    resolution: {integrity: sha512-8YckXsPN9e0NfU4zZvP23xCIKNESyYb1Y/xVllI1fZ+uVsd/shoz2zplbeGVQHPjXHWfY9aT5tF98Lp920HDIQ==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^3.25.76 || ^4
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/gateway@1.0.19':
     resolution: {integrity: sha512-TYLxx8Sclr/RdB0RIwGmA8OtJtyJxoPGtrTYgwrbzM2GdtwYtUuA/UIc4tZyCeyR1ujfqjbqiIF3kB54zGRD3A==}
@@ -218,20 +218,20 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/google-vertex@3.0.24':
-    resolution: {integrity: sha512-OZ6oeJ9gJflSAcLSFs24b198TWTlOB++17vBg7k8ZmathHu5LCLamcdEZzkFNC5gWdW+7yy/yr3Z9MbVTuDW5g==}
+  '@ai-sdk/google-vertex@3.0.55':
+    resolution: {integrity: sha512-nUAIQywTzVXbKMYibq2vbjTRorrhWQcKJ/j1mwZKyPahLX41wh1kn8Fbwjxhd7ECeEJEZpJCnQh8OlQ1CeTO7Q==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^3.25.76 || ^4
-
-  '@ai-sdk/google@2.0.13':
-    resolution: {integrity: sha512-5WauM+IrqbllWT4uXZVrfTnPCSKTtkHGNsD2CYD0JgGfeIOpa285UYCYUi0Z4RtcovwnZitvQABq465FfeLwzA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/google@2.0.24':
     resolution: {integrity: sha512-GUNj1fo+q/JHDB2d1zIEULPt/EvwhGs8MIDo7PEEsuMcNyFwXzc80IUlTvFRUNy0tiZ6kBRw40dRU/hJRx5zQg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@2.0.25':
+    resolution: {integrity: sha512-tH2rA3428jnY6COoPfKB/BoQMs57sv9t+PEdyIB9ePtlV9dnVUbfKcdKoEcAaVffNZ6pzk8otrQYnu67pyn8TQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -256,6 +256,12 @@ packages:
 
   '@ai-sdk/provider-utils@3.0.13':
     resolution: {integrity: sha512-aXFLBLRPTUYA853MJliItefSXeJPl+mg0KSjbToP41kJ+banBmHO8ZPGLJhNqGlCU82o11TYN7G05EREKX8CkA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@3.0.14':
+    resolution: {integrity: sha512-CYRU6L7IlR7KslSBVxvlqlybQvXJln/PI57O8swhOaDIURZbjRP2AY3igKgUsrmWqqnFFUHP+AwTN8xqJAknnA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1315,8 +1321,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  bignumber.js@9.3.0:
-    resolution: {integrity: sha512-EM7aMFTXbptt/wZdMlBv2t8IViwQL+h6SLHosp8Yf0dqJMTnY6iL32opnAB6kAdL0SZPuvcAzFr31o0c/R3/RA==}
+  bignumber.js@9.3.1:
+    resolution: {integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==}
 
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
@@ -3499,10 +3505,10 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@2.0.14(zod@4.1.11)':
+  '@ai-sdk/anthropic@2.0.39(zod@4.1.11)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
       zod: 4.1.11
 
   '@ai-sdk/gateway@1.0.19(zod@4.1.11)':
@@ -3511,28 +3517,28 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
       zod: 4.1.11
 
-  '@ai-sdk/google-vertex@3.0.24(zod@4.1.11)':
+  '@ai-sdk/google-vertex@3.0.55(zod@4.1.11)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.14(zod@4.1.11)
-      '@ai-sdk/google': 2.0.13(zod@4.1.11)
+      '@ai-sdk/anthropic': 2.0.39(zod@4.1.11)
+      '@ai-sdk/google': 2.0.25(zod@4.1.11)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
       google-auth-library: 9.15.1
       zod: 4.1.11
     transitivePeerDependencies:
       - encoding
       - supports-color
 
-  '@ai-sdk/google@2.0.13(zod@4.1.11)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
-      zod: 4.1.11
-
   '@ai-sdk/google@2.0.24(zod@4.1.11)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.13(zod@4.1.11)
+      zod: 4.1.11
+
+  '@ai-sdk/google@2.0.25(zod@4.1.11)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
       zod: 4.1.11
 
   '@ai-sdk/openai-compatible@1.0.15(zod@4.1.11)':
@@ -3555,6 +3561,13 @@ snapshots:
       zod: 4.1.11
 
   '@ai-sdk/provider-utils@3.0.13(zod@4.1.11)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 4.1.11
+
+  '@ai-sdk/provider-utils@3.0.14(zod@4.1.11)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -4463,7 +4476,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  bignumber.js@9.3.0: {}
+  bignumber.js@9.3.1: {}
 
   binary-extensions@2.3.0: {}
 
@@ -5352,7 +5365,7 @@ snapshots:
 
   json-bigint@1.0.0:
     dependencies:
-      bignumber.js: 9.3.0
+      bignumber.js: 9.3.1
 
   json-parse-even-better-errors@3.0.2: {}
 
@@ -6114,7 +6127,7 @@ snapshots:
   'spark@file:':
     dependencies:
       '@ai-sdk/google': 2.0.24(zod@4.1.11)
-      '@ai-sdk/google-vertex': 3.0.24(zod@4.1.11)
+      '@ai-sdk/google-vertex': 3.0.55(zod@4.1.11)
       '@ai-sdk/openai': 2.0.27(zod@4.1.11)
       '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.11)
       '@ghostery/adblocker-playwright': 2.11.6(playwright@1.56.1)
