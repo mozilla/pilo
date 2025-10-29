@@ -13,11 +13,21 @@ interface RealtimeEventMessage {
   event: EventData;
 }
 
+interface TaskStartedData {
+  plan?: string;
+  taskId?: string;
+  timestamp?: number;
+  [key: string]: unknown;
+}
+
 /**
  * EventStoreLogger - Collects all WebAgent events into an array for React consumption
  * Instead of writing HTML, this logger stores structured event data that React can render
  */
 export class EventStoreLogger extends GenericLogger {
+  private static readonly PLAN_LOG_MESSAGE = "Task Plan Details";
+  private static readonly UNKNOWN_TASK_ID = "unknown";
+
   private events: EventData[] = [];
   private subscribers: Set<(events: EventData[]) => void> = new Set();
   private logger = createLogger("EventStoreLogger");
@@ -47,6 +57,9 @@ export class EventStoreLogger extends GenericLogger {
         break;
       case "task:aborted":
         console.error("Task Aborted:", data);
+        break;
+      case "task:started":
+        this.logTaskPlan(data);
         break;
     }
 
@@ -136,5 +149,41 @@ export class EventStoreLogger extends GenericLogger {
         this.logger.error("Error in event subscriber", {}, error);
       }
     });
+  }
+
+  /**
+   * Log task plan details when a task starts
+   */
+  private logTaskPlan(data: unknown): void {
+    if (!this.isTaskStartedWithPlan(data)) {
+      return;
+    }
+
+    const planData = data as TaskStartedData;
+
+    // Log with the plan details as additional arguments so they appear in console
+    this.logger.info(
+      EventStoreLogger.PLAN_LOG_MESSAGE,
+      {
+        taskId: planData.taskId || EventStoreLogger.UNKNOWN_TASK_ID,
+      },
+      {
+        taskId: planData.taskId || EventStoreLogger.UNKNOWN_TASK_ID,
+        plan: planData.plan!,
+        planLength: planData.plan!.length,
+        timestamp: this.getTimestamp(data),
+        fullEventData: data,
+      },
+    );
+  }
+
+  private isTaskStartedWithPlan(data: unknown): boolean {
+    return !!(
+      data &&
+      typeof data === "object" &&
+      "plan" in data &&
+      (data as TaskStartedData).plan &&
+      typeof (data as TaskStartedData).plan === "string"
+    );
   }
 }
