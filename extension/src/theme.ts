@@ -3,25 +3,25 @@ export const theme = {
   typography: {
     // Font sizes
     size: {
-      xs: "text-xs",      // 12px - metadata, timestamps, labels
-      sm: "text-sm",      // 14px - default body text
-      base: "text-base",  // 16px - emphasized body text
-      lg: "text-lg",      // 18px - subheadings, icons
-      xl: "text-xl",      // 20px - section headings
-      "2xl": "text-2xl",  // 24px - page titles
+      xs: "text-xs", // 12px - metadata, timestamps, labels
+      sm: "text-sm", // 14px - default body text
+      base: "text-base", // 16px - emphasized body text
+      lg: "text-lg", // 18px - subheadings, icons
+      xl: "text-xl", // 20px - section headings
+      "2xl": "text-2xl", // 24px - page titles
     },
     // Font weights - Clean hierarchy
     weight: {
-      normal: "font-normal",    // 400 - regular text
-      medium: "font-medium",    // 500 - slightly emphasized
+      normal: "font-normal", // 400 - regular text
+      medium: "font-medium", // 500 - slightly emphasized
       semibold: "font-semibold", // 600 - headings, labels
-      bold: "font-bold",        // 700 - major headings
+      bold: "font-bold", // 700 - major headings
     },
     // Line heights - For readability
     leading: {
-      tight: "leading-tight",    // 1.25
-      snug: "leading-snug",      // 1.375
-      normal: "leading-normal",  // 1.5
+      tight: "leading-tight", // 1.25
+      snug: "leading-snug", // 1.375
+      normal: "leading-normal", // 1.5
       relaxed: "leading-relaxed", // 1.625
     },
   },
@@ -31,55 +31,55 @@ export const theme = {
     // Padding
     padding: {
       "0": "p-0",
-      "1": "p-1",    // 4px - tight spacing
-      "2": "p-2",    // 8px - compact elements
-      "3": "p-3",    // 12px - form inputs
-      "4": "p-4",    // 16px - standard containers
-      "6": "p-6",    // 24px - generous sections
+      "1": "p-1", // 4px - tight spacing
+      "2": "p-2", // 8px - compact elements
+      "3": "p-3", // 12px - form inputs
+      "4": "p-4", // 16px - standard containers
+      "6": "p-6", // 24px - generous sections
     },
     paddingX: {
-      "2": "px-2",   // 8px - inline elements
-      "3": "px-3",   // 12px - buttons, inputs
-      "4": "px-4",   // 16px - cards, bubbles
+      "2": "px-2", // 8px - inline elements
+      "3": "px-3", // 12px - buttons, inputs
+      "4": "px-4", // 16px - cards, bubbles
     },
     paddingY: {
-      "1": "py-1",   // 4px - compact vertical
-      "2": "py-2",   // 8px - standard vertical
-      "3": "py-3",   // 12px - generous vertical
+      "1": "py-1", // 4px - compact vertical
+      "2": "py-2", // 8px - standard vertical
+      "3": "py-3", // 12px - generous vertical
     },
     // Margins
     margin: {
       "0": "m-0",
-      "1": "mt-1",   // 4px - tight spacing
-      "2": "mt-2",   // 8px - standard spacing
-      "3": "mt-3",   // 12px - section spacing
-      "4": "mt-4",   // 16px - major spacing
+      "1": "mt-1", // 4px - tight spacing
+      "2": "mt-2", // 8px - standard spacing
+      "3": "mt-3", // 12px - section spacing
+      "4": "mt-4", // 16px - major spacing
     },
     marginBottom: {
-      "1": "mb-1",   // 4px - between related items
-      "2": "mb-2",   // 8px - between paragraphs
-      "3": "mb-3",   // 12px - between sections
-      "4": "mb-4",   // 16px - between messages
+      "1": "mb-1", // 4px - between related items
+      "2": "mb-2", // 8px - between paragraphs
+      "3": "mb-3", // 12px - between sections
+      "4": "mb-4", // 16px - between messages
     },
     marginTop: {
-      "1": "mt-1",   // 4px - micro spacing
-      "2": "mt-2",   // 8px - standard spacing
-      "3": "mt-3",   // 12px - section spacing
-      "4": "mt-4",   // 16px - major spacing
+      "1": "mt-1", // 4px - micro spacing
+      "2": "mt-2", // 8px - standard spacing
+      "3": "mt-3", // 12px - section spacing
+      "4": "mt-4", // 16px - major spacing
     },
     // Gap (flexbox/grid spacing)
     gap: {
-      "1": "gap-1",  // 4px - tight grouping
-      "2": "gap-2",  // 8px - standard grouping
-      "3": "gap-3",  // 12px - comfortable spacing
-      "4": "gap-4",  // 16px - generous spacing
+      "1": "gap-1", // 4px - tight grouping
+      "2": "gap-2", // 8px - standard grouping
+      "3": "gap-3", // 12px - comfortable spacing
+      "4": "gap-4", // 16px - generous spacing
     },
     // Space (space-between utilities)
     space: {
       y: {
-        "2": "space-y-2",  // 8px vertical spacing
-        "4": "space-y-4",  // 16px vertical spacing
-        "6": "space-y-6",  // 24px section spacing
+        "2": "space-y-2", // 8px vertical spacing
+        "4": "space-y-4", // 16px vertical spacing
+        "6": "space-y-6", // 24px section spacing
       },
     },
   },
@@ -87,18 +87,18 @@ export const theme = {
   // Layout - Common layout utilities
   layout: {
     maxWidth: {
-      xs: "max-w-xs",      // 320px - compact containers
-      sm: "max-w-sm",      // 384px - small content
-      md: "max-w-md",      // 448px - medium content
-      lg: "max-w-lg",      // 512px - large content
+      xs: "max-w-xs", // 320px - compact containers
+      sm: "max-w-sm", // 384px - small content
+      md: "max-w-md", // 448px - medium content
+      lg: "max-w-lg", // 512px - large content
       "lg:md": "lg:max-w-md", // Responsive sizing
     },
     rounded: {
       none: "rounded-none",
-      sm: "rounded-sm",    // 2px
-      base: "rounded",     // 4px
-      md: "rounded-md",    // 6px
-      lg: "rounded-lg",    // 8px
+      sm: "rounded-sm", // 2px
+      base: "rounded", // 4px
+      md: "rounded-md", // 6px
+      lg: "rounded-lg", // 8px
     },
     overflow: {
       hidden: "overflow-hidden",
@@ -181,9 +181,9 @@ export const theme = {
   light: {
     // Backgrounds
     bg: {
-      primary: "bg-[#F5F3EF]",  // Main sidebar background (cream/beige)
-      secondary: "bg-[#FDFCFA]",  // Card/content area background (off-white)
-      tertiary: "bg-[#EBE9E5]",  // Tertiary background (darker cream)
+      primary: "bg-[#F5F3EF]", // Main sidebar background (cream/beige)
+      secondary: "bg-[#FDFCFA]", // Card/content area background (off-white)
+      tertiary: "bg-[#EBE9E5]", // Tertiary background (darker cream)
       input: "bg-white",
       success: "bg-green-50",
       error: "bg-red-50",
@@ -197,12 +197,12 @@ export const theme = {
       success: "text-green-700",
       error: "text-red-700",
       warning: "text-yellow-700",
-      accent: "text-[#FF6B35]",  // Orange accent for spark icon
+      accent: "text-[#FF6B35]", // Orange accent for spark icon
     },
     // Borders
     border: {
-      primary: "border-[#E5E3DF]",  // Very light gray border
-      secondary: "border-[#D8D6D2]",  // Slightly darker border
+      primary: "border-[#E5E3DF]", // Very light gray border
+      secondary: "border-[#D8D6D2]", // Slightly darker border
       input: "border-[#E5E3DF]",
       success: "border-green-200",
       error: "border-red-200",
@@ -210,8 +210,8 @@ export const theme = {
     },
     // Interactive states
     hover: {
-      primary: "hover:bg-[#EBE9E5]",  // Subtle hover on cream
-      secondary: "hover:bg-[#E5E3DF]",  // Slightly darker hover
+      primary: "hover:bg-[#EBE9E5]", // Subtle hover on cream
+      secondary: "hover:bg-[#E5E3DF]", // Slightly darker hover
       settings: "hover:text-gray-900 hover:bg-[#EBE9E5]",
     },
     // Event log specific colors
@@ -238,28 +238,28 @@ export const theme = {
   dark: {
     // Backgrounds - Dark mode with warm undertones
     bg: {
-      primary: "bg-[#1C1B19]",  // Warm dark background
-      secondary: "bg-[#252422]",  // Slightly lighter dark
-      tertiary: "bg-[#2F2E2B]",  // Tertiary dark
-      input: "bg-[#252422]",  // Input background
+      primary: "bg-[#1C1B19]", // Warm dark background
+      secondary: "bg-[#252422]", // Slightly lighter dark
+      tertiary: "bg-[#2F2E2B]", // Tertiary dark
+      input: "bg-[#252422]", // Input background
       success: "bg-green-950",
       error: "bg-red-950",
       warning: "bg-yellow-950",
     },
     // Text colors - Light text on dark
     text: {
-      primary: "text-[#F5F3EF]",  // Light cream text
+      primary: "text-[#F5F3EF]", // Light cream text
       secondary: "text-gray-300",
       muted: "text-gray-500",
       success: "text-green-300",
       error: "text-red-300",
       warning: "text-yellow-300",
-      accent: "text-[#FF8C5A]",  // Lighter orange accent for dark mode
+      accent: "text-[#FF8C5A]", // Lighter orange accent for dark mode
     },
     // Borders - Subtle borders for dark mode
     border: {
-      primary: "border-[#3A3936]",  // Subtle dark border
-      secondary: "border-[#4A4946]",  // Slightly lighter border
+      primary: "border-[#3A3936]", // Subtle dark border
+      secondary: "border-[#4A4946]", // Slightly lighter border
       input: "border-[#3A3936]",
       success: "border-green-800",
       error: "border-red-800",
@@ -267,8 +267,8 @@ export const theme = {
     },
     // Interactive states - Subtle hover for dark mode
     hover: {
-      primary: "hover:bg-[#2F2E2B]",  // Subtle hover
-      secondary: "hover:bg-[#3A3936]",  // Slightly lighter hover
+      primary: "hover:bg-[#2F2E2B]", // Subtle hover
+      secondary: "hover:bg-[#3A3936]", // Slightly lighter hover
       settings: "hover:text-[#F5F3EF] hover:bg-[#2F2E2B]",
     },
     // Event log specific colors - Soft pastels for dark mode
