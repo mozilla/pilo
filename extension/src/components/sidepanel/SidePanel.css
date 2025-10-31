@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* Add custom styles to Tailwind's components layer to ensure they're included in build */
+@layer components {
+  /* Restore list styles for markdown content */
+  .markdown-content ol {
+    list-style-type: decimal;
+    list-style-position: inside;
+  }
+
+  .markdown-content ul {
+    list-style-type: disc;
+    list-style-position: inside;
+  }
+
+  /* The `marked` library generates <p> tags inside <li> elements when
+   * rendering markdown lists, causing line breaks between list numbers
+   * and content.  The next two rules are to workaround this.
+   * 
+   * XXX If/when we switch away from the `marked` library, we should see if
+   * we can get rid of this.
+   */
+
+  /* Make paragraph tags inside list items display inline */
+  .markdown-content li > p {
+    display: inline;
+    margin: 0;
+  }
+
+  /* Handle multiple paragraphs in a list item */
+  .markdown-content li > p:not(:first-child) {
+    display: block;
+    margin-top: 0.5em;
+  }
+}

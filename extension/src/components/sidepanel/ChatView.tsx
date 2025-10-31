@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import { marked } from "marked";
+import clsx from "clsx";
 import { ChatMessage } from "../../ChatMessage";
 import { useChat } from "../../useChat";
 import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
@@ -36,7 +37,7 @@ interface ChatViewProps {
 // Markdown rendering utilities
 const renderMarkdown = (content: string): string => {
   return marked(content, {
-    breaks: true,
+    breaks: false,
     gfm: true,
   }) as string;
 };
@@ -47,8 +48,11 @@ interface MarkdownContentProps {
   className?: string;
 }
 
-const MarkdownContent = ({ children, className = "" }: MarkdownContentProps): ReactElement => (
-  <span className={className} dangerouslySetInnerHTML={{ __html: renderMarkdown(children) }} />
+const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
+  <div
+    className={clsx("markdown-content", className)}
+    dangerouslySetInnerHTML={{ __html: renderMarkdown(children) }}
+  />
 );
 
 // Task message component
