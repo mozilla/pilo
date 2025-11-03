@@ -33,7 +33,7 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
-    "@hono/node-server": "^1.16.0",
+    "@hono/node-server": "^1.19.6",
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.3",
     "hono": "^4.10.3",
