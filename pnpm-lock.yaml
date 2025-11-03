@@ -10,28 +10,28 @@ importers:
     dependencies:
       '@ai-sdk/google':
         specifier: ^2.0.24
-        version: 2.0.24(zod@4.1.11)
+        version: 2.0.24(zod@4.1.12)
       '@ai-sdk/google-vertex':
         specifier: ^3.0.55
-        version: 3.0.55(zod@4.1.11)
+        version: 3.0.55(zod@4.1.12)
       '@ai-sdk/openai':
         specifier: ^2.0.15
-        version: 2.0.27(zod@4.1.11)
+        version: 2.0.27(zod@4.1.12)
       '@ai-sdk/openai-compatible':
         specifier: ^1.0.7
-        version: 1.0.15(zod@4.1.11)
+        version: 1.0.15(zod@4.1.12)
       '@ghostery/adblocker-playwright':
         specifier: ^2.11.3
         version: 2.11.6(playwright@1.56.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^1.1.2
-        version: 1.2.0(ai@5.0.37(zod@4.1.11))(zod@4.1.11)
+        version: 1.2.0(ai@5.0.37(zod@4.1.12))(zod@4.1.12)
       '@types/turndown':
         specifier: ^5.0.5
         version: 5.0.5
       ai:
         specifier: ^5.0.15
-        version: 5.0.37(zod@4.1.11)
+        version: 5.0.37(zod@4.1.12)
       chalk:
         specifier: ^5.5.0
         version: 5.6.2
@@ -55,7 +55,7 @@ importers:
         version: 5.1.5
       ollama-ai-provider-v2:
         specifier: ^1.5.1
-        version: 1.5.1(zod@4.1.11)
+        version: 1.5.1(zod@4.1.12)
       playwright:
         specifier: 1.56.1
         version: 1.56.1
@@ -63,8 +63,8 @@ importers:
         specifier: ^7.2.1
         version: 7.2.1
       zod:
-        specifier: ^4.1.8
-        version: 4.1.11
+        specifier: ^4.1.12
+        version: 4.1.12
     devDependencies:
       '@types/jsdom':
         specifier: ^21.1.7
@@ -3485,8 +3485,8 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.1.11:
-    resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
+  zod@4.1.12:
+    resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
 
   zustand@5.0.8:
     resolution: {integrity: sha512-gyPKpIaxY9XcO2vSMrLbiER7QMAMGOQZVRdJ6Zi782jkbzZygq5GI9nG8g+sMgitRtndwaBSl7uiqC49o1SSiw==}
@@ -3515,81 +3515,81 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@2.0.39(zod@4.1.11)':
+  '@ai-sdk/anthropic@2.0.39(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/gateway@1.0.19(zod@4.1.11)':
+  '@ai-sdk/gateway@1.0.19(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/google-vertex@3.0.55(zod@4.1.11)':
+  '@ai-sdk/google-vertex@3.0.55(zod@4.1.12)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.39(zod@4.1.11)
-      '@ai-sdk/google': 2.0.25(zod@4.1.11)
+      '@ai-sdk/anthropic': 2.0.39(zod@4.1.12)
+      '@ai-sdk/google': 2.0.25(zod@4.1.12)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
       google-auth-library: 9.15.1
-      zod: 4.1.11
+      zod: 4.1.12
     transitivePeerDependencies:
       - encoding
       - supports-color
 
-  '@ai-sdk/google@2.0.24(zod@4.1.11)':
+  '@ai-sdk/google@2.0.24(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.13(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.13(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/google@2.0.25(zod@4.1.11)':
+  '@ai-sdk/google@2.0.25(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/openai-compatible@1.0.15(zod@4.1.11)':
+  '@ai-sdk/openai-compatible@1.0.15(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/openai@2.0.27(zod@4.1.11)':
+  '@ai-sdk/openai@2.0.27(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
+      zod: 4.1.12
 
-  '@ai-sdk/provider-utils@3.0.12(zod@4.1.11)':
+  '@ai-sdk/provider-utils@3.0.12(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
-      zod: 4.1.11
+      zod: 4.1.12
 
-  '@ai-sdk/provider-utils@3.0.13(zod@4.1.11)':
+  '@ai-sdk/provider-utils@3.0.13(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
-      zod: 4.1.11
+      zod: 4.1.12
 
-  '@ai-sdk/provider-utils@3.0.14(zod@4.1.11)':
+  '@ai-sdk/provider-utils@3.0.14(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
-      zod: 4.1.11
+      zod: 4.1.12
 
-  '@ai-sdk/provider-utils@3.0.8(zod@4.1.11)':
+  '@ai-sdk/provider-utils@3.0.8(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
-      zod: 4.1.11
+      zod: 4.1.12
 
   '@ai-sdk/provider@2.0.0':
     dependencies:
@@ -3994,10 +3994,10 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@openrouter/ai-sdk-provider@1.2.0(ai@5.0.37(zod@4.1.11))(zod@4.1.11)':
+  '@openrouter/ai-sdk-provider@1.2.0(ai@5.0.37(zod@4.1.12))(zod@4.1.12)':
     dependencies:
-      ai: 5.0.37(zod@4.1.11)
-      zod: 4.1.11
+      ai: 5.0.37(zod@4.1.12)
+      zod: 4.1.12
 
   '@opentelemetry/api@1.9.0': {}
 
@@ -4422,13 +4422,13 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@5.0.37(zod@4.1.11):
+  ai@5.0.37(zod@4.1.12):
     dependencies:
-      '@ai-sdk/gateway': 1.0.19(zod@4.1.11)
+      '@ai-sdk/gateway': 1.0.19(zod@4.1.12)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.11)
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
       '@opentelemetry/api': 1.9.0
-      zod: 4.1.11
+      zod: 4.1.12
 
   ansi-align@3.0.1:
     dependencies:
@@ -5702,11 +5702,11 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  ollama-ai-provider-v2@1.5.1(zod@4.1.11):
+  ollama-ai-provider-v2@1.5.1(zod@4.1.12):
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.12(zod@4.1.11)
-      zod: 4.1.11
+      '@ai-sdk/provider-utils': 3.0.12(zod@4.1.12)
+      zod: 4.1.12
 
   on-exit-leak-free@2.1.2: {}
 
@@ -6142,14 +6142,14 @@ snapshots:
 
   'spark@file:':
     dependencies:
-      '@ai-sdk/google': 2.0.24(zod@4.1.11)
-      '@ai-sdk/google-vertex': 3.0.55(zod@4.1.11)
-      '@ai-sdk/openai': 2.0.27(zod@4.1.11)
-      '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.11)
+      '@ai-sdk/google': 2.0.24(zod@4.1.12)
+      '@ai-sdk/google-vertex': 3.0.55(zod@4.1.12)
+      '@ai-sdk/openai': 2.0.27(zod@4.1.12)
+      '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.11.6(playwright@1.56.1)
-      '@openrouter/ai-sdk-provider': 1.2.0(ai@5.0.37(zod@4.1.11))(zod@4.1.11)
+      '@openrouter/ai-sdk-provider': 1.2.0(ai@5.0.37(zod@4.1.12))(zod@4.1.12)
       '@types/turndown': 5.0.5
-      ai: 5.0.37(zod@4.1.11)
+      ai: 5.0.37(zod@4.1.12)
       chalk: 5.6.2
       commander: 14.0.2
       cross-fetch: 4.1.0
@@ -6157,10 +6157,10 @@ snapshots:
       eventemitter3: 5.0.1
       liquidjs: 10.21.1
       nanoid: 5.1.5
-      ollama-ai-provider-v2: 1.5.1(zod@4.1.11)
+      ollama-ai-provider-v2: 1.5.1(zod@4.1.12)
       playwright: 1.56.1
       turndown: 7.2.1
-      zod: 4.1.11
+      zod: 4.1.12
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -6788,7 +6788,7 @@ snapshots:
 
   zod@3.25.76: {}
 
-  zod@4.1.11: {}
+  zod@4.1.12: {}
 
   zustand@5.0.8(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.5.0(react@19.2.0)):
     optionalDependencies:
