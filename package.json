@@ -74,7 +74,7 @@
     "cross-fetch": "^4.1.0",
     "dotenv": "^17.2.3",
     "eventemitter3": "^5.0.1",
-    "liquidjs": "^10.21.1",
+    "liquidjs": "^10.24.0",
     "nanoid": "^5.1.5",
     "ollama-ai-provider-v2": "^1.5.1",
     "playwright": "1.56.1",
