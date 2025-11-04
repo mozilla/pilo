@@ -473,78 +473,85 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   };
 
   return (
-    <div className={`h-screen ${t.bg.primary} ${t.text.primary} flex flex-col`}>
-      {/* Header */}
+    <div className={`h-screen ${t.text.primary} flex flex-col p-4`}>
       <div
-        className={`${t.bg.secondary} border-b ${t.border.primary} p-4 flex items-center justify-between`}
+        className={`${t.bg.primary} border ${t.border.primary} rounded-2xl flex flex-col h-full overflow-hidden shadow-lg`}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">⚡</span>
-          <div>
-            <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
-            <p className={`${t.text.muted} text-xs`}>
-              {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
-            </p>
+        {/* Header */}
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚡</span>
+            <div>
+              <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
+              <p className={`${t.text.muted} text-xs`}>
+                {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
+              </p>
+            </div>
           </div>
+          <button
+            onClick={onOpenSettings}
+            className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
+            title="Settings"
+          >
+            ⚙️
+          </button>
         </div>
-        <button
-          onClick={onOpenSettings}
-          className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
-          title="Settings"
+
+        {/* Chat Messages */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4"
         >
-          ⚙️
-        </button>
-      </div>
-
-      {/* Chat Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <h2 className={`text-xl font-bold ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
-            <p className={`${t.text.muted} text-sm max-w-sm`}>
-              I can help you automate tasks on any webpage. Just describe what you'd like me to do!
-            </p>
-          </div>
-        )}
-
-        <ul className="space-y-4" role="list">
-          {renderMessages()}
-        </ul>
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className={`${t.bg.secondary} border-t ${t.border.primary} p-4`}>
-        <div className="flex items-center gap-2">
-          <textarea
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="What would you like me to do?"
-            rows={2}
-            disabled={isExecuting}
-            className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
-          />
-          {isExecuting ? (
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              onClick={handleExecute}
-              disabled={!task.trim()}
-              className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              Send
-            </button>
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <h2 className={`text-xl font-bold ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
+              <p className={`${t.text.muted} text-sm max-w-sm`}>
+                I can help you automate tasks on any webpage. Just describe what you'd like me to
+                do!
+              </p>
+            </div>
           )}
+
+          <ul className="space-y-4" role="list">
+            {renderMessages()}
+          </ul>
+
+          <div ref={messagesEndRef} />
         </div>
-        <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
-          Press Enter to send • Shift+Enter for new line
+
+        {/* Input Area */}
+        <div className={`border-t ${t.border.primary} p-4`}>
+          <div className="flex items-center gap-2">
+            <textarea
+              value={task}
+              onChange={(e) => setTask(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What would you like me to do?"
+              rows={2}
+              disabled={isExecuting}
+              className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
+            />
+            {isExecuting ? (
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={handleExecute}
+                disabled={!task.trim()}
+                className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                Send
+              </button>
+            )}
+          </div>
+          <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
+            Press Enter to send • Shift+Enter for new line
+          </div>
         </div>
       </div>
     </div>
