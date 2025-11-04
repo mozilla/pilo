@@ -147,7 +147,7 @@ const TaskBubble = ({
   };
 
   return (
-    <div className="flex justify-start mb-4">
+    <li className="flex justify-start mb-4">
       <div
         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${t.bg.secondary} ${t.text.primary} border ${t.border.primary}`}
       >
@@ -189,7 +189,7 @@ const TaskBubble = ({
           </div>
         )}
       </div>
-    </div>
+    </li>
   );
 };
 
@@ -425,6 +425,53 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     }
   };
 
+  /**
+   * Renders all messages in the order they exist in the enclosing scope's
+   * messages array.
+   *
+   * We iterate through them once, rendering user/system messages directly
+   * and task bubbles at the first occurrence of each unique taskId. This
+   * ensures task-related messages (plan, reasoning, result)
+   * are grouped together in a single bubble while maintaining overall
+   * chronological order.
+   *
+   * @returns Array of React elements to render in the message list
+   */
+  const renderMessages = () => {
+    const renderedTaskIds = new Set<string>();
+    const elements: React.ReactElement[] = [];
+
+    messages.forEach((message) => {
+      if (message.type === "user" || message.type === "system") {
+        elements.push(
+          <ChatMessage
+            key={message.id}
+            type={message.type as "user" | "assistant" | "system"}
+            content={message.content}
+            timestamp={message.timestamp}
+            theme={t}
+          />,
+        );
+      }
+
+      // Render task bubble when we encounter the first message with this taskId
+      else if (message.taskId && !renderedTaskIds.has(message.taskId)) {
+        renderedTaskIds.add(message.taskId);
+        elements.push(
+          <TaskBubble
+            key={message.taskId}
+            taskId={message.taskId}
+            messages={messages}
+            currentTaskId={currentTaskId}
+            theme={t}
+          />,
+        );
+      }
+    });
+
+    return elements;
+  };
+
   return (
     <div className={`h-screen ${t.bg.primary} ${t.text.primary} flex flex-col`}>
       {/* Header */}
@@ -460,37 +507,9 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           </div>
         )}
 
-        <div className="space-y-4">
-          {messages
-            .filter((msg) => msg.type === "user" || msg.type === "system")
-            .map((message) => (
-              <ChatMessage
-                key={message.id}
-                type={message.type as "user" | "assistant" | "system"}
-                content={message.content}
-                timestamp={message.timestamp}
-                theme={t}
-              />
-            ))}
-
-          {/* Render task bubbles */}
-          {Array.from(
-            new Set(
-              messages
-                .filter((msg) => msg.taskId)
-                .map((msg) => msg.taskId)
-                .filter((taskId): taskId is string => taskId !== undefined),
-            ),
-          ).map((taskId) => (
-            <TaskBubble
-              key={taskId}
-              taskId={taskId}
-              messages={messages}
-              currentTaskId={currentTaskId}
-              theme={t}
-            />
-          ))}
-        </div>
+        <ul className="space-y-4" role="list">
+          {renderMessages()}
+        </ul>
 
         <div ref={messagesEndRef} />
       </div>

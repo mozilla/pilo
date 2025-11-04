@@ -40,7 +40,7 @@ export function ChatMessage({
   const isSystem = type === "system";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
+    <li className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
       <div
         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
           isUser
@@ -100,6 +100,6 @@ export function ChatMessage({
           <div className={`text-xs ${t.text.muted} mt-1`}>{timestamp.toLocaleTimeString()}</div>
         )}
       </div>
-    </div>
+    </li>
   );
 }
