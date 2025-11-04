@@ -29,7 +29,7 @@
     "@types/node": "^24.9.1",
     "prettier": "^3.6.2",
     "tsx": "^4.20.4",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vitest": "^1.6.1"
   },
   "dependencies": {
