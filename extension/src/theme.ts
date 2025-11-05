@@ -181,11 +181,11 @@ export const theme = {
   light: {
     // Backgrounds
     bg: {
-      sidebar: "bg-[#E5E3DF]", // Light sidebar background in light mode
-      panel: "bg-[#F5F3EF]", // Main panel background (cream/beige)
-      primary: "bg-[#FDFCFA]", // Message bubbles background (off-white)
-      secondary: "bg-[#F5F3EF]", // Secondary message bubbles (cream)
-      tertiary: "bg-[#EBE9E5]", // Tertiary background (darker cream)
+      sidebar: "bg-stone-175", // Light sidebar background in light mode
+      panel: "bg-stone-25", // Main panel background - matches AI messages
+      primary: "bg-stone-75", // Message bubbles background - user messages
+      secondary: "bg-stone-25", // Secondary message bubbles - AI messages pop more
+      tertiary: "bg-stone-125", // Tertiary background
       input: "bg-white",
       success: "bg-green-50",
       error: "bg-red-50",
@@ -203,18 +203,18 @@ export const theme = {
     },
     // Borders - Light borders for light mode
     border: {
-      primary: "border-[#E5E3DF]", // Light border for panel in light mode
-      secondary: "border-[#D8D6D2]", // Slightly darker border
-      input: "border-[#E5E3DF]",
+      primary: "border-stone-175", // Light border for panel in light mode
+      secondary: "border-stone-225", // Slightly darker border
+      input: "border-stone-175",
       success: "border-green-200",
       error: "border-red-200",
       warning: "border-yellow-200",
     },
     // Interactive states
     hover: {
-      primary: "hover:bg-[#EBE9E5]", // Subtle hover on cream
-      secondary: "hover:bg-[#E5E3DF]", // Slightly darker hover
-      settings: "hover:text-gray-900 hover:bg-[#EBE9E5]",
+      primary: "hover:bg-stone-125", // Subtle hover
+      secondary: "hover:bg-stone-175", // Slightly darker hover
+      settings: "hover:text-gray-900 hover:bg-stone-125",
     },
     // Event log specific colors
     events: {
@@ -238,13 +238,13 @@ export const theme = {
     },
   },
   dark: {
-    // Backgrounds - Light cream panel (same as light mode)
+    // Backgrounds - Light panel (same as light mode)
     bg: {
-      sidebar: "bg-[#1C1B22]", // Dark sidebar bg to match Firefox extension bar
-      panel: "bg-[#F5F3EF]", // Light cream panel background
-      primary: "bg-[#FDFCFA]", // Light off-white message bubbles
-      secondary: "bg-[#F5F3EF]", // Light cream message bubbles
-      tertiary: "bg-[#EBE9E5]", // Darker cream for system messages
+      sidebar: "bg-stone-925", // Dark sidebar bg to match Firefox extension bar
+      panel: "bg-stone-25", // Light panel background
+      primary: "bg-stone-75", // Message bubbles - User messages
+      secondary: "bg-stone-25", // Message bubbles - AI messages
+      tertiary: "bg-stone-125", // System messages
       input: "bg-white", // White input background
       success: "bg-green-50",
       error: "bg-red-50",
@@ -262,18 +262,18 @@ export const theme = {
     },
     // Borders - Dark borders for panel, light borders for bubbles
     border: {
-      primary: "border-[#2F2F2F]", // Dark border for panel
-      secondary: "border-[#E5E3DF]", // Light border for message bubbles
-      input: "border-[#E5E3DF]",
+      primary: "border-stone-875", // Dark border for panel
+      secondary: "border-stone-175", // Light border for message bubbles
+      input: "border-stone-175",
       success: "border-green-200",
       error: "border-red-200",
       warning: "border-yellow-200",
     },
     // Interactive states - Subtle hover for light elements
     hover: {
-      primary: "hover:bg-[#EBE9E5]", // Subtle hover on cream
-      secondary: "hover:bg-[#E5E3DF]", // Slightly darker hover
-      settings: "hover:text-white hover:bg-[#3A3A3A]", // Settings button
+      primary: "hover:bg-stone-125", // Subtle hover
+      secondary: "hover:bg-stone-175", // Slightly darker hover
+      settings: "hover:text-white hover:bg-stone-875", // Settings button
     },
     // Event log specific colors - Soft pastels for dark mode
     events: {
