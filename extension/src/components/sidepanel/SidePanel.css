@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Custom color tokens extending Tailwind's stone palette */
+@theme {
+  --color-stone-25: #fdfcfa;
+  --color-stone-75: #f5f3ef;
+  --color-stone-125: #ebe9e5;
+  --color-stone-175: #e5e3df;
+  --color-stone-225: #d8d6d2;
+  --color-stone-875: #2f2f2f;
+  --color-stone-925: #1c1b22;
+}
+
 /* Add custom styles to Tailwind's components layer to ensure they're included in build */
 @layer components {
   /* Restore list styles for markdown content */
