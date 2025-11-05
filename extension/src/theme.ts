@@ -181,8 +181,10 @@ export const theme = {
   light: {
     // Backgrounds
     bg: {
-      primary: "bg-[#F5F3EF]", // Main sidebar background (cream/beige)
-      secondary: "bg-[#FDFCFA]", // Card/content area background (off-white)
+      sidebar: "bg-[#E5E3DF]", // Light sidebar background in light mode
+      panel: "bg-[#F5F3EF]", // Main panel background (cream/beige)
+      primary: "bg-[#FDFCFA]", // Message bubbles background (off-white)
+      secondary: "bg-[#F5F3EF]", // Secondary message bubbles (cream)
       tertiary: "bg-[#EBE9E5]", // Tertiary background (darker cream)
       input: "bg-white",
       success: "bg-green-50",
@@ -199,9 +201,9 @@ export const theme = {
       warning: "text-yellow-700",
       accent: "text-[#FF6B35]", // Orange accent for spark icon
     },
-    // Borders
+    // Borders - Light borders for light mode
     border: {
-      primary: "border-[#E5E3DF]", // Very light gray border
+      primary: "border-[#E5E3DF]", // Light border for panel in light mode
       secondary: "border-[#D8D6D2]", // Slightly darker border
       input: "border-[#E5E3DF]",
       success: "border-green-200",
@@ -236,40 +238,42 @@ export const theme = {
     },
   },
   dark: {
-    // Backgrounds - Dark mode with warm undertones
+    // Backgrounds - Light cream panel (same as light mode)
     bg: {
-      primary: "bg-[#1C1B19]", // Warm dark background
-      secondary: "bg-[#252422]", // Slightly lighter dark
-      tertiary: "bg-[#2F2E2B]", // Tertiary dark
-      input: "bg-[#252422]", // Input background
-      success: "bg-green-950",
-      error: "bg-red-950",
-      warning: "bg-yellow-950",
+      sidebar: "bg-[#1C1B22]", // Dark sidebar bg to match Firefox extension bar
+      panel: "bg-[#F5F3EF]", // Light cream panel background
+      primary: "bg-[#FDFCFA]", // Light off-white message bubbles
+      secondary: "bg-[#F5F3EF]", // Light cream message bubbles
+      tertiary: "bg-[#EBE9E5]", // Darker cream for system messages
+      input: "bg-white", // White input background
+      success: "bg-green-50",
+      error: "bg-red-50",
+      warning: "bg-yellow-50",
     },
-    // Text colors - Light text on dark
+    // Text colors - Dark text on light backgrounds
     text: {
-      primary: "text-[#F5F3EF]", // Light cream text
-      secondary: "text-gray-300",
+      primary: "text-gray-900", // Dark text for readability
+      secondary: "text-gray-600",
       muted: "text-gray-500",
-      success: "text-green-300",
-      error: "text-red-300",
-      warning: "text-yellow-300",
-      accent: "text-[#FF8C5A]", // Lighter orange accent for dark mode
+      success: "text-green-700",
+      error: "text-red-700",
+      warning: "text-yellow-700",
+      accent: "text-[#FF6B35]", // Orange accent
     },
-    // Borders - Subtle borders for dark mode
+    // Borders - Dark borders for panel, light borders for bubbles
     border: {
-      primary: "border-[#3A3936]", // Subtle dark border
-      secondary: "border-[#4A4946]", // Slightly lighter border
-      input: "border-[#3A3936]",
-      success: "border-green-800",
-      error: "border-red-800",
-      warning: "border-yellow-800",
+      primary: "border-[#2F2F2F]", // Dark border for panel
+      secondary: "border-[#E5E3DF]", // Light border for message bubbles
+      input: "border-[#E5E3DF]",
+      success: "border-green-200",
+      error: "border-red-200",
+      warning: "border-yellow-200",
     },
-    // Interactive states - Subtle hover for dark mode
+    // Interactive states - Subtle hover for light elements
     hover: {
-      primary: "hover:bg-[#2F2E2B]", // Subtle hover
-      secondary: "hover:bg-[#3A3936]", // Slightly lighter hover
-      settings: "hover:text-[#F5F3EF] hover:bg-[#2F2E2B]",
+      primary: "hover:bg-[#EBE9E5]", // Subtle hover on cream
+      secondary: "hover:bg-[#E5E3DF]", // Slightly darker hover
+      settings: "hover:text-white hover:bg-[#3A3A3A]", // Settings button
     },
     // Event log specific colors - Soft pastels for dark mode
     events: {
