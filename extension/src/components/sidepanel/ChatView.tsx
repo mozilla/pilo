@@ -473,9 +473,9 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   };
 
   return (
-    <div className={`h-screen ${t.text.primary} flex flex-col p-4`}>
+    <div className={`h-screen flex flex-col ${t.bg.sidebar}`}>
       <div
-        className={`${t.bg.primary} border ${t.border.primary} rounded-2xl flex flex-col h-full overflow-hidden shadow-lg`}
+        className={`${t.bg.panel} m-6 rounded-2xl flex flex-col flex-1 overflow-hidden shadow-lg`}
       >
         {/* Header */}
         <div className="p-4 flex items-center justify-between">
