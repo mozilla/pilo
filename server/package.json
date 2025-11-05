@@ -30,7 +30,7 @@
     "prettier": "^3.6.2",
     "tsx": "^4.20.4",
     "typescript": "^5.9.3",
-    "vitest": "^1.6.1"
+    "vitest": "^4.0.5"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",

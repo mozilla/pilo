@@ -30,9 +30,13 @@ describe("AgentManager", () => {
       execute: vi.fn().mockResolvedValue({ finalAnswer: "test result" }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(WebAgent).mockImplementation(() => mockWebAgent);
+    vi.mocked(WebAgent).mockImplementation(function () {
+      return mockWebAgent;
+    });
 
-    vi.mocked(ExtensionBrowser).mockImplementation(() => ({}) as any);
+    vi.mocked(ExtensionBrowser).mockImplementation(function () {
+      return {} as any;
+    });
   });
 
   afterEach(() => {

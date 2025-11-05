@@ -4,17 +4,21 @@ import { createRunCommand } from "../../../src/cli/commands/run.js";
 
 // Mock all the dependencies
 vi.mock("../../../src/webAgent.js", () => ({
-  WebAgent: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      success: true,
-      finalAnswer: "Task completed",
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
+  WebAgent: vi.fn().mockImplementation(function () {
+    return {
+      execute: vi.fn().mockResolvedValue({
+        success: true,
+        finalAnswer: "Task completed",
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+  }),
 }));
 
 vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
-  PlaywrightBrowser: vi.fn().mockImplementation(() => ({})),
+  PlaywrightBrowser: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock("../../../src/config.js", () => ({
@@ -29,11 +33,15 @@ vi.mock("../../../src/provider.js", () => ({
 }));
 
 vi.mock("../../../src/loggers/chalkConsole.js", () => ({
-  ChalkConsoleLogger: vi.fn().mockImplementation(() => ({})),
+  ChalkConsoleLogger: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock("../../../src/loggers/json.js", () => ({
-  JSONConsoleLogger: vi.fn().mockImplementation(() => ({})),
+  JSONConsoleLogger: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock("../../../src/cli/utils.js", () => ({
@@ -54,10 +62,12 @@ vi.mock("../../../src/events.js", () => ({
   WebAgentEventType: {
     AI_GENERATION: "ai:generation",
   },
-  WebAgentEventEmitter: vi.fn().mockImplementation(() => ({
-    onEvent: vi.fn(),
-    emit: vi.fn(),
-  })),
+  WebAgentEventEmitter: vi.fn().mockImplementation(function () {
+    return {
+      onEvent: vi.fn(),
+      emit: vi.fn(),
+    };
+  }),
 }));
 
 import { WebAgent } from "../../../src/webAgent.js";
@@ -84,7 +94,7 @@ describe("CLI Run Command", () => {
   beforeEach(() => {
     // Mock process.exit to prevent tests from actually exiting
     originalExit = process.exit;
-    mockExit = vi.fn<Parameters<typeof process.exit>, never>() as any;
+    mockExit = vi.fn() as any;
     process.exit = mockExit as any;
 
     command = createRunCommand();
@@ -191,7 +201,9 @@ describe("CLI Run Command", () => {
         execute: vi.fn().mockResolvedValue({ success: true }),
         close: vi.fn().mockResolvedValue(undefined),
       };
-      mockWebAgent.mockImplementation(() => mockWebAgentInstance as any);
+      mockWebAgent.mockImplementation(function () {
+        return mockWebAgentInstance as any;
+      });
     });
 
     it("should execute with minimal options", async () => {
@@ -477,7 +489,9 @@ describe("CLI Run Command", () => {
 
       // Clear previous mocks and set up new mock before command execution
       vi.clearAllMocks();
-      mockWebAgent.mockImplementation(() => mockWebAgentInstance as any);
+      mockWebAgent.mockImplementation(function () {
+        return mockWebAgentInstance as any;
+      });
 
       const args = ["test task"];
       await command.parseAsync(args, { from: "user" });

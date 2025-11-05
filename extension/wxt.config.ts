@@ -36,7 +36,7 @@ function generateWebExtJSON(): WebExtConfig {
 let config = {
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss()] as any,
   }),
   manifest: ({ browser }: { browser: string }) => {
     // Common configuration for all browsers
