@@ -10,6 +10,8 @@ import { JSONConsoleLogger } from "../../loggers/json.js";
 import { WebAgentEventType, WebAgentEventEmitter } from "../../events.js";
 import * as fs from "fs";
 import * as path from "path";
+import { MetricsCollector } from "../../loggers/metricsCollector.js";
+import { Logger } from "../../loggers/types.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -99,6 +101,11 @@ export function createRunCommand(): Command {
       config.get("proxy_password"),
     )
     .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
+    .option(
+      "--metrics-incremental",
+      "Show incremental metrics updates during task execution",
+      config.get("metrics_incremental", false),
+    )
     .action(executeRunCommand);
 }
 
@@ -136,7 +143,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     }
 
     // Create logger
-    const logger = options.logger === "json" ? new JSONConsoleLogger() : new ChalkConsoleLogger();
+    const logger: Logger = new MetricsCollector(
+      options.logger === "json"
+        ? new JSONConsoleLogger()
+        : new ChalkConsoleLogger({ metricsIncremental: options.metricsIncremental }),
+    );
 
     // Create browser instance
     const browser = new PlaywrightBrowser({

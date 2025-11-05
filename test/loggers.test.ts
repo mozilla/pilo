@@ -793,10 +793,11 @@ describe("JSONConsoleLogger", () => {
         object: { action: "click", ref: "button1" },
         finishReason: "stop",
         usage: {
-          promptTokens: 100,
-          completionTokens: 50,
           totalTokens: 150,
+          inputTokens: 100,
+          outputTokens: 50,
         },
+        providerMetadata: {},
         temperature: 0.7,
         warnings: [],
       };
@@ -813,8 +814,8 @@ describe("JSONConsoleLogger", () => {
       expect(parsed.event).toBe(WebAgentEventType.AI_GENERATION);
       expect(parsed.data.prompt).toBe("Generate a response");
       expect(parsed.data.object).toEqual({ action: "click", ref: "button1" });
-      expect(parsed.data.usage.promptTokens).toBe(100);
-      expect(parsed.data.usage.completionTokens).toBe(50);
+      expect(parsed.data.usage.inputTokens).toBe(100);
+      expect(parsed.data.usage.outputTokens).toBe(50);
       expect(parsed.data.temperature).toBe(0.7);
     });
 
