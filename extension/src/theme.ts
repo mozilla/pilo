@@ -182,9 +182,9 @@ export const theme = {
     // Backgrounds
     bg: {
       sidebar: "bg-[#E5E3DF]", // Light sidebar background in light mode
-      panel: "bg-[#F5F3EF]", // Main panel background (cream/beige)
-      primary: "bg-[#FDFCFA]", // Message bubbles background (off-white)
-      secondary: "bg-[#F5F3EF]", // Secondary message bubbles (cream)
+      panel: "bg-[#FDFCFA]", // Main panel background (off-white) - match AI messages
+      primary: "bg-[#F5F3EF]", // Message bubbles background (cream) - user messages
+      secondary: "bg-[#FDFCFA]", // Secondary message bubbles (off-white) - AI messages pop more
       tertiary: "bg-[#EBE9E5]", // Tertiary background (darker cream)
       input: "bg-white",
       success: "bg-green-50",
@@ -241,9 +241,9 @@ export const theme = {
     // Backgrounds - Light cream panel (same as light mode)
     bg: {
       sidebar: "bg-[#1C1B22]", // Dark sidebar bg to match Firefox extension bar
-      panel: "bg-[#F5F3EF]", // Light cream panel background
-      primary: "bg-[#FDFCFA]", // Light off-white message bubbles
-      secondary: "bg-[#F5F3EF]", // Light cream message bubbles
+      panel: "bg-[#FDFCFA]", // Light off-white panel background 
+      primary: "bg-[#F5F3EF]", // Light cream message bubbles - User messages
+      secondary: "bg-[#FDFCFA]", // Light off-white message bubbles - AI messages
       tertiary: "bg-[#EBE9E5]", // Darker cream for system messages
       input: "bg-white", // White input background
       success: "bg-green-50",
