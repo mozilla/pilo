@@ -26,7 +26,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       expect(tools.create_plan.description).toBe(
-        "Create a step-by-step plan for completing the task",
+        "Create a step-by-step plan for completing the task, formatted as Markdown",
       );
     });
 
@@ -34,7 +34,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       expect(tools.create_plan_with_url.description).toBe(
-        "Create a step-by-step plan and determine the best starting URL",
+        "Create a step-by-step plan formatted as Markdown and determine the best starting URL",
       );
     });
 

@@ -63,7 +63,7 @@ export const TOOL_STRINGS = {
     done: {
       description: "Complete the task with your final answer",
       result:
-        "The complete, standalone deliverable that fulfills the user's request. Be concise. This will be used on its own.",
+        "The complete, standalone deliverable in Markdown format. Use headers, lists, bold text, and links. NEVER use raw JSON - format all data as readable Markdown.",
     },
     abort: {
       description:
@@ -80,14 +80,15 @@ export const TOOL_STRINGS = {
     /** Common parameter descriptions */
     common: {
       successCriteria: "What would make a great response - key information and detail level needed",
-      plan: "Step-by-step plan for the task",
+      plan: "Step-by-step plan for the task, formatted as Markdown",
     },
     /** Individual tool descriptions */
     create_plan: {
-      description: "Create a step-by-step plan for completing the task",
+      description: "Create a step-by-step plan for completing the task, formatted as Markdown",
     },
     create_plan_with_url: {
-      description: "Create a step-by-step plan and determine the best starting URL",
+      description:
+        "Create a step-by-step plan formatted as Markdown and determine the best starting URL",
       url: "Starting URL for the task",
     },
   },
@@ -270,7 +271,10 @@ Provide your final answer:
 - Match the depth to the task (brief for simple queries, detailed for research)
 - Write naturally and informatively
 - Include all requested information
-- Use a format that's easy to read and use
+- Format results as readable Markdown (use headers, lists, bold text, links)
+- NEVER return raw JSON - always format structured data as Markdown
+- For multiple items: use numbered lists or separate sections with headers
+- For URLs: create proper Markdown links [text](url)
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
