@@ -63,7 +63,7 @@ export const TOOL_STRINGS = {
     done: {
       description: "Complete the task with your final answer",
       result:
-        "The complete, standalone deliverable in Markdown format. Use headers, lists, bold text, and links. NEVER use raw JSON - format all data as readable Markdown.",
+        "The complete, standalone deliverable in Markdown format. NEVER use raw JSON - format all data as Markdown.",
     },
     abort: {
       description:
@@ -271,10 +271,8 @@ Provide your final answer:
 - Match the depth to the task (brief for simple queries, detailed for research)
 - Write naturally and informatively
 - Include all requested information
-- Format results as readable Markdown (use headers, lists, bold text, links)
+- Format results as readable Markdown
 - NEVER return raw JSON - always format structured data as Markdown
-- For multiple items: use numbered lists or separate sections with headers
-- For URLs: create proper Markdown links [text](url)
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
