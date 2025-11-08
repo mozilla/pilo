@@ -44,11 +44,6 @@ vi.mock("../../../src/useSystemTheme", () => ({
   }),
 }));
 
-// Mock marked library
-vi.mock("marked", () => ({
-  marked: (content: string) => content,
-}));
-
 // Mock useChat hook
 const mockMessages: any[] = [];
 const mockAddMessage = vi.fn();
@@ -496,6 +491,113 @@ describe("ChatView", () => {
       expect(firstUserIdx).toBeGreaterThan(welcomeIdx);
       expect(apiKeyIdx).toBeGreaterThan(firstUserIdx);
       expect(secondUserIdx).toBeGreaterThan(apiKeyIdx);
+    });
+  });
+
+  describe("Markdown Rendering", () => {
+    it("renders double newlines as separate paragraphs with spacing", () => {
+      // Arrange: Create a message with double newlines
+      const now = new Date();
+      const messages = [
+        {
+          id: "msg1",
+          type: "result",
+          content: "Line 1\n\nLine 2",
+          taskId: "task1",
+          timestamp: now,
+        },
+      ];
+
+      mockMessages.push(...messages);
+
+      // Act: Render the component
+      render(<ChatView {...defaultProps} />);
+
+      // Assert: Should have two separate <p> elements
+      const paragraphs = screen.getAllByText(/Line \d/);
+      expect(paragraphs).toHaveLength(2);
+
+      // Find the parent container of the paragraphs
+      const firstP = paragraphs[0].closest("p");
+      const secondP = paragraphs[1].closest("p");
+
+      expect(firstP).toBeInTheDocument();
+      expect(secondP).toBeInTheDocument();
+      expect(firstP).not.toBe(secondP); // They should be different elements
+
+      // Verify the markdown-content class is present (which provides spacing via CSS)
+      const markdownContainer = firstP?.closest(".markdown-content");
+      expect(markdownContainer).toBeInTheDocument();
+    });
+
+    it("renders markdown lists correctly", () => {
+      // Arrange: Create messages with both bullet and numbered lists
+      const now = new Date();
+      const messages = [
+        {
+          id: "msg1",
+          type: "result",
+          content: "Items:\n- Item 1\n- Item 2\n- Item 3",
+          taskId: "task1",
+          timestamp: new Date(now.getTime() - 1000),
+        },
+        {
+          id: "msg2",
+          type: "result",
+          content: "Steps:\n1. First\n2. Second\n3. Third",
+          taskId: "task2",
+          timestamp: now,
+        },
+      ];
+
+      mockMessages.push(...messages);
+
+      // Act: Render the component
+      render(<ChatView {...defaultProps} />);
+
+      // Assert: Should have bullet list (ul) with list items
+      const bulletLists = document.querySelectorAll("ul");
+      expect(bulletLists.length).toBeGreaterThan(0);
+
+      const bulletItems = document.querySelectorAll("ul li");
+      expect(bulletItems.length).toBeGreaterThanOrEqual(3);
+
+      // Assert: Should have numbered list (ol) with list items
+      const numberedLists = document.querySelectorAll("ol");
+      expect(numberedLists.length).toBeGreaterThan(0);
+
+      const numberedItems = document.querySelectorAll("ol li");
+      expect(numberedItems.length).toBeGreaterThanOrEqual(3);
+
+      // Verify list items contain expected text
+      expect(document.body.textContent).toContain("Item 1");
+      expect(document.body.textContent).toContain("First");
+    });
+
+    it("applies theme classes to markdown content", () => {
+      // Arrange: Create a message with markdown content
+      const now = new Date();
+      const messages = [
+        {
+          id: "msg1",
+          type: "result",
+          content: "Test content",
+          taskId: "task1",
+          timestamp: now,
+        },
+      ];
+
+      mockMessages.push(...messages);
+
+      // Act: Render the component
+      render(<ChatView {...defaultProps} />);
+
+      // Assert: markdown-content class should be present
+      const markdownContainer = document.querySelector(".markdown-content");
+      expect(markdownContainer).toBeInTheDocument();
+
+      // Verify the content is rendered
+      expect(markdownContainer?.textContent).toContain("Test content");
     });
   });
 });

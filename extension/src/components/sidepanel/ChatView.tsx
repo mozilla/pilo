@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
-import { marked } from "marked";
+import Markdown from "marked-react";
 import clsx from "clsx";
 import { ChatMessage } from "../../ChatMessage";
 import { useChat } from "../../useChat";
@@ -34,25 +34,23 @@ interface ChatViewProps {
   onOpenSettings: () => void;
 }
 
-// Markdown rendering utilities
-const renderMarkdown = (content: string): string => {
-  return marked(content, {
-    breaks: false,
-    gfm: true,
-  }) as string;
-};
-
-// Markdown content component
+/**
+ * Renders markdown with marked-react which provides better security by preventing XSS attacks through
+ * HTML injection. The component supports GitHub Flavored Markdown (GFM) and handles
+ * line breaks properly.
+ *
+ * @param children - The markdown content to render
+ * @param className - Optional additional CSS classes to apply
+ */
 interface MarkdownContentProps {
   children: string;
   className?: string;
 }
 
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div
-    className={clsx("markdown-content", className)}
-    dangerouslySetInnerHTML={{ __html: renderMarkdown(children) }}
-  />
+  <div className={clsx("markdown-content", className)}>
+    <Markdown value={children} breaks gfm />
+  </div>
 );
 
 // Task message component
