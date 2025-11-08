@@ -30,11 +30,10 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.16",
-    "@types/marked": "^6.0.0",
     "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "clsx": "^2.1.1",
-    "marked": "^16.0.0",
+    "marked-react": "^3.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "spark": "file:..",
