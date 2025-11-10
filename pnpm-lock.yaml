@@ -15,8 +15,8 @@ importers:
         specifier: ^3.0.55
         version: 3.0.55(zod@4.1.12)
       '@ai-sdk/openai':
-        specifier: ^2.0.15
-        version: 2.0.27(zod@4.1.12)
+        specifier: ^2.0.64
+        version: 2.0.64(zod@4.1.12)
       '@ai-sdk/openai-compatible':
         specifier: ^1.0.7
         version: 1.0.15(zod@4.1.12)
@@ -245,11 +245,11 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/openai@2.0.27':
-    resolution: {integrity: sha512-5fUFBlE9qGFgezVIVkzQk87qZYkxsn5PsedtCFPoGxHK6c2QVYHuD1UcrVIKt0elr043Vx17Xo/gS5oJAR5YEQ==}
+  '@ai-sdk/openai@2.0.64':
+    resolution: {integrity: sha512-+1mqxn42uB32DPZ6kurSyGAmL3MgCaDpkYU7zNDWI4NLy3Zg97RxTsI1jBCGIqkEVvRZKJlIMYtb89OvMnq3AQ==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^3.25.76 || ^4
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/provider-utils@3.0.12':
     resolution: {integrity: sha512-ZtbdvYxdMoria+2SlNarEk6Hlgyf+zzcznlD55EAl+7VZvJaSg2sqPvwArY7L6TfDEDJsnCq0fdhBSkYo0Xqdg==}
@@ -3505,10 +3505,10 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
       zod: 4.1.12
 
-  '@ai-sdk/openai@2.0.27(zod@4.1.12)':
+  '@ai-sdk/openai@2.0.64(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.12)
+      '@ai-sdk/provider-utils': 3.0.16(zod@4.1.12)
       zod: 4.1.12
 
   '@ai-sdk/provider-utils@3.0.12(zod@4.1.12)':
@@ -5987,7 +5987,7 @@ snapshots:
     dependencies:
       '@ai-sdk/google': 2.0.28(zod@4.1.12)
       '@ai-sdk/google-vertex': 3.0.55(zod@4.1.12)
-      '@ai-sdk/openai': 2.0.27(zod@4.1.12)
+      '@ai-sdk/openai': 2.0.64(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.11.6(playwright@1.56.1)
       '@openrouter/ai-sdk-provider': 1.2.0(ai@5.0.87(zod@4.1.12))(zod@4.1.12)
