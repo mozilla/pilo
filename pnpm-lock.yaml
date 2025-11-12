@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.30
         version: 2.0.31(zod@4.1.12)
       '@ai-sdk/google-vertex':
-        specifier: ^3.0.55
-        version: 3.0.55(zod@4.1.12)
+        specifier: ^3.0.62
+        version: 3.0.62(zod@4.1.12)
       '@ai-sdk/openai':
         specifier: ^2.0.64
         version: 2.0.65(zod@4.1.12)
@@ -209,8 +209,8 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/anthropic@2.0.39':
-    resolution: {integrity: sha512-8YckXsPN9e0NfU4zZvP23xCIKNESyYb1Y/xVllI1fZ+uVsd/shoz2zplbeGVQHPjXHWfY9aT5tF98Lp920HDIQ==}
+  '@ai-sdk/anthropic@2.0.44':
+    resolution: {integrity: sha512-o8TfNXRzO/KZkBrcx+CL9LQsPhx7PHyqzUGjza3TJaF9WxfH1S5UQLAmEw8F7lQoHNLU0IX03WT8o8R/4JbUxQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -221,14 +221,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google-vertex@3.0.55':
-    resolution: {integrity: sha512-nUAIQywTzVXbKMYibq2vbjTRorrhWQcKJ/j1mwZKyPahLX41wh1kn8Fbwjxhd7ECeEJEZpJCnQh8OlQ1CeTO7Q==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/google@2.0.25':
-    resolution: {integrity: sha512-tH2rA3428jnY6COoPfKB/BoQMs57sv9t+PEdyIB9ePtlV9dnVUbfKcdKoEcAaVffNZ6pzk8otrQYnu67pyn8TQ==}
+  '@ai-sdk/google-vertex@3.0.62':
+    resolution: {integrity: sha512-2TvmbxJ8BR7tFpvIcNWKcMaKS7G2yoIO2ZZXMX4F6UfJLuwZkO5j2xGeVs5TNbILEYVOTzN+CfjUTKsLpe7DRQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -253,12 +247,6 @@ packages:
 
   '@ai-sdk/provider-utils@3.0.12':
     resolution: {integrity: sha512-ZtbdvYxdMoria+2SlNarEk6Hlgyf+zzcznlD55EAl+7VZvJaSg2sqPvwArY7L6TfDEDJsnCq0fdhBSkYo0Xqdg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider-utils@3.0.14':
-    resolution: {integrity: sha512-CYRU6L7IlR7KslSBVxvlqlybQvXJln/PI57O8swhOaDIURZbjRP2AY3igKgUsrmWqqnFFUHP+AwTN8xqJAknnA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3468,10 +3456,10 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@2.0.39(zod@4.1.12)':
+  '@ai-sdk/anthropic@2.0.44(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
+      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
       zod: 4.1.12
 
   '@ai-sdk/gateway@2.0.6(zod@4.1.12)':
@@ -3481,23 +3469,17 @@ snapshots:
       '@vercel/oidc': 3.0.3
       zod: 4.1.12
 
-  '@ai-sdk/google-vertex@3.0.55(zod@4.1.12)':
+  '@ai-sdk/google-vertex@3.0.62(zod@4.1.12)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.39(zod@4.1.12)
-      '@ai-sdk/google': 2.0.25(zod@4.1.12)
+      '@ai-sdk/anthropic': 2.0.44(zod@4.1.12)
+      '@ai-sdk/google': 2.0.31(zod@4.1.12)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
+      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
       google-auth-library: 9.15.1
       zod: 4.1.12
     transitivePeerDependencies:
       - encoding
       - supports-color
-
-  '@ai-sdk/google@2.0.25(zod@4.1.12)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.14(zod@4.1.12)
-      zod: 4.1.12
 
   '@ai-sdk/google@2.0.31(zod@4.1.12)':
     dependencies:
@@ -3518,13 +3500,6 @@ snapshots:
       zod: 4.1.12
 
   '@ai-sdk/provider-utils@3.0.12(zod@4.1.12)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
-      eventsource-parser: 3.0.6
-      zod: 4.1.12
-
-  '@ai-sdk/provider-utils@3.0.14(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -5999,7 +5974,7 @@ snapshots:
   'spark@file:':
     dependencies:
       '@ai-sdk/google': 2.0.31(zod@4.1.12)
-      '@ai-sdk/google-vertex': 3.0.55(zod@4.1.12)
+      '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
       '@ai-sdk/openai': 2.0.65(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.15(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.11.6(playwright@1.56.1)
