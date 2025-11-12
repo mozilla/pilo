@@ -68,7 +68,7 @@
     "@ghostery/adblocker-playwright": "^2.12.5",
     "@openrouter/ai-sdk-provider": "^1.1.2",
     "@types/turndown": "^5.0.5",
-    "ai": "^5.0.87",
+    "ai": "^5.0.93",
     "chalk": "^5.5.0",
     "commander": "^14.0.2",
     "cross-fetch": "^4.1.0",
