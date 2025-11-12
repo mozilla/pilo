@@ -61,7 +61,7 @@
     "vitest": "^4.0.5"
   },
   "dependencies": {
-    "@ai-sdk/google": "^2.0.27",
+    "@ai-sdk/google": "^2.0.30",
     "@ai-sdk/google-vertex": "^3.0.55",
     "@ai-sdk/openai": "^2.0.64",
     "@ai-sdk/openai-compatible": "^1.0.7",
