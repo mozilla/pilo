@@ -48,6 +48,7 @@ const MAX_VALIDATION_RETRIES = 3;
  * Non-user-facing errors include:
  * - Validation errors during retry attempts (below MAX_VALIDATION_RETRIES)
  * - Recoverable browser action errors (agent will retry automatically)
+ * - AI generation errors marked as tool errors (agent will retry)
  *
  * @param eventType - The type of error event
  * @param data - The error event data
@@ -62,6 +63,11 @@ export function shouldDisplayError(eventType: string, data: any): boolean {
   // Filter recoverable browser action errors
   if (eventType === "browser:action:completed" && data.success === false) {
     return !data.isRecoverable;
+  }
+
+  // Filter AI generation errors that are tool errors (will be retried)
+  if (eventType === "ai:generation:error") {
+    return !data.isToolError;
   }
 
   // Show all other errors by default
@@ -295,11 +301,12 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           addMessage("status", typedMessage.event.data.message, currentTaskId);
         }
 
-        // Handle AI generation errors
+        // Handle AI generation errors (only show non-tool errors)
         if (
           typedMessage.event.type === "ai:generation:error" &&
           typedMessage.event.data?.error &&
-          currentTaskId
+          currentTaskId &&
+          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
         ) {
           addMessage("error", `AI Error: ${typedMessage.event.data.error}`, currentTaskId);
         }
