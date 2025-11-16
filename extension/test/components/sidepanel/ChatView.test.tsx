@@ -1,7 +1,8 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import ChatView from "../../../src/components/sidepanel/ChatView";
+import ChatView, { shouldDisplayError } from "../../../src/components/sidepanel/ChatView";
 import { theme } from "../../../src/theme";
+import browser from "webextension-polyfill";
 
 // Mock the browser API
 vi.mock("webextension-polyfill", () => ({
@@ -49,6 +50,7 @@ const mockMessages: any[] = [];
 const mockAddMessage = vi.fn();
 const mockStartTask = vi.fn();
 const mockEndTask = vi.fn();
+let mockCurrentTaskId: string | null = null;
 
 vi.mock("../../../src/useChat", () => ({
   useChat: () => ({
@@ -59,7 +61,9 @@ vi.mock("../../../src/useChat", () => ({
     messagesEndRef: { current: null },
     scrollContainerRef: { current: null },
     handleScroll: vi.fn(),
-    currentTaskId: null,
+    get currentTaskId() {
+      return mockCurrentTaskId;
+    },
     isExecuting: false,
     setExecutionState: vi.fn(),
     clearMessages: vi.fn(),
@@ -83,6 +87,7 @@ describe("ChatView", () => {
   beforeEach(() => {
     // Clear mock messages before each test
     mockMessages.length = 0;
+    mockCurrentTaskId = null;
     vi.clearAllMocks();
   });
 
@@ -491,6 +496,209 @@ describe("ChatView", () => {
       expect(firstUserIdx).toBeGreaterThan(welcomeIdx);
       expect(apiKeyIdx).toBeGreaterThan(firstUserIdx);
       expect(secondUserIdx).toBeGreaterThan(apiKeyIdx);
+    });
+  });
+
+  describe("Error Filtering", () => {
+    describe("shouldDisplayError", () => {
+      it("should hide validation errors during retries (retryCount < 3)", () => {
+        // Arrange: Test validation error with low retry count
+        const eventType = "task:validation_error";
+        const eventData = {
+          errors: ["Validation failed"],
+          retryCount: 1,
+        };
+
+        // Act
+        const result = shouldDisplayError(eventType, eventData);
+
+        // Assert: Should return false (hide from user)
+        expect(result).toBe(false);
+      });
+
+      it("should show validation errors when max retries exceeded", () => {
+        // Arrange: Test validation error with high retry count
+        const eventType = "task:validation_error";
+        const eventData = {
+          errors: ["Validation failed"],
+          retryCount: 3,
+        };
+
+        // Act
+        const result = shouldDisplayError(eventType, eventData);
+
+        // Assert: Should return true (show to user)
+        expect(result).toBe(true);
+      });
+
+      it("should hide recoverable browser action errors", () => {
+        // Arrange: Test browser action error marked as recoverable
+        const eventType = "browser:action:completed";
+        const eventData = {
+          success: false,
+          error: "Element not found",
+          isRecoverable: true,
+        };
+
+        // Act
+        const result = shouldDisplayError(eventType, eventData);
+
+        // Assert: Should return false (hide from user)
+        expect(result).toBe(false);
+      });
+
+      it("should show non-recoverable browser action errors", () => {
+        // Arrange: Test browser action error not marked as recoverable
+        const eventType = "browser:action:completed";
+        const eventData = {
+          success: false,
+          error: "Fatal browser error",
+          isRecoverable: false,
+        };
+
+        // Act
+        const result = shouldDisplayError(eventType, eventData);
+
+        // Assert: Should return true (show to user)
+        expect(result).toBe(true);
+      });
+
+      it("should show all other event types by default", () => {
+        // Arrange: Test unknown event type
+        const eventType = "unknown:event";
+        const eventData = {
+          error: "Some error",
+        };
+
+        // Act
+        const result = shouldDisplayError(eventType, eventData);
+
+        // Assert: Should return true (show to user by default)
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("Integration: Error filtering in event handlers", () => {
+      beforeEach(() => {
+        vi.clearAllMocks();
+      });
+
+      it("should not add error message for validation errors during retries", () => {
+        // Arrange: Render component to register the handler
+        render(<ChatView {...defaultProps} />);
+
+        // Get the registered handler from the mock
+        const mockAddListener = browser.runtime.onMessage.addListener as any;
+        expect(mockAddListener).toHaveBeenCalled();
+        const registeredHandler = mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+
+        // Act: Simulate validation error event with retryCount < 3
+        registeredHandler({
+          type: "realtimeEvent",
+          event: {
+            type: "task:validation_error",
+            data: {
+              errors: ["Validation failed"],
+              retryCount: 1,
+            },
+          },
+        });
+
+        // Assert: addMessage should NOT have been called for error
+        expect(mockAddMessage).not.toHaveBeenCalledWith(
+          "error",
+          expect.stringContaining("Validation Error"),
+          expect.anything()
+        );
+      });
+
+      it("should add error message for validation errors when max retries exceeded", () => {
+        // Arrange: Set currentTaskId before rendering
+        mockCurrentTaskId = "task-123";
+        render(<ChatView {...defaultProps} />);
+
+        // Get the registered handler
+        const mockAddListener = browser.runtime.onMessage.addListener as any;
+        const registeredHandler = mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+
+        // Act: Simulate validation error with retryCount >= 3
+        registeredHandler({
+          type: "realtimeEvent",
+          event: {
+            type: "task:validation_error",
+            data: {
+              errors: ["Max retries exceeded"],
+              retryCount: 3,
+            },
+          },
+        });
+
+        // Assert: addMessage SHOULD have been called
+        expect(mockAddMessage).toHaveBeenCalledWith(
+          "error",
+          "Validation Error: Max retries exceeded",
+          "task-123"
+        );
+      });
+
+      it("should not add error message for recoverable browser action errors", () => {
+        // Arrange
+        render(<ChatView {...defaultProps} />);
+
+        // Get the registered handler
+        const mockAddListener = browser.runtime.onMessage.addListener as any;
+        const registeredHandler = mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+
+        // Act: Simulate recoverable browser error
+        registeredHandler({
+          type: "realtimeEvent",
+          event: {
+            type: "browser:action:completed",
+            data: {
+              success: false,
+              error: "Element not found",
+              isRecoverable: true,
+            },
+          },
+        });
+
+        // Assert: addMessage should NOT have been called
+        expect(mockAddMessage).not.toHaveBeenCalledWith(
+          "error",
+          expect.stringContaining("Action Failed"),
+          expect.anything()
+        );
+      });
+
+      it("should add error message for non-recoverable browser action errors", () => {
+        // Arrange: Set currentTaskId before rendering
+        mockCurrentTaskId = "task-456";
+        render(<ChatView {...defaultProps} />);
+
+        // Get the registered handler
+        const mockAddListener = browser.runtime.onMessage.addListener as any;
+        const registeredHandler = mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+
+        // Act: Simulate non-recoverable browser error
+        registeredHandler({
+          type: "realtimeEvent",
+          event: {
+            type: "browser:action:completed",
+            data: {
+              success: false,
+              error: "Fatal browser crash",
+              isRecoverable: false,
+            },
+          },
+        });
+
+        // Assert: addMessage SHOULD have been called
+        expect(mockAddMessage).toHaveBeenCalledWith(
+          "error",
+          "Action Failed: Fatal browser crash",
+          "task-456"
+        );
+      });
     });
   });
 
