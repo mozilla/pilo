@@ -71,7 +71,11 @@ export function ChatMessage({
 
         {/* Show content if not streaming or if streaming is finished */}
         {(!isStreaming || content) && (
-          <div className="text-sm whitespace-pre-wrap">{renderContent(content)}</div>
+          <div
+            className={`${isUser ? "text-message-user" : "text-message-assistant"} whitespace-pre-wrap`}
+          >
+            {renderContent(content)}
+          </div>
         )}
 
         {/* Show loading indicator if streaming and no content yet */}

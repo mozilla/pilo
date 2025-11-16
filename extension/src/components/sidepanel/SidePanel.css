@@ -13,12 +13,20 @@
 
 /* Add custom styles to Tailwind's components layer to ensure they're included in build */
 @layer components {
-  .markdown-content p {
-    margin-bottom: 1em;
+  /* Semantic classes for message content with enhanced readability */
+  .text-message-user {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    font-weight: 500;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
 
-  .markdown-content p:last-child {
-    margin-bottom: 0;
+  .text-message-assistant {
+    font-size: 1rem;
+    line-height: 1.5;
+    font-weight: 500;
+    font-family: Georgia, "Times New Roman", Times, serif;
   }
 
   /* Restore list styles for markdown content */
