@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: spark-batch-github-eval-
+  namespace: argo
+spec:
+  workflowTemplateRef:
+    name: spark-batch-eval-from-file
+  arguments:
+    parameters:
+      # Use regular nodes for CI/CD reliability (no preemption)
+      - name: node-type
+        value: "regular"
+      - name: evaluations-gcs-key
+        value: "${EVALUATIONS_GCS_KEY}"
+      # Agent configuration
+      - name: agent-type
+        value: "spark"
+      - name: agent-version
+        value: "${GITHUB_SHA}"
+      # Agent build metadata
+      - name: agent-build-id
+        value: "${GITHUB_SHA}"
+      - name: agent-build-date
+        value: "${HEAD_COMMIT_TIMESTAMP}"
+      # GitHub context for status updates
+      - name: github-repo
+        value: "${GITHUB_REPOSITORY}"
+      - name: github-sha
+        value: "${GITHUB_SHA}"
+      - name: github-ref
+        value: "${GITHUB_REF}"
+      - name: github-run-id
+        value: "${GITHUB_RUN_ID}"
+      # Secret name containing GitHub token
+      - name: github-token-secret
+        value: "github-token-${GITHUB_RUN_ID}"

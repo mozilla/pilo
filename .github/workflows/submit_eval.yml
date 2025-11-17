@@ -1,0 +1,95 @@
+name: Submit Spark Evals Workflow
+
+on:
+  push:
+    branches:
+      - "evals/**"
+  pull_request:
+    branches:
+      - "evals/**"
+
+permissions:
+  contents: read
+  statuses: write # Required for updating commit status via GitHub API
+
+jobs:
+  build-spark-server-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.EVALS_GCP_SA_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker gcr.io
+
+      - name: Build and Push Spark Server Image
+        env:
+          PROJECT_ID: ${{ vars.EVALS_GCP_PROJECT_ID }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building Spark server image with tag: $IMAGE_TAG"
+
+          docker build \
+            --platform linux/amd64 \
+            -f ./server/Dockerfile \
+            -t spark-server:$IMAGE_TAG \
+            .
+
+          docker tag spark-server:$IMAGE_TAG gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG
+          docker push gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG
+
+          echo "✅ Image pushed to gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG"
+
+  submit-evals-workflow:
+    needs: build-spark-server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.EVALS_GCP_SA_KEY }}
+
+      - name: Activate Service Account for gcloud/gsutil
+        run: |
+          # Activate the service account so gcloud/gsutil can use it
+          gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+          gcloud config set project ${{ vars.EVALS_GCP_PROJECT_ID }}
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.EVALS_GKE_CLUSTER_NAME }}
+          location: ${{ vars.EVALS_GKE_CLUSTER_ZONE }}
+
+      - name: Submit Argo Workflow
+        id: submit
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+          HEAD_COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+        run: |
+          ./scripts/evals/submit-eval-workflow.sh
+
+      - name: Wait for Workflow Completion
+        run: |
+          ./scripts/evals/wait-for-workflow.sh
+
+      - name: Cleanup GitHub Token Secret
+        if: always()
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          ./scripts/evals/cleanup-secrets.sh
