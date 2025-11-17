@@ -50,8 +50,6 @@ jobs:
                 value: "eval-inputs/test.jsonl"
               - name: agent-version
                 value: "latest"
-              - name: judge-version
-                value: "latest"
               # GitHub context for status updates
               - name: github-repo
                 value: "${{ github.repository }}"
@@ -68,12 +66,43 @@ jobs:
 
           echo "Workflow submitted successfully"
 
-          # Optional: Wait for workflow to complete and get status
+          # Get the workflow name
           WORKFLOW_NAME=$(kubectl get workflows -n argo --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
           echo "Workflow name: $WORKFLOW_NAME"
           echo "View in Argo UI:"
           echo "kubectl -n argo port-forward service/argo-server 2746:2746"
           echo "https://localhost:2746/workflows/argo/$WORKFLOW_NAME"
+
+      - name: Wait for Workflow Completion
+        run: |
+          WORKFLOW_NAME=$(kubectl get workflows -n argo --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+          echo "Waiting for workflow $WORKFLOW_NAME to complete..."
+
+          # Wait for workflow to complete (max 60 minutes)
+          TIMEOUT=3600
+          ELAPSED=0
+          INTERVAL=10
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            PHASE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}')
+            echo "[$ELAPSED s] Workflow phase: $PHASE"
+
+            if [ "$PHASE" = "Succeeded" ]; then
+              echo "✅ Workflow completed successfully!"
+              exit 0
+            elif [ "$PHASE" = "Failed" ] || [ "$PHASE" = "Error" ]; then
+              echo "❌ Workflow failed with phase: $PHASE"
+              echo "View logs with: kubectl logs -n argo -l workflows.argoproj.io/workflow=$WORKFLOW_NAME"
+              exit 1
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "⏱️ Workflow timed out after ${TIMEOUT}s"
+          echo "Current phase: $(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}')"
+          exit 1
 
       - name: Cleanup GitHub Token Secret
         if: always()
