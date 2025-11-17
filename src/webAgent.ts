@@ -665,7 +665,12 @@ export class WebAgent {
     // Process tool results
     if (!aiResponse?.toolResults?.length) {
       console.error("[WebAgent] No tools called in action generation");
-      throw new Error("You must use exactly one tool. Please use one of the available tools.");
+      throw new ToolExecutionError(
+        "You must use exactly one tool. Please use one of the available tools.",
+        {
+          action: "none",
+        },
+      );
     }
 
     const toolResult = aiResponse.toolResults[0];
