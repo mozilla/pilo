@@ -221,6 +221,23 @@ describe("Web Action Tools", () => {
       expect(result.isRecoverable).toBe(true);
     });
 
+    it("should emit BROWSER_ACTION_COMPLETED with isRecoverable and error on browser exception", async () => {
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("click", "Element is not clickable"),
+      );
+
+      await tools.click.execute({ ref: "btn1" });
+
+      // Should emit BROWSER_ACTION_COMPLETED with error details
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: false,
+        action: "click",
+        error: "Element is not clickable",
+        isRecoverable: true,
+      });
+    });
+
     it("should re-throw non-browser errors", async () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(new Error("Network error"));
 
