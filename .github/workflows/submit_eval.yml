@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write  # Required for updating commit status via GitHub API
 
 jobs:
   submit-workflow:
@@ -39,7 +40,7 @@ jobs:
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
           metadata:
-            generateName: spark-batch-eval-
+            generateName: spark-batch-github-eval-
             namespace: argo
           spec:
             workflowTemplateRef:
