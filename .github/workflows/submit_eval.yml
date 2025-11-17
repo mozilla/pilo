@@ -1,0 +1,82 @@
+name: Submit Argo Eval Workflow
+
+on:
+  push:
+    branches:
+      - 'evals/**'
+  pull_request:
+    branches:
+      - 'evals/**'
+
+permissions:
+  contents: read
+
+jobs:
+  submit-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.EVALS_GCP_SA_KEY }}
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.EVALS_GKE_CLUSTER_NAME }}
+          location: ${{ vars.EVALS_GKE_CLUSTER_ZONE }}
+
+      - name: Submit Argo Workflow
+        run: |
+          # Create a Kubernetes secret with the GitHub token for this workflow
+          kubectl create secret generic github-token-${{ github.run_id }} \
+            -n argo \
+            --from-literal=token=${{ secrets.GITHUB_TOKEN }}
+
+          kubectl create -f - <<EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            generateName: spark-batch-eval-
+            namespace: argo
+          spec:
+            workflowTemplateRef:
+              name: spark-batch-eval-from-file
+            arguments:
+              parameters:
+              - name: evaluations-gcs-key
+                value: "eval-inputs/test.jsonl"
+              - name: agent-version
+                value: "latest"
+              - name: judge-version
+                value: "latest"
+              # GitHub context for status updates
+              - name: github-repo
+                value: "${{ github.repository }}"
+              - name: github-sha
+                value: "${{ github.sha }}"
+              - name: github-ref
+                value: "${{ github.ref }}"
+              - name: github-run-id
+                value: "${{ github.run_id }}"
+              # Secret name containing GitHub token
+              - name: github-token-secret
+                value: "github-token-${{ github.run_id }}"
+          EOF
+
+          echo "Workflow submitted successfully"
+
+          # Optional: Wait for workflow to complete and get status
+          WORKFLOW_NAME=$(kubectl get workflows -n argo --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+          echo "Workflow name: $WORKFLOW_NAME"
+          echo "View in Argo UI:"
+          echo "kubectl -n argo port-forward service/argo-server 2746:2746"
+          echo "https://localhost:2746/workflows/argo/$WORKFLOW_NAME"
+
+      - name: Cleanup GitHub Token Secret
+        if: always()
+        run: |
+          # Clean up the temporary secret after workflow submission
+          kubectl delete secret github-token-${{ github.run_id }} -n argo --ignore-not-found=true
