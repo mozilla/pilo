@@ -1,4 +1,4 @@
-name: Submit Argo Eval Workflow
+name: Submit Spark Evals Workflow
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
   statuses: write  # Required for updating commit status via GitHub API
 
 jobs:
-  submit-workflow:
+  spark-evals-submit-workflow:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,8 +85,27 @@ jobs:
           INTERVAL=10
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
+            # Get workflow status details
             PHASE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}')
-            echo "[$ELAPSED s] Workflow phase: $PHASE"
+            PROGRESS=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.progress}')
+            MESSAGE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.message}')
+
+            # Count node statuses
+            SUCCEEDED=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Succeeded")] | length')
+            FAILED=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Failed")] | length')
+            RUNNING=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Running")] | length')
+
+            # Build status line
+            STATUS_LINE="[$ELAPSED s] Phase: $PHASE"
+            if [ -n "$PROGRESS" ]; then
+              STATUS_LINE="$STATUS_LINE | Progress: $PROGRESS"
+            fi
+            STATUS_LINE="$STATUS_LINE | ✅ $SUCCEEDED | ❌ $FAILED | ⚙️  $RUNNING"
+            if [ -n "$MESSAGE" ]; then
+              STATUS_LINE="$STATUS_LINE | $MESSAGE"
+            fi
+
+            echo "$STATUS_LINE"
 
             if [ "$PHASE" = "Succeeded" ]; then
               echo "✅ Workflow completed successfully!"
