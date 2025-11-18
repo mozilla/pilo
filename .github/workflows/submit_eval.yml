@@ -29,6 +29,31 @@ jobs:
           cluster_name: ${{ vars.EVALS_GKE_CLUSTER_NAME }}
           location: ${{ vars.EVALS_GKE_CLUSTER_ZONE }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker gcr.io
+
+      - name: Build and Push Spark Server Image
+        env:
+          PROJECT_ID: ${{ vars.EVALS_GCP_PROJECT_ID }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building Spark server image with tag: $IMAGE_TAG"
+
+          docker build \
+            --platform linux/amd64 \
+            -f ./server/Dockerfile \
+            -t spark-server:$IMAGE_TAG \
+            .
+
+          docker tag spark-server:$IMAGE_TAG gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG
+          docker push gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG
+
+          echo "✅ Image pushed to gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG"
+
       - name: Submit Argo Workflow
         run: |
           # Create a Kubernetes secret with the GitHub token for this workflow
@@ -50,7 +75,7 @@ jobs:
               - name: evaluations-gcs-key
                 value: "eval-inputs/test.jsonl"
               - name: agent-version
-                value: "latest"
+                value: "${{ github.sha }}"
               # GitHub context for status updates
               - name: github-repo
                 value: "${{ github.repository }}"
