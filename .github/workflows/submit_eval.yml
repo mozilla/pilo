@@ -124,15 +124,34 @@ jobs:
           INTERVAL=10
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            # Get workflow status details
-            PHASE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}')
-            PROGRESS=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.progress}')
-            MESSAGE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.message}')
+            # Get workflow status details with retry on transient errors
+            PHASE=""
+            RETRY_COUNT=0
+            MAX_RETRIES=3
 
-            # Count node statuses
-            SUCCEEDED=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Succeeded")] | length')
-            FAILED=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Failed")] | length')
-            RUNNING=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json | jq '[.status.nodes // {} | .[] | select(.phase=="Running")] | length')
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if WORKFLOW_JSON=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json 2>&1); then
+                # Successfully got workflow data
+                PHASE=$(echo "$WORKFLOW_JSON" | jq -r '.status.phase // ""')
+                PROGRESS=$(echo "$WORKFLOW_JSON" | jq -r '.status.progress // ""')
+                MESSAGE=$(echo "$WORKFLOW_JSON" | jq -r '.status.message // ""')
+                SUCCEEDED=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Succeeded")] | length')
+                FAILED=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Failed")] | length')
+                RUNNING=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Running")] | length')
+                break
+              else
+                # kubectl command failed, retry after a brief delay
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "⚠️  Transient API error (attempt $RETRY_COUNT/$MAX_RETRIES), retrying..."
+                  sleep 2
+                else
+                  echo "❌ Failed to get workflow status after $MAX_RETRIES attempts"
+                  echo "Error: $WORKFLOW_JSON"
+                  exit 1
+                fi
+              fi
+            done
 
             # Build status line
             STATUS_LINE="[$ELAPSED s] Phase: $PHASE"
@@ -160,7 +179,9 @@ jobs:
           done
 
           echo "⏱️ Workflow timed out after ${TIMEOUT}s"
-          echo "Current phase: $(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}')"
+          # Final status check with retry
+          FINAL_PHASE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
+          echo "Current phase: $FINAL_PHASE"
           exit 1
 
       - name: Cleanup GitHub Token Secret
