@@ -37,7 +37,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "spark": "file:..",
-    "tailwindcss": "^4.1.11",
+    "tailwindcss": "^4.1.17",
     "webextension-polyfill": "^0.12.0",
     "yaml": "^2.8.0",
     "zustand": "^5.0.8"
