@@ -3,14 +3,14 @@ name: Submit Spark Evals Workflow
 on:
   push:
     branches:
-      - 'evals/**'
+      - "evals/**"
   pull_request:
     branches:
-      - 'evals/**'
+      - "evals/**"
 
 permissions:
   contents: read
-  statuses: write  # Required for updating commit status via GitHub API
+  statuses: write # Required for updating commit status via GitHub API
 
 jobs:
   build-spark-server-image:
