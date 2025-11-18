@@ -13,7 +13,7 @@ permissions:
   statuses: write  # Required for updating commit status via GitHub API
 
 jobs:
-  build-image:
+  build-spark-server-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,8 +48,8 @@ jobs:
 
           echo "✅ Image pushed to gcr.io/$PROJECT_ID/spark-server:$IMAGE_TAG"
 
-  submit-workflow:
-    needs: build-image
+  submit-evals-workflow:
+    needs: build-spark-server-image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +83,9 @@ jobs:
               name: spark-batch-eval-from-file
             arguments:
               parameters:
+              # Use regular nodes for CI/CD reliability (no preemption)
+              - name: node-type
+                value: "regular"
               - name: evaluations-gcs-key
                 value: "eval-inputs/test.jsonl"
               - name: agent-version
