@@ -88,6 +88,9 @@ jobs:
                 value: "regular"
               - name: evaluations-gcs-key
                 value: "eval-inputs/test.jsonl"
+              # Agent configuration
+              - name: agent-type
+                value: "spark"
               - name: agent-version
                 value: "${{ github.sha }}"
               # Agent build metadata
