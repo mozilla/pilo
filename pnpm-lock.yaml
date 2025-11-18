@@ -24,8 +24,8 @@ importers:
         specifier: ^2.12.5
         version: 2.12.5(playwright@1.56.1)
       '@openrouter/ai-sdk-provider':
-        specifier: ^1.1.2
-        version: 1.2.0(ai@5.0.93(zod@4.1.12))(zod@4.1.12)
+        specifier: ^1.2.3
+        version: 1.2.3(ai@5.0.93(zod@4.1.12))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)
       '@types/turndown':
         specifier: ^5.0.5
         version: 5.0.5
@@ -116,7 +116,7 @@ importers:
         version: 19.2.0(react@19.2.0)
       spark:
         specifier: file:..
-        version: 'file:'
+        version: file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       tailwindcss:
         specifier: ^4.1.11
         version: 4.1.11
@@ -180,7 +180,7 @@ importers:
         version: 4.10.3
       spark:
         specifier: file:..
-        version: 'file:'
+        version: file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
@@ -937,12 +937,26 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@openrouter/ai-sdk-provider@1.2.0':
-    resolution: {integrity: sha512-stuIwq7Yb7DNmk3GuCtz+oS3nZOY4TXEV3V5KsknDGQN7Fpu3KRMQVWRc1J073xKdf0FC9EHOctSyzsACmp5Ag==}
+  '@openrouter/ai-sdk-provider@1.2.3':
+    resolution: {integrity: sha512-a6Nc8dPRHakRH9966YJ/HZJhLOds7DuPTscNZDoAr+Aw+tEFUlacSJMvb/b3gukn74mgbuaJRji9YOn62ipfVg==}
     engines: {node: '>=18'}
     peerDependencies:
       ai: ^5.0.0
       zod: ^3.24.1 || ^v4
+
+  '@openrouter/sdk@0.1.11':
+    resolution: {integrity: sha512-OuPc8qqidL/PUM8+9WgrOfSR9+b6rKIWiezGcUJ54iPTdh+Gye5Qjut6hrLWlOCMZE7Z853gN90r1ft4iChj7Q==}
+    peerDependencies:
+      '@tanstack/react-query': ^5
+      react: ^18 || ^19
+      react-dom: ^18 || ^19
+    peerDependenciesMeta:
+      '@tanstack/react-query':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -4107,10 +4121,22 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@openrouter/ai-sdk-provider@1.2.0(ai@5.0.93(zod@4.1.12))(zod@4.1.12)':
+  '@openrouter/ai-sdk-provider@1.2.3(ai@5.0.93(zod@4.1.12))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)':
     dependencies:
+      '@openrouter/sdk': 0.1.11(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       ai: 5.0.93(zod@4.1.12)
       zod: 4.1.12
+    transitivePeerDependencies:
+      - '@tanstack/react-query'
+      - react
+      - react-dom
+
+  '@openrouter/sdk@0.1.11(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      zod: 4.1.12
+    optionalDependencies:
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
 
   '@opentelemetry/api@1.9.0': {}
 
@@ -6155,14 +6181,14 @@ snapshots:
 
   source-map@0.7.6: {}
 
-  'spark@file:':
+  spark@file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
       '@ai-sdk/google': 2.0.31(zod@4.1.12)
       '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
       '@ai-sdk/openai': 2.0.65(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.12.5(playwright@1.56.1)
-      '@openrouter/ai-sdk-provider': 1.2.0(ai@5.0.93(zod@4.1.12))(zod@4.1.12)
+      '@openrouter/ai-sdk-provider': 1.2.3(ai@5.0.93(zod@4.1.12))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)
       '@types/turndown': 5.0.5
       ai: 5.0.93(zod@4.1.12)
       chalk: 5.6.2
@@ -6177,7 +6203,10 @@ snapshots:
       turndown: 7.2.2
       zod: 4.1.12
     transitivePeerDependencies:
+      - '@tanstack/react-query'
       - encoding
+      - react
+      - react-dom
       - supports-color
 
   spawn-sync@1.0.15:
