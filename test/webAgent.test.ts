@@ -1287,6 +1287,7 @@ describe("WebAgent", () => {
       );
       expect(errorEvent).toBeDefined();
       expect(errorEvent?.data.error).toContain("You must use exactly one tool");
+      expect(errorEvent?.data.isToolError).toBe(true); // Should be marked as tool error for UI filtering
     });
 
     it("should handle tool result without output property", async () => {

@@ -35,6 +35,46 @@ interface ChatViewProps {
 }
 
 /**
+ * Maximum number of validation retries before showing error to user.
+ * Validation errors below this threshold are considered recoverable
+ * and are handled automatically by the agent.
+ */
+const MAX_VALIDATION_RETRIES = 3;
+
+/**
+ * Determines whether an error event should be displayed to the user.
+ * Filters out non-fatal errors that are handled automatically by the agent.
+ *
+ * Non-user-facing errors include:
+ * - Validation errors during retry attempts (below MAX_VALIDATION_RETRIES)
+ * - Recoverable browser action errors (agent will retry automatically)
+ * - AI generation errors marked as tool errors (agent will retry)
+ *
+ * @param eventType - The type of error event
+ * @param data - The error event data
+ * @returns true if error should be shown to user, false otherwise
+ */
+export function shouldDisplayError(eventType: string, data: any): boolean {
+  // Filter validation errors during retries
+  if (eventType === "task:validation_error") {
+    return data.retryCount >= MAX_VALIDATION_RETRIES;
+  }
+
+  // Filter recoverable browser action errors
+  if (eventType === "browser:action:completed" && data.success === false) {
+    return !data.isRecoverable;
+  }
+
+  // Filter AI generation errors that are tool errors (will be retried)
+  if (eventType === "ai:generation:error") {
+    return !data.isToolError;
+  }
+
+  // Show all other errors by default
+  return true;
+}
+
+/**
  * Renders markdown with marked-react which provides better security by preventing XSS attacks through
  * HTML injection. The component supports GitHub Flavored Markdown (GFM) and handles
  * line breaks properly.
@@ -261,30 +301,33 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           addMessage("status", typedMessage.event.data.message, currentTaskId);
         }
 
-        // Handle AI generation errors
+        // Handle AI generation errors (only show non-tool errors)
         if (
           typedMessage.event.type === "ai:generation:error" &&
           typedMessage.event.data?.error &&
-          currentTaskId
+          currentTaskId &&
+          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
         ) {
           addMessage("error", `AI Error: ${typedMessage.event.data.error}`, currentTaskId);
         }
 
-        // Handle validation errors
+        // Handle validation errors (only show if max retries exceeded)
         if (
           typedMessage.event.type === "task:validation_error" &&
           typedMessage.event.data?.errors &&
-          currentTaskId
+          currentTaskId &&
+          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
         ) {
           const errorMessages = typedMessage.event.data.errors.join(", ");
           addMessage("error", `Validation Error: ${errorMessages}`, currentTaskId);
         }
 
-        // Handle browser action result failures
+        // Handle browser action result failures (only show non-recoverable errors)
         if (
           typedMessage.event.type === "browser:action:completed" &&
           typedMessage.event.data?.success === false &&
-          currentTaskId
+          currentTaskId &&
+          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
         ) {
           const errorText = typedMessage.event.data.error || "Browser action failed";
           addMessage("error", `Action Failed: ${errorText}`, currentTaskId);

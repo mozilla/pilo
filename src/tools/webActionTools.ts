@@ -78,14 +78,15 @@ async function performActionWithValidation(
 
     return { success: true, action, ...(ref && { ref }), ...(value !== undefined && { value }) };
   } catch (error) {
-    // Emit failure
-    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-      success: false,
-      action,
-    });
-
-    // For browser exceptions, return error info with recoverable flag
+    // For browser exceptions, emit failure with error details and return error info
     if (error instanceof BrowserException) {
+      context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+        success: false,
+        action,
+        error: error.message,
+        isRecoverable: true,
+      });
+
       return {
         success: false,
         action,
@@ -96,7 +97,12 @@ async function performActionWithValidation(
       };
     }
 
-    // Re-throw non-browser errors
+    // For non-browser errors, emit failure without recoverable flag and re-throw
+    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+      success: false,
+      action,
+    });
+
     throw error;
   }
 }
