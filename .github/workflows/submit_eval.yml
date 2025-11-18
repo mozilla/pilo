@@ -90,6 +90,11 @@ jobs:
                 value: "eval-inputs/test.jsonl"
               - name: agent-version
                 value: "${{ github.sha }}"
+              # Agent build metadata
+              - name: agent-build-id
+                value: "${{ github.sha }}"
+              - name: agent-build-date
+                value: "${{ github.event.head_commit.timestamp }}"
               # GitHub context for status updates
               - name: github-repo
                 value: "${{ github.repository }}"
