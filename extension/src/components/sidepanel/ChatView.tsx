@@ -16,43 +16,20 @@ import type {
   CancelTaskResponse,
   RealtimeEventMessage,
   RealtimeEvent,
-  TaskStartedEventData,
-  AgentReasonedEventData,
-  AgentStatusEventData,
-  AIGenerationErrorEventData,
-  TaskValidationErrorEventData,
-  BrowserActionCompletedEventData,
 } from "../../types/browser";
+import {
+  isTaskStartedData,
+  isAgentReasonedData,
+  isAgentStatusData,
+  isAIGenerationErrorData,
+  isTaskValidationErrorData,
+  isBrowserActionCompletedData,
+} from "../../utils/typeGuards";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
   type: string;
   data: unknown;
-}
-
-// Type guard functions for narrowing event data types
-function isTaskStartedData(data: unknown): data is TaskStartedEventData {
-  return typeof data === "object" && data !== null;
-}
-
-function isAgentReasonedData(data: unknown): data is AgentReasonedEventData {
-  return typeof data === "object" && data !== null;
-}
-
-function isAgentStatusData(data: unknown): data is AgentStatusEventData {
-  return typeof data === "object" && data !== null;
-}
-
-function isAIGenerationErrorData(data: unknown): data is AIGenerationErrorEventData {
-  return typeof data === "object" && data !== null;
-}
-
-function isTaskValidationErrorData(data: unknown): data is TaskValidationErrorEventData {
-  return typeof data === "object" && data !== null;
-}
-
-function isBrowserActionCompletedData(data: unknown): data is BrowserActionCompletedEventData {
-  return typeof data === "object" && data !== null;
 }
 
 interface ChatViewProps {
