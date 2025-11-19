@@ -72,12 +72,12 @@ vi.mock("../../../src/useChat", () => ({
 }));
 
 // Helper to create typed realtime event messages for tests
-function createRealtimeMessage(eventType: string, data: unknown): RealtimeEventMessage {
+function createRealtimeMessage(eventType: string, data: Record<string, unknown>): RealtimeEventMessage {
   return {
     type: "realtimeEvent",
     event: {
       type: eventType,
-      data: data as Record<string, unknown>,
+      data: data,
       timestamp: Date.now(),
     },
   };
