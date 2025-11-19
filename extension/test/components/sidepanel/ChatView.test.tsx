@@ -1,8 +1,9 @@
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi, type MockedFunction } from "vitest";
 import { render, screen } from "@testing-library/react";
 import ChatView, { shouldDisplayError } from "../../../src/components/sidepanel/ChatView";
 import { theme } from "../../../src/theme";
 import browser from "webextension-polyfill";
+import type { RealtimeEventMessage } from "../../../src/types/browser";
 
 // Mock the browser API
 vi.mock("webextension-polyfill", () => ({
@@ -69,6 +70,21 @@ vi.mock("../../../src/useChat", () => ({
     clearMessages: vi.fn(),
   }),
 }));
+
+// Helper to create typed realtime event messages for tests
+function createRealtimeMessage(
+  eventType: string,
+  data: Record<string, unknown>,
+): RealtimeEventMessage {
+  return {
+    type: "realtimeEvent",
+    event: {
+      type: eventType,
+      data: data,
+      timestamp: Date.now(),
+    },
+  };
+}
 
 describe("ChatView", () => {
   const defaultProps = {
@@ -503,14 +519,17 @@ describe("ChatView", () => {
     describe("shouldDisplayError", () => {
       it("should hide validation errors during retries (retryCount < 3)", () => {
         // Arrange: Test validation error with low retry count
-        const eventType = "task:validation_error";
-        const eventData = {
-          errors: ["Validation failed"],
-          retryCount: 1,
+        const event = {
+          type: "task:validation_error" as const,
+          data: {
+            errors: ["Validation failed"],
+            retryCount: 1,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -518,14 +537,17 @@ describe("ChatView", () => {
 
       it("should show validation errors when max retries exceeded", () => {
         // Arrange: Test validation error with high retry count
-        const eventType = "task:validation_error";
-        const eventData = {
-          errors: ["Validation failed"],
-          retryCount: 3,
+        const event = {
+          type: "task:validation_error" as const,
+          data: {
+            errors: ["Validation failed"],
+            retryCount: 3,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -533,15 +555,18 @@ describe("ChatView", () => {
 
       it("should hide recoverable browser action errors", () => {
         // Arrange: Test browser action error marked as recoverable
-        const eventType = "browser:action:completed";
-        const eventData = {
-          success: false,
-          error: "Element not found",
-          isRecoverable: true,
+        const event = {
+          type: "browser:action:completed" as const,
+          data: {
+            success: false,
+            error: "Element not found",
+            isRecoverable: true,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -549,15 +574,18 @@ describe("ChatView", () => {
 
       it("should show non-recoverable browser action errors", () => {
         // Arrange: Test browser action error not marked as recoverable
-        const eventType = "browser:action:completed";
-        const eventData = {
-          success: false,
-          error: "Fatal browser error",
-          isRecoverable: false,
+        const event = {
+          type: "browser:action:completed" as const,
+          data: {
+            success: false,
+            error: "Fatal browser error",
+            isRecoverable: false,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -565,13 +593,16 @@ describe("ChatView", () => {
 
       it("should show all other event types by default", () => {
         // Arrange: Test unknown event type
-        const eventType = "unknown:event";
-        const eventData = {
-          error: "Some error",
+        const event = {
+          type: "unknown:event",
+          data: {
+            error: "Some error",
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user by default)
         expect(result).toBe(true);
@@ -579,14 +610,17 @@ describe("ChatView", () => {
 
       it("should hide AI generation errors marked as tool errors", () => {
         // Arrange: Test AI error that is a tool error (agent will handle)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "You must use exactly one tool",
-          isToolError: true,
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "You must use exactly one tool",
+            isToolError: true,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -594,14 +628,17 @@ describe("ChatView", () => {
 
       it("should show AI generation errors that are not tool errors", () => {
         // Arrange: Test AI error that is not a tool error (fatal)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "API key invalid",
-          isToolError: false,
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "API key invalid",
+            isToolError: false,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -609,13 +646,16 @@ describe("ChatView", () => {
 
       it("should show AI generation errors without isToolError field", () => {
         // Arrange: Test AI error without isToolError field (assume fatal)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "Unknown error",
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "Unknown error",
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user by default)
         expect(result).toBe(true);
@@ -632,22 +672,20 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler from the mock
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
         expect(mockAddListener).toHaveBeenCalled();
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate validation error event with retryCount < 3
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "task:validation_error",
-            data: {
-              errors: ["Validation failed"],
-              retryCount: 1,
-            },
-          },
+        const message = createRealtimeMessage("task:validation_error", {
+          errors: ["Validation failed"],
+          retryCount: 1,
         });
+        registeredHandler(message);
 
         // Assert: addMessage should NOT have been called for error
         expect(mockAddMessage).not.toHaveBeenCalledWith(
@@ -663,21 +701,19 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate validation error with retryCount >= 3
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "task:validation_error",
-            data: {
-              errors: ["Max retries exceeded"],
-              retryCount: 3,
-            },
-          },
+        const message = createRealtimeMessage("task:validation_error", {
+          errors: ["Max retries exceeded"],
+          retryCount: 3,
         });
+        registeredHandler(message);
 
         // Assert: addMessage SHOULD have been called
         expect(mockAddMessage).toHaveBeenCalledWith(
@@ -692,22 +728,20 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate recoverable browser error
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "browser:action:completed",
-            data: {
-              success: false,
-              error: "Element not found",
-              isRecoverable: true,
-            },
-          },
+        const message = createRealtimeMessage("browser:action:completed", {
+          success: false,
+          error: "Element not found",
+          isRecoverable: true,
         });
+        registeredHandler(message);
 
         // Assert: addMessage should NOT have been called
         expect(mockAddMessage).not.toHaveBeenCalledWith(
@@ -723,22 +757,20 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate non-recoverable browser error
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "browser:action:completed",
-            data: {
-              success: false,
-              error: "Fatal browser crash",
-              isRecoverable: false,
-            },
-          },
+        const message = createRealtimeMessage("browser:action:completed", {
+          success: false,
+          error: "Fatal browser crash",
+          isRecoverable: false,
         });
+        registeredHandler(message);
 
         // Assert: addMessage SHOULD have been called
         expect(mockAddMessage).toHaveBeenCalledWith(
@@ -754,21 +786,19 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate AI generation error marked as tool error
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "ai:generation:error",
-            data: {
-              error: "You must use exactly one tool",
-              isToolError: true,
-            },
-          },
+        const message = createRealtimeMessage("ai:generation:error", {
+          error: "You must use exactly one tool",
+          isToolError: true,
         });
+        registeredHandler(message);
 
         // Assert: addMessage should NOT have been called
         expect(mockAddMessage).not.toHaveBeenCalledWith(
@@ -784,21 +814,19 @@ describe("ChatView", () => {
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
-        const mockAddListener = browser.runtime.onMessage.addListener as any;
-        const registeredHandler =
-          mockAddListener.mock.calls[mockAddListener.mock.calls.length - 1][0];
+        const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+          typeof browser.runtime.onMessage.addListener
+        >;
+        const registeredHandler = mockAddListener.mock.calls[
+          mockAddListener.mock.calls.length - 1
+        ][0] as (message: unknown) => void;
 
         // Act: Simulate AI generation error not marked as tool error
-        registeredHandler({
-          type: "realtimeEvent",
-          event: {
-            type: "ai:generation:error",
-            data: {
-              error: "API key invalid",
-              isToolError: false,
-            },
-          },
+        const message = createRealtimeMessage("ai:generation:error", {
+          error: "API key invalid",
+          isToolError: false,
         });
+        registeredHandler(message);
 
         // Assert: addMessage SHOULD have been called
         expect(mockAddMessage).toHaveBeenCalledWith(

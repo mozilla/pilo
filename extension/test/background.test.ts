@@ -78,7 +78,11 @@ describe("Background Script - Provider Support", () => {
     });
 
     it("should handle missing provider correctly", () => {
-      const settings = {
+      const settings: {
+        apiKey: string;
+        model: string;
+        provider?: "openai" | "openrouter";
+      } = {
         apiKey: "test-key",
         model: "gpt-4.1",
       };
@@ -86,7 +90,7 @@ describe("Background Script - Provider Support", () => {
       const taskOptions = {
         apiKey: settings.apiKey,
         model: settings.model || "gpt-4.1",
-        provider: (settings as any).provider,
+        provider: settings.provider,
       };
 
       expect(taskOptions.provider).toBeUndefined();

@@ -58,13 +58,54 @@ export interface CancelTaskResponse {
   message?: string;
 }
 
+// Event data types for different event kinds
+export interface TaskStartedEventData {
+  plan?: string;
+  taskId?: string;
+}
+
+export interface AgentReasonedEventData {
+  thought?: string;
+}
+
+export interface AgentStatusEventData {
+  message?: string;
+}
+
+export interface AIGenerationErrorEventData {
+  error?: string;
+  isToolError?: boolean;
+}
+
+export interface TaskValidationErrorEventData {
+  errors?: string[];
+  retryCount?: number;
+}
+
+export interface BrowserActionCompletedEventData {
+  success: boolean;
+  error?: string;
+  isRecoverable?: boolean;
+}
+
+// Generic event data for unknown event types
+export interface GenericEventData {
+  [key: string]: unknown;
+}
+
+// Discriminated union of all event types
+export type RealtimeEvent =
+  | { type: "task:started"; data: TaskStartedEventData; timestamp: number }
+  | { type: "agent:reasoned"; data: AgentReasonedEventData; timestamp: number }
+  | { type: "agent:status"; data: AgentStatusEventData; timestamp: number }
+  | { type: "ai:generation:error"; data: AIGenerationErrorEventData; timestamp: number }
+  | { type: "task:validation_error"; data: TaskValidationErrorEventData; timestamp: number }
+  | { type: "browser:action:completed"; data: BrowserActionCompletedEventData; timestamp: number }
+  | { type: string; data: GenericEventData; timestamp: number };
+
 export interface RealtimeEventMessage {
   type: "realtimeEvent";
-  event: {
-    type: string;
-    data: any;
-    timestamp: number;
-  };
+  event: RealtimeEvent;
 }
 
 export type ExtensionMessage =

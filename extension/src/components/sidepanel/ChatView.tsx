@@ -14,19 +14,22 @@ import type {
   ExecuteTaskResponse,
   CancelTaskMessage,
   CancelTaskResponse,
+  RealtimeEventMessage,
+  RealtimeEvent,
 } from "../../types/browser";
+import {
+  isTaskStartedData,
+  isAgentReasonedData,
+  isAgentStatusData,
+  isAIGenerationErrorData,
+  isTaskValidationErrorData,
+  isBrowserActionCompletedData,
+} from "../../utils/typeGuards";
 
-interface RealtimeMessage {
-  type: string;
-  event?: {
-    type: string;
-    data: any;
-  };
-}
-
+// Interface for events in ExecuteTaskResponse
 interface EventData {
   type: string;
-  data: any;
+  data: unknown;
 }
 
 interface ChatViewProps {
@@ -50,24 +53,25 @@ const MAX_VALIDATION_RETRIES = 3;
  * - Recoverable browser action errors (agent will retry automatically)
  * - AI generation errors marked as tool errors (agent will retry)
  *
- * @param eventType - The type of error event
- * @param data - The error event data
+ * @param event - The realtime event
  * @returns true if error should be shown to user, false otherwise
  */
-export function shouldDisplayError(eventType: string, data: any): boolean {
+export function shouldDisplayError(event: RealtimeEvent): boolean {
   // Filter validation errors during retries
-  if (eventType === "task:validation_error") {
-    return data.retryCount >= MAX_VALIDATION_RETRIES;
+  if (event.type === "task:validation_error" && isTaskValidationErrorData(event.data)) {
+    return (event.data.retryCount ?? 0) >= MAX_VALIDATION_RETRIES;
   }
 
   // Filter recoverable browser action errors
-  if (eventType === "browser:action:completed" && data.success === false) {
-    return !data.isRecoverable;
+  if (event.type === "browser:action:completed" && isBrowserActionCompletedData(event.data)) {
+    if (event.data.success === false) {
+      return !event.data.isRecoverable;
+    }
   }
 
   // Filter AI generation errors that are tool errors (will be retried)
-  if (eventType === "ai:generation:error") {
-    return !data.isToolError;
+  if (event.type === "ai:generation:error" && isAIGenerationErrorData(event.data)) {
+    return !event.data.isToolError;
   }
 
   // Show all other errors by default
@@ -270,43 +274,47 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   // Listen for real-time events from background script
   useEffect(() => {
     const handleMessage = (message: unknown) => {
-      const typedMessage = message as RealtimeMessage;
-      if (typedMessage.type === "realtimeEvent" && typedMessage.event) {
+      const typedMessage = message as RealtimeEventMessage;
+      if (typedMessage.type === "realtimeEvent") {
         addEvent(typedMessage.event.type, typedMessage.event.data);
 
         // Handle task started event to show plan
         if (
           typedMessage.event.type === "task:started" &&
-          typedMessage.event.data?.plan &&
-          currentTaskId
+          isTaskStartedData(typedMessage.event.data)
         ) {
-          addMessage("plan", typedMessage.event.data.plan, currentTaskId);
+          if (typedMessage.event.data.plan && currentTaskId) {
+            addMessage("plan", typedMessage.event.data.plan, currentTaskId);
+          }
         }
 
         // Handle reasoning events for streaming chat
         if (
           typedMessage.event.type === "agent:reasoned" &&
-          typedMessage.event.data?.thought &&
-          currentTaskId
+          isAgentReasonedData(typedMessage.event.data)
         ) {
-          addMessage("reasoning", typedMessage.event.data.thought, currentTaskId);
+          if (typedMessage.event.data.thought && currentTaskId) {
+            addMessage("reasoning", typedMessage.event.data.thought, currentTaskId);
+          }
         }
 
         // Handle agent status updates
         if (
           typedMessage.event.type === "agent:status" &&
-          typedMessage.event.data?.message &&
-          currentTaskId
+          isAgentStatusData(typedMessage.event.data)
         ) {
-          addMessage("status", typedMessage.event.data.message, currentTaskId);
+          if (typedMessage.event.data.message && currentTaskId) {
+            addMessage("status", typedMessage.event.data.message, currentTaskId);
+          }
         }
 
         // Handle AI generation errors (only show non-tool errors)
         if (
           typedMessage.event.type === "ai:generation:error" &&
-          typedMessage.event.data?.error &&
+          isAIGenerationErrorData(typedMessage.event.data) &&
+          typedMessage.event.data.error &&
           currentTaskId &&
-          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
+          shouldDisplayError(typedMessage.event)
         ) {
           addMessage("error", `AI Error: ${typedMessage.event.data.error}`, currentTaskId);
         }
@@ -314,9 +322,10 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         // Handle validation errors (only show if max retries exceeded)
         if (
           typedMessage.event.type === "task:validation_error" &&
-          typedMessage.event.data?.errors &&
+          isTaskValidationErrorData(typedMessage.event.data) &&
+          typedMessage.event.data.errors &&
           currentTaskId &&
-          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
+          shouldDisplayError(typedMessage.event)
         ) {
           const errorMessages = typedMessage.event.data.errors.join(", ");
           addMessage("error", `Validation Error: ${errorMessages}`, currentTaskId);
@@ -325,9 +334,10 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         // Handle browser action result failures (only show non-recoverable errors)
         if (
           typedMessage.event.type === "browser:action:completed" &&
-          typedMessage.event.data?.success === false &&
+          isBrowserActionCompletedData(typedMessage.event.data) &&
+          typedMessage.event.data.success === false &&
           currentTaskId &&
-          shouldDisplayError(typedMessage.event.type, typedMessage.event.data)
+          shouldDisplayError(typedMessage.event)
         ) {
           const errorText = typedMessage.event.data.error || "Browser action failed";
           addMessage("error", `Action Failed: ${errorText}`, currentTaskId);
