@@ -58,8 +58,18 @@ export interface CancelTaskResponse {
   message?: string;
 }
 
+export interface RealtimeEventMessage {
+  type: "realtimeEvent";
+  event: {
+    type: string;
+    data: any;
+    timestamp: number;
+  };
+}
+
 export type ExtensionMessage =
   | ExecuteTaskMessage
   | GetPageInfoMessage
   | ExecutePageActionMessage
-  | CancelTaskMessage;
+  | CancelTaskMessage
+  | RealtimeEventMessage;
