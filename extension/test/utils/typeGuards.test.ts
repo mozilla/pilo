@@ -11,6 +11,7 @@ import {
   isAIGenerationErrorData,
   isTaskValidationErrorData,
   isBrowserActionCompletedData,
+  isValidRealtimeEvent,
 } from "../../src/utils/typeGuards";
 import type {
   TaskStartedEventData,
@@ -312,5 +313,120 @@ describe("Event Data Type Guards", () => {
       const data = { success: true, isRecoverable: "true" };
       expect(isBrowserActionCompletedData(data)).toBe(false);
     });
+  });
+});
+
+describe("isValidRealtimeEvent type guard", () => {
+  it("should return true for valid event with string type, object data, and number timestamp", () => {
+    const validEvent = {
+      type: "task:started",
+      data: { plan: "test plan", taskId: "123" },
+      timestamp: 1234567890,
+    };
+
+    expect(isValidRealtimeEvent(validEvent)).toBe(true);
+  });
+
+  it("should return true for event with empty object data", () => {
+    const validEvent = {
+      type: "agent:status",
+      data: {},
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(validEvent)).toBe(true);
+  });
+
+  it("should return false when type is not a string", () => {
+    const invalidEvent = {
+      type: 123,
+      data: { test: "data" },
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when data is null", () => {
+    const invalidEvent = {
+      type: "test:event",
+      data: null,
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when data is not an object", () => {
+    const invalidEvent = {
+      type: "test:event",
+      data: "not an object",
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when timestamp is not a number", () => {
+    const invalidEvent = {
+      type: "test:event",
+      data: { test: "data" },
+      timestamp: "not a number",
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when timestamp is missing", () => {
+    const invalidEvent = {
+      type: "test:event",
+      data: { test: "data" },
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when type is missing", () => {
+    const invalidEvent = {
+      data: { test: "data" },
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return false when data is missing", () => {
+    const invalidEvent = {
+      type: "test:event",
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+
+  it("should return true for event with nested object data", () => {
+    const validEvent = {
+      type: "ai:generation:error",
+      data: {
+        error: "Failed",
+        details: {
+          code: 500,
+          message: "Internal error",
+        },
+      },
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(validEvent)).toBe(true);
+  });
+
+  it("should return false when data is an array", () => {
+    const invalidEvent = {
+      type: "test:event",
+      data: ["array", "data"],
+      timestamp: Date.now(),
+    };
+
+    expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
   });
 });

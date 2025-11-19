@@ -9,6 +9,7 @@ import type {
   AIGenerationErrorEventData,
   TaskValidationErrorEventData,
   BrowserActionCompletedEventData,
+  RealtimeEvent,
 } from "../types/browser";
 
 /**
@@ -93,21 +94,15 @@ export function isAgentStatusData(data: unknown): data is AgentStatusEventData {
  */
 export function isAIGenerationErrorData(data: unknown): data is AIGenerationErrorEventData {
   if (typeof data !== "object" || data === null) return false;
-  return (
-    hasOptionalStringProp(data, "error") && hasOptionalBooleanProp(data, "isToolError")
-  );
+  return hasOptionalStringProp(data, "error") && hasOptionalBooleanProp(data, "isToolError");
 }
 
 /**
  * Type guard for TaskValidationErrorEventData
  */
-export function isTaskValidationErrorData(
-  data: unknown,
-): data is TaskValidationErrorEventData {
+export function isTaskValidationErrorData(data: unknown): data is TaskValidationErrorEventData {
   if (typeof data !== "object" || data === null) return false;
-  return (
-    hasOptionalStringArrayProp(data, "errors") && hasOptionalNumberProp(data, "retryCount")
-  );
+  return hasOptionalStringArrayProp(data, "errors") && hasOptionalNumberProp(data, "retryCount");
 }
 
 /**
@@ -122,4 +117,32 @@ export function isBrowserActionCompletedData(
     hasOptionalStringProp(data, "error") &&
     hasOptionalBooleanProp(data, "isRecoverable")
   );
+}
+
+/**
+ * Type guard to validate if an event has the structure required for RealtimeEvent
+ */
+export function isValidRealtimeEvent(event: unknown): event is RealtimeEvent {
+  if (!event || typeof event !== "object") {
+    return false;
+  }
+
+  const candidate = event as Record<string, unknown>;
+
+  // Check type field is a string
+  if (typeof candidate.type !== "string") {
+    return false;
+  }
+
+  // Check timestamp field is a number
+  if (typeof candidate.timestamp !== "number") {
+    return false;
+  }
+
+  // Check data field exists and is a non-null object (not array)
+  if (!candidate.data || typeof candidate.data !== "object" || Array.isArray(candidate.data)) {
+    return false;
+  }
+
+  return true;
 }

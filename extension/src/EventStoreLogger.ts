@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
 import { createLogger } from "./utils/logger";
+import { isValidRealtimeEvent } from "./utils/typeGuards";
 import type { RealtimeEventMessage } from "./types/browser";
 
 interface EventData {
@@ -71,14 +72,16 @@ export class EventStoreLogger extends GenericLogger {
     // Note: When in background script, we broadcast to all extension contexts
     if (typeof browser !== "undefined" && browser.runtime) {
       try {
-        const message: RealtimeEventMessage = {
-          type: "realtimeEvent",
-          event: event as { type: string; data: Record<string, unknown>; timestamp: number },
-        };
-        // Use runtime.sendMessage to broadcast to all contexts (including sidepanel)
-        browser.runtime.sendMessage(message).catch(() => {
-          // Ignore errors if no listeners or sidepanel isn't open
-        });
+        if (isValidRealtimeEvent(event)) {
+          const message: RealtimeEventMessage = {
+            type: "realtimeEvent",
+            event,
+          };
+          // Use runtime.sendMessage to broadcast to all contexts (including sidepanel)
+          browser.runtime.sendMessage(message).catch(() => {
+            // Ignore errors if no listeners or sidepanel isn't open
+          });
+        }
       } catch (error) {
         // Ignore errors in case we're not in background script context
       }
