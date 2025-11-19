@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
 import type { WebAgentEventType } from "spark/core";
 import { reviver } from "../utils/storage";
+import type { RealtimeEventMessage } from "../types/browser";
 
 export interface EventData {
   id: string;
@@ -67,7 +68,7 @@ export const useEventStore = create<EventStore>()(
         // Send real-time event to SidePanel if in background script context
         if (typeof browser !== "undefined" && browser.runtime) {
           try {
-            const message = {
+            const message: RealtimeEventMessage = {
               type: "realtimeEvent",
               event: {
                 type: event.type,

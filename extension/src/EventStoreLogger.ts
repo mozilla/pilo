@@ -1,16 +1,12 @@
 import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
 import { createLogger } from "./utils/logger";
+import type { RealtimeEventMessage } from "./types/browser";
 
 interface EventData {
   type: string;
   data: unknown;
   timestamp: number;
-}
-
-interface RealtimeEventMessage {
-  type: "realtimeEvent";
-  event: EventData;
 }
 
 interface TaskStartedData {

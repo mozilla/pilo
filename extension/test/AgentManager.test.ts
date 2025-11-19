@@ -6,24 +6,24 @@ vi.mock("@openrouter/ai-sdk-provider");
 vi.mock("spark/core");
 vi.mock("../src/ExtensionBrowser");
 
-import { createOpenAI } from "@ai-sdk/openai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI, type OpenAIProvider } from "@ai-sdk/openai";
+import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-provider";
 import { WebAgent } from "spark/core";
 import { ExtensionBrowser } from "../src/ExtensionBrowser";
 
 describe("AgentManager", () => {
-  let mockOpenAI: any;
-  let mockOpenRouter: any;
-  let mockModel: any;
-  let mockWebAgent: any;
+  let mockOpenAI: OpenAIProvider;
+  let mockOpenRouter: OpenRouterProvider;
+  let mockModel: unknown;
+  let mockWebAgent: { execute: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockModel = vi.fn();
 
-    mockOpenAI = vi.fn(() => mockModel);
+    mockOpenAI = vi.fn(() => mockModel) as unknown as OpenAIProvider;
     vi.mocked(createOpenAI).mockReturnValue(mockOpenAI);
 
-    mockOpenRouter = vi.fn(() => mockModel);
+    mockOpenRouter = vi.fn(() => mockModel) as unknown as OpenRouterProvider;
     vi.mocked(createOpenRouter).mockReturnValue(mockOpenRouter);
 
     mockWebAgent = {
@@ -31,11 +31,19 @@ describe("AgentManager", () => {
       close: vi.fn().mockResolvedValue(undefined),
     };
     vi.mocked(WebAgent).mockImplementation(function () {
-      return mockWebAgent;
+      return mockWebAgent as unknown as WebAgent;
     });
 
     vi.mocked(ExtensionBrowser).mockImplementation(function () {
-      return {} as any;
+      // Return a minimal mock that satisfies the AriaBrowser interface
+      return {
+        browserName: "extension:chrome",
+        navigateTo: vi.fn(),
+        getCurrentUrl: vi.fn(),
+        getSimplifiedDom: vi.fn(),
+        performAction: vi.fn(),
+        close: vi.fn(),
+      } as unknown as ExtensionBrowser;
     });
   });
 

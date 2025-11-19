@@ -14,15 +14,8 @@ import type {
   ExecuteTaskResponse,
   CancelTaskMessage,
   CancelTaskResponse,
+  RealtimeEventMessage,
 } from "../../types/browser";
-
-interface RealtimeMessage {
-  type: string;
-  event?: {
-    type: string;
-    data: any;
-  };
-}
 
 interface EventData {
   type: string;
@@ -270,8 +263,8 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   // Listen for real-time events from background script
   useEffect(() => {
     const handleMessage = (message: unknown) => {
-      const typedMessage = message as RealtimeMessage;
-      if (typedMessage.type === "realtimeEvent" && typedMessage.event) {
+      const typedMessage = message as RealtimeEventMessage;
+      if (typedMessage.type === "realtimeEvent") {
         addEvent(typedMessage.event.type, typedMessage.event.data);
 
         // Handle task started event to show plan
