@@ -436,4 +436,3 @@ MIT
 
 Contributions welcome! Please submit a Pull Request.
 
-Delete me! Change just to trigger a build
