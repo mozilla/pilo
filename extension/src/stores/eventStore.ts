@@ -72,7 +72,7 @@ export const useEventStore = create<EventStore>()(
               type: "realtimeEvent",
               event: {
                 type: event.type,
-                data: event.data,
+                data: event.data as Record<string, unknown>,
                 timestamp: event.timestamp.getTime(),
               },
             };

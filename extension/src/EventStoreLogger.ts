@@ -73,7 +73,7 @@ export class EventStoreLogger extends GenericLogger {
       try {
         const message: RealtimeEventMessage = {
           type: "realtimeEvent",
-          event,
+          event: event as { type: string; data: Record<string, unknown>; timestamp: number },
         };
         // Use runtime.sendMessage to broadcast to all contexts (including sidepanel)
         browser.runtime.sendMessage(message).catch(() => {

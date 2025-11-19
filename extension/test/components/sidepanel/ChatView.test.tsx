@@ -72,12 +72,12 @@ vi.mock("../../../src/useChat", () => ({
 }));
 
 // Helper to create typed realtime event messages for tests
-function createRealtimeMessage(eventType: string, data: any): RealtimeEventMessage {
+function createRealtimeMessage(eventType: string, data: unknown): RealtimeEventMessage {
   return {
     type: "realtimeEvent",
     event: {
       type: eventType,
-      data,
+      data: data as Record<string, unknown>,
       timestamp: Date.now(),
     },
   };
@@ -516,14 +516,17 @@ describe("ChatView", () => {
     describe("shouldDisplayError", () => {
       it("should hide validation errors during retries (retryCount < 3)", () => {
         // Arrange: Test validation error with low retry count
-        const eventType = "task:validation_error";
-        const eventData = {
-          errors: ["Validation failed"],
-          retryCount: 1,
+        const event = {
+          type: "task:validation_error" as const,
+          data: {
+            errors: ["Validation failed"],
+            retryCount: 1,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -531,14 +534,17 @@ describe("ChatView", () => {
 
       it("should show validation errors when max retries exceeded", () => {
         // Arrange: Test validation error with high retry count
-        const eventType = "task:validation_error";
-        const eventData = {
-          errors: ["Validation failed"],
-          retryCount: 3,
+        const event = {
+          type: "task:validation_error" as const,
+          data: {
+            errors: ["Validation failed"],
+            retryCount: 3,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -546,15 +552,18 @@ describe("ChatView", () => {
 
       it("should hide recoverable browser action errors", () => {
         // Arrange: Test browser action error marked as recoverable
-        const eventType = "browser:action:completed";
-        const eventData = {
-          success: false,
-          error: "Element not found",
-          isRecoverable: true,
+        const event = {
+          type: "browser:action:completed" as const,
+          data: {
+            success: false,
+            error: "Element not found",
+            isRecoverable: true,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -562,15 +571,18 @@ describe("ChatView", () => {
 
       it("should show non-recoverable browser action errors", () => {
         // Arrange: Test browser action error not marked as recoverable
-        const eventType = "browser:action:completed";
-        const eventData = {
-          success: false,
-          error: "Fatal browser error",
-          isRecoverable: false,
+        const event = {
+          type: "browser:action:completed" as const,
+          data: {
+            success: false,
+            error: "Fatal browser error",
+            isRecoverable: false,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -578,13 +590,16 @@ describe("ChatView", () => {
 
       it("should show all other event types by default", () => {
         // Arrange: Test unknown event type
-        const eventType = "unknown:event";
-        const eventData = {
-          error: "Some error",
+        const event = {
+          type: "unknown:event",
+          data: {
+            error: "Some error",
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user by default)
         expect(result).toBe(true);
@@ -592,14 +607,17 @@ describe("ChatView", () => {
 
       it("should hide AI generation errors marked as tool errors", () => {
         // Arrange: Test AI error that is a tool error (agent will handle)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "You must use exactly one tool",
-          isToolError: true,
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "You must use exactly one tool",
+            isToolError: true,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return false (hide from user)
         expect(result).toBe(false);
@@ -607,14 +625,17 @@ describe("ChatView", () => {
 
       it("should show AI generation errors that are not tool errors", () => {
         // Arrange: Test AI error that is not a tool error (fatal)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "API key invalid",
-          isToolError: false,
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "API key invalid",
+            isToolError: false,
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user)
         expect(result).toBe(true);
@@ -622,13 +643,16 @@ describe("ChatView", () => {
 
       it("should show AI generation errors without isToolError field", () => {
         // Arrange: Test AI error without isToolError field (assume fatal)
-        const eventType = "ai:generation:error";
-        const eventData = {
-          error: "Unknown error",
+        const event = {
+          type: "ai:generation:error" as const,
+          data: {
+            error: "Unknown error",
+          },
+          timestamp: Date.now(),
         };
 
         // Act
-        const result = shouldDisplayError(eventType, eventData);
+        const result = shouldDisplayError(event);
 
         // Assert: Should return true (show to user by default)
         expect(result).toBe(true);
