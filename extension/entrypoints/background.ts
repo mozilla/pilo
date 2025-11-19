@@ -63,16 +63,17 @@ export default defineBackground(() => {
       return Promise.resolve({ success: false, message: "Invalid message format" });
     }
 
+    const typedMessage = message as ExtensionMessage;
+
     // Handle realtimeEvent messages immediately - just ignore them
-    if ((message as any).type === "realtimeEvent") {
+    if (typedMessage.type === "realtimeEvent") {
       // These are meant for sidepanel consumption, not background handling
-      console.log("Background received message: realtimeEvent");
+      console.log("Background received message: realtimeEvent", typedMessage.event);
       // Return undefined to indicate no response
       return;
     }
 
-    const typedMessage = message as ExtensionMessage;
-    console.log("Background received message:", typedMessage.type);
+    console.log("Background received message:", typedMessage.type, typedMessage);
 
     // Return a Promise for async processing
     return (async () => {
