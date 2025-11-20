@@ -394,9 +394,13 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       console.log("Sending message to background script:", message);
 
       // Add timeout to prevent hanging in Firefox
+      // XXXdmose Ultimately, we should make this abort anything that's in
+      // flight; likely using the handleCancel function, perhaps with a few
+      // tweaks (ie clean and clear presentation to the user). It could be that
+      // once we add status events in, we should drop the number back down.
       const messagePromise = browser.runtime.sendMessage(message);
       const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 60000), // 60 second timeout
+        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 300000), // 5 mins
       );
 
       let response: ExecuteTaskResponse;
