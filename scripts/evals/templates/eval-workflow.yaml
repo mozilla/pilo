@@ -12,7 +12,7 @@ spec:
     - name: node-type
       value: "regular"
     - name: evaluations-gcs-key
-      value: "eval-inputs/test.jsonl"
+      value: "${EVALUATIONS_GCS_KEY}"
     # Agent configuration
     - name: agent-type
       value: "spark"
