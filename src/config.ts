@@ -93,7 +93,7 @@ export class ConfigManager {
 
     // Load local .env file if it exists (for development)
     try {
-      loadDotenv({ path: ".env" });
+      loadDotenv({ path: ".env", quiet: true });
     } catch {
       // Ignore if .env doesn't exist
     }
