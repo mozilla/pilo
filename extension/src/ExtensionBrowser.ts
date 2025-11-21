@@ -182,16 +182,20 @@ export class ExtensionBrowser implements AriaBrowser {
           console.log(`[DEBUG] MutationObserver set up for ${snapshot.elements.size} elements`);
 
           // DEBUG: Verify attributes are actually in the DOM
-          const ariaRefCount = document.querySelectorAll('[aria-ref]').length;
-          console.log(`[DEBUG] After setting attributes, found ${ariaRefCount} elements with aria-ref in DOM`);
+          const ariaRefCount = document.querySelectorAll("[aria-ref]").length;
+          console.log(
+            `[DEBUG] After setting attributes, found ${ariaRefCount} elements with aria-ref in DOM`,
+          );
 
           // DEBUG: Check a few specific elements
           const firstThreeRefs = Array.from(snapshot.elements.keys()).slice(0, 3);
-          firstThreeRefs.forEach(ref => {
+          firstThreeRefs.forEach((ref) => {
             const element = snapshot.elements.get(ref);
-            const hasAttr = element?.hasAttribute('aria-ref');
-            const attrValue = element?.getAttribute('aria-ref');
-            console.log(`[DEBUG] Element with ref ${ref}: hasAttribute=${hasAttr}, getAttribute=${attrValue}`);
+            const hasAttr = element?.hasAttribute("aria-ref");
+            const attrValue = element?.getAttribute("aria-ref");
+            console.log(
+              `[DEBUG] Element with ref ${ref}: hasAttribute=${hasAttr}, getAttribute=${attrValue}`,
+            );
           });
 
           const renderedText = win.renderAriaTree(snapshot, {
@@ -200,8 +204,10 @@ export class ExtensionBrowser implements AriaBrowser {
           });
 
           // DEBUG: Check again before returning
-          const ariaRefCountBeforeReturn = document.querySelectorAll('[aria-ref]').length;
-          console.log(`[DEBUG] Before returning, found ${ariaRefCountBeforeReturn} elements with aria-ref in DOM`);
+          const ariaRefCountBeforeReturn = document.querySelectorAll("[aria-ref]").length;
+          console.log(
+            `[DEBUG] Before returning, found ${ariaRefCountBeforeReturn} elements with aria-ref in DOM`,
+          );
 
           // Return just the rendered text - elements can be looked up via aria-ref attributes
           return {
@@ -399,8 +405,10 @@ export class ExtensionBrowser implements AriaBrowser {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
           // DEBUG: Check if any aria-ref attributes exist at the start of performAction
-          const totalAriaRefs = document.querySelectorAll('[aria-ref]').length;
-          console.log(`[DEBUG performAction] At start: found ${totalAriaRefs} elements with aria-ref in DOM`);
+          const totalAriaRefs = document.querySelectorAll("[aria-ref]").length;
+          console.log(
+            `[DEBUG performAction] At start: found ${totalAriaRefs} elements with aria-ref in DOM`,
+          );
           console.log(`[DEBUG performAction] Looking for ref: ${refParam}`);
 
           // Look up the element using the aria-ref attribute that's now set by ariaSnapshot
@@ -411,7 +419,10 @@ export class ExtensionBrowser implements AriaBrowser {
             console.log(`[DEBUG performAction] No aria-ref attributes found. Regenerating...`);
 
             const win = window as Window & {
-              generateAriaTree?: (element: Element, options: { forAI: boolean; refPrefix: string }) => {
+              generateAriaTree?: (
+                element: Element,
+                options: { forAI: boolean; refPrefix: string },
+              ) => {
                 elements: Map<string, Element>;
               };
             };
@@ -427,7 +438,9 @@ export class ExtensionBrowser implements AriaBrowser {
                 el.setAttribute("aria-ref", ref);
               }
 
-              console.log(`[DEBUG performAction] Regenerated ${snapshot.elements.size} aria-ref attributes`);
+              console.log(
+                `[DEBUG performAction] Regenerated ${snapshot.elements.size} aria-ref attributes`,
+              );
 
               // Try to find the element again
               element = document.querySelector(`[aria-ref="${refParam}"]`);
@@ -436,22 +449,26 @@ export class ExtensionBrowser implements AriaBrowser {
 
           if (!element) {
             // Find the highest ref number to give helpful feedback
-            const allRefs = Array.from(document.querySelectorAll('[aria-ref]'))
-              .map(el => el.getAttribute('aria-ref'))
-              .filter(ref => ref !== null) as string[];
+            const allRefs = Array.from(document.querySelectorAll("[aria-ref]"))
+              .map((el) => el.getAttribute("aria-ref"))
+              .filter((ref) => ref !== null) as string[];
 
             const refNumbers = allRefs
-              .map(ref => parseInt(ref.replace(/[^\d]/g, ''), 10))
-              .filter(num => !isNaN(num));
+              .map((ref) => parseInt(ref.replace(/[^\d]/g, ""), 10))
+              .filter((num) => !isNaN(num));
 
             const maxRef = refNumbers.length > 0 ? Math.max(...refNumbers) : 0;
             const minRef = refNumbers.length > 0 ? Math.min(...refNumbers) : 0;
 
-            console.error(`[DEBUG performAction] Ref ${refParam} not found. First 10 refs in DOM:`, allRefs.slice(0, 10));
+            console.error(
+              `[DEBUG performAction] Ref ${refParam} not found. First 10 refs in DOM:`,
+              allRefs.slice(0, 10),
+            );
 
-            const errorMsg = totalAriaRefs > 0
-              ? `Element with ref ${refParam} not found. This ref does not exist in the current page snapshot (valid refs range from s1e${minRef} to s1e${maxRef}). Please use only the refs visible in the snapshot provided to you.`
-              : `Element with ref ${refParam} not found. No refs are available on this page.`;
+            const errorMsg =
+              totalAriaRefs > 0
+                ? `Element with ref ${refParam} not found. This ref does not exist in the current page snapshot (valid refs range from s1e${minRef} to s1e${maxRef}). Please use only the refs visible in the snapshot provided to you.`
+                : `Element with ref ${refParam} not found. No refs are available on this page.`;
 
             return {
               success: false,
