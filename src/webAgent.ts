@@ -550,6 +550,15 @@ export class WebAgent {
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
 
+    // DEBUG: Log sample of refs in compressed snapshot
+    const refMatches = compressedSnapshot.match(/\[s1e\d+\]/g);
+    if (refMatches) {
+      const uniqueRefs = [...new Set(refMatches)];
+      console.log(`[DEBUG WebAgent] Found ${uniqueRefs.length} unique refs in compressed snapshot`);
+      console.log(`[DEBUG WebAgent] First 10 refs:`, uniqueRefs.slice(0, 10));
+      console.log(`[DEBUG WebAgent] Last 10 refs:`, uniqueRefs.slice(-10));
+    }
+
     // Debug compression stats if enabled
     if (this.debug) {
       const stats = this.calculateCompressionStats(
