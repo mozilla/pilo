@@ -435,15 +435,27 @@ export class ExtensionBrowser implements AriaBrowser {
           }
 
           if (!element) {
-            // DEBUG: Show some example refs that do exist
+            // Find the highest ref number to give helpful feedback
             const allRefs = Array.from(document.querySelectorAll('[aria-ref]'))
               .map(el => el.getAttribute('aria-ref'))
-              .slice(0, 10);
-            console.error(`[DEBUG performAction] Ref ${refParam} not found. First 10 refs in DOM:`, allRefs);
+              .filter(ref => ref !== null) as string[];
+
+            const refNumbers = allRefs
+              .map(ref => parseInt(ref.replace(/[^\d]/g, ''), 10))
+              .filter(num => !isNaN(num));
+
+            const maxRef = refNumbers.length > 0 ? Math.max(...refNumbers) : 0;
+            const minRef = refNumbers.length > 0 ? Math.min(...refNumbers) : 0;
+
+            console.error(`[DEBUG performAction] Ref ${refParam} not found. First 10 refs in DOM:`, allRefs.slice(0, 10));
+
+            const errorMsg = totalAriaRefs > 0
+              ? `Element with ref ${refParam} not found. This ref does not exist in the current page snapshot (valid refs range from s1e${minRef} to s1e${maxRef}). Please use only the refs visible in the snapshot provided to you.`
+              : `Element with ref ${refParam} not found. No refs are available on this page.`;
 
             return {
               success: false,
-              error: `Element with ref ${refParam} not found in DOM`,
+              error: errorMsg,
             };
           }
 
