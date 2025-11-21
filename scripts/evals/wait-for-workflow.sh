@@ -21,12 +21,12 @@ MAX_RETRIES="${MAX_RETRIES:-3}"
 # Wait for workflow to complete
 ELAPSED=0
 
-while [ $ELAPSED -lt $TIMEOUT ]; do
+while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
   # Get workflow status details with retry on transient errors
   PHASE=""
   RETRY_COUNT=0
 
-  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
     if WORKFLOW_JSON=$(kubectl get workflow -n argo "$WORKFLOW_NAME" -o json 2>&1); then
       # Successfully got workflow data
       PHASE=$(echo "$WORKFLOW_JSON" | jq -r '.status.phase // ""')
@@ -39,7 +39,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     else
       # kubectl command failed, retry after a brief delay
       RETRY_COUNT=$((RETRY_COUNT + 1))
-      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+      if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
         echo "⚠️  Transient API error (attempt $RETRY_COUNT/$MAX_RETRIES), retrying..."
         sleep 2
       else
@@ -71,7 +71,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     exit 1
   fi
 
-  sleep $INTERVAL
+  sleep "$INTERVAL"
   ELAPSED=$((ELAPSED + INTERVAL))
 done
 
