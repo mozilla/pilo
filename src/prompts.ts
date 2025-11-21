@@ -11,8 +11,8 @@ export const TOOL_STRINGS = {
   webActions: {
     /** Common parameter descriptions used across multiple tools */
     common: {
-      elementRefExample: "e###",
-      elementRef: "Element reference from page snapshot (e.g., e###)",
+      elementRefExample: "s1e###",
+      elementRef: "Element reference from page snapshot (e.g., s1e###)",
       textValue: "Text to enter into the field",
     },
     /** Individual tool descriptions */
@@ -263,6 +263,7 @@ Analyze the current page state and determine your next action based on previous 
 - Find alternative elements if primary ones aren't available
 - Adapt your approach based on what's actually available
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
+- If extraction fails on a page, consider whether another page could be found and used instead
 - Use abort() only after trying reasonable alternatives (site down, access blocked, required data unavailable)
 - For research: Use extract() immediately when finding relevant data
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
@@ -353,9 +354,9 @@ URL: {{ url }}
 The above accessibility tree shows page elements in a hierarchical text format. Each line represents an element with:
 - Element type (button, link, textbox, generic, etc.)
 - Text content in quotes or description
-- Reference ID in brackets like [e###] - use these exact IDs when interacting with elements
+- Reference ID in brackets like [s1e###] - use these exact IDs when interacting with elements
 - Properties like [cursor=pointer] or [disabled]
-Example: button "Submit Form" [e455] [cursor=pointer]
+Example: button "Submit Form" [s1e455] [cursor=pointer]
 
 This shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
 
