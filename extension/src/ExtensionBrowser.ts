@@ -348,8 +348,41 @@ export class ExtensionBrowser implements AriaBrowser {
         func: (paramsJson: string) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
+          // DEBUG: Check if any aria-ref attributes exist at the start of performAction
+          const totalAriaRefs = document.querySelectorAll('[aria-ref]').length;
+          console.log(`[DEBUG performAction] At start: found ${totalAriaRefs} elements with aria-ref in DOM`);
+          console.log(`[DEBUG performAction] Looking for ref: ${refParam}`);
+
           // Look up the element using the aria-ref attribute that's now set by ariaSnapshot
-          const element = document.querySelector(`[aria-ref="${refParam}"]`);
+          let element = document.querySelector(`[aria-ref="${refParam}"]`);
+
+          // If element not found and there are no aria-ref attributes, regenerate them
+          if (!element && totalAriaRefs === 0) {
+            console.log(`[DEBUG performAction] No aria-ref attributes found. Regenerating...`);
+
+            const win = window as Window & {
+              generateAriaTree?: (element: Element, options: { forAI: boolean; refPrefix: string }) => {
+                elements: Map<string, Element>;
+              };
+            };
+
+            if (typeof win.generateAriaTree === "function") {
+              const snapshot = win.generateAriaTree(document.body, {
+                forAI: true,
+                refPrefix: "s1",
+              });
+
+              // Re-add aria-ref attributes to DOM elements
+              for (const [ref, el] of snapshot.elements.entries()) {
+                el.setAttribute("aria-ref", ref);
+              }
+
+              console.log(`[DEBUG performAction] Regenerated ${snapshot.elements.size} aria-ref attributes`);
+
+              // Try to find the element again
+              element = document.querySelector(`[aria-ref="${refParam}"]`);
+            }
+          }
 
           if (!element) {
             return {
