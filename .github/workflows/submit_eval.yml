@@ -66,134 +66,24 @@ jobs:
           location: ${{ vars.EVALS_GKE_CLUSTER_ZONE }}
 
       - name: Submit Argo Workflow
+        id: submit
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+          HEAD_COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          # Create a Kubernetes secret with the GitHub token for this workflow
-          kubectl create secret generic github-token-${{ github.run_id }} \
-            -n argo \
-            --from-literal=token=${{ secrets.GITHUB_TOKEN }}
-
-          kubectl create -f - <<EOF
-          apiVersion: argoproj.io/v1alpha1
-          kind: Workflow
-          metadata:
-            generateName: spark-batch-github-eval-
-            namespace: argo
-          spec:
-            workflowTemplateRef:
-              name: spark-batch-eval-from-file
-            arguments:
-              parameters:
-              # Use regular nodes for CI/CD reliability (no preemption)
-              - name: node-type
-                value: "regular"
-              - name: evaluations-gcs-key
-                value: "eval-inputs/test.jsonl"
-              # Agent configuration
-              - name: agent-type
-                value: "spark"
-              - name: agent-version
-                value: "${{ github.sha }}"
-              # Agent build metadata
-              - name: agent-build-id
-                value: "${{ github.sha }}"
-              - name: agent-build-date
-                value: "${{ github.event.head_commit.timestamp }}"
-              # GitHub context for status updates
-              - name: github-repo
-                value: "${{ github.repository }}"
-              - name: github-sha
-                value: "${{ github.sha }}"
-              - name: github-ref
-                value: "${{ github.ref }}"
-              - name: github-run-id
-                value: "${{ github.run_id }}"
-              # Secret name containing GitHub token
-              - name: github-token-secret
-                value: "github-token-${{ github.run_id }}"
-          EOF
-
-          echo "Workflow submitted successfully"
-
-          # Get the workflow name
-          WORKFLOW_NAME=$(kubectl get workflows -n argo --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
-          echo "Workflow name: $WORKFLOW_NAME"
-          echo "View in Argo UI:"
-          echo "kubectl -n argo port-forward service/argo-server 2746:2746"
-          echo "https://localhost:2746/workflows/argo/$WORKFLOW_NAME"
+          ./scripts/evals/submit-eval-workflow.sh
 
       - name: Wait for Workflow Completion
         run: |
-          WORKFLOW_NAME=$(kubectl get workflows -n argo --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
-          echo "Waiting for workflow $WORKFLOW_NAME to complete..."
-
-          # Wait for workflow to complete (max 60 minutes)
-          TIMEOUT=3600
-          ELAPSED=0
-          INTERVAL=10
-
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            # Get workflow status details with retry on transient errors
-            PHASE=""
-            RETRY_COUNT=0
-            MAX_RETRIES=3
-
-            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-              if WORKFLOW_JSON=$(kubectl get workflow -n argo $WORKFLOW_NAME -o json 2>&1); then
-                # Successfully got workflow data
-                PHASE=$(echo "$WORKFLOW_JSON" | jq -r '.status.phase // ""')
-                PROGRESS=$(echo "$WORKFLOW_JSON" | jq -r '.status.progress // ""')
-                MESSAGE=$(echo "$WORKFLOW_JSON" | jq -r '.status.message // ""')
-                SUCCEEDED=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Succeeded")] | length')
-                FAILED=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Failed")] | length')
-                RUNNING=$(echo "$WORKFLOW_JSON" | jq '[.status.nodes // {} | .[] | select(.phase=="Running")] | length')
-                break
-              else
-                # kubectl command failed, retry after a brief delay
-                RETRY_COUNT=$((RETRY_COUNT + 1))
-                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                  echo "⚠️  Transient API error (attempt $RETRY_COUNT/$MAX_RETRIES), retrying..."
-                  sleep 2
-                else
-                  echo "❌ Failed to get workflow status after $MAX_RETRIES attempts"
-                  echo "Error: $WORKFLOW_JSON"
-                  exit 1
-                fi
-              fi
-            done
-
-            # Build status line
-            STATUS_LINE="[$ELAPSED s] Phase: $PHASE"
-            if [ -n "$PROGRESS" ]; then
-              STATUS_LINE="$STATUS_LINE | Progress: $PROGRESS"
-            fi
-            STATUS_LINE="$STATUS_LINE | ✅ $SUCCEEDED | ❌ $FAILED | ⚙️  $RUNNING"
-            if [ -n "$MESSAGE" ]; then
-              STATUS_LINE="$STATUS_LINE | $MESSAGE"
-            fi
-
-            echo "$STATUS_LINE"
-
-            if [ "$PHASE" = "Succeeded" ]; then
-              echo "✅ Workflow completed successfully!"
-              exit 0
-            elif [ "$PHASE" = "Failed" ] || [ "$PHASE" = "Error" ]; then
-              echo "❌ Workflow failed with phase: $PHASE"
-              echo "View logs with: kubectl logs -n argo -l workflows.argoproj.io/workflow=$WORKFLOW_NAME"
-              exit 1
-            fi
-
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-          done
-
-          echo "⏱️ Workflow timed out after ${TIMEOUT}s"
-          # Final status check with retry
-          FINAL_PHASE=$(kubectl get workflow -n argo $WORKFLOW_NAME -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
-          echo "Current phase: $FINAL_PHASE"
-          exit 1
+          ./scripts/evals/wait-for-workflow.sh
 
       - name: Cleanup GitHub Token Secret
         if: always()
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
-          # Clean up the temporary secret after workflow submission
-          kubectl delete secret github-token-${{ github.run_id }} -n argo --ignore-not-found=true
+          ./scripts/evals/cleanup-secrets.sh
