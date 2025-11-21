@@ -148,10 +148,60 @@ export class ExtensionBrowser implements AriaBrowser {
             element.setAttribute("aria-ref", ref);
           }
 
+          // DEBUG: Set up MutationObserver to track aria-ref removal
+          console.log("[DEBUG] Setting up MutationObserver to track aria-ref attribute changes");
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === "attributes" && mutation.attributeName === "aria-ref") {
+                const target = mutation.target as Element;
+                const oldValue = mutation.oldValue;
+                const newValue = target.getAttribute("aria-ref");
+                // Only log if the value actually changed
+                if (oldValue !== newValue) {
+                  console.error(
+                    `[ARIA-REF CHANGED] Element ${target.tagName} aria-ref changed from "${oldValue}" to "${newValue}"`,
+                    {
+                      element: target,
+                      stackTrace: new Error().stack,
+                    },
+                  );
+                }
+              }
+            });
+          });
+
+          // Observe all elements that have aria-ref
+          for (const [, element] of snapshot.elements.entries()) {
+            observer.observe(element, {
+              attributes: true,
+              attributeOldValue: true,
+              attributeFilter: ["aria-ref"],
+            });
+          }
+
+          console.log(`[DEBUG] MutationObserver set up for ${snapshot.elements.size} elements`);
+
+          // DEBUG: Verify attributes are actually in the DOM
+          const ariaRefCount = document.querySelectorAll('[aria-ref]').length;
+          console.log(`[DEBUG] After setting attributes, found ${ariaRefCount} elements with aria-ref in DOM`);
+
+          // DEBUG: Check a few specific elements
+          const firstThreeRefs = Array.from(snapshot.elements.keys()).slice(0, 3);
+          firstThreeRefs.forEach(ref => {
+            const element = snapshot.elements.get(ref);
+            const hasAttr = element?.hasAttribute('aria-ref');
+            const attrValue = element?.getAttribute('aria-ref');
+            console.log(`[DEBUG] Element with ref ${ref}: hasAttribute=${hasAttr}, getAttribute=${attrValue}`);
+          });
+
           const renderedText = win.renderAriaTree(snapshot, {
             mode: "raw",
             forAI: true,
           });
+
+          // DEBUG: Check again before returning
+          const ariaRefCountBeforeReturn = document.querySelectorAll('[aria-ref]').length;
+          console.log(`[DEBUG] Before returning, found ${ariaRefCountBeforeReturn} elements with aria-ref in DOM`);
 
           // Return just the rendered text - elements can be looked up via aria-ref attributes
           return {
@@ -385,6 +435,12 @@ export class ExtensionBrowser implements AriaBrowser {
           }
 
           if (!element) {
+            // DEBUG: Show some example refs that do exist
+            const allRefs = Array.from(document.querySelectorAll('[aria-ref]'))
+              .map(el => el.getAttribute('aria-ref'))
+              .slice(0, 10);
+            console.error(`[DEBUG performAction] Ref ${refParam} not found. First 10 refs in DOM:`, allRefs);
+
             return {
               success: false,
               error: `Element with ref ${refParam} not found in DOM`,
