@@ -34,45 +34,11 @@ kubectl create secret generic "github-token-${GITHUB_RUN_ID}" \
   --from-literal="token=${GITHUB_TOKEN}"
 
 echo "Submitting Argo workflow..."
-kubectl create -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Workflow
-metadata:
-  generateName: spark-batch-github-eval-
-  namespace: argo
-spec:
-  workflowTemplateRef:
-    name: spark-batch-eval-from-file
-  arguments:
-    parameters:
-    # Use regular nodes for CI/CD reliability (no preemption)
-    - name: node-type
-      value: "regular"
-    - name: evaluations-gcs-key
-      value: "eval-inputs/test.jsonl"
-    # Agent configuration
-    - name: agent-type
-      value: "spark"
-    - name: agent-version
-      value: "${GITHUB_SHA}"
-    # Agent build metadata
-    - name: agent-build-id
-      value: "${GITHUB_SHA}"
-    - name: agent-build-date
-      value: "${HEAD_COMMIT_TIMESTAMP}"
-    # GitHub context for status updates
-    - name: github-repo
-      value: "${GITHUB_REPOSITORY}"
-    - name: github-sha
-      value: "${GITHUB_SHA}"
-    - name: github-ref
-      value: "${GITHUB_REF}"
-    - name: github-run-id
-      value: "${GITHUB_RUN_ID}"
-    # Secret name containing GitHub token
-    - name: github-token-secret
-      value: "github-token-${GITHUB_RUN_ID}"
-EOF
+# Get the directory where this script lives
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Use envsubst to substitute environment variables in the template
+envsubst < "$SCRIPT_DIR/templates/eval-workflow.yaml" | kubectl create -f -
 
 echo "✅ Workflow submitted successfully"
 
