@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { MetricsCollector } from "../../loggers/metricsCollector.js";
 import { Logger } from "../../loggers/types.js";
+import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -144,9 +145,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create logger
     const logger: Logger = new MetricsCollector(
-      options.logger === "json"
-        ? new JSONConsoleLogger()
-        : new ChalkConsoleLogger({ metricsIncremental: options.metricsIncremental }),
+      new SecretsRedactor(
+        options.logger === "json"
+          ? new JSONConsoleLogger()
+          : new ChalkConsoleLogger({ metricsIncremental: options.metricsIncremental }),
+      ),
     );
 
     // Create browser instance

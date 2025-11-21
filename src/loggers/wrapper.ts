@@ -3,7 +3,7 @@ import { Logger } from "./types.js";
 
 export class LoggerWrapper implements Logger {
   protected emitter: WebAgentEventEmitter | null = null;
-  private wrappedLogger: Logger;
+  protected wrappedLogger: Logger;
 
   constructor(wrappedLogger: Logger) {
     this.wrappedLogger = wrappedLogger;
