@@ -76,7 +76,7 @@
     "eventemitter3": "^5.0.1",
     "liquidjs": "^10.24.0",
     "nanoid": "^5.1.6",
-    "ollama-ai-provider-v2": "^1.5.1",
+    "ollama-ai-provider-v2": "^1.5.3",
     "playwright": "1.56.1",
     "turndown": "^7.2.2",
     "zod": "^4.1.12"
