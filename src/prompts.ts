@@ -272,6 +272,14 @@ Analyze the current page state and determine your next action based on previous 
 - For research: Use extract() immediately when finding relevant data
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
 
+**If an element ref is not found:**
+- The snapshot shows all available interactive elements with their refs
+- Some elements may be filtered out for brevity - their refs will not be available
+- Never guess ref numbers - only use refs visible in the snapshot
+- Look for alternative elements that accomplish the same goal
+- Use extract() if more information about page content is needed
+- Consider different navigation paths to reach the given objective
+
 **When using done():**
 Provide your final answer:
 - Think of this as a final deliverable, not part of a conversation
@@ -363,6 +371,12 @@ The above accessibility tree shows page elements in a hierarchical text format. 
 Example: button "Submit Form" [s1e455] [cursor=pointer]
 
 This shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
+
+**CRITICAL: ONLY use element references that appear in the current snapshot.**
+- Never guess or extrapolate reference numbers
+- Reference numbers are non-sequential due to filtering - do not assume a ref exists just because there are refs with nearby numbers
+- If an element can't be found, use extract() to gather information or try alternative approaches
+- If an element truly cannot be found, explain why rather than guessing refs
 
 **Your task:**
 - Analyze the current state and select your next action
