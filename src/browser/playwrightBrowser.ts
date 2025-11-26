@@ -29,20 +29,22 @@ export interface PlaywrightBrowserOptions {
   blockAds?: boolean;
   /** Block specific resource types to improve performance */
   blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
-  /** Playwright endpoint URL to connect to remote browser */
-  pwEndpoint?: string;
-  /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
-  pwCdpEndpoint?: string;
-  /** Run browser in headless mode (maps to launchOptions.headless) */
-  headless?: boolean;
   /** Bypass Content Security Policy (maps to contextOptions.bypassCSP) */
   bypassCSP?: boolean;
+  /** Browser channel to use (e.g. 'chrome', 'msedge', 'chrome-beta', 'firefox') */
+  channel?: string;
+  /** Run browser in headless mode (maps to launchOptions.headless) */
+  headless?: boolean;
   /** Proxy server URL (http://host:port, https://host:port, socks5://host:port) */
   proxyServer?: string;
   /** Proxy authentication username */
   proxyUsername?: string;
   /** Proxy authentication password */
   proxyPassword?: string;
+  /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
+  pwCdpEndpoint?: string;
+  /** Playwright endpoint URL to connect to remote browser */
+  pwEndpoint?: string;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -59,6 +61,7 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
  */
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
+  public channel: string | undefined;
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
@@ -69,6 +72,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
+    this.channel = this.options.channel ?? this.getDefaultChannel();
   }
 
   get pwEndpoint(): string | undefined {
@@ -84,6 +88,29 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
+   * Get the default channel based on browser type
+   */
+  private getDefaultChannel(): string | undefined {
+    const browserType = this.options.browser ?? "firefox";
+
+    switch (browserType) {
+      case "edge":
+        // Edge uses the "msedge" channel in Playwright
+        return "msedge";
+      case "chrome":
+        return "chrome";
+      case "firefox":
+        return "firefox";
+      case "chromium":
+      case "safari":
+      case "webkit":
+      default:
+        // These browsers don't use channels or use bundled versions
+        return undefined;
+    }
+  }
+
+  /**
    * Maps Spark's top-level options into the appropriate Playwright options
    * Top-level options take precedence over Playwright options
    */
@@ -94,6 +121,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   } {
     const launchOptions: LaunchOptions = {
       headless: false, // Spark default
+      channel: this.options.channel ?? this.getDefaultChannel(),
       ...this.options.launchOptions, // User-provided Playwright options
     };
 
@@ -117,6 +145,9 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
     if (this.options.bypassCSP !== undefined) {
       contextOptions.bypassCSP = this.options.bypassCSP;
+    }
+    if (this.options.channel !== undefined) {
+      launchOptions.channel = this.options.channel;
     }
     if (this.options.proxyServer) {
       launchOptions.proxy = {
@@ -167,13 +198,13 @@ export class PlaywrightBrowser implements AriaBrowser {
         break;
 
       case "edge":
-        // Edge uses chromium with channel setting
+        // Edge uses chromium with channel setting (defaults to "msedge")
         if (this.options.pwCdpEndpoint) {
           this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
         } else if (this.options.pwEndpoint) {
           this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
         } else {
-          this.browser = await chromium.launch({ ...launchOptions, channel: "msedge" });
+          this.browser = await chromium.launch(launchOptions);
         }
         break;
 

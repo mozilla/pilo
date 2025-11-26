@@ -27,6 +27,7 @@ export interface SparkConfig {
 
   // Browser Configuration
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  channel?: string;
   headless?: boolean;
   block_ads?: boolean;
   block_resources?: string;
@@ -138,6 +139,9 @@ export class ConfigManager {
       // Browser Configuration
       ...(process.env.SPARK_BROWSER && {
         browser: process.env.SPARK_BROWSER as SparkConfig["browser"],
+      }),
+      ...(process.env.SPARK_CHANNEL && {
+        channel: process.env.SPARK_CHANNEL,
       }),
       ...(process.env.SPARK_HEADLESS && {
         headless: process.env.SPARK_HEADLESS === "true",
@@ -331,6 +335,7 @@ export class ConfigManager {
     // Browser Configuration
     if (process.env.SPARK_BROWSER)
       env.browser = process.env.SPARK_BROWSER as SparkConfig["browser"];
+    if (process.env.SPARK_CHANNEL) env.channel = process.env.SPARK_CHANNEL;
     if (process.env.SPARK_HEADLESS) env.headless = process.env.SPARK_HEADLESS === "true";
     if (process.env.SPARK_BLOCK_ADS) env.block_ads = process.env.SPARK_BLOCK_ADS === "true";
     if (process.env.SPARK_BLOCK_RESOURCES) env.block_resources = process.env.SPARK_BLOCK_RESOURCES;

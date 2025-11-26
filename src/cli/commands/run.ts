@@ -42,6 +42,11 @@ export function createRunCommand(): Command {
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
       config.get("browser", "firefox"),
     )
+    .option(
+      "--channel <channel>",
+      "Browser channel to use (e.g., chrome, msedge, chrome-beta, moz-firefox)",
+      config.get("channel"),
+    )
     .option("--headless", "Run browser in headless mode", config.get("headless", false))
     .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
     .option(
@@ -155,15 +160,16 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Create browser instance
     const browser = new PlaywrightBrowser({
       browser: options.browser,
+      bypassCSP: options.bypassCsp,
+      channel: options.channel,
       blockAds: options.blockAds ?? config.get("block_ads", true),
       blockResources,
-      pwEndpoint: options.pwEndpoint,
-      pwCdpEndpoint: options.pwCdpEndpoint,
       headless: options.headless,
-      bypassCSP: options.bypassCsp,
       proxyServer: options.proxy,
       proxyUsername: options.proxyUsername,
       proxyPassword: options.proxyPassword,
+      pwEndpoint: options.pwEndpoint,
+      pwCdpEndpoint: options.pwCdpEndpoint,
     });
 
     // Create AI provider with CLI overrides

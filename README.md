@@ -152,6 +152,9 @@ pnpm spark run "check shipping costs" --guardrails "don't submit any payment for
 ### Advanced Options
 
 ```bash
+# Run a vanilla Firefox with WebDriver BiDi as protocol
+pnpm spark run "test checkout flow" --channel moz-firefox
+
 # Chrome browser testing
 pnpm spark run "test checkout flow" --browser chrome --headless
 
@@ -330,6 +333,7 @@ Built with TypeScript, Playwright, and the Vercel AI SDK.
 | `--openai-api-key <key>`        | OpenAI API key                                             | -                | `--openai-api-key sk-...`               |
 | `--openrouter-api-key <key>`    | OpenRouter API key                                         | -                | `--openrouter-api-key sk-or-...`        |
 | `--browser <browser>`           | Browser (firefox, chrome, chromium, safari, webkit, edge)  | firefox          | `--browser chrome`                      |
+| `--channel <channel>`           | Browser channel (chrome, msedge, chrome-beta, moz-firefox) | -                | `--channel chrome-beta`                 |
 | `--headless`                    | Run browser in headless mode                               | false            | `--headless`                            |
 | `--debug`                       | Enable debug mode with snapshots                           | false            | `--debug`                               |
 | `--vision`                      | Enable vision capabilities                                 | false            | `--vision`                              |
@@ -369,6 +373,7 @@ All configuration options can be set via environment variables. Environment vari
 | `SPARK_OPENAI_COMPATIBLE_NAME`     | OpenAI-compatible provider name                            | -                           |
 | **Browser Configuration**          |                                                            |                             |
 | `SPARK_BROWSER`                    | Browser to use                                             | `--browser`                 |
+| `SPARK_CHANNEL`                    | Browser channel                                            | `--channel`                 |
 | `SPARK_HEADLESS`                   | Run headless (true/false)                                  | `--headless`                |
 | `SPARK_BLOCK_ADS`                  | Block ads (true/false)                                     | `--no-block-ads`            |
 | `SPARK_BLOCK_RESOURCES`            | Resources to block (comma-separated)                       | `--block-resources`         |

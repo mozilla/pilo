@@ -51,6 +51,7 @@ interface SparkTaskRequest {
 
   // Browser configuration overrides
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  channel?: string;
   headless?: boolean;
   vision?: boolean;
   debug?: boolean;
@@ -122,6 +123,7 @@ spark.post("/run", async (c) => {
         // Merge server config with request overrides
         const browserConfig = {
           browser: body.browser || serverConfig.browser || "firefox",
+          channel: body.channel || serverConfig.channel,
           headless:
             body.headless !== undefined
               ? body.headless

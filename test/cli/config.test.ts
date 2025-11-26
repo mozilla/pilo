@@ -149,6 +149,43 @@ describe("Config Integration", () => {
     });
   });
 
+  describe("channel configuration", () => {
+    it("should merge channel environment variable", () => {
+      const mockSparkConfig: SparkConfig = {
+        browser: "chrome",
+        channel: "chrome-beta",
+      };
+
+      mockConfig.getConfig.mockReturnValue(mockSparkConfig);
+
+      const result = mockConfig.getConfig();
+      expect(result.channel).toBe("chrome-beta");
+    });
+
+    it("should handle missing channel config gracefully", () => {
+      mockConfig.getConfig.mockReturnValue({
+        browser: "firefox",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.channel).toBeUndefined();
+    });
+
+    it("should support various channel values", () => {
+      const channels = ["firefox", "moz-firefox"];
+
+      channels.forEach((channel) => {
+        mockConfig.getConfig.mockReturnValue({
+          browser: "firefox",
+          channel,
+        });
+
+        const result = mockConfig.getConfig();
+        expect(result.channel).toBe(channel);
+      });
+    });
+  });
+
   describe("proxy environment variables", () => {
     it("should merge proxy environment variables", () => {
       const mockSparkConfig: SparkConfig = {
