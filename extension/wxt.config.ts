@@ -58,6 +58,15 @@ let config = {
         action: {
           default_title: "Open Spark Sidepanel",
         },
+        commands: {
+          _execute_action: {
+            suggested_key: {
+              default: "Ctrl+Shift+S",
+              mac: "Command+Shift+S",
+            },
+            description: "Open Spark Sidepanel",
+          },
+        },
       };
     }
 

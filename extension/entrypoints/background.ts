@@ -23,6 +23,15 @@ export default defineBackground(() => {
   // Track running tasks by tab ID and their abort controllers
   const runningTasks = new Map<number, AbortController>();
 
+  // Configure side panel to open on action click (persists across restarts)
+  browser.runtime.onInstalled.addListener(() => {
+    const chromeBrowser = browser as ChromeBrowser;
+    if (chromeBrowser.sidePanel?.setPanelBehavior) {
+      chromeBrowser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      console.log("Side panel configured to open on action click");
+    }
+  });
+
   // Handle extension button clicks to open panel
   // Polyfill should normalize but doesn't seem to work properly
   const browserAction = browser.action || browser.browserAction;
