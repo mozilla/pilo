@@ -80,16 +80,16 @@ export const TOOL_STRINGS = {
     /** Common parameter descriptions */
     common: {
       successCriteria: "What would make a great response - key information and detail level needed",
-      plan: "Step-by-step plan for the task, formatted as VALID Markdown",
+      plan: "Step-by-step plan for the task, MUST be formatted as VALID Markdown",
     },
     /** Individual tool descriptions */
     create_plan: {
       description:
-        "Create a step-by-step plan for completing the task, formatted as VALID Markdown",
+        "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
     },
     create_plan_with_url: {
       description:
-        "Create a step-by-step plan formatted as VALID Markdown and determine the best starting URL",
+        "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
       url: "Starting URL for the task",
     },
   },
