@@ -26,7 +26,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       expect(tools.create_plan.description).toBe(
-        "Create a step-by-step plan for completing the task, formatted as VALID Markdown",
+        "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
       );
     });
 
@@ -34,7 +34,7 @@ describe("Planning Tools", () => {
       const tools = createPlanningTools();
 
       expect(tools.create_plan_with_url.description).toBe(
-        "Create a step-by-step plan formatted as VALID Markdown and determine the best starting URL",
+        "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
       );
     });
 
