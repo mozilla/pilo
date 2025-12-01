@@ -54,8 +54,8 @@ importers:
         specifier: ^5.1.6
         version: 5.1.6
       ollama-ai-provider-v2:
-        specifier: ^1.5.3
-        version: 1.5.3(zod@4.1.12)
+        specifier: ^1.5.4
+        version: 1.5.4(zod@4.1.12)
       playwright:
         specifier: 1.56.1
         version: 1.56.1
@@ -247,6 +247,12 @@ packages:
 
   '@ai-sdk/provider-utils@3.0.17':
     resolution: {integrity: sha512-TR3Gs4I3Tym4Ll+EPdzRdvo/rc8Js6c4nVhFLuvGLX/Y4V9ZcQMa/HTiYsHEgmYrf1zVi6Q145UEZUfleOwOjw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@3.0.18':
+    resolution: {integrity: sha512-ypv1xXMsgGcNKUP+hglKqtdDuMg68nWHucPPAhIENrbFAI+xCHiqPVN8Zllxyv1TNZwGWUghPxJXU+Mqps0YRQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2646,8 +2652,8 @@ packages:
   ohash@2.0.11:
     resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
 
-  ollama-ai-provider-v2@1.5.3:
-    resolution: {integrity: sha512-LnpvKuxNJyE+cB03cfUjFJnaiBJoUqz3X97GFc71gz09gOdrxNh1AsVBxrpw3uX5aiMxRIWPOZ8god0dHSChsg==}
+  ollama-ai-provider-v2@1.5.4:
+    resolution: {integrity: sha512-OTxzIvxW7GutgkyYe55Y4lJeUbnDjH1jDkAQhjGiynffkDn0wyWbv/dD92A8HX1ni5Ec+i+ksYMXXlVOYPQR4g==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^4.0.16
@@ -3600,6 +3606,13 @@ snapshots:
       zod: 4.1.12
 
   '@ai-sdk/provider-utils@3.0.17(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 4.1.12
+
+  '@ai-sdk/provider-utils@3.0.18(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -5722,10 +5735,10 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  ollama-ai-provider-v2@1.5.3(zod@4.1.12):
+  ollama-ai-provider-v2@1.5.4(zod@4.1.12):
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.1.12)
       zod: 4.1.12
 
   on-exit-leak-free@2.1.2: {}
@@ -6169,7 +6182,7 @@ snapshots:
       eventemitter3: 5.0.1
       liquidjs: 10.24.0
       nanoid: 5.1.6
-      ollama-ai-provider-v2: 1.5.3(zod@4.1.12)
+      ollama-ai-provider-v2: 1.5.4(zod@4.1.12)
       playwright: 1.56.1
       turndown: 7.2.2
       zod: 4.1.12
