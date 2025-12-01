@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.30
         version: 2.0.31(zod@4.1.12)
       '@ai-sdk/google-vertex':
-        specifier: ^3.0.62
-        version: 3.0.62(zod@4.1.12)
+        specifier: ^3.0.65
+        version: 3.0.65(zod@4.1.12)
       '@ai-sdk/openai':
         specifier: ^2.0.68
         version: 2.0.68(zod@4.1.12)
@@ -221,14 +221,20 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google-vertex@3.0.62':
-    resolution: {integrity: sha512-2TvmbxJ8BR7tFpvIcNWKcMaKS7G2yoIO2ZZXMX4F6UfJLuwZkO5j2xGeVs5TNbILEYVOTzN+CfjUTKsLpe7DRQ==}
+  '@ai-sdk/google-vertex@3.0.65':
+    resolution: {integrity: sha512-ej6u2Fp5HHSKJw8qG5EJCnXDtA6iCJcmn98xe/TudjTKWskoD5e+q9m419J1ArlQSaXrvRS9p1Y6Bqme5XxkLA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/google@2.0.31':
     resolution: {integrity: sha512-wOlUkrXHuL73sXPZd251+30BQ378zn2Zo8pW+Hq+8d9FmSJpZXOSK8cmYle1SE5ZWe/TS+eSj3eBCZ6AW+q2EA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@2.0.34':
+    resolution: {integrity: sha512-zIDWktv8bj/907EZjbzaelbTqIaOqtLVq3v2wQp9A7WuqaRVRJ8vAiwQy/dGBdN0Sj5/X01HVhj5eU6xHgHgAg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3569,10 +3575,10 @@ snapshots:
       '@vercel/oidc': 3.0.3
       zod: 4.1.12
 
-  '@ai-sdk/google-vertex@3.0.62(zod@4.1.12)':
+  '@ai-sdk/google-vertex@3.0.65(zod@4.1.12)':
     dependencies:
       '@ai-sdk/anthropic': 2.0.44(zod@4.1.12)
-      '@ai-sdk/google': 2.0.31(zod@4.1.12)
+      '@ai-sdk/google': 2.0.34(zod@4.1.12)
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
       google-auth-library: 9.15.1
@@ -3582,6 +3588,12 @@ snapshots:
       - supports-color
 
   '@ai-sdk/google@2.0.31(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
+      zod: 4.1.12
+
+  '@ai-sdk/google@2.0.34(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
@@ -6155,7 +6167,7 @@ snapshots:
   spark@file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
       '@ai-sdk/google': 2.0.31(zod@4.1.12)
-      '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
+      '@ai-sdk/google-vertex': 3.0.65(zod@4.1.12)
       '@ai-sdk/openai': 2.0.68(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.12.5(playwright@1.56.1)
