@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^2.0.30
-        version: 2.0.31(zod@4.1.12)
+        specifier: ^2.0.34
+        version: 2.0.34(zod@4.1.12)
       '@ai-sdk/google-vertex':
         specifier: ^3.0.62
         version: 3.0.62(zod@4.1.12)
@@ -229,6 +229,12 @@ packages:
 
   '@ai-sdk/google@2.0.31':
     resolution: {integrity: sha512-wOlUkrXHuL73sXPZd251+30BQ378zn2Zo8pW+Hq+8d9FmSJpZXOSK8cmYle1SE5ZWe/TS+eSj3eBCZ6AW+q2EA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@2.0.34':
+    resolution: {integrity: sha512-zIDWktv8bj/907EZjbzaelbTqIaOqtLVq3v2wQp9A7WuqaRVRJ8vAiwQy/dGBdN0Sj5/X01HVhj5eU6xHgHgAg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3587,6 +3593,12 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
       zod: 4.1.12
 
+  '@ai-sdk/google@2.0.34(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
+      zod: 4.1.12
+
   '@ai-sdk/openai-compatible@1.0.27(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -6154,7 +6166,7 @@ snapshots:
 
   spark@file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
-      '@ai-sdk/google': 2.0.31(zod@4.1.12)
+      '@ai-sdk/google': 2.0.34(zod@4.1.12)
       '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
       '@ai-sdk/openai': 2.0.68(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.12)
