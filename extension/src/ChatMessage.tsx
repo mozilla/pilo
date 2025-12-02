@@ -1,4 +1,7 @@
 import type { ReactElement } from "react";
+
+import clsx from "clsx";
+
 import type { Theme } from "./theme";
 
 import type { ChatMessage } from "./hooks/useConversation";
@@ -36,21 +39,40 @@ export function ChatMessage({
   isStreaming,
   reasoning,
 }: ChatMessageProps): ReactElement {
-  const isUser = type === "user";
-  const isSystem = type === "system";
+  let liClass = "";
+  let divClass = "";
+
+  switch (type) {
+    case "user":
+      liClass = "flex mb-4 justify-end";
+      divClass = clsx(
+        "px-4 py-2 rounded-lg max-w-xs lg:max-w-md",
+        t.bg.primary,
+        t.text.primary,
+        "border",
+        t.border.primary,
+      );
+      break;
+    case "system":
+      liClass = "flex mb-4";
+      divClass = clsx("px-4 py-2 rounded-lg w-full", t.bg.tertiary, t.text.muted);
+      break;
+    case "assistant":
+      liClass = "flex mb-4 justify-start";
+      divClass = clsx(
+        "px-4 py-2 rounded-lg max-w-xs lg:max-w-md",
+        t.bg.secondary,
+        t.text.primary,
+        "border",
+        t.border.primary,
+      );
+      break;
+  }
 
   return (
-    <li className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
-      <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isUser
-            ? `${t.bg.primary} ${t.text.primary} border ${t.border.primary}`
-            : isSystem
-              ? `${t.bg.tertiary} ${t.text.muted} border ${t.border.primary}`
-              : `${t.bg.secondary} ${t.text.primary} border ${t.border.primary}`
-        }`}
-      >
-        {!isUser && !isSystem && (
+    <li className={liClass}>
+      <div className={divClass}>
+        {type === "assistant" && (
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">⚡</span>
             <span className={`text-xs font-medium ${t.text.secondary}`}>Spark</span>
@@ -72,7 +94,7 @@ export function ChatMessage({
         {/* Show content if not streaming or if streaming is finished */}
         {(!isStreaming || content) && (
           <div
-            className={`${isUser ? "text-message-user" : "text-message-assistant"} whitespace-pre-wrap`}
+            className={`${type === "user" ? "text-message-user" : "text-message-assistant"} whitespace-pre-wrap`}
           >
             {renderContent(content)}
           </div>
