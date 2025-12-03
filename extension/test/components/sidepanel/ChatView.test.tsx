@@ -1296,10 +1296,10 @@ describe("ChatView", () => {
         .calls[0][0];
       messageListener(message);
 
-      // Assert: actionItems should be passed to addMessage as formatted markdown list
+      // Assert: actionItems should be passed to addMessage as numbered markdown list
       expect(mockAddMessage).toHaveBeenCalledWith(
         "plan",
-        "- **Search for recipes**\n- **Filter results**\n- **Select recipe**",
+        "1. Search for recipes\n2. Filter results\n3. Select recipe",
         "task-123",
       );
     });
