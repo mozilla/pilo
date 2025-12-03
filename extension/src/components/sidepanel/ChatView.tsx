@@ -349,7 +349,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             // Display actionItems if present, otherwise fall back to full plan
             if (typedMessage.event.data.actionItems?.length) {
               const displayPlan = typedMessage.event.data.actionItems
-                .map((item) => `- **${item}**`)
+                .map((item, index) => `${index + 1}. ${item}`)
                 .join("\n");
               addMessage("plan", displayPlan, taskId);
             } else if (typedMessage.event.data.plan) {
