@@ -1279,4 +1279,78 @@ describe("ChatView", () => {
       });
     });
   });
+
+  describe("Action Items Display", () => {
+    it("should display actionItems as bulleted list when present", () => {
+      // Arrange: Set up a task ID
+      mockCurrentTaskId = "task-123";
+
+      // Act: Render and simulate receiving a task:started event with actionItems
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one with details\n2. Step two with more details",
+        actionItems: ["Search for recipes", "Filter results", "Select recipe"],
+      });
+
+      // Trigger the message listener
+      const messageListener = (browser.runtime.onMessage.addListener as MockedFunction<any>).mock
+        .calls[0][0];
+      messageListener(message);
+
+      // Assert: actionItems should be passed to addMessage as formatted markdown list
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "- **Search for recipes**\n- **Filter results**\n- **Select recipe**",
+        "task-123",
+      );
+    });
+
+    it("should fall back to plan when actionItems is missing", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+
+      // Act: Render and simulate receiving a task:started event without actionItems
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one\n2. Step two",
+      });
+
+      const messageListener = (browser.runtime.onMessage.addListener as MockedFunction<any>).mock
+        .calls[0][0];
+      messageListener(message);
+
+      // Assert: plan should be used directly
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "## Full plan\n\n1. Step one\n2. Step two",
+        "task-123",
+      );
+    });
+
+    it("should fall back to plan when actionItems is empty array", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+
+      // Act
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one",
+        actionItems: [],
+      });
+
+      const messageListener = (browser.runtime.onMessage.addListener as MockedFunction<any>).mock
+        .calls[0][0];
+      messageListener(message);
+
+      // Assert: plan should be used when actionItems is empty
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "## Full plan\n\n1. Step one",
+        "task-123",
+      );
+    });
+  });
 });

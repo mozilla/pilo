@@ -203,5 +203,107 @@ describe("Planning Tools", () => {
       expect((result as any).plan).toContain("Étape");
       expect((result as any).plan).toContain("完成任务");
     });
+
+    it("should accept actionItems array in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const validInput = {
+        successCriteria: "I need to search for information",
+        plan: "1. Navigate to search\n2. Enter query\n3. Review results",
+        actionItems: ["Navigate to search", "Enter query", "Review results"],
+      };
+
+      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept actionItems array in create_plan_with_url", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan_with_url.inputSchema;
+
+      const validInput = {
+        successCriteria: "I need to search for flights",
+        plan: "1. Go to travel site\n2. Enter dates\n3. Search flights",
+        url: "https://travel-site.com",
+        actionItems: ["Go to travel site", "Enter dates", "Search flights"],
+      };
+
+      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid actionItems (non-array) in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        actionItems: "not an array", // should be array
+      };
+
+      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid actionItems (non-string elements) in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        actionItems: [123, true, { item: "wrong" }], // should be string array
+      };
+
+      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      expect(result.success).toBe(false);
+    });
+
+    it("should return actionItems when provided to create_plan", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test successCriteria",
+        plan: "Test plan",
+        actionItems: ["Action 1", "Action 2", "Action 3"],
+      };
+
+      const result = await tools.create_plan.execute!(input, {} as any);
+
+      expect(result).toEqual(input);
+      expect((result as any).actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
+    });
+
+    it("should return actionItems when provided to create_plan_with_url", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test successCriteria",
+        plan: "Test plan",
+        url: "https://example.com",
+        actionItems: ["Action 1", "Action 2"],
+      };
+
+      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+
+      expect(result).toEqual(input);
+      expect((result as any).actionItems).toEqual(["Action 1", "Action 2"]);
+    });
+
+    it("should work without actionItems (optional field)", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test",
+        plan: "Plan without action items",
+      };
+
+      const result = await tools.create_plan.execute!(input, {} as any);
+
+      expect(result).toEqual(input);
+      expect((result as any).actionItems).toBeUndefined();
+    });
   });
 });

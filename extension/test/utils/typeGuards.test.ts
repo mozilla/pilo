@@ -184,6 +184,41 @@ describe("Event Data Type Guards", () => {
     it("should return false for non-object", () => {
       expect(isTaskStartedData("not an object")).toBe(false);
     });
+
+    it("should return true for valid actionItems (string array)", () => {
+      const data: TaskStartedEventData = {
+        plan: "test plan",
+        taskId: "task-123",
+        actionItems: ["Action 1", "Action 2", "Action 3"],
+      };
+      expect(isTaskStartedData(data)).toBe(true);
+    });
+
+    it("should return true when actionItems is missing (optional)", () => {
+      const data: TaskStartedEventData = {
+        plan: "test plan",
+        taskId: "task-123",
+      };
+      expect(isTaskStartedData(data)).toBe(true);
+    });
+
+    it("should return false when actionItems is not an array", () => {
+      const data = {
+        plan: "test plan",
+        taskId: "task-123",
+        actionItems: "not an array",
+      };
+      expect(isTaskStartedData(data)).toBe(false);
+    });
+
+    it("should return false when actionItems contains non-string elements", () => {
+      const data = {
+        plan: "test plan",
+        taskId: "task-123",
+        actionItems: ["Action 1", 123, true],
+      };
+      expect(isTaskStartedData(data)).toBe(false);
+    });
   });
 
   describe("isAgentReasonedData", () => {

@@ -81,6 +81,8 @@ export const TOOL_STRINGS = {
     common: {
       successCriteria: "What would make a great response - key information and detail level needed",
       plan: "Step-by-step plan for the task, MUST be formatted as VALID Markdown",
+      actionItems:
+        "Array of 3-6 word action titles (e.g., ['Search for recipes', 'Filter results'])",
     },
     /** Individual tool descriptions */
     create_plan: {
@@ -198,11 +200,13 @@ Your plan should:
 Call create_plan_with_url() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
+- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
 - url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
 {% else %}
 Call create_plan() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
+- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
 {% endif %}
 
 ${toolCallInstruction}
