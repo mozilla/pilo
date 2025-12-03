@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Custom color tokens extending Tailwind's stone palette */
 @theme {

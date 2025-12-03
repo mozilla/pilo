@@ -92,7 +92,16 @@ interface MarkdownContentProps {
 }
 
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div className={clsx("markdown-content", className)}>
+  <div
+    className={clsx(
+      "markdown-content",
+      "prose",
+      "prose-base",
+      "prose-slate",
+      "max-w-none",
+      className,
+    )}
+  >
     <Markdown value={children} breaks gfm />
   </div>
 );
@@ -169,6 +178,8 @@ const TaskBubble = ({
 
   if (taskMessages.length === 0 && !latestStatus) return <></>;
 
+  const hasPlan = taskMessages.some((msg) => msg.type === "plan");
+
   // Track which section headings we've shown
   const seenTypes = new Set<string>();
 
@@ -188,11 +199,25 @@ const TaskBubble = ({
     }
   };
 
+  let liClass = "";
+  let divClass = "";
+
+  if (hasPlan) {
+    liClass = "flex mb-4";
+    divClass = clsx("w-full px-4 py-2 rounded-lg", t.bg.secondary, t.text.primary);
+  } else {
+    liClass = "flex mb-4 justify-start";
+    divClass = clsx(
+      "max-w-xs lg:max-w-md px-4 py-2 rounded-lg border",
+      t.bg.secondary,
+      t.text.primary,
+      t.border.primary,
+    );
+  }
+
   return (
-    <li className="flex justify-start mb-4">
-      <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${t.bg.secondary} ${t.text.primary} border ${t.border.primary}`}
-      >
+    <li className={liClass}>
+      <div className={divClass}>
         {/* Header */}
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">⚡</span>
