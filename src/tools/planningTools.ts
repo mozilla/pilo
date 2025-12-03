@@ -15,9 +15,13 @@ export function createPlanningTools() {
       inputSchema: z.object({
         successCriteria: z.string().describe(TOOL_STRINGS.planning.common.successCriteria),
         plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
+        actionItems: z
+          .array(z.string())
+          .optional()
+          .describe(TOOL_STRINGS.planning.common.actionItems),
       }),
-      execute: async ({ successCriteria, plan }) => {
-        return { successCriteria, plan };
+      execute: async ({ successCriteria, plan, actionItems }) => {
+        return { successCriteria, plan, ...(actionItems && { actionItems }) };
       },
     }),
 
@@ -27,9 +31,13 @@ export function createPlanningTools() {
         successCriteria: z.string().describe(TOOL_STRINGS.planning.common.successCriteria),
         plan: z.string().describe(TOOL_STRINGS.planning.common.plan),
         url: z.string().describe(TOOL_STRINGS.planning.create_plan_with_url.url),
+        actionItems: z
+          .array(z.string())
+          .optional()
+          .describe(TOOL_STRINGS.planning.common.actionItems),
       }),
-      execute: async ({ successCriteria, plan, url }) => {
-        return { successCriteria, plan, url };
+      execute: async ({ successCriteria, plan, url, actionItems }) => {
+        return { successCriteria, plan, url, ...(actionItems && { actionItems }) };
       },
     }),
   };

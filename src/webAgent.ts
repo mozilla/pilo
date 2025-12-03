@@ -122,6 +122,7 @@ export class WebAgent {
   private url: string = "";
   private messages: ModelMessage[] = [];
   private successCriteria: string = "";
+  private actionItems?: string[];
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
@@ -1062,10 +1063,11 @@ export class WebAgent {
         throw new Error("No tool results returned from planning");
       }
 
-      const { plan, successCriteria, url } = this.extractPlanOutput(planningResponse);
+      const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(planningResponse);
 
       this.plan = plan;
       this.successCriteria = successCriteria;
+      this.actionItems = actionItems;
 
       if (!startingUrl && url) {
         this.url = url;
@@ -1149,6 +1151,7 @@ export class WebAgent {
     plan: string;
     successCriteria: string;
     url?: string;
+    actionItems?: string[];
   } {
     const firstToolResult = planningResponse.toolResults[0] as any;
     const planOutput = firstToolResult.output;
@@ -1157,6 +1160,7 @@ export class WebAgent {
       plan: planOutput.plan || "",
       successCriteria: planOutput.successCriteria || "",
       url: planOutput.url,
+      actionItems: planOutput.actionItems,
     };
   }
 
@@ -1204,6 +1208,7 @@ export class WebAgent {
       plan: this.plan,
       url: this.url,
       title: this.currentPage.title,
+      actionItems: this.actionItems,
     });
   }
 
