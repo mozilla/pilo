@@ -300,3 +300,7 @@ export const theme = {
 
 export type Theme = typeof theme.light;
 export type ThemeMode = "light" | "dark";
+
+// Prose typography for markdown content is defined in CSS via @theme variables.
+// See: src/components/sidepanel/SidePanel.css (--prose-chat-* variables)
+// Documentation: docs/prose-typography-customization-plan.md
