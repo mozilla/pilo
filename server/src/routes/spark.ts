@@ -52,6 +52,7 @@ interface SparkTaskRequest {
   // Browser configuration overrides
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
   channel?: string;
+  executablePath?: string;
   headless?: boolean;
   vision?: boolean;
   debug?: boolean;
@@ -124,6 +125,7 @@ spark.post("/run", async (c) => {
         const browserConfig = {
           browser: body.browser || serverConfig.browser || "firefox",
           channel: body.channel || serverConfig.channel,
+          executablePath: body.executablePath || serverConfig.executable_path,
           headless:
             body.headless !== undefined
               ? body.headless

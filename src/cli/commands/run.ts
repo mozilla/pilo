@@ -47,6 +47,11 @@ export function createRunCommand(): Command {
       "Browser channel to use (e.g., chrome, msedge, chrome-beta, moz-firefox)",
       config.get("channel"),
     )
+    .option(
+      "--executable-path <path>",
+      "Path to browser executable (e.g., /usr/bin/firefox, /Applications/Firefox.app/Contents/MacOS/firefox)",
+      config.get("executable_path"),
+    )
     .option("--headless", "Run browser in headless mode", config.get("headless", false))
     .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
     .option(
@@ -162,6 +167,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       browser: options.browser,
       bypassCSP: options.bypassCsp,
       channel: options.channel,
+      executablePath: options.executablePath,
       blockAds: options.blockAds ?? config.get("block_ads", true),
       blockResources,
       headless: options.headless,

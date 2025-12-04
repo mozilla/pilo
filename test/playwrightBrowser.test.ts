@@ -379,6 +379,97 @@ describe("PlaywrightBrowser", () => {
     });
   });
 
+  describe("executablePath configuration", () => {
+    it("should handle explicit executablePath option", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "firefox",
+        executablePath: "/usr/bin/firefox",
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+    });
+
+    it("should handle executablePath on different platforms", () => {
+      const paths = [
+        "/usr/bin/firefox",
+        "/Applications/Firefox.app/Contents/MacOS/firefox",
+        "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+      ];
+
+      paths.forEach((executablePath) => {
+        const browser = new PlaywrightBrowser({
+          browser: "firefox",
+          executablePath,
+        });
+        expect(browser).toBeDefined();
+        expect(browser).toBeInstanceOf(PlaywrightBrowser);
+      });
+    });
+
+    it("should pass executablePath to launch options", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "chrome",
+        executablePath: "/usr/bin/google-chrome",
+      });
+      expect(browser).toBeDefined();
+
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.executablePath).toBe("/usr/bin/google-chrome");
+    });
+
+    it("should handle executablePath with other options", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "chrome",
+        executablePath: "/usr/bin/chromium",
+        headless: true,
+        blockAds: true,
+        blockResources: ["image"],
+      });
+      expect(browser).toBeDefined();
+      expect(browser).toBeInstanceOf(PlaywrightBrowser);
+
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.executablePath).toBe("/usr/bin/chromium");
+    });
+
+    it("should prioritize top-level executablePath over launchOptions executablePath", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "chrome",
+        executablePath: "/usr/bin/google-chrome-beta",
+        launchOptions: {
+          executablePath: "/usr/bin/google-chrome",
+        },
+      });
+      expect(browser).toBeDefined();
+
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.executablePath).toBe("/usr/bin/google-chrome-beta");
+    });
+
+    it("should handle undefined executablePath gracefully", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "firefox",
+      });
+      expect(browser).toBeDefined();
+
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.executablePath).toBeUndefined();
+    });
+
+    it("should work with channel and executablePath together", () => {
+      const browser = new PlaywrightBrowser({
+        browser: "chrome",
+        channel: "chrome-beta",
+        executablePath: "/usr/bin/google-chrome-beta",
+      });
+      expect(browser).toBeDefined();
+
+      const mappedOptions = (browser as any).mapOptionsToPlaywright();
+      expect(mappedOptions.launchOptions.channel).toBe("chrome-beta");
+      expect(mappedOptions.launchOptions.executablePath).toBe("/usr/bin/google-chrome-beta");
+    });
+  });
+
   describe("proxy configuration", () => {
     it("should handle proxy options", () => {
       const browser = new PlaywrightBrowser({

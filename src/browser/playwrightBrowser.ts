@@ -33,6 +33,8 @@ export interface PlaywrightBrowserOptions {
   bypassCSP?: boolean;
   /** Browser channel to use (e.g. 'chrome', 'msedge', 'chrome-beta', 'firefox') */
   channel?: string;
+  /** Path to a browser executable to use instead of the bundled browser (maps to launchOptions.executablePath) */
+  executablePath?: string;
   /** Run browser in headless mode (maps to launchOptions.headless) */
   headless?: boolean;
   /** Proxy server URL (http://host:port, https://host:port, socks5://host:port) */
@@ -148,6 +150,9 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
     if (this.options.channel !== undefined) {
       launchOptions.channel = this.options.channel;
+    }
+    if (this.options.executablePath !== undefined) {
+      launchOptions.executablePath = this.options.executablePath;
     }
     if (this.options.proxyServer) {
       launchOptions.proxy = {
