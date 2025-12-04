@@ -96,7 +96,7 @@ const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactEl
     className={clsx(
       "markdown-content",
       "prose",
-      "prose-base",
+      "prose-chat",
       "prose-slate",
       "max-w-none",
       className,
