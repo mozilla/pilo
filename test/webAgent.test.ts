@@ -1704,6 +1704,79 @@ describe("WebAgent", () => {
       );
       expect(thinkingEvents.length).toBeGreaterThanOrEqual(1); // at least one thinking event
     });
+
+    it("should emit AGENT_STATUS event when creating task plan", async () => {
+      // Plan
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {
+              successCriteria: "Test",
+              plan: "1. Test",
+            },
+            output: {
+              successCriteria: "Test",
+              plan: "1. Test",
+            },
+          },
+        ],
+      } as any);
+
+      // Done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Done",
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      await webAgent.execute("Test status events", { startingUrl: "https://example.com" });
+
+      // Check AGENT_STATUS event was emitted for "Creating task plan"
+      const statusEvents = mockLogger.events.filter(
+        (e) => e.type === WebAgentEventType.AGENT_STATUS,
+      );
+
+      const creatingPlanStatus = statusEvents.find((e) => e.data.message === "Creating task plan");
+
+      expect(creatingPlanStatus).toBeDefined();
+      expect(creatingPlanStatus?.data.iterationId).toBe("planning");
+    });
   });
 
   describe("task validation", () => {

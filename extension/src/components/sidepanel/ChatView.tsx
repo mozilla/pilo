@@ -7,6 +7,7 @@ import { useChat } from "../../useChat";
 import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
+import { useConversationStore } from "../../stores/conversationStore";
 import { useSystemTheme } from "../../useSystemTheme";
 import type { Theme } from "../../theme";
 import type {
@@ -211,6 +212,9 @@ const TaskBubble = ({
   const latestStatus = statusMessages.length > 0 ? statusMessages[statusMessages.length - 1] : null;
   const resultMessage = taskMessages.find((msg) => msg.type === "result");
   const isActive = currentTaskId === taskId;
+  // Show spinner when only status messages exist (before any task messages arrive),
+  // such as during the initial planning phase.
+  const isEarlyPhase = taskMessages.length === 0 && latestStatus !== null;
 
   if (taskMessages.length === 0 && !latestStatus) return <></>;
 
@@ -275,8 +279,8 @@ const TaskBubble = ({
           );
         })}
 
-        {/* Current status for active tasks */}
-        {!resultMessage && isActive && (
+        {/* Current status for active tasks or early phase status-only tasks */}
+        {!resultMessage && (isActive || isEarlyPhase) && (
           <div className="flex items-center gap-2 text-sm">
             <LoadingSpinner />
             <span className={t.text.muted}>
@@ -339,13 +343,25 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       if (typedMessage.type === "realtimeEvent") {
         addEvent(typedMessage.event.type, typedMessage.event.data);
 
+        // Read taskId directly from store to avoid race condition with React state.
+        // When events arrive immediately after startTask(), the store is updated
+        // but React may not have re-rendered yet, leaving currentTaskId stale.
+        //
+        // XXX this is an icky workaround.  what we really want is to make
+        // every event contain a task ID so that we don't have manually
+        // manage these associations, and race conditions like this disappear.
+        const conversation = stableTabId
+          ? useConversationStore.getState().getConversation(stableTabId)
+          : null;
+        const taskId = conversation?.currentTaskId ?? null;
+
         // Handle task started event to show plan
         if (
           typedMessage.event.type === "task:started" &&
           isTaskStartedData(typedMessage.event.data)
         ) {
-          if (typedMessage.event.data.plan && currentTaskId) {
-            addMessage("plan", typedMessage.event.data.plan, currentTaskId);
+          if (typedMessage.event.data.plan && taskId) {
+            addMessage("plan", typedMessage.event.data.plan, taskId);
           }
         }
 
@@ -354,8 +370,8 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "agent:reasoned" &&
           isAgentReasonedData(typedMessage.event.data)
         ) {
-          if (typedMessage.event.data.thought && currentTaskId) {
-            addMessage("reasoning", typedMessage.event.data.thought, currentTaskId);
+          if (typedMessage.event.data.thought && taskId) {
+            addMessage("reasoning", typedMessage.event.data.thought, taskId);
           }
         }
 
@@ -364,18 +380,18 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "agent:status" &&
           isAgentStatusData(typedMessage.event.data)
         ) {
-          if (typedMessage.event.data.message && currentTaskId) {
-            addMessage("status", typedMessage.event.data.message, currentTaskId);
+          if (typedMessage.event.data.message && taskId) {
+            addMessage("status", typedMessage.event.data.message, taskId);
           }
         }
 
         // Handle browser action started events
         if (typedMessage.event.type === "browser:action_started") {
           const eventData = typedMessage.event.data;
-          if (isBrowserActionStartedData(eventData) && currentTaskId) {
+          if (isBrowserActionStartedData(eventData) && taskId) {
             const statusMessage = formatBrowserAction(eventData);
             if (statusMessage) {
-              addMessage("status", statusMessage, currentTaskId);
+              addMessage("status", statusMessage, taskId);
             }
           }
         }
@@ -383,9 +399,9 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         // Handle agent action events (e.g., extract)
         if (typedMessage.event.type === "agent:action") {
           const eventData = typedMessage.event.data;
-          if (isAgentActionData(eventData) && currentTaskId) {
+          if (isAgentActionData(eventData) && taskId) {
             if (eventData.action === "extract") {
-              addMessage("status", "Extracting data", currentTaskId);
+              addMessage("status", "Extracting data", taskId);
             }
           }
         }
@@ -395,10 +411,10 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "ai:generation:error" &&
           isAIGenerationErrorData(typedMessage.event.data) &&
           typedMessage.event.data.error &&
-          currentTaskId &&
+          taskId &&
           shouldDisplayError(typedMessage.event)
         ) {
-          addMessage("error", `AI Error: ${typedMessage.event.data.error}`, currentTaskId);
+          addMessage("error", `AI Error: ${typedMessage.event.data.error}`, taskId);
         }
 
         // Handle validation errors (only show if max retries exceeded)
@@ -406,11 +422,11 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "task:validation_error" &&
           isTaskValidationErrorData(typedMessage.event.data) &&
           typedMessage.event.data.errors &&
-          currentTaskId &&
+          taskId &&
           shouldDisplayError(typedMessage.event)
         ) {
           const errorMessages = typedMessage.event.data.errors.join(", ");
-          addMessage("error", `Validation Error: ${errorMessages}`, currentTaskId);
+          addMessage("error", `Validation Error: ${errorMessages}`, taskId);
         }
 
         // Handle browser action result failures (only show non-recoverable errors)
@@ -418,11 +434,11 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "browser:action:completed" &&
           isBrowserActionCompletedData(typedMessage.event.data) &&
           typedMessage.event.data.success === false &&
-          currentTaskId &&
+          taskId &&
           shouldDisplayError(typedMessage.event)
         ) {
           const errorText = typedMessage.event.data.error || "Browser action failed";
-          addMessage("error", `Action Failed: ${errorText}`, currentTaskId);
+          addMessage("error", `Action Failed: ${errorText}`, taskId);
         }
       }
     };
@@ -432,7 +448,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     return () => {
       browser.runtime.onMessage.removeListener(handleMessage);
     };
-  }, [addEvent, addMessage, currentTaskId]);
+  }, [addEvent, addMessage, stableTabId]);
 
   const handleExecute = async () => {
     if (!task.trim()) return;
