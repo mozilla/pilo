@@ -11,7 +11,9 @@ import {
   isAIGenerationErrorData,
   isTaskValidationErrorData,
   isBrowserActionCompletedData,
+  isBrowserActionStartedData,
   isValidRealtimeEvent,
+  isAgentActionData,
 } from "../../src/utils/typeGuards";
 import type {
   TaskStartedEventData,
@@ -20,6 +22,7 @@ import type {
   AIGenerationErrorEventData,
   TaskValidationErrorEventData,
   BrowserActionCompletedEventData,
+  BrowserActionStartedEventData,
 } from "../../src/types/browser";
 
 describe("Type Guard Helpers", () => {
@@ -44,9 +47,10 @@ describe("Type Guard Helpers", () => {
       expect(hasOptionalStringProp(obj, "name")).toBe(false);
     });
 
-    it("should return false when property is undefined but exists", () => {
+    it("should return true when property is undefined but exists", () => {
+      // undefined is allowed for optional string props (common in real event data)
       const obj = { name: undefined };
-      expect(hasOptionalStringProp(obj, "name")).toBe(false);
+      expect(hasOptionalStringProp(obj, "name")).toBe(true);
     });
   });
 
@@ -428,5 +432,86 @@ describe("isValidRealtimeEvent type guard", () => {
     };
 
     expect(isValidRealtimeEvent(invalidEvent)).toBe(false);
+  });
+});
+
+describe("isBrowserActionStartedData", () => {
+  it("should return false for null", () => {
+    expect(isBrowserActionStartedData(null)).toBe(false);
+  });
+
+  it("should return false for missing action", () => {
+    expect(isBrowserActionStartedData({})).toBe(false);
+  });
+
+  it("should return false for non-string action", () => {
+    expect(isBrowserActionStartedData({ action: 123 })).toBe(false);
+  });
+
+  it("should return true for valid minimal data", () => {
+    expect(isBrowserActionStartedData({ action: "click" })).toBe(true);
+  });
+
+  it("should return true for valid data with optional ref and value", () => {
+    expect(isBrowserActionStartedData({ action: "click", ref: "btn", value: "x" })).toBe(true);
+  });
+
+  it("should return false when ref is not a string", () => {
+    expect(isBrowserActionStartedData({ action: "click", ref: 123 })).toBe(false);
+  });
+
+  it("should return false when value is not a string", () => {
+    expect(isBrowserActionStartedData({ action: "click", value: 123 })).toBe(false);
+  });
+
+  it("should return true for typed BrowserActionStartedEventData", () => {
+    const data: BrowserActionStartedEventData = {
+      action: "click",
+      ref: "Submit button",
+    };
+    expect(isBrowserActionStartedData(data)).toBe(true);
+  });
+
+  it("should return true when ref and value are explicitly undefined", () => {
+    // This matches real event data from the core library
+    const data = { action: "back", ref: undefined, value: undefined };
+    expect(isBrowserActionStartedData(data)).toBe(true);
+  });
+
+  it("should return true for data with additional properties from WebAgentEventData", () => {
+    // Real events include timestamp and iterationId from base interface
+    const data = {
+      action: "click",
+      ref: "Submit",
+      value: undefined,
+      timestamp: 1234567890,
+      iterationId: "iter-123",
+    };
+    expect(isBrowserActionStartedData(data)).toBe(true);
+  });
+});
+
+describe("isAgentActionData", () => {
+  it("should return true for valid agent action data with action property", () => {
+    const data = { action: "extract" };
+    expect(isAgentActionData(data)).toBe(true);
+  });
+
+  it("should return true for valid agent action data with action and value", () => {
+    const data = { action: "extract", value: "some data" };
+    expect(isAgentActionData(data)).toBe(true);
+  });
+
+  it("should return false for object without action property", () => {
+    const data = { value: "some data" };
+    expect(isAgentActionData(data)).toBe(false);
+  });
+
+  it("should return false for null", () => {
+    expect(isAgentActionData(null)).toBe(false);
+  });
+
+  it("should return false for string", () => {
+    expect(isAgentActionData("extract")).toBe(false);
   });
 });
