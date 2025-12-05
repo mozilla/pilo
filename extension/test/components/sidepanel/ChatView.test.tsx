@@ -8,6 +8,16 @@ import { theme } from "../../../src/theme";
 import browser from "webextension-polyfill";
 import type { RealtimeEventMessage } from "../../../src/types/browser";
 
+type MessageListenerCallback = (message: RealtimeEventMessage) => void;
+
+function getMockMessageListener(): MessageListenerCallback {
+  return (
+    browser.runtime.onMessage.addListener as MockedFunction<
+      (callback: MessageListenerCallback) => void
+    >
+  ).mock.calls[0][0];
+}
+
 // Mock the browser API
 vi.mock("webextension-polyfill", () => ({
   default: {
@@ -55,6 +65,8 @@ const mockAddMessage = vi.fn();
 const mockStartTask = vi.fn();
 const mockEndTask = vi.fn();
 let mockCurrentTaskId: string | null = null;
+// Separate store state to simulate race condition where store is updated but React hasn't re-rendered
+let mockStoreCurrentTaskId: string | null = null;
 
 vi.mock("../../../src/useChat", () => ({
   useChat: () => ({
@@ -72,6 +84,25 @@ vi.mock("../../../src/useChat", () => ({
     setExecutionState: vi.fn(),
     clearMessages: vi.fn(),
   }),
+}));
+
+// Mock conversationStore with getState() for synchronous access
+vi.mock("../../../src/stores/conversationStore", () => ({
+  useConversationStore: Object.assign(
+    // The hook itself (for React components)
+    () => ({}),
+    // Static getState() method for synchronous access outside React
+    {
+      getState: () => ({
+        getConversation: (tabId: number) => ({
+          currentTaskId: mockStoreCurrentTaskId,
+          tabId,
+          messages: [],
+          isExecuting: false,
+        }),
+      }),
+    },
+  ),
 }));
 
 // Helper to create typed realtime event messages for tests
@@ -107,6 +138,7 @@ describe("ChatView", () => {
     // Clear mock messages before each test
     mockMessages.length = 0;
     mockCurrentTaskId = null;
+    mockStoreCurrentTaskId = null;
     vi.clearAllMocks();
   });
 
@@ -701,6 +733,7 @@ describe("ChatView", () => {
       it("should add error message for validation errors when max retries exceeded", () => {
         // Arrange: Set currentTaskId before rendering
         mockCurrentTaskId = "task-123";
+        mockStoreCurrentTaskId = "task-123";
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
@@ -757,6 +790,7 @@ describe("ChatView", () => {
       it("should add error message for non-recoverable browser action errors", () => {
         // Arrange: Set currentTaskId before rendering
         mockCurrentTaskId = "task-456";
+        mockStoreCurrentTaskId = "task-456";
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
@@ -814,6 +848,7 @@ describe("ChatView", () => {
       it("should add error message for AI errors that are not tool errors", () => {
         // Arrange: Set currentTaskId before rendering
         mockCurrentTaskId = "task-999";
+        mockStoreCurrentTaskId = "task-999";
         render(<ChatView {...defaultProps} />);
 
         // Get the registered handler
@@ -882,6 +917,7 @@ describe("ChatView", () => {
     it("should add status message when browser:action_started event received", () => {
       // Arrange: Set currentTaskId before rendering
       mockCurrentTaskId = "task-browser-action";
+      mockStoreCurrentTaskId = "task-browser-action";
       render(<ChatView {...defaultProps} />);
 
       // Get the registered handler
@@ -935,6 +971,7 @@ describe("ChatView", () => {
     it("should add status message when agent:action event with extract action is received", () => {
       // Arrange: Set currentTaskId before rendering
       mockCurrentTaskId = "task-agent-action";
+      mockStoreCurrentTaskId = "task-agent-action";
       render(<ChatView {...defaultProps} />);
 
       // Get the registered handler
@@ -1106,6 +1143,136 @@ describe("ChatView", () => {
 
       // Verify the content is rendered
       expect(markdownContainer?.textContent).toContain("Test content");
+    });
+  });
+
+  describe("Status Events During Planning", () => {
+    it("should display agent:status events when currentTaskId is set", () => {
+      // Arrange: Set up a task ID before rendering
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      // Act: Render and simulate receiving an agent:status event
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("agent:status", {
+        message: "Creating task plan",
+        iterationId: "planning",
+      });
+
+      // Trigger the message listener
+      getMockMessageListener()(message);
+
+      // Assert: status message should be passed to addMessage
+      expect(mockAddMessage).toHaveBeenCalledWith("status", "Creating task plan", "task-123");
+    });
+
+    it("should show spinner with status message in early phase (status-only task bubble)", () => {
+      // Arrange: A task bubble exists with only status messages (no plan/result yet).
+      // This tests that the UI correctly renders status messages even when
+      // currentTaskId hasn't been updated yet - the UI should display task bubbles
+      // based on the taskId in messages, not just currentTaskId.
+      const now = new Date();
+      mockMessages.push({
+        id: "status1",
+        type: "status",
+        content: "Creating task plan",
+        taskId: "task-123",
+        timestamp: now,
+      });
+
+      // currentTaskId is null but message has taskId - UI should still render
+      mockCurrentTaskId = null;
+
+      // Act: Render the component
+      render(<ChatView {...defaultProps} />);
+
+      // Assert: The spinner should show with the status message
+      expect(screen.getByText("Creating task plan")).toBeInTheDocument();
+    });
+
+    describe("Race Condition: Events arriving before React state updates", () => {
+      // These tests verify that events are NOT dropped when they arrive before
+      // React has re-rendered with the new currentTaskId. The race condition
+      // window exists between:
+      // 1. User clicks send -> startTask() updates Zustand store
+      // 2. React re-renders with new currentTaskId from store
+      //
+      // The fix: Read currentTaskId directly from the store via getState()
+      // instead of relying on React state from the useChat hook.
+
+      it("should not drop status events when currentTaskId is null but event has taskId", () => {
+        // Arrange: React state is null but store has the taskId (race condition)
+        mockCurrentTaskId = null;
+        mockStoreCurrentTaskId = "task-123"; // Store updated, React hasn't re-rendered
+        render(<ChatView {...defaultProps} />);
+
+        // Act: An agent:status event arrives before React updates
+        // This simulates the race condition: startTask() was called, the store
+        // was updated, but React hasn't re-rendered yet
+        const message = createRealtimeMessage("agent:status", {
+          message: "Creating task plan",
+          iterationId: "planning",
+        });
+        getMockMessageListener()(message);
+
+        // Assert: Message should be processed using taskId from store (via getState())
+        expect(mockAddMessage).toHaveBeenCalledWith("status", "Creating task plan", "task-123");
+      });
+
+      it("should not drop plan events when currentTaskId is null but event has taskId", () => {
+        // Arrange: React state is null but store has the taskId (race condition)
+        mockCurrentTaskId = null;
+        mockStoreCurrentTaskId = "task-123"; // Store updated, React hasn't re-rendered
+        render(<ChatView {...defaultProps} />);
+
+        // Act: A task:started event arrives with a plan
+        const message = createRealtimeMessage("task:started", {
+          plan: "Step 1: Navigate to page\nStep 2: Click button",
+        });
+        getMockMessageListener()(message);
+
+        // Assert: Plan message should be processed using taskId from store (via getState())
+        expect(mockAddMessage).toHaveBeenCalledWith(
+          "plan",
+          "Step 1: Navigate to page\nStep 2: Click button",
+          "task-123",
+        );
+      });
+
+      it("should not drop browser action events when currentTaskId is null but event has taskId", () => {
+        // Arrange: React state is null but store has the taskId (race condition)
+        mockCurrentTaskId = null;
+        mockStoreCurrentTaskId = "task-123"; // Store updated, React hasn't re-rendered
+        render(<ChatView {...defaultProps} />);
+
+        // Act: A browser:action_started event arrives
+        const message = createRealtimeMessage("browser:action_started", {
+          action: "click",
+          ref: "Submit button",
+        });
+        getMockMessageListener()(message);
+
+        // Assert: Status message should be processed using taskId from store (via getState())
+        expect(mockAddMessage).toHaveBeenCalledWith("status", "Clicking", "task-123");
+      });
+
+      it("should process events correctly when currentTaskId is set before render", () => {
+        // Arrange: Both React state and store have taskId (no race condition)
+        mockCurrentTaskId = "task-123";
+        mockStoreCurrentTaskId = "task-123";
+        render(<ChatView {...defaultProps} />);
+
+        // Act: Events arrive after currentTaskId is properly set
+        const message = createRealtimeMessage("agent:status", {
+          message: "Executing step 1",
+          iterationId: "step-1",
+        });
+        getMockMessageListener()(message);
+
+        // Assert: Message is processed correctly
+        expect(mockAddMessage).toHaveBeenCalledWith("status", "Executing step 1", "task-123");
+      });
     });
   });
 });

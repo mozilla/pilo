@@ -1019,6 +1019,12 @@ export class WebAgent {
       iterationId: this.currentIterationId || "planning",
     });
 
+    // Also emit as status so extension ChatView shows it to user
+    this.emit(WebAgentEventType.AGENT_STATUS, {
+      message: "Creating task plan",
+      iterationId: this.currentIterationId || "planning",
+    });
+
     try {
       const planningTools = createPlanningTools();
 
