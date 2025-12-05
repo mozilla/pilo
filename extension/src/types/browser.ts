@@ -88,6 +88,12 @@ export interface BrowserActionCompletedEventData {
   isRecoverable?: boolean;
 }
 
+export interface BrowserActionStartedEventData {
+  action: string;
+  ref?: string;
+  value?: string;
+}
+
 // Generic event data for unknown event types
 export interface GenericEventData {
   [key: string]: unknown;
@@ -101,6 +107,7 @@ export type RealtimeEvent =
   | { type: "ai:generation:error"; data: AIGenerationErrorEventData; timestamp: number }
   | { type: "task:validation_error"; data: TaskValidationErrorEventData; timestamp: number }
   | { type: "browser:action:completed"; data: BrowserActionCompletedEventData; timestamp: number }
+  | { type: "browser:action_started"; data: BrowserActionStartedEventData; timestamp: number }
   | { type: string; data: GenericEventData; timestamp: number };
 
 export interface RealtimeEventMessage {

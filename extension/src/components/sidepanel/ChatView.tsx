@@ -24,7 +24,9 @@ import {
   isAIGenerationErrorData,
   isTaskValidationErrorData,
   isBrowserActionCompletedData,
+  isBrowserActionStartedData,
 } from "../../utils/typeGuards";
+import type { BrowserActionStartedEventData } from "../../types/browser";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
@@ -43,6 +45,39 @@ interface ChatViewProps {
  * and are handled automatically by the agent.
  */
 const MAX_VALIDATION_RETRIES = 3;
+
+/**
+ * Formats a browser action into a human-readable status message.
+ *
+ * @param data - The browser action started event data
+ * @returns A human-readable description of the action
+ */
+export function formatBrowserAction(data: BrowserActionStartedEventData): string {
+  const { action, value } = data;
+
+  switch (action) {
+    case "click":
+      return "Clicking";
+    case "fill":
+      return "Filling";
+    case "goto": {
+      if (value) {
+        try {
+          const url = new URL(value);
+          return `Navigating to ${url.hostname}`;
+        } catch (error) {
+          console.warn("Failed to parse URL in formatBrowserAction:", error);
+          return `Navigating to ${value}`;
+        }
+      }
+      return "Navigating";
+    }
+    case "select":
+      return value ? `Selecting '${value}'` : "Selecting";
+    default:
+      return "";
+  }
+}
 
 /**
  * Determines whether an error event should be displayed to the user.
@@ -330,6 +365,17 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         ) {
           if (typedMessage.event.data.message && currentTaskId) {
             addMessage("status", typedMessage.event.data.message, currentTaskId);
+          }
+        }
+
+        // Handle browser action started events
+        if (typedMessage.event.type === "browser:action_started") {
+          const eventData = typedMessage.event.data;
+          if (isBrowserActionStartedData(eventData) && currentTaskId) {
+            const statusMessage = formatBrowserAction(eventData);
+            if (statusMessage) {
+              addMessage("status", statusMessage, currentTaskId);
+            }
           }
         }
 

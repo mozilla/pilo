@@ -9,19 +9,22 @@ import type {
   AIGenerationErrorEventData,
   TaskValidationErrorEventData,
   BrowserActionCompletedEventData,
+  BrowserActionStartedEventData,
   RealtimeEvent,
 } from "../types/browser";
 
 /**
  * Check if an object has an optional string property
+ * Accepts: missing property, string value, or explicit undefined
  */
 export function hasOptionalStringProp(obj: unknown, prop: string): boolean {
   if (typeof obj !== "object" || obj === null) return false;
   const record = obj as Record<string, unknown>;
   // If property doesn't exist in object, that's fine (optional)
   if (!(prop in record)) return true;
-  // If property exists, it must be a string (not undefined, null, etc)
-  return typeof record[prop] === "string";
+  const value = record[prop];
+  // If property exists, it must be a string or undefined
+  return typeof value === "string" || value === undefined;
 }
 
 /**
@@ -116,6 +119,19 @@ export function isBrowserActionCompletedData(
     hasRequiredBooleanProp(data, "success") &&
     hasOptionalStringProp(data, "error") &&
     hasOptionalBooleanProp(data, "isRecoverable")
+  );
+}
+
+/**
+ * Type guard for BrowserActionStartedEventData
+ */
+export function isBrowserActionStartedData(data: unknown): data is BrowserActionStartedEventData {
+  if (typeof data !== "object" || data === null) return false;
+  const record = data as Record<string, unknown>;
+  return (
+    typeof record.action === "string" &&
+    hasOptionalStringProp(data, "ref") &&
+    hasOptionalStringProp(data, "value")
   );
 }
 

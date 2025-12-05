@@ -1,6 +1,9 @@
 import { beforeEach, describe, it, expect, vi, type MockedFunction } from "vitest";
 import { render, screen } from "@testing-library/react";
-import ChatView, { shouldDisplayError } from "../../../src/components/sidepanel/ChatView";
+import ChatView, {
+  shouldDisplayError,
+  formatBrowserAction,
+} from "../../../src/components/sidepanel/ChatView";
 import { theme } from "../../../src/theme";
 import browser from "webextension-polyfill";
 import type { RealtimeEventMessage } from "../../../src/types/browser";
@@ -835,6 +838,96 @@ describe("ChatView", () => {
           "task-999",
         );
       });
+    });
+  });
+
+  describe("formatBrowserAction", () => {
+    it("formats click action without exposing ref", () => {
+      const result = formatBrowserAction({ action: "click", ref: "Submit button" });
+      expect(result).toBe("Clicking");
+    });
+
+    it("formats click action without ref", () => {
+      const result = formatBrowserAction({ action: "click" });
+      expect(result).toBe("Clicking");
+    });
+
+    it("formats fill action without exposing ref", () => {
+      const result = formatBrowserAction({ action: "fill", ref: "Email input" });
+      expect(result).toBe("Filling");
+    });
+
+    it("formats goto action with hostname", () => {
+      const result = formatBrowserAction({ action: "goto", value: "https://example.com" });
+      expect(result).toBe("Navigating to example.com");
+    });
+
+    it("formats select action with value only", () => {
+      const result = formatBrowserAction({ action: "select", ref: "Country", value: "USA" });
+      expect(result).toBe("Selecting 'USA'");
+    });
+
+    it("formats select action without value", () => {
+      const result = formatBrowserAction({ action: "select", ref: "Country" });
+      expect(result).toBe("Selecting");
+    });
+
+    it("returns empty string for unknown actions", () => {
+      const result = formatBrowserAction({ action: "someNewAction" });
+      expect(result).toBe("");
+    });
+  });
+
+  describe("browser:action_started event handling", () => {
+    it("should add status message when browser:action_started event received", () => {
+      // Arrange: Set currentTaskId before rendering
+      mockCurrentTaskId = "task-browser-action";
+      render(<ChatView {...defaultProps} />);
+
+      // Get the registered handler
+      const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+        typeof browser.runtime.onMessage.addListener
+      >;
+      const registeredHandler = mockAddListener.mock.calls[
+        mockAddListener.mock.calls.length - 1
+      ][0] as (message: unknown) => void;
+
+      // Act: Simulate browser:action_started event
+      const message = createRealtimeMessage("browser:action_started", {
+        action: "click",
+        ref: "Submit button",
+      });
+      registeredHandler(message);
+
+      // Assert: addMessage should have been called with formatted status (ref not exposed)
+      expect(mockAddMessage).toHaveBeenCalledWith("status", "Clicking", "task-browser-action");
+    });
+
+    it("should not add status message for unknown actions", () => {
+      // Arrange: Set currentTaskId before rendering
+      mockCurrentTaskId = "task-unknown-action";
+      render(<ChatView {...defaultProps} />);
+
+      // Get the registered handler
+      const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+        typeof browser.runtime.onMessage.addListener
+      >;
+      const registeredHandler = mockAddListener.mock.calls[
+        mockAddListener.mock.calls.length - 1
+      ][0] as (message: unknown) => void;
+
+      // Act: Simulate browser:action_started event with unknown action
+      const message = createRealtimeMessage("browser:action_started", {
+        action: "someUnknownAction",
+      });
+      registeredHandler(message);
+
+      // Assert: addMessage should NOT have been called (empty string is not displayed)
+      expect(mockAddMessage).not.toHaveBeenCalledWith(
+        "status",
+        expect.anything(),
+        "task-unknown-action",
+      );
     });
   });
 
