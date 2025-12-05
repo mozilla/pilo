@@ -162,3 +162,12 @@ export function isValidRealtimeEvent(event: unknown): event is RealtimeEvent {
 
   return true;
 }
+
+/**
+ * Type guard for agent action event data (from agent:action events)
+ */
+export function isAgentActionData(data: unknown): data is { action: string; value?: string } {
+  if (typeof data !== "object" || data === null) return false;
+  const record = data as Record<string, unknown>;
+  return typeof record.action === "string";
+}

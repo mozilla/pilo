@@ -13,6 +13,7 @@ import {
   isBrowserActionCompletedData,
   isBrowserActionStartedData,
   isValidRealtimeEvent,
+  isAgentActionData,
 } from "../../src/utils/typeGuards";
 import type {
   TaskStartedEventData,
@@ -487,5 +488,30 @@ describe("isBrowserActionStartedData", () => {
       iterationId: "iter-123",
     };
     expect(isBrowserActionStartedData(data)).toBe(true);
+  });
+});
+
+describe("isAgentActionData", () => {
+  it("should return true for valid agent action data with action property", () => {
+    const data = { action: "extract" };
+    expect(isAgentActionData(data)).toBe(true);
+  });
+
+  it("should return true for valid agent action data with action and value", () => {
+    const data = { action: "extract", value: "some data" };
+    expect(isAgentActionData(data)).toBe(true);
+  });
+
+  it("should return false for object without action property", () => {
+    const data = { value: "some data" };
+    expect(isAgentActionData(data)).toBe(false);
+  });
+
+  it("should return false for null", () => {
+    expect(isAgentActionData(null)).toBe(false);
+  });
+
+  it("should return false for string", () => {
+    expect(isAgentActionData("extract")).toBe(false);
   });
 });

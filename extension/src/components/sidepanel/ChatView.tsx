@@ -25,6 +25,7 @@ import {
   isTaskValidationErrorData,
   isBrowserActionCompletedData,
   isBrowserActionStartedData,
+  isAgentActionData,
 } from "../../utils/typeGuards";
 import type { BrowserActionStartedEventData } from "../../types/browser";
 
@@ -375,6 +376,16 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             const statusMessage = formatBrowserAction(eventData);
             if (statusMessage) {
               addMessage("status", statusMessage, currentTaskId);
+            }
+          }
+        }
+
+        // Handle agent action events (e.g., extract)
+        if (typedMessage.event.type === "agent:action") {
+          const eventData = typedMessage.event.data;
+          if (isAgentActionData(eventData) && currentTaskId) {
+            if (eventData.action === "extract") {
+              addMessage("status", "Extracting data", currentTaskId);
             }
           }
         }

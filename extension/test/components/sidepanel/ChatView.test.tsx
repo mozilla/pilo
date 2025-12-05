@@ -931,6 +931,77 @@ describe("ChatView", () => {
     });
   });
 
+  describe("agent:action event handling", () => {
+    it("should add status message when agent:action event with extract action is received", () => {
+      // Arrange: Set currentTaskId before rendering
+      mockCurrentTaskId = "task-agent-action";
+      render(<ChatView {...defaultProps} />);
+
+      // Get the registered handler
+      const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+        typeof browser.runtime.onMessage.addListener
+      >;
+      const registeredHandler = mockAddListener.mock.calls[
+        mockAddListener.mock.calls.length - 1
+      ][0] as (message: unknown) => void;
+
+      // Act: Simulate agent:action event with extract action
+      const message = createRealtimeMessage("agent:action", {
+        action: "extract",
+      });
+      registeredHandler(message);
+
+      // Assert: addMessage should have been called with status message
+      expect(mockAddMessage).toHaveBeenCalledWith("status", "Extracting data", "task-agent-action");
+    });
+
+    it("should not add status message when agent:action event with done action is received", () => {
+      // Arrange: Set currentTaskId before rendering
+      mockCurrentTaskId = "task-agent-done";
+      render(<ChatView {...defaultProps} />);
+
+      // Get the registered handler
+      const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+        typeof browser.runtime.onMessage.addListener
+      >;
+      const registeredHandler = mockAddListener.mock.calls[
+        mockAddListener.mock.calls.length - 1
+      ][0] as (message: unknown) => void;
+
+      // Act: Simulate agent:action event with done action
+      const message = createRealtimeMessage("agent:action", {
+        action: "done",
+      });
+      registeredHandler(message);
+
+      // Assert: addMessage should NOT have been called
+      expect(mockAddMessage).not.toHaveBeenCalled();
+    });
+
+    it("should not add status message when agent:action event with abort action is received", () => {
+      // Arrange: Set currentTaskId before rendering
+      mockCurrentTaskId = "task-agent-abort";
+      render(<ChatView {...defaultProps} />);
+
+      // Get the registered handler
+      const mockAddListener = browser.runtime.onMessage.addListener as MockedFunction<
+        typeof browser.runtime.onMessage.addListener
+      >;
+      const registeredHandler = mockAddListener.mock.calls[
+        mockAddListener.mock.calls.length - 1
+      ][0] as (message: unknown) => void;
+
+      // Act: Simulate agent:action event with abort action
+      const message = createRealtimeMessage("agent:action", {
+        action: "abort",
+      });
+      registeredHandler(message);
+
+      // Assert: addMessage should NOT have been called
+      expect(mockAddMessage).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Markdown Rendering", () => {
     it("renders double newlines as separate paragraphs with spacing", () => {
       // Arrange: Create a message with double newlines
