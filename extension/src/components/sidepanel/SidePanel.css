@@ -3,6 +3,13 @@
 
 /* Custom color tokens extending Tailwind's stone palette */
 @theme {
+  /* Override default font to use Inter Variable */
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  /* letter spacing */
+  --tracking-normal: -0.1px;
+
   --color-stone-25: #fdfcfa;
   --color-stone-75: #f5f3ef;
   --color-stone-125: #ebe9e5;
@@ -47,16 +54,13 @@
   .text-message-user {
     font-size: 0.875rem;
     line-height: 1.5;
-    font-weight: 500;
-    font-family:
-      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-weight: 400;
   }
 
   .text-message-assistant {
     font-size: 1rem;
     line-height: 1.5;
-    font-weight: 500;
-    font-family: Georgia, "Times New Roman", Times, serif;
+    font-weight: 400;
   }
 
   /* Restore list styles for markdown content */
