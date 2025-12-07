@@ -22,7 +22,7 @@
   /* Font sizes */
   --prose-chat-font-size: 0.75rem;
   --prose-chat-h1-font-size: 1.125rem;
-  --prose-chat-h2-font-size: 1.125rem;
+  --prose-chat-h2-font-size: 1rem;
   --prose-chat-h3-font-size: 1rem;
   --prose-chat-h4-font-size: 1em;
   --prose-chat-code-font-size: 0.875em;
@@ -90,6 +90,7 @@
     line-height: var(--prose-chat-h1-line-height);
     margin-top: var(--prose-chat-h1-margin-top);
     margin-bottom: var(--prose-chat-h1-margin-bottom);
+    font-weight: 600;
   }
 
   h2 {
@@ -97,6 +98,7 @@
     line-height: var(--prose-chat-h2-line-height);
     margin-top: var(--prose-chat-h2-margin-top);
     margin-bottom: var(--prose-chat-h2-margin-bottom);
+    font-weight: 600;
   }
 
   h3 {

@@ -152,13 +152,13 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
   const getClassName = () => {
     switch (message.type) {
       case "plan":
-        return `text-message-assistant ${t.text.secondary}`;
+        return `text-message-assistant ${t.text.secondary} text-xs`;
       case "reasoning":
         return `text-message-assistant ${t.text.secondary}`;
       case "error":
         return "text-message-assistant text-red-600 p-2 bg-red-50 rounded border border-red-200";
       case "result":
-        return "text-message-assistant";
+        return "text-message-assistant text-sm";
       default:
         return "text-message-assistant";
     }
