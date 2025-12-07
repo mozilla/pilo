@@ -134,7 +134,6 @@ const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactEl
       "markdown-content",
       "prose",
       "prose-chat",
-      "prose-slate",
       "max-w-none",
       className,
     )}
@@ -153,7 +152,7 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
   const getClassName = () => {
     switch (message.type) {
       case "plan":
-        return `text-message-assistant ${t.text.primary}`;
+        return `text-message-assistant ${t.text.secondary}`;
       case "reasoning":
         return `text-message-assistant ${t.text.secondary}`;
       case "error":
@@ -168,7 +167,7 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
   return (
     <div className="mb-2">
       <div className={getClassName()}>
-        <MarkdownContent>{message.content}</MarkdownContent>
+        <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
       </div>
     </div>
   );
