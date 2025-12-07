@@ -7,6 +7,9 @@ function generateWebExtJSON(): WebExtConfig {
     // Open developer tools on startup (mostly to see the logs) during development
     // (requires Firefox 106+). Only seems to work in Firefox.
     openDevtools: true,
+    // Enable Chrome DevTools Protocol
+    // Connect via: curl http://localhost:9222/json
+    chromiumArgs: ["--remote-debugging-port=9222"],
   };
 
   // Firefox profile persistence - controlled by environment variables
