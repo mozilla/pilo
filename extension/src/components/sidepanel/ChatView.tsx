@@ -175,7 +175,7 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
 
 // Loading spinner component
 const LoadingSpinner = (): ReactElement => (
-  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+  <svg className="animate-spin stroke-[#924fe8] h-4 w-4" fill="none" viewBox="0 0 24 24">
     <circle
       className="opacity-25"
       cx="12"
@@ -282,7 +282,7 @@ const TaskBubble = ({
         {!resultMessage && (isActive || isEarlyPhase) && (
           <div className="flex items-center gap-2 text-sm">
             <LoadingSpinner />
-            <span className={t.text.muted}>
+            <span className="text-[#924FE8]">
               {latestStatus ? latestStatus.content : "Starting task..."}
             </span>
           </div>
