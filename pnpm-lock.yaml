@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.30
         version: 2.0.31(zod@4.1.12)
       '@ai-sdk/google-vertex':
-        specifier: ^3.0.62
-        version: 3.0.62(zod@4.1.12)
+        specifier: ^3.0.74
+        version: 3.0.74(zod@4.1.12)
       '@ai-sdk/openai':
         specifier: ^2.0.68
         version: 2.0.68(zod@4.1.12)
@@ -212,8 +212,8 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/anthropic@2.0.44':
-    resolution: {integrity: sha512-o8TfNXRzO/KZkBrcx+CL9LQsPhx7PHyqzUGjza3TJaF9WxfH1S5UQLAmEw8F7lQoHNLU0IX03WT8o8R/4JbUxQ==}
+  '@ai-sdk/anthropic@2.0.45':
+    resolution: {integrity: sha512-Ipv62vavDCmrV/oE/lXehL9FzwQuZOnnlhPEftWizx464Wb6lvnBTJx8uhmEYruFSzOWTI95Z33ncZ4tA8E6RQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -224,14 +224,20 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google-vertex@3.0.62':
-    resolution: {integrity: sha512-2TvmbxJ8BR7tFpvIcNWKcMaKS7G2yoIO2ZZXMX4F6UfJLuwZkO5j2xGeVs5TNbILEYVOTzN+CfjUTKsLpe7DRQ==}
+  '@ai-sdk/google-vertex@3.0.74':
+    resolution: {integrity: sha512-W0375p41RQOheAmy7iJGtuJWQWX/aKkO4sJHf6eIYa3bkz93Cbo1aRG1X7ocyMusLZ3dIaW7x6X9WHD8IHkNfg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/google@2.0.31':
     resolution: {integrity: sha512-wOlUkrXHuL73sXPZd251+30BQ378zn2Zo8pW+Hq+8d9FmSJpZXOSK8cmYle1SE5ZWe/TS+eSj3eBCZ6AW+q2EA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@2.0.42':
+    resolution: {integrity: sha512-Jdn+3TZm4iIt62CUjjUoIOshqFIXyzNmUDfkSVV4FcjlSo5+AuhzI1KC7QiNHlqPNejzR6NLIqGJx96VAES34g==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2373,8 +2379,8 @@ packages:
   jwa@2.0.1:
     resolution: {integrity: sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==}
 
-  jws@4.0.0:
-    resolution: {integrity: sha512-KDncfTmOZoOMTFG4mBlG0qUIOlc03fmzH+ru6RgYVZhPkyiy/92Owlt/8UEN+a4TXR1FQetfIpJE8ApdvdVxTg==}
+  jws@4.0.1:
+    resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
 
   kleur@3.0.3:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
@@ -3573,7 +3579,7 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@2.0.44(zod@4.1.12)':
+  '@ai-sdk/anthropic@2.0.45(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
@@ -3586,10 +3592,10 @@ snapshots:
       '@vercel/oidc': 3.0.3
       zod: 4.1.12
 
-  '@ai-sdk/google-vertex@3.0.62(zod@4.1.12)':
+  '@ai-sdk/google-vertex@3.0.74(zod@4.1.12)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.44(zod@4.1.12)
-      '@ai-sdk/google': 2.0.31(zod@4.1.12)
+      '@ai-sdk/anthropic': 2.0.45(zod@4.1.12)
+      '@ai-sdk/google': 2.0.42(zod@4.1.12)
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
       google-auth-library: 9.15.1
@@ -3599,6 +3605,12 @@ snapshots:
       - supports-color
 
   '@ai-sdk/google@2.0.31(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
+      zod: 4.1.12
+
+  '@ai-sdk/google@2.0.42(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.12)
@@ -5245,7 +5257,7 @@ snapshots:
       gaxios: 6.7.1
       gcp-metadata: 6.1.1
       gtoken: 7.1.0
-      jws: 4.0.0
+      jws: 4.0.1
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -5263,7 +5275,7 @@ snapshots:
   gtoken@7.1.0:
     dependencies:
       gaxios: 6.7.1
-      jws: 4.0.0
+      jws: 4.0.1
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -5478,7 +5490,7 @@ snapshots:
       ecdsa-sig-formatter: 1.0.11
       safe-buffer: 5.2.1
 
-  jws@4.0.0:
+  jws@4.0.1:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
@@ -6184,7 +6196,7 @@ snapshots:
   spark@file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
       '@ai-sdk/google': 2.0.31(zod@4.1.12)
-      '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
+      '@ai-sdk/google-vertex': 3.0.74(zod@4.1.12)
       '@ai-sdk/openai': 2.0.68(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.12)
       '@ghostery/adblocker-playwright': 2.12.5(playwright@1.56.1)
