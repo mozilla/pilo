@@ -269,7 +269,7 @@ const TaskBubble = ({
           return (
             <div key={msg.id}>
               {heading && (
-                <div className="text-sm font-semibold text-gray-500 mb-2 mt-3 first:mt-0">
+                <div className="text-sm font-semibold text-[#924FE8] mb-2 mt-3 first:mt-0">
                   {heading}
                 </div>
               )}
