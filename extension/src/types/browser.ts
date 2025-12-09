@@ -58,6 +58,9 @@ export interface CancelTaskResponse {
   message?: string;
 }
 
+// Note: GetIndicatorStateMessage and GetIndicatorStateResponse removed
+// Indicator is now controlled via CSS injection in background script (see indicatorControl.ts)
+
 // Event data types for different event kinds
 export interface TaskStartedEventData {
   plan?: string;
@@ -112,6 +115,7 @@ export type RealtimeEvent =
 
 export interface RealtimeEventMessage {
   type: "realtimeEvent";
+  tabId: number;
   event: RealtimeEvent;
 }
 

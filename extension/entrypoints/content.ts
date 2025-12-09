@@ -17,10 +17,16 @@ declare global {
 
 export default defineContentScript({
   matches: ["<all_urls>"],
+  runAt: "document_start",
+  registration: "manifest",
   main() {
+    console.log("[Spark] Content script loaded at document_start");
     // Make ARIA tree functions available globally for executeScript
     window.generateAriaTree = generateAriaTree;
     window.renderAriaTree = renderAriaTree;
+
+    // Note: Indicator is now controlled via CSS injection from background script
+    // (see indicatorControl.ts) - no need to query state or handle messages here
 
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {
