@@ -109,9 +109,11 @@ vi.mock("../../../src/stores/conversationStore", () => ({
 function createRealtimeMessage(
   eventType: string,
   data: Record<string, unknown>,
+  tabId: number = 1,
 ): RealtimeEventMessage {
   return {
     type: "realtimeEvent",
+    tabId,
     event: {
       type: eventType,
       data: data,

@@ -175,3 +175,4 @@ export function isAgentActionData(data: unknown): data is { action: string; valu
   const record = data as Record<string, unknown>;
   return typeof record.action === "string";
 }
+

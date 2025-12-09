@@ -113,6 +113,7 @@ export type RealtimeEvent =
 
 export interface RealtimeEventMessage {
   type: "realtimeEvent";
+  tabId: number;
   event: RealtimeEvent;
 }
 

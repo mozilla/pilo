@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import { AgentManager, EventStoreLogger } from "../src/AgentManager";
 import { useConversationStore } from "../src/stores/conversationStore";
+import { forwardIndicatorEvent } from "../src/background/indicatorForwarder";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -57,7 +58,7 @@ export default defineBackground(() => {
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener((message: unknown, _sender: any) => {
+  browser.runtime.onMessage.addListener((message: unknown) => {
     // Type guard to validate message structure
     if (!message || typeof message !== "object" || !("type" in message)) {
       return Promise.resolve({ success: false, message: "Invalid message format" });
@@ -65,11 +66,11 @@ export default defineBackground(() => {
 
     const typedMessage = message as ExtensionMessage;
 
-    // Handle realtimeEvent messages immediately - just ignore them
+    // Handle realtimeEvent messages - forward indicator events to content script
     if (typedMessage.type === "realtimeEvent") {
-      // These are meant for sidepanel consumption, not background handling
-      console.log("Background received message: realtimeEvent", typedMessage.event);
-      // Return undefined to indicate no response
+      // Forward indicator events to the content script for visual feedback
+      forwardIndicatorEvent(typedMessage);
+      // Return undefined to indicate no response (sidepanel also consumes these)
       return;
     }
 
@@ -93,6 +94,16 @@ export default defineBackground(() => {
               "provider",
             ])) as StorageSettings;
 
+            // Debug: Log what settings we got (without the full API key for security)
+            console.log("Settings loaded:", {
+              hasApiKey: !!settings.apiKey,
+              apiKeyLength: settings.apiKey?.length || 0,
+              apiKeyPrefix: settings.apiKey?.substring(0, 8) || "none",
+              provider: settings.provider,
+              model: settings.model,
+              apiEndpoint: settings.apiEndpoint,
+            });
+
             if (!settings.apiKey) {
               response = {
                 success: false,
@@ -100,9 +111,6 @@ export default defineBackground(() => {
               };
               break;
             }
-
-            // Create event store logger to capture events for React
-            const logger = new EventStoreLogger();
 
             // Create AbortController for this task
             const abortController = new AbortController();
@@ -115,6 +123,9 @@ export default defineBackground(() => {
               };
               break;
             }
+
+            // Create event store logger with tabId to enable indicator forwarding
+            const logger = new EventStoreLogger(tabId);
 
             // Cancel any existing task for this tab
             if (runningTasks.has(tabId)) {
@@ -158,14 +169,29 @@ export default defineBackground(() => {
                     (error.message.includes("cancelled") || error.message.includes("aborted"))));
 
               if (isCancellation) {
+                // Emit task:aborted event for cancellation to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: "Task cancelled by user",
+                  finalAnswer: "Task cancelled",
+                  timestamp: Date.now(),
+                  iterationId: "cancelled",
+                });
                 response = {
                   success: true, // Treat cancellation as success to avoid error styling
                   result: "Task cancelled",
                 };
               } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                // Emit task:aborted event for errors to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: errorMessage,
+                  finalAnswer: `Task failed: ${errorMessage}`,
+                  timestamp: Date.now(),
+                  iterationId: "error",
+                });
                 response = {
                   success: false,
-                  message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                  message: `Task execution failed: ${errorMessage}`,
                 };
               }
             } finally {
@@ -230,6 +256,29 @@ export default defineBackground(() => {
     if (controller) {
       controller.abort();
       runningTasks.delete(tabId);
+    }
+  });
+
+  // Re-send indicator state when a tab with a running task navigates
+  // This ensures the indicator persists across page navigations
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    // Only act when navigation completes and there's a running task for this tab
+    if (changeInfo.status === "complete" && runningTasks.has(tabId)) {
+      console.log(`[Background] Tab ${tabId} navigated, re-sending indicator state`);
+      // Re-send task:setup to show the indicator on the new page
+      const indicatorMessage = {
+        type: "realtimeEvent" as const,
+        tabId,
+        event: {
+          type: "task:setup",
+          data: {},
+          timestamp: Date.now(),
+        },
+      };
+      browser.tabs.sendMessage(tabId, indicatorMessage).catch((error) => {
+        // Content script may not be ready yet, that's okay
+        console.log(`[Background] Could not send indicator to tab ${tabId}:`, error);
+      });
     }
   });
 
