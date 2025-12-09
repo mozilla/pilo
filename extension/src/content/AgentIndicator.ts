@@ -15,10 +15,10 @@ export function getIndicatorStyles(): string {
   return `
 @keyframes spark-pulse {
   0%, 100% {
-    box-shadow: inset 0 0 0 4px rgba(139, 92, 246, 0.3);
+    opacity: 0.6;
   }
   50% {
-    box-shadow: inset 0 0 0 4px rgba(139, 92, 246, 0.8);
+    opacity: 1;
   }
 }
 .spark-agent-indicator {
@@ -29,6 +29,11 @@ export function getIndicatorStyles(): string {
   height: 100%;
   pointer-events: none;
   z-index: 2147483647;
+  box-shadow:
+    inset 60px 60px 80px -40px rgba(139, 92, 246, 0.6),
+    inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
+    inset 60px -60px 80px -40px rgba(139, 92, 246, 0.6),
+    inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
   animation: spark-pulse 2s ease-in-out infinite;
 }
 `;

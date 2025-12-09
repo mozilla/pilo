@@ -61,6 +61,15 @@ describe("getIndicatorStyles", () => {
     expect(styles).toContain(".spark-agent-indicator");
     expect(styles).toContain("animation");
   });
+
+  it("should position glow effects in corners using multiple shadows", () => {
+    // Act
+    const styles = getIndicatorStyles();
+
+    // Assert - multiple inset box-shadows with offsets create corner glow effect
+    const shadowMatches = styles.match(/inset\s+-?\d+px\s+-?\d+px/g);
+    expect(shadowMatches?.length).toBeGreaterThanOrEqual(4);
+  });
 });
 
 describe("injectStyles", () => {
