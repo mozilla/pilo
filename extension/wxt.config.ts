@@ -46,8 +46,9 @@ let config = {
         manifest.content_scripts = [
           {
             matches: ["<all_urls>"],
-            run_at: "document_idle",
-            js: ["content-scripts/content.js"],
+            run_at: "document_start",
+            css: ["content-scripts/indicator.css"],
+            js: ["content-scripts/content.js", "content-scripts/indicator.js"],
           },
         ];
       }

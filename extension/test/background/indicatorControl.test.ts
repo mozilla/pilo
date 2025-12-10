@@ -1,6 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
-  getIndicatorCSS,
   showIndicator,
   hideIndicator,
   setupNavigationListener,
@@ -12,6 +11,7 @@ import browser from "webextension-polyfill";
 vi.mock("webextension-polyfill", () => ({
   default: {
     scripting: {
+      executeScript: vi.fn(),
       insertCSS: vi.fn(),
       removeCSS: vi.fn(),
     },
@@ -25,65 +25,62 @@ vi.mock("webextension-polyfill", () => ({
 }));
 
 describe("indicatorControl", () => {
-  describe("getIndicatorCSS", () => {
-    it("should return a non-empty CSS string", () => {
-      const css = getIndicatorCSS();
-      expect(css).toBeTruthy();
-      expect(typeof css).toBe("string");
-      expect(css.length).toBeGreaterThan(0);
-    });
-
-    it("should include pulse animation keyframes", () => {
-      const css = getIndicatorCSS();
-      expect(css).toContain("@keyframes spark-pulse");
-    });
-
-    it("should use html::after pseudo-element", () => {
-      const css = getIndicatorCSS();
-      expect(css).toContain("html::after");
-    });
-
-    it("should have pointer-events: none to not block interactions", () => {
-      const css = getIndicatorCSS();
-      expect(css).toContain("pointer-events: none");
-    });
-
-    it("should have fixed positioning", () => {
-      const css = getIndicatorCSS();
-      expect(css).toContain("position: fixed");
-    });
-
-    it("should have purple glow box-shadow", () => {
-      const css = getIndicatorCSS();
-      expect(css).toContain("box-shadow");
-      expect(css).toContain("rgba(139, 92, 246");
-    });
-  });
-
   describe("showIndicator", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([]);
       vi.mocked(browser.scripting.insertCSS).mockResolvedValue(undefined);
+      vi.mocked(browser.scripting.removeCSS).mockResolvedValue(undefined);
     });
 
-    it("should call browser.scripting.insertCSS with the correct tabId", async () => {
+    afterEach(() => {
+      cleanupNavigationListener();
+    });
+
+    it("should call browser.scripting.executeScript with the correct tabId", async () => {
       await showIndicator(123);
-      expect(browser.scripting.insertCSS).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: { tabId: 123 },
-        }),
-      );
+      expect(browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        func: expect.any(Function),
+      });
     });
 
-    it("should inject CSS containing spark-pulse animation", async () => {
+    it("should add spark-indicator-active class to html element", async () => {
       await showIndicator(123);
-      const call = vi.mocked(browser.scripting.insertCSS).mock.calls[0];
-      const cssOptions = call[0] as { css: string };
-      expect(cssOptions.css).toContain("spark-pulse");
+
+      // Capture and test the injected function
+      const call = vi.mocked(browser.scripting.executeScript).mock.calls[0];
+      const options = call[0] as { func: () => void };
+
+      // Mock document.documentElement
+      const mockClassList = {
+        add: vi.fn(),
+        remove: vi.fn(),
+      };
+      const originalDocumentElement = globalThis.document?.documentElement;
+      Object.defineProperty(globalThis, "document", {
+        value: { documentElement: { classList: mockClassList } },
+        writable: true,
+        configurable: true,
+      });
+
+      // Execute the function
+      options.func();
+
+      expect(mockClassList.add).toHaveBeenCalledWith("spark-indicator-active");
+
+      // Restore
+      if (originalDocumentElement) {
+        Object.defineProperty(globalThis, "document", {
+          value: { documentElement: originalDocumentElement },
+          writable: true,
+          configurable: true,
+        });
+      }
     });
 
-    it("should not throw when insertCSS fails", async () => {
-      vi.mocked(browser.scripting.insertCSS).mockRejectedValue(new Error("Tab not found"));
+    it("should not throw when executeScript fails", async () => {
+      vi.mocked(browser.scripting.executeScript).mockRejectedValue(new Error("Tab not found"));
       await expect(showIndicator(123)).resolves.toBeUndefined();
     });
   });
@@ -91,27 +88,59 @@ describe("indicatorControl", () => {
   describe("hideIndicator", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([]);
+      vi.mocked(browser.scripting.insertCSS).mockResolvedValue(undefined);
       vi.mocked(browser.scripting.removeCSS).mockResolvedValue(undefined);
     });
 
-    it("should call browser.scripting.removeCSS with the correct tabId", async () => {
-      await hideIndicator(123);
-      expect(browser.scripting.removeCSS).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: { tabId: 123 },
-        }),
-      );
+    afterEach(() => {
+      cleanupNavigationListener();
     });
 
-    it("should remove CSS containing spark-pulse animation", async () => {
+    it("should call browser.scripting.executeScript with the correct tabId", async () => {
       await hideIndicator(123);
-      const call = vi.mocked(browser.scripting.removeCSS).mock.calls[0];
-      const cssOptions = call[0] as { css: string };
-      expect(cssOptions.css).toContain("spark-pulse");
+      expect(browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        func: expect.any(Function),
+      });
     });
 
-    it("should not throw when removeCSS fails", async () => {
-      vi.mocked(browser.scripting.removeCSS).mockRejectedValue(new Error("Tab not found"));
+    it("should remove spark-indicator-active class from html element", async () => {
+      await hideIndicator(123);
+
+      // Capture and test the injected function
+      const call = vi.mocked(browser.scripting.executeScript).mock.calls[0];
+      const options = call[0] as { func: () => void };
+
+      // Mock document.documentElement
+      const mockClassList = {
+        add: vi.fn(),
+        remove: vi.fn(),
+      };
+      const originalDocumentElement = globalThis.document?.documentElement;
+      Object.defineProperty(globalThis, "document", {
+        value: { documentElement: { classList: mockClassList } },
+        writable: true,
+        configurable: true,
+      });
+
+      // Execute the function
+      options.func();
+
+      expect(mockClassList.remove).toHaveBeenCalledWith("spark-indicator-active");
+
+      // Restore
+      if (originalDocumentElement) {
+        Object.defineProperty(globalThis, "document", {
+          value: { documentElement: originalDocumentElement },
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it("should not throw when executeScript fails", async () => {
+      vi.mocked(browser.scripting.executeScript).mockRejectedValue(new Error("Tab not found"));
       await expect(hideIndicator(123)).resolves.toBeUndefined();
     });
   });
@@ -119,6 +148,7 @@ describe("indicatorControl", () => {
   describe("indicator state tracking", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([]);
       vi.mocked(browser.scripting.insertCSS).mockResolvedValue(undefined);
       vi.mocked(browser.scripting.removeCSS).mockResolvedValue(undefined);
     });
@@ -153,6 +183,7 @@ describe("indicatorControl", () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([]);
       vi.mocked(browser.scripting.insertCSS).mockResolvedValue(undefined);
       vi.mocked(browser.scripting.removeCSS).mockResolvedValue(undefined);
       vi.mocked(browser.tabs.onUpdated.addListener).mockImplementation((listener) => {
@@ -177,7 +208,7 @@ describe("indicatorControl", () => {
       expect(browser.tabs.onUpdated.addListener).toHaveBeenCalledTimes(1);
     });
 
-    it("should re-inject CSS when page completes loading for active indicator tab", async () => {
+    it("should re-apply class via executeScript when page completes loading for active indicator tab", async () => {
       setupNavigationListener();
       await showIndicator(123);
       vi.clearAllMocks();
@@ -188,14 +219,13 @@ describe("indicatorControl", () => {
       // Wait for async re-injection
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(browser.scripting.insertCSS).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: { tabId: 123 },
-        }),
-      );
+      expect(browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        func: expect.any(Function),
+      });
     });
 
-    it("should not re-inject CSS for tabs without active indicator", async () => {
+    it("should not re-apply class for tabs without active indicator", async () => {
       setupNavigationListener();
       // Don't show indicator for tab 123
 
@@ -204,20 +234,36 @@ describe("indicatorControl", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(browser.scripting.insertCSS).not.toHaveBeenCalled();
+      expect(browser.scripting.executeScript).not.toHaveBeenCalled();
     });
 
-    it("should not re-inject CSS for non-complete status changes", async () => {
+    it("should re-apply class on loading status to reduce flash", async () => {
       setupNavigationListener();
       await showIndicator(123);
       vi.clearAllMocks();
 
-      // Simulate loading status (not complete)
+      // Simulate loading status - should trigger early injection
       capturedListener?.(123, { status: "loading" }, { id: 123 });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(browser.scripting.insertCSS).not.toHaveBeenCalled();
+      expect(browser.scripting.insertCSS).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        css: expect.any(String),
+      });
+    });
+
+    it("should not re-apply class for other status changes", async () => {
+      setupNavigationListener();
+      await showIndicator(123);
+      vi.clearAllMocks();
+
+      // Simulate other status (not loading or complete)
+      capturedListener?.(123, { status: "interactive" }, { id: 123 });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(browser.scripting.executeScript).not.toHaveBeenCalled();
     });
 
     it("should remove listener when cleanupNavigationListener is called", () => {

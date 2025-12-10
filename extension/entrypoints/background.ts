@@ -74,7 +74,9 @@ export default defineBackground(() => {
     const typedMessage = message as ExtensionMessage;
 
     // Note: Indicator events are now handled via CSS injection (see indicatorControl.ts)
-    // No need to forward to content script or handle getIndicatorState queries
+    // The indicator is shown via logger.subscribe() in the executeTask handler below,
+    // not via realtimeEvent messages (which don't reach the background script since
+    // runtime.sendMessage doesn't deliver to the sender's own onMessage listener).
 
     // realtimeEvent messages are consumed by sidepanel via runtime.sendMessage from EventStoreLogger
     if (typedMessage.type === "realtimeEvent") {
@@ -135,15 +137,31 @@ export default defineBackground(() => {
             // Create event store logger with tabId to enable indicator forwarding
             const logger = new EventStoreLogger(tabId);
 
+            // Subscribe to logger events to show/hide indicator
+            // This is needed because runtime.sendMessage doesn't deliver to the sender's own listener
+            let indicatorShown = false;
+            const unsubscribe = logger.subscribe((events) => {
+              // Show indicator on task:started (planning complete)
+              if (!indicatorShown && events.some((e) => e.type === "task:started")) {
+                indicatorShown = true;
+                showIndicator(tabId).catch(() => {});
+              }
+              // Hide indicator on task completion or abort
+              if (
+                indicatorShown &&
+                events.some((e) => e.type === "task:completed" || e.type === "task:aborted")
+              ) {
+                hideIndicator(tabId).catch(() => {});
+                unsubscribe();
+              }
+            });
+
             // Cancel any existing task for this tab
             if (runningTasks.has(tabId)) {
               runningTasks.get(tabId)?.abort();
             }
 
             runningTasks.set(tabId, abortController);
-
-            // Show indicator via CSS injection (persists across navigations)
-            await showIndicator(tabId);
 
             try {
               console.log(

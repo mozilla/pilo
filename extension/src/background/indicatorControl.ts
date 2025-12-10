@@ -1,8 +1,8 @@
 /**
- * Background-controlled indicator via CSS injection.
- * This module handles showing/hiding the visual indicator by injecting CSS
- * directly from the background script. It also listens for navigation events
- * to re-inject CSS on cross-origin navigations.
+ * Background-controlled indicator via class toggle.
+ * This module handles showing/hiding the visual indicator by toggling a CSS class
+ * on the html element. The CSS is pre-loaded via manifest content script.
+ * It also listens for navigation events to re-apply the class on navigations.
  */
 
 import browser from "webextension-polyfill";
@@ -20,15 +20,10 @@ let navigationListener:
     ) => void)
   | null = null;
 
-export function getIndicatorCSS(): string {
-  return `
-@keyframes spark-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-html::after {
-  content: '';
+// CSS for the indicator - injected programmatically for reliability
+const INDICATOR_CSS = `
+html.spark-indicator-active::after {
+  content: "";
   pointer-events: none;
   position: fixed;
   top: 0;
@@ -36,6 +31,7 @@ html::after {
   width: 100%;
   height: 100%;
   z-index: 2147483647;
+  opacity: 1;
   box-shadow:
     inset 60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
@@ -43,16 +39,27 @@ html::after {
     inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
   animation: spark-pulse 3s ease-in-out infinite;
 }
-`;
+@keyframes spark-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
+`;
 
 export async function showIndicator(tabId: number): Promise<void> {
   try {
+    // Inject CSS first (idempotent - checks if already injected)
     await browser.scripting.insertCSS({
       target: { tabId },
-      css: getIndicatorCSS(),
+      css: INDICATOR_CSS,
     });
-    // Only track if injection succeeded
+    // Then add the class to activate the indicator
+    await browser.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        document.documentElement.classList.add("spark-indicator-active");
+      },
+    });
+    // Only track if both succeeded
     activeIndicators.add(tabId);
   } catch {
     // Silently ignore errors (e.g., tab closed, chrome:// pages)
@@ -63,9 +70,17 @@ export async function hideIndicator(tabId: number): Promise<void> {
   // Remove from tracking first
   activeIndicators.delete(tabId);
   try {
+    // Remove the class first
+    await browser.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        document.documentElement.classList.remove("spark-indicator-active");
+      },
+    });
+    // Then remove the CSS
     await browser.scripting.removeCSS({
       target: { tabId },
-      css: getIndicatorCSS(),
+      css: INDICATOR_CSS,
     });
   } catch {
     // Silently ignore errors (e.g., tab closed, chrome:// pages)
@@ -80,7 +95,7 @@ export function isIndicatorActive(tabId: number): boolean {
 }
 
 /**
- * Set up the navigation listener to re-inject CSS on cross-origin navigations.
+ * Set up the navigation listener to re-apply class on navigations.
  * This should be called once when the background script starts.
  */
 export function setupNavigationListener(): void {
@@ -89,16 +104,28 @@ export function setupNavigationListener(): void {
   }
 
   navigationListener = (tabId, changeInfo) => {
-    // Re-inject CSS when page completes loading for tabs with active indicators
-    if (changeInfo.status === "complete" && activeIndicators.has(tabId)) {
-      // Re-inject CSS (fire and forget)
+    // Re-apply CSS and class for tabs with active indicators
+    // Inject on both "loading" (early, reduces flash) and "complete" (reliable fallback)
+    if (
+      (changeInfo.status === "loading" || changeInfo.status === "complete") &&
+      activeIndicators.has(tabId)
+    ) {
+      // Re-inject CSS and add class (fire and forget)
       browser.scripting
         .insertCSS({
           target: { tabId },
-          css: getIndicatorCSS(),
+          css: INDICATOR_CSS,
         })
+        .then(() =>
+          browser.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              document.documentElement.classList.add("spark-indicator-active");
+            },
+          }),
+        )
         .catch(() => {
-          // Silently ignore errors
+          // Silently ignore errors - may fail on "loading" if page not ready yet
         });
     }
   };
