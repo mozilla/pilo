@@ -68,7 +68,7 @@ let config = {
     const baseManifest = {
       name: "Spark Extension",
       description: "AI-powered web automation browser extension",
-      permissions: ["activeTab", "storage", "scripting", "tabs"],
+      permissions: ["activeTab", "storage", "scripting", "tabs", "webNavigation"],
       host_permissions: ["*://*/*"],
     };
 
