@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import browser from "webextension-polyfill";
-import { forwardIndicatorEvent } from "../src/background/indicatorForwarder";
 import { EventStoreLogger } from "../src/EventStoreLogger";
-import type { RealtimeEventMessage } from "../src/types/browser";
 
 // Mock the webextension-polyfill module
 vi.mock("webextension-polyfill", () => ({
@@ -214,179 +212,9 @@ describe("Background Script - Provider Support", () => {
   });
 });
 
-describe("Background Script - Indicator Event Forwarding", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe("forwardIndicatorEvent", () => {
-    it("should forward task:setup event to the originating tab", async () => {
-      // Arrange
-      const message: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 123,
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act
-      await forwardIndicatorEvent(message);
-
-      // Assert
-      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(123, message);
-    });
-
-    it("should forward task:completed event to the originating tab", async () => {
-      // Arrange
-      const message: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 456,
-        event: {
-          type: "task:completed",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act
-      await forwardIndicatorEvent(message);
-
-      // Assert
-      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(456, message);
-    });
-
-    it("should forward task:aborted event to the originating tab", async () => {
-      // Arrange
-      const message: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 789,
-        event: {
-          type: "task:aborted",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act
-      await forwardIndicatorEvent(message);
-
-      // Assert
-      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(789, message);
-    });
-
-    it("should not forward non-indicator events (e.g., agent:reasoned)", async () => {
-      // Arrange
-      const message: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 123,
-        event: {
-          type: "agent:reasoned",
-          data: { thought: "thinking..." },
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act
-      await forwardIndicatorEvent(message);
-
-      // Assert
-      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it("should route events to the correct tab using tabId", async () => {
-      // Arrange - two messages for different tabs
-      const message1: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 100,
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-      const message2: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 200,
-        event: {
-          type: "task:completed",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act
-      await forwardIndicatorEvent(message1);
-      await forwardIndicatorEvent(message2);
-
-      // Assert - each message sent to its respective tab
-      expect(browser.tabs.sendMessage).toHaveBeenNthCalledWith(1, 100, message1);
-      expect(browser.tabs.sendMessage).toHaveBeenNthCalledWith(2, 200, message2);
-    });
-
-    it("should handle tabs.sendMessage failures gracefully (no throw)", async () => {
-      // Arrange - mock sendMessage to reject
-      vi.mocked(browser.tabs.sendMessage).mockRejectedValueOnce(
-        new Error("Could not establish connection. Receiving end does not exist."),
-      );
-      const message: RealtimeEventMessage = {
-        type: "realtimeEvent",
-        tabId: 123,
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-
-      // Act & Assert - should not throw
-      await expect(forwardIndicatorEvent(message)).resolves.not.toThrow();
-    });
-
-    it("should handle malformed realtimeEvent messages gracefully", async () => {
-      // Arrange - message missing event property
-      const malformedMessage = {
-        type: "realtimeEvent",
-        tabId: 123,
-        // missing event property
-      } as unknown as RealtimeEventMessage;
-
-      // Act & Assert - should not throw
-      await expect(forwardIndicatorEvent(malformedMessage)).resolves.not.toThrow();
-      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it("should ignore events with missing or invalid tabId", async () => {
-      // Arrange - message with missing tabId
-      const messageNoTabId = {
-        type: "realtimeEvent",
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      } as unknown as RealtimeEventMessage;
-
-      // Arrange - message with non-numeric tabId
-      const messageInvalidTabId = {
-        type: "realtimeEvent",
-        tabId: "not-a-number",
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      } as unknown as RealtimeEventMessage;
-
-      // Act & Assert - should not throw and should not forward
-      await expect(forwardIndicatorEvent(messageNoTabId)).resolves.not.toThrow();
-      await expect(forwardIndicatorEvent(messageInvalidTabId)).resolves.not.toThrow();
-      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
-    });
-  });
-});
+// Note: "Background Script - Indicator Event Forwarding" tests removed
+// Indicator is now controlled via CSS injection in background script (see indicatorControl.ts)
+// instead of forwarding events to content script via tabs.sendMessage
 
 describe("Background Script - Error Handling", () => {
   describe("task:aborted event on error", () => {
@@ -422,18 +250,8 @@ describe("Background Script - Error Handling", () => {
           }),
         }),
       );
-
-      // Assert - indicator forwarder should also be called (via forwardIndicatorEvent in EventStoreLogger)
-      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
-        123,
-        expect.objectContaining({
-          type: "realtimeEvent",
-          tabId: 123,
-          event: expect.objectContaining({
-            type: "task:aborted",
-          }),
-        }),
-      );
+      // Note: Indicator visibility is now handled via CSS injection in background script
+      // (see indicatorControl.ts) instead of forwarding to content script via tabs.sendMessage
     });
 
     it("should emit task:aborted when task is cancelled by user", async () => {
@@ -449,15 +267,18 @@ describe("Background Script - Error Handling", () => {
         iterationId: "cancelled",
       });
 
-      // Assert
-      expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
-        456,
+      // Assert - event should be broadcast to sidepanel via runtime.sendMessage
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
+          type: "realtimeEvent",
+          tabId: 456,
           event: expect.objectContaining({
             type: "task:aborted",
           }),
         }),
       );
+      // Note: Indicator visibility is now handled via CSS injection in background script
+      // (see indicatorControl.ts) instead of forwarding to content script via tabs.sendMessage
     });
   });
 });

@@ -1,7 +1,11 @@
 import browser from "webextension-polyfill";
 import { AgentManager, EventStoreLogger } from "../src/AgentManager";
 import { useConversationStore } from "../src/stores/conversationStore";
-import { forwardIndicatorEvent } from "../src/background/indicatorForwarder";
+import {
+  showIndicator,
+  hideIndicator,
+  setupNavigationListener,
+} from "../src/background/indicatorControl";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -20,6 +24,9 @@ interface StorageSettings {
 
 export default defineBackground(() => {
   console.log("Background script loaded");
+
+  // Set up navigation listener to re-inject indicator CSS on cross-origin navigations
+  setupNavigationListener();
 
   // Track running tasks by tab ID and their abort controllers
   const runningTasks = new Map<number, AbortController>();
@@ -58,212 +65,201 @@ export default defineBackground(() => {
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener(
-    (message: unknown, sender: browser.Runtime.MessageSender) => {
-      // Type guard to validate message structure
-      if (!message || typeof message !== "object" || !("type" in message)) {
-        return Promise.resolve({ success: false, message: "Invalid message format" });
-      }
+  browser.runtime.onMessage.addListener((message: unknown) => {
+    // Type guard to validate message structure
+    if (!message || typeof message !== "object" || !("type" in message)) {
+      return Promise.resolve({ success: false, message: "Invalid message format" });
+    }
 
-      const typedMessage = message as ExtensionMessage;
+    const typedMessage = message as ExtensionMessage;
 
-      // Handle realtimeEvent messages - forward indicator events to content script
-      if (typedMessage.type === "realtimeEvent") {
-        // Forward indicator events to the content script for visual feedback
-        forwardIndicatorEvent(typedMessage);
-        // Return undefined to indicate no response (sidepanel also consumes these)
-        return;
-      }
+    // Note: Indicator events are now handled via CSS injection (see indicatorControl.ts)
+    // No need to forward to content script or handle getIndicatorState queries
 
-      // Handle content script asking for current indicator state
-      if (typedMessage.type === "getIndicatorState") {
-        // Get tab ID from sender (content script doesn't know its own tab ID)
-        const tabId = sender.tab?.id;
-        const hasRunningTask = tabId !== undefined && runningTasks.has(tabId);
-        console.log(
-          "[Background] getIndicatorState for tab:",
-          tabId,
-          "hasRunningTask:",
-          hasRunningTask,
-        );
-        return Promise.resolve({ shouldShowIndicator: hasRunningTask });
-      }
+    // realtimeEvent messages are consumed by sidepanel via runtime.sendMessage from EventStoreLogger
+    if (typedMessage.type === "realtimeEvent") {
+      // Return undefined to indicate no response (sidepanel consumes these)
+      return;
+    }
 
-      console.log("Background received message:", typedMessage.type, typedMessage);
+    console.log("Background received message:", typedMessage.type, typedMessage);
 
-      // Return a Promise for async processing
-      return (async () => {
-        try {
-          let response: ExecuteTaskResponse | CancelTaskResponse;
+    // Return a Promise for async processing
+    return (async () => {
+      try {
+        let response: ExecuteTaskResponse | CancelTaskResponse;
 
-          switch (typedMessage.type) {
-            case "executeTask":
-              const executeMessage = typedMessage as ExecuteTaskMessage;
-              console.log("Executing task:", executeMessage.task);
+        switch (typedMessage.type) {
+          case "executeTask":
+            const executeMessage = typedMessage as ExecuteTaskMessage;
+            console.log("Executing task:", executeMessage.task);
 
-              // Get settings from storage
-              const settings = (await browser.storage.local.get([
-                "apiKey",
-                "apiEndpoint",
-                "model",
-                "provider",
-              ])) as StorageSettings;
+            // Get settings from storage
+            const settings = (await browser.storage.local.get([
+              "apiKey",
+              "apiEndpoint",
+              "model",
+              "provider",
+            ])) as StorageSettings;
 
-              // Debug: Log what settings we got (without the full API key for security)
-              console.log("Settings loaded:", {
-                hasApiKey: !!settings.apiKey,
-                apiKeyLength: settings.apiKey?.length || 0,
-                apiKeyPrefix: settings.apiKey?.substring(0, 8) || "none",
-                provider: settings.provider,
-                model: settings.model,
+            // Debug: Log what settings we got (without the full API key for security)
+            console.log("Settings loaded:", {
+              hasApiKey: !!settings.apiKey,
+              apiKeyLength: settings.apiKey?.length || 0,
+              apiKeyPrefix: settings.apiKey?.substring(0, 8) || "none",
+              provider: settings.provider,
+              model: settings.model,
+              apiEndpoint: settings.apiEndpoint,
+            });
+
+            if (!settings.apiKey) {
+              response = {
+                success: false,
+                message: "API key not configured. Please set up your credentials first.",
+              };
+              break;
+            }
+
+            // Create AbortController for this task
+            const abortController = new AbortController();
+            const tabId = executeMessage.tabId;
+
+            if (!tabId) {
+              response = {
+                success: false,
+                message: "No tab ID provided for task execution",
+              };
+              break;
+            }
+
+            // Create event store logger with tabId to enable indicator forwarding
+            const logger = new EventStoreLogger(tabId);
+
+            // Cancel any existing task for this tab
+            if (runningTasks.has(tabId)) {
+              runningTasks.get(tabId)?.abort();
+            }
+
+            runningTasks.set(tabId, abortController);
+
+            // Show indicator via CSS injection (persists across navigations)
+            await showIndicator(tabId);
+
+            try {
+              console.log(
+                `Starting task execution for tab ${executeMessage.tabId} with data:`,
+                executeMessage.data,
+              );
+
+              // Use AgentManager to run the task with AbortSignal
+              const result = await AgentManager.runTask(executeMessage.task, {
+                apiKey: settings.apiKey,
                 apiEndpoint: settings.apiEndpoint,
+                model: settings.model || "gpt-4.1-mini",
+                provider: settings.provider,
+                logger,
+                tabId: executeMessage.tabId,
+                data: executeMessage.data,
+                abortSignal: abortController.signal,
               });
 
-              if (!settings.apiKey) {
-                response = {
-                  success: false,
-                  message: "API key not configured. Please set up your credentials first.",
-                };
-                break;
-              }
-
-              // Create AbortController for this task
-              const abortController = new AbortController();
-              const tabId = executeMessage.tabId;
-
-              if (!tabId) {
-                response = {
-                  success: false,
-                  message: "No tab ID provided for task execution",
-                };
-                break;
-              }
-
-              // Create event store logger with tabId to enable indicator forwarding
-              const logger = new EventStoreLogger(tabId);
-
-              // Cancel any existing task for this tab
-              if (runningTasks.has(tabId)) {
-                runningTasks.get(tabId)?.abort();
-              }
-
-              runningTasks.set(tabId, abortController);
-
-              try {
-                console.log(
-                  `Starting task execution for tab ${executeMessage.tabId} with data:`,
-                  executeMessage.data,
-                );
-
-                // Use AgentManager to run the task with AbortSignal
-                const result = await AgentManager.runTask(executeMessage.task, {
-                  apiKey: settings.apiKey,
-                  apiEndpoint: settings.apiEndpoint,
-                  model: settings.model || "gpt-4.1-mini",
-                  provider: settings.provider,
-                  logger,
-                  tabId: executeMessage.tabId,
-                  data: executeMessage.data,
-                  abortSignal: abortController.signal,
-                });
-
-                console.log(`Task completed successfully:`, result);
-
-                response = {
-                  success: true,
-                  result: result,
-                };
-              } catch (error) {
-                console.error("Task execution error:", error);
-
-                // Check if this was a cancellation
-                const isCancellation =
-                  error instanceof Error &&
-                  (error.name === "AbortError" ||
-                    (abortController.signal.aborted &&
-                      (error.message.includes("cancelled") || error.message.includes("aborted"))));
-
-                if (isCancellation) {
-                  // Emit task:aborted event for cancellation to hide indicator
-                  logger.addEvent("task:aborted", {
-                    reason: "Task cancelled by user",
-                    finalAnswer: "Task cancelled",
-                    timestamp: Date.now(),
-                    iterationId: "cancelled",
-                  });
-                  response = {
-                    success: true, // Treat cancellation as success to avoid error styling
-                    result: "Task cancelled",
-                  };
-                } else {
-                  const errorMessage = error instanceof Error ? error.message : String(error);
-                  // Emit task:aborted event for errors to hide indicator
-                  logger.addEvent("task:aborted", {
-                    reason: errorMessage,
-                    finalAnswer: `Task failed: ${errorMessage}`,
-                    timestamp: Date.now(),
-                    iterationId: "error",
-                  });
-                  response = {
-                    success: false,
-                    message: `Task execution failed: ${errorMessage}`,
-                  };
-                }
-              } finally {
-                // Clean up the task tracking
-                runningTasks.delete(tabId);
-              }
-              break;
-
-            case "cancelTask":
-              const cancelMessage = typedMessage as CancelTaskMessage;
-              console.log("Cancelling running tasks");
-
-              // Cancel all running tasks (or specific tab if provided)
-              let cancelledCount = 0;
-              if (cancelMessage.tabId) {
-                // Cancel task for specific tab
-                const controller = runningTasks.get(cancelMessage.tabId);
-                if (controller) {
-                  controller.abort();
-                  cancelledCount = 1;
-                }
-              } else {
-                // Cancel all running tasks
-                for (const [, controller] of runningTasks.entries()) {
-                  controller.abort();
-                  cancelledCount++;
-                }
-              }
+              console.log(`Task completed successfully:`, result);
 
               response = {
                 success: true,
-                message:
-                  cancelledCount > 0
-                    ? `Cancelled ${cancelledCount} running task(s)`
-                    : "No running tasks to cancel",
+                result: result,
               };
-              break;
+            } catch (error) {
+              console.error("Task execution error:", error);
 
-            default:
-              response = {
-                success: false,
-                message: "Unknown message type",
-              };
-          }
+              // Check if this was a cancellation
+              const isCancellation =
+                error instanceof Error &&
+                (error.name === "AbortError" ||
+                  (abortController.signal.aborted &&
+                    (error.message.includes("cancelled") || error.message.includes("aborted"))));
 
-          console.log("Sending response:", response);
-          return response;
-        } catch (error) {
-          console.error("Error in message handler:", error);
-          return {
-            success: false,
-            message: error instanceof Error ? error.message : "Unknown error occurred",
-          };
+              if (isCancellation) {
+                // Emit task:aborted event for cancellation to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: "Task cancelled by user",
+                  finalAnswer: "Task cancelled",
+                  timestamp: Date.now(),
+                  iterationId: "cancelled",
+                });
+                response = {
+                  success: true, // Treat cancellation as success to avoid error styling
+                  result: "Task cancelled",
+                };
+              } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                // Emit task:aborted event for errors to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: errorMessage,
+                  finalAnswer: `Task failed: ${errorMessage}`,
+                  timestamp: Date.now(),
+                  iterationId: "error",
+                });
+                response = {
+                  success: false,
+                  message: `Task execution failed: ${errorMessage}`,
+                };
+              }
+            } finally {
+              // Hide indicator and clean up the task tracking
+              await hideIndicator(tabId);
+              runningTasks.delete(tabId);
+            }
+            break;
+
+          case "cancelTask":
+            const cancelMessage = typedMessage as CancelTaskMessage;
+            console.log("Cancelling running tasks");
+
+            // Cancel all running tasks (or specific tab if provided)
+            let cancelledCount = 0;
+            if (cancelMessage.tabId) {
+              // Cancel task for specific tab
+              const controller = runningTasks.get(cancelMessage.tabId);
+              if (controller) {
+                controller.abort();
+                cancelledCount = 1;
+              }
+            } else {
+              // Cancel all running tasks
+              for (const [, controller] of runningTasks.entries()) {
+                controller.abort();
+                cancelledCount++;
+              }
+            }
+
+            response = {
+              success: true,
+              message:
+                cancelledCount > 0
+                  ? `Cancelled ${cancelledCount} running task(s)`
+                  : "No running tasks to cancel",
+            };
+            break;
+
+          default:
+            response = {
+              success: false,
+              message: "Unknown message type",
+            };
         }
-      })();
-    },
-  );
+
+        console.log("Sending response:", response);
+        return response;
+      } catch (error) {
+        console.error("Error in message handler:", error);
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : "Unknown error occurred",
+        };
+      }
+    })();
+  });
 
   // Handle tab removal to cancel running tasks
   browser.tabs.onRemoved.addListener((tabId) => {
@@ -275,28 +271,8 @@ export default defineBackground(() => {
     }
   });
 
-  // Re-send indicator state when a tab with a running task navigates
-  // This ensures the indicator persists across page navigations
-  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    // Only act when navigation completes and there's a running task for this tab
-    if (changeInfo.status === "complete" && runningTasks.has(tabId)) {
-      console.log(`[Background] Tab ${tabId} navigated, re-sending indicator state`);
-      // Re-send task:setup to show the indicator on the new page
-      const indicatorMessage = {
-        type: "realtimeEvent" as const,
-        tabId,
-        event: {
-          type: "task:setup",
-          data: {},
-          timestamp: Date.now(),
-        },
-      };
-      browser.tabs.sendMessage(tabId, indicatorMessage).catch((error) => {
-        // Content script may not be ready yet, that's okay
-        console.log(`[Background] Could not send indicator to tab ${tabId}:`, error);
-      });
-    }
-  });
+  // Note: Indicator now persists across navigations automatically via CSS injection
+  // (see indicatorControl.ts) - no need for tabs.onUpdated listener
 
   // Start cleanup timer for conversations
   setInterval(async () => {

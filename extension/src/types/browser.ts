@@ -58,13 +58,8 @@ export interface CancelTaskResponse {
   message?: string;
 }
 
-export interface GetIndicatorStateMessage {
-  type: "getIndicatorState";
-}
-
-export interface GetIndicatorStateResponse {
-  shouldShowIndicator: boolean;
-}
+// Note: GetIndicatorStateMessage and GetIndicatorStateResponse removed
+// Indicator is now controlled via CSS injection in background script (see indicatorControl.ts)
 
 // Event data types for different event kinds
 export interface TaskStartedEventData {
@@ -130,5 +125,4 @@ export type ExtensionMessage =
   | GetPageInfoMessage
   | ExecutePageActionMessage
   | CancelTaskMessage
-  | RealtimeEventMessage
-  | GetIndicatorStateMessage;
+  | RealtimeEventMessage;

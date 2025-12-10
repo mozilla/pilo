@@ -2,7 +2,6 @@ import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
 import { createLogger } from "./utils/logger";
 import { isValidRealtimeEvent } from "./utils/typeGuards";
-import { forwardIndicatorEvent } from "./background/indicatorForwarder";
 import type { RealtimeEventMessage } from "./types/browser";
 
 interface EventData {
@@ -85,11 +84,8 @@ export class EventStoreLogger extends GenericLogger {
           browser.runtime.sendMessage(message).catch(() => {
             // Ignore errors if no listeners or sidepanel isn't open
           });
-
-          // Directly forward indicator events to content script
-          // (runtime.sendMessage doesn't deliver to the same context that sent it,
-          // so we need to call this directly from the background script)
-          forwardIndicatorEvent(message);
+          // Note: Indicator events are now handled via CSS injection in background script
+          // (see indicatorControl.ts) instead of forwarding to content script
         }
       } catch (error) {
         // Ignore errors in case we're not in background script context
