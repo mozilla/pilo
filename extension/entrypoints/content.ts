@@ -2,6 +2,7 @@
 import browser from "webextension-polyfill";
 import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot";
 import { handleIndicatorMessage } from "../src/content/indicatorHandler";
+import { showIndicator } from "../src/content/AgentIndicator";
 import type {
   ExtensionMessage,
   GetPageInfoResponse,
@@ -19,13 +20,29 @@ declare global {
 
 export default defineContentScript({
   matches: ["<all_urls>"],
-  runAt: "document_idle",
+  runAt: "document_start",
   registration: "manifest",
   main() {
-    console.log("[Spark] Content script loaded");
+    console.log("[Spark] Content script loaded at document_start");
     // Make ARIA tree functions available globally for executeScript
     window.generateAriaTree = generateAriaTree;
     window.renderAriaTree = renderAriaTree;
+
+    // Check if there's already a running task for this tab and show indicator if so
+    // This handles the race condition where the task started before the content script loaded
+    browser.runtime
+      .sendMessage({ type: "getIndicatorState" })
+      .then((response: unknown) => {
+        const typedResponse = response as { shouldShowIndicator?: boolean } | undefined;
+        if (typedResponse?.shouldShowIndicator) {
+          console.log("[Spark] Task already running, showing indicator");
+          showIndicator();
+        }
+      })
+      .catch((error) => {
+        // Ignore errors - this is best-effort
+        console.log("[Spark] Could not get indicator state:", error);
+      });
 
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {

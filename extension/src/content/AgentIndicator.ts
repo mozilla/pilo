@@ -18,7 +18,7 @@ export function getIndicatorStyles(): string {
     opacity: 0.6;
   }
   50% {
-    opacity: 1;
+    opacity: 0.85;
   }
 }
 .spark-agent-indicator {
@@ -34,7 +34,7 @@ export function getIndicatorStyles(): string {
     inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset 60px -60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
-  animation: spark-pulse 2s ease-in-out infinite;
+  animation: spark-pulse 3s ease-in-out infinite;
 }
 `;
 }

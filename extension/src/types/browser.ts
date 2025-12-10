@@ -58,6 +58,14 @@ export interface CancelTaskResponse {
   message?: string;
 }
 
+export interface GetIndicatorStateMessage {
+  type: "getIndicatorState";
+}
+
+export interface GetIndicatorStateResponse {
+  shouldShowIndicator: boolean;
+}
+
 // Event data types for different event kinds
 export interface TaskStartedEventData {
   plan?: string;
@@ -122,4 +130,5 @@ export type ExtensionMessage =
   | GetPageInfoMessage
   | ExecutePageActionMessage
   | CancelTaskMessage
-  | RealtimeEventMessage;
+  | RealtimeEventMessage
+  | GetIndicatorStateMessage;
