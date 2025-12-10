@@ -21,6 +21,12 @@ vi.mock("webextension-polyfill", () => ({
         removeListener: vi.fn(),
       },
     },
+    webNavigation: {
+      onCommitted: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    },
   },
 }));
 
@@ -177,8 +183,11 @@ describe("indicatorControl", () => {
   });
 
   describe("navigation listener", () => {
-    let capturedListener:
+    let capturedTabsListener:
       | ((tabId: number, changeInfo: { status?: string }, tab: { id?: number }) => void)
+      | null = null;
+    let capturedWebNavListener:
+      | ((details: { tabId: number; frameId: number }) => void)
       | null = null;
 
     beforeEach(() => {
@@ -187,17 +196,22 @@ describe("indicatorControl", () => {
       vi.mocked(browser.scripting.insertCSS).mockResolvedValue(undefined);
       vi.mocked(browser.scripting.removeCSS).mockResolvedValue(undefined);
       vi.mocked(browser.tabs.onUpdated.addListener).mockImplementation((listener) => {
-        capturedListener = listener as typeof capturedListener;
+        capturedTabsListener = listener as typeof capturedTabsListener;
+      });
+      vi.mocked(browser.webNavigation.onCommitted.addListener).mockImplementation((listener) => {
+        capturedWebNavListener = listener as typeof capturedWebNavListener;
       });
     });
 
     afterEach(() => {
       cleanupNavigationListener();
-      capturedListener = null;
+      capturedTabsListener = null;
+      capturedWebNavListener = null;
     });
 
-    it("should register a tabs.onUpdated listener when setupNavigationListener is called", () => {
+    it("should register both webNavigation and tabs.onUpdated listeners", () => {
       setupNavigationListener();
+      expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalledTimes(1);
       expect(browser.tabs.onUpdated.addListener).toHaveBeenCalledTimes(1);
     });
 
@@ -205,7 +219,37 @@ describe("indicatorControl", () => {
       setupNavigationListener();
       setupNavigationListener();
       setupNavigationListener();
+      expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalledTimes(1);
       expect(browser.tabs.onUpdated.addListener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should inject on webNavigation.onCommitted for main frame", async () => {
+      setupNavigationListener();
+      await showIndicator(123);
+      vi.clearAllMocks();
+
+      // Simulate navigation committed (main frame)
+      capturedWebNavListener?.({ tabId: 123, frameId: 0 });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(browser.scripting.insertCSS).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        css: expect.any(String),
+      });
+    });
+
+    it("should not inject on webNavigation.onCommitted for iframes", async () => {
+      setupNavigationListener();
+      await showIndicator(123);
+      vi.clearAllMocks();
+
+      // Simulate navigation committed (iframe, frameId !== 0)
+      capturedWebNavListener?.({ tabId: 123, frameId: 1 });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(browser.scripting.insertCSS).not.toHaveBeenCalled();
     });
 
     it("should re-apply class via executeScript when page completes loading for active indicator tab", async () => {
@@ -214,7 +258,7 @@ describe("indicatorControl", () => {
       vi.clearAllMocks();
 
       // Simulate navigation complete
-      capturedListener?.(123, { status: "complete" }, { id: 123 });
+      capturedTabsListener?.(123, { status: "complete" }, { id: 123 });
 
       // Wait for async re-injection
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -230,45 +274,30 @@ describe("indicatorControl", () => {
       // Don't show indicator for tab 123
 
       // Simulate navigation complete
-      capturedListener?.(123, { status: "complete" }, { id: 123 });
+      capturedTabsListener?.(123, { status: "complete" }, { id: 123 });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(browser.scripting.executeScript).not.toHaveBeenCalled();
     });
 
-    it("should re-apply class on loading status to reduce flash", async () => {
+    it("should not re-apply class for loading status (handled by webNavigation)", async () => {
       setupNavigationListener();
       await showIndicator(123);
       vi.clearAllMocks();
 
-      // Simulate loading status - should trigger early injection
-      capturedListener?.(123, { status: "loading" }, { id: 123 });
+      // Simulate loading status - now handled by webNavigation, not tabs.onUpdated
+      capturedTabsListener?.(123, { status: "loading" }, { id: 123 });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(browser.scripting.insertCSS).toHaveBeenCalledWith({
-        target: { tabId: 123 },
-        css: expect.any(String),
-      });
+      expect(browser.scripting.insertCSS).not.toHaveBeenCalled();
     });
 
-    it("should not re-apply class for other status changes", async () => {
-      setupNavigationListener();
-      await showIndicator(123);
-      vi.clearAllMocks();
-
-      // Simulate other status (not loading or complete)
-      capturedListener?.(123, { status: "interactive" }, { id: 123 });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(browser.scripting.executeScript).not.toHaveBeenCalled();
-    });
-
-    it("should remove listener when cleanupNavigationListener is called", () => {
+    it("should remove listeners when cleanupNavigationListener is called", () => {
       setupNavigationListener();
       cleanupNavigationListener();
+      expect(browser.webNavigation.onCommitted.removeListener).toHaveBeenCalled();
       expect(browser.tabs.onUpdated.removeListener).toHaveBeenCalled();
     });
   });

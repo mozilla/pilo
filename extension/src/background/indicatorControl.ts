@@ -12,12 +12,15 @@ const activeIndicators = new Set<number>();
 
 // Track if navigation listener is registered
 let navigationListenerRegistered = false;
-let navigationListener:
+let tabsUpdatedListener:
   | ((
       tabId: number,
       changeInfo: browser.Tabs.OnUpdatedChangeInfoType,
       tab: browser.Tabs.Tab,
     ) => void)
+  | null = null;
+let webNavCommittedListener:
+  | ((details: browser.WebNavigation.OnCommittedDetailsType) => void)
   | null = null;
 
 // CSS for the indicator - injected programmatically for reliability
@@ -95,6 +98,28 @@ export function isIndicatorActive(tabId: number): boolean {
 }
 
 /**
+ * Helper to inject indicator CSS and class into a tab
+ */
+function injectIndicator(tabId: number): void {
+  browser.scripting
+    .insertCSS({
+      target: { tabId },
+      css: INDICATOR_CSS,
+    })
+    .then(() =>
+      browser.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          document.documentElement.classList.add("spark-indicator-active");
+        },
+      }),
+    )
+    .catch(() => {
+      // Silently ignore errors - may fail if page not ready yet
+    });
+}
+
+/**
  * Set up the navigation listener to re-apply class on navigations.
  * This should be called once when the background script starts.
  */
@@ -103,34 +128,27 @@ export function setupNavigationListener(): void {
     return;
   }
 
-  navigationListener = (tabId, changeInfo) => {
-    // Re-apply CSS and class for tabs with active indicators
-    // Inject on both "loading" (early, reduces flash) and "complete" (reliable fallback)
-    if (
-      (changeInfo.status === "loading" || changeInfo.status === "complete") &&
-      activeIndicators.has(tabId)
-    ) {
-      // Re-inject CSS and add class (fire and forget)
-      browser.scripting
-        .insertCSS({
-          target: { tabId },
-          css: INDICATOR_CSS,
-        })
-        .then(() =>
-          browser.scripting.executeScript({
-            target: { tabId },
-            func: () => {
-              document.documentElement.classList.add("spark-indicator-active");
-            },
-          }),
-        )
-        .catch(() => {
-          // Silently ignore errors - may fail on "loading" if page not ready yet
-        });
+  // Use webNavigation.onCommitted for earliest possible injection
+  // This fires when the navigation is committed but before the new document is created
+  webNavCommittedListener = (details) => {
+    // Only handle main frame navigations (not iframes)
+    if (details.frameId === 0 && activeIndicators.has(details.tabId)) {
+      // Inject immediately - this is the earliest we can act
+      injectIndicator(details.tabId);
     }
   };
 
-  browser.tabs.onUpdated.addListener(navigationListener);
+  // Use tabs.onUpdated as a fallback for reliability
+  tabsUpdatedListener = (tabId, changeInfo) => {
+    // Re-apply CSS and class for tabs with active indicators
+    // Only on "complete" now since webNavigation handles early injection
+    if (changeInfo.status === "complete" && activeIndicators.has(tabId)) {
+      injectIndicator(tabId);
+    }
+  };
+
+  browser.webNavigation.onCommitted.addListener(webNavCommittedListener);
+  browser.tabs.onUpdated.addListener(tabsUpdatedListener);
   navigationListenerRegistered = true;
 }
 
@@ -138,9 +156,13 @@ export function setupNavigationListener(): void {
  * Clean up the navigation listener. Mainly useful for testing.
  */
 export function cleanupNavigationListener(): void {
-  if (navigationListener) {
-    browser.tabs.onUpdated.removeListener(navigationListener);
-    navigationListener = null;
+  if (webNavCommittedListener) {
+    browser.webNavigation.onCommitted.removeListener(webNavCommittedListener);
+    webNavCommittedListener = null;
+  }
+  if (tabsUpdatedListener) {
+    browser.tabs.onUpdated.removeListener(tabsUpdatedListener);
+    tabsUpdatedListener = null;
   }
   navigationListenerRegistered = false;
   activeIndicators.clear();

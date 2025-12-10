@@ -8,6 +8,6 @@ export default defineContentScript({
   registration: "manifest",
   main() {
     // CSS is loaded automatically via import above
-    // No JavaScript logic needed - the indicator is toggled via class from background script
+    // The indicator class is toggled from background script via scripting.executeScript
   },
 });
