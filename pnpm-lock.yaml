@@ -22,7 +22,7 @@ importers:
         version: 1.0.27(zod@4.1.12)
       '@ghostery/adblocker-playwright':
         specifier: ^2.12.5
-        version: 2.12.5(playwright@1.56.1)
+        version: 2.12.5(playwright@1.57.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^1.2.3
         version: 1.2.3(ai@5.0.93(zod@4.1.12))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)
@@ -57,8 +57,8 @@ importers:
         specifier: ^1.5.3
         version: 1.5.3(zod@4.1.12)
       playwright:
-        specifier: 1.56.1
-        version: 1.56.1
+        specifier: 1.57.0
+        version: 1.57.0
       turndown:
         specifier: ^7.2.2
         version: 7.2.2
@@ -2752,13 +2752,13 @@ packages:
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
 
-  playwright-core@1.56.1:
-    resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
+  playwright-core@1.57.0:
+    resolution: {integrity: sha512-agTcKlMw/mjBWOnD6kFZttAAGHgi/Nw0CZ2o6JqWSbMlI219lAFLZZCyqByTsvVAJq5XA5H8cA6PrvBRpBWEuQ==}
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright@1.56.1:
-    resolution: {integrity: sha512-aFi5B0WovBHTEvpM3DzXTUaeN6eN0qWnTkKx4NQaH4Wvcmc153PdaY2UBdSYKaGYw+UyWXSVyxDUg5DoPEttjw==}
+  playwright@1.57.0:
+    resolution: {integrity: sha512-ilYQj1s8sr2ppEJ2YVadYBN0Mb3mdo9J0wQ+UuDhzYqURwSoW4n1Xs5vs7ORwgDGmyEh33tRMeS8KhdkMoLXQw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -4027,11 +4027,11 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.12.5': {}
 
-  '@ghostery/adblocker-playwright@2.12.5(playwright@1.56.1)':
+  '@ghostery/adblocker-playwright@2.12.5(playwright@1.57.0)':
     dependencies:
       '@ghostery/adblocker': 2.12.5
       '@ghostery/adblocker-content': 2.12.5
-      playwright: 1.56.1
+      playwright: 1.57.0
       tldts-experimental: 7.0.17
 
   '@ghostery/adblocker@2.12.5':
@@ -5864,11 +5864,11 @@ snapshots:
       exsolve: 1.0.7
       pathe: 2.0.3
 
-  playwright-core@1.56.1: {}
+  playwright-core@1.57.0: {}
 
-  playwright@1.56.1:
+  playwright@1.57.0:
     dependencies:
-      playwright-core: 1.56.1
+      playwright-core: 1.57.0
     optionalDependencies:
       fsevents: 2.3.2
 
@@ -6158,7 +6158,7 @@ snapshots:
       '@ai-sdk/google-vertex': 3.0.62(zod@4.1.12)
       '@ai-sdk/openai': 2.0.68(zod@4.1.12)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.12)
-      '@ghostery/adblocker-playwright': 2.12.5(playwright@1.56.1)
+      '@ghostery/adblocker-playwright': 2.12.5(playwright@1.57.0)
       '@openrouter/ai-sdk-provider': 1.2.3(ai@5.0.93(zod@4.1.12))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)
       '@types/turndown': 5.0.6
       ai: 5.0.93(zod@4.1.12)
@@ -6170,7 +6170,7 @@ snapshots:
       liquidjs: 10.24.0
       nanoid: 5.1.6
       ollama-ai-provider-v2: 1.5.3(zod@4.1.12)
-      playwright: 1.56.1
+      playwright: 1.57.0
       turndown: 7.2.2
       zod: 4.1.12
     transitivePeerDependencies:
