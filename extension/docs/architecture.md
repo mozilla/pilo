@@ -614,6 +614,148 @@ export const theme = {
 - **Dark Mode**: Dark sidebar + light panel with dark text (maintains readability)
 - **Event Colors**: Semantic colors for different event types (task, plan, action, success, error, etc.)
 
+## CSS Architecture
+
+The extension uses a modern CSS-first architecture built on Tailwind CSS.
+
+### Technology Stack
+
+- **Tailwind CSS** - Utility-first CSS framework with CSS-based configuration
+- **@tailwindcss/vite** - Build integration via Vite plugin
+- **@tailwindcss/typography** - Prose styling for markdown content (temporary, see below)
+
+### Single CSS Entry Point
+
+**Location**: [src/components/sidepanel/SidePanel.css](../src/components/sidepanel/SidePanel.css)
+
+All CSS configuration lives in a single file imported by the React app. This file uses Tailwind v4's CSS-first configuration approach—there are no separate `tailwind.config.js` or `postcss.config.js` files.
+
+**Structure**:
+
+```css
+/* Base Tailwind import */
+@import "tailwindcss";
+
+/* Typography plugin for markdown */
+@plugin "@tailwindcss/typography";
+
+/* Custom design tokens via @theme directive */
+@theme {
+  /* Extended stone color palette and prose chat
+     typography variables (font sizes, line heights,
+     margins for headings and paragraphs) */
+}
+
+/* Semantic component classes */
+@layer components {
+  .text-message-user {
+    /* User message styling */
+  }
+  .text-message-assistant {
+    /* Assistant message styling */
+  }
+  .markdown-content {
+    /* Markdown container */
+  }
+}
+
+/* Custom prose variant for chat */
+@utility prose-chat {
+  /* Compact typography for chat messages */
+}
+```
+
+### Build Integration
+
+**Location**: [wxt.config.ts](../wxt.config.ts)
+
+Tailwind is integrated via the `@tailwindcss/vite` plugin:
+
+```typescript
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  vite: () => ({
+    plugins: [tailwindcss()],
+  }),
+});
+```
+
+### Custom Color Palette
+
+The extension extends Tailwind's stone color palette with additional shades for finer control:
+
+| Variable            | Hex     | Usage                          |
+| ------------------- | ------- | ------------------------------ |
+| `--color-stone-25`  | #fdfcfa | Panel backgrounds (light mode) |
+| `--color-stone-75`  | #f5f3ef | Message bubbles                |
+| `--color-stone-125` | #ebe9e5 | Tertiary backgrounds           |
+| `--color-stone-175` | #e5e3df | Borders (light mode)           |
+| `--color-stone-225` | #d8d6d2 | Secondary borders              |
+| `--color-stone-875` | #2f2f2f | Dark text/elements             |
+| `--color-stone-925` | #1c1b22 | Sidebar (dark mode)            |
+
+These are used via theme.ts color mappings and applied with standard Tailwind utilities like `bg-stone-25`.
+
+### Theme Integration
+
+The CSS architecture works in conjunction with [theme.ts](../src/theme.ts):
+
+1. **CSS defines the colors** - Custom palette via `@theme` directive
+2. **theme.ts maps semantic names** - `t.bg.panel`, `t.text.primary`, etc.
+3. **Components use theme object** - Dynamic class composition with `clsx()`
+
+Example component styling:
+
+<!-- prettier-ignore -->
+```tsx
+const { theme: t } = useSystemTheme();
+
+<div className={`${t.bg.panel} ${t.text.primary} rounded-lg p-4`}>
+  {/* Content */}
+</div>;
+```
+
+### Semantic CSS Classes
+
+The extension defines semantic classes in the `@layer components` block:
+
+**Message Typography**:
+
+- `.text-message-user` - Sans-serif styling for user messages (system fonts, 0.875rem)
+- `.text-message-assistant` - Serif styling for AI responses (Georgia, 1rem) to visually distinguish speakers
+
+**Markdown Rendering**:
+
+- `.markdown-content` - Container that restores HTML list styling (`<ol>`, `<ul>`)
+- `.prose-chat` - Custom prose variant with compact spacing for chat context
+
+### Typography Plugin (Temporary)
+
+The `@tailwindcss/typography` plugin provides the `prose` class for markdown rendering. It's used in combination with a custom `prose-chat` utility:
+
+```tsx
+<div className="markdown-content prose prose-chat max-w-none">
+  <Markdown value={content} />
+</div>
+```
+
+**Note**: The typography plugin will eventually be discarded in favor of custom CSS that integrates better with the theme system. The custom `prose-chat` utility already demonstrates this direction by providing chat-specific typography variables.
+
+### Future Direction
+
+Several aspects of the current CSS architecture are transitional:
+
+1. **@tailwindcss/typography** - Will be replaced with custom prose styling that integrates with theme.ts color mappings and supports both light/dark modes natively
+
+2. **Semantic message classes** (`text-message-user`, `text-message-assistant`) - Will likely be removed in favor of standard Tailwind utility composition, allowing more flexibility and consistency with the rest of the codebase
+
+The goal is a unified styling system where:
+
+- All colors flow from theme.ts
+- Typography uses standard Tailwind utilities
+- No plugin dependencies for core styling
+
 ## Utility Modules
 
 **Location**: [src/utils/](../src/utils/)
