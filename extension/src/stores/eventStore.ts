@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
 import type { WebAgentEventType } from "spark/core";
+import { reviver } from "../utils/storage";
+import type { RealtimeEventMessage } from "../types/browser";
 
 export interface EventData {
   id: string;
@@ -27,19 +29,24 @@ interface EventStore {
 }
 
 // Create browser storage adapter for events (optional persistence)
-const browserStorage = createJSONStorage(() => ({
-  getItem: async (name: string): Promise<string | null> => {
-    const result = await browser.storage.local.get(name);
-    const value = result[name];
-    return typeof value === "string" ? value : null;
+const browserStorage = createJSONStorage(
+  () => ({
+    getItem: async (name: string): Promise<string | null> => {
+      const result = await browser.storage.local.get(name);
+      const value = result[name];
+      return typeof value === "string" ? value : null;
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      await browser.storage.local.set({ [name]: value });
+    },
+    removeItem: async (name: string): Promise<void> => {
+      await browser.storage.local.remove(name);
+    },
+  }),
+  {
+    reviver,
   },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await browser.storage.local.set({ [name]: value });
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await browser.storage.local.remove(name);
-  },
-}));
+);
 
 export const useEventStore = create<EventStore>()(
   persist(
@@ -61,11 +68,11 @@ export const useEventStore = create<EventStore>()(
         // Send real-time event to SidePanel if in background script context
         if (typeof browser !== "undefined" && browser.runtime) {
           try {
-            const message = {
+            const message: RealtimeEventMessage = {
               type: "realtimeEvent",
               event: {
                 type: event.type,
-                data: event.data,
+                data: event.data as Record<string, unknown>,
                 timestamp: event.timestamp.getTime(),
               },
             };

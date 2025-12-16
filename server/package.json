@@ -26,17 +26,17 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^22.17.2",
+    "@types/node": "^24.10.1",
     "prettier": "^3.6.2",
-    "tsx": "^4.20.4",
-    "typescript": "^5.9.2",
-    "vitest": "^1.6.1"
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
   },
   "dependencies": {
-    "@hono/node-server": "^1.16.0",
+    "@hono/node-server": "^1.19.6",
     "@hono/sentry": "^1.2.2",
-    "dotenv": "^16.6.1",
-    "hono": "^4.9.7",
+    "dotenv": "^17.2.3",
+    "hono": "^4.10.6",
     "spark": "file:.."
   },
   "packageManager": "pnpm@9.0.0"

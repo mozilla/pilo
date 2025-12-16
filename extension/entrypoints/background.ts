@@ -14,6 +14,7 @@ interface StorageSettings {
   apiKey?: string;
   apiEndpoint?: string;
   model?: string;
+  provider?: "openai" | "openrouter";
 }
 
 export default defineBackground(() => {
@@ -62,16 +63,17 @@ export default defineBackground(() => {
       return Promise.resolve({ success: false, message: "Invalid message format" });
     }
 
+    const typedMessage = message as ExtensionMessage;
+
     // Handle realtimeEvent messages immediately - just ignore them
-    if ((message as any).type === "realtimeEvent") {
+    if (typedMessage.type === "realtimeEvent") {
       // These are meant for sidepanel consumption, not background handling
-      console.log("Background received message: realtimeEvent");
+      console.log("Background received message: realtimeEvent", typedMessage.event);
       // Return undefined to indicate no response
       return;
     }
 
-    const typedMessage = message as ExtensionMessage;
-    console.log("Background received message:", typedMessage.type);
+    console.log("Background received message:", typedMessage.type, typedMessage);
 
     // Return a Promise for async processing
     return (async () => {
@@ -88,6 +90,7 @@ export default defineBackground(() => {
               "apiKey",
               "apiEndpoint",
               "model",
+              "provider",
             ])) as StorageSettings;
 
             if (!settings.apiKey) {
@@ -130,7 +133,8 @@ export default defineBackground(() => {
               const result = await AgentManager.runTask(executeMessage.task, {
                 apiKey: settings.apiKey,
                 apiEndpoint: settings.apiEndpoint,
-                model: settings.model || "gpt-4.1",
+                model: settings.model || "gpt-4.1-mini",
+                provider: settings.provider,
                 logger,
                 tabId: executeMessage.tabId,
                 data: executeMessage.data,

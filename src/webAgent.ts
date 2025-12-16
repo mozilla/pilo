@@ -7,7 +7,7 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { streamText, ModelMessage } from "ai";
+import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
@@ -16,6 +16,7 @@ import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import { RecoverableError, ToolExecutionError } from "./errors.js";
 import { generateTextWithRetry } from "./utils/retry.js";
+import type { AwaitedProperties } from "./utils/types.js";
 import {
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
@@ -102,6 +103,15 @@ interface ExecutionState {
   actionRepeatCount: number;
   validationAttempts: number;
 }
+
+type StreamTextResultGeneric = StreamTextResult<any, never>;
+// HACK: cobble together a type from StreamTextResult with promises resolved
+type ProcessedAIResponse = AwaitedProperties<
+  Pick<
+    StreamTextResultGeneric,
+    "toolResults" | "response" | "finishReason" | "usage" | "warnings" | "providerMetadata"
+  >
+>;
 
 /**
  * Simplified WebAgent with core execution logic
@@ -556,7 +566,7 @@ export class WebAgent {
       iterationId: this.currentIterationId,
     });
 
-    let aiResponse: any = null;
+    let aiResponse: ProcessedAIResponse | null = null;
     let generationError: Error | null = null;
 
     try {
@@ -653,9 +663,14 @@ export class WebAgent {
     }
 
     // Process tool results
-    if (!aiResponse.toolResults?.length) {
+    if (!aiResponse?.toolResults?.length) {
       console.error("[WebAgent] No tools called in action generation");
-      throw new Error("You must use exactly one tool. Please use one of the available tools.");
+      throw new ToolExecutionError(
+        "You must use exactly one tool. Please use one of the available tools.",
+        {
+          action: "none",
+        },
+      );
     }
 
     const toolResult = aiResponse.toolResults[0];
@@ -1001,6 +1016,12 @@ export class WebAgent {
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
       operation: "Creating task plan",
       hasScreenshot: false,
+      iterationId: this.currentIterationId || "planning",
+    });
+
+    // Also emit as status so extension ChatView shows it to user
+    this.emit(WebAgentEventType.AGENT_STATUS, {
+      message: "Creating task plan",
       iterationId: this.currentIterationId || "planning",
     });
 

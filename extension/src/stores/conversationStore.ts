@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
 import type { ChatMessage } from "../useChat";
+import { reviver } from "../utils/storage";
 
 export interface Conversation {
   id: string;
@@ -34,19 +35,24 @@ interface ConversationStore {
 }
 
 // Create browser storage adapter for Zustand
-const browserStorage = createJSONStorage(() => ({
-  getItem: async (name: string): Promise<string | null> => {
-    const result = await browser.storage.local.get(name);
-    const value = result[name];
-    return typeof value === "string" ? value : null;
+const browserStorage = createJSONStorage(
+  () => ({
+    getItem: async (name: string): Promise<string | null> => {
+      const result = await browser.storage.local.get(name);
+      const value = result[name];
+      return typeof value === "string" ? value : null;
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      await browser.storage.local.set({ [name]: value });
+    },
+    removeItem: async (name: string): Promise<void> => {
+      await browser.storage.local.remove(name);
+    },
+  }),
+  {
+    reviver,
   },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await browser.storage.local.set({ [name]: value });
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await browser.storage.local.remove(name);
-  },
-}));
+);
 
 const createConversationId = (tabId: number) => `tab_${tabId}`;
 

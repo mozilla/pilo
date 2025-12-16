@@ -8,11 +8,14 @@ Browser extension for Spark AI-powered web automation.
 # Install dependencies
 pnpm install
 
-# Development (Firefox)
+# Development (Firefox - persistent profile)
 pnpm dev:firefox
 
-# Development (Chrome)
-pnpm dev:chrome
+# Development (Firefox - fresh temporary profile)
+pnpm dev:firefox:tmp-profile
+
+# Development (Chrome - fresh temporary profile)
+pnpm dev:chrome:tmp-profile
 
 # Build for production
 pnpm build:firefox  # Firefox

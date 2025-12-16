@@ -8,9 +8,13 @@
     "node": "^22.0.0"
   },
   "scripts": {
-    "dev:chrome": "wxt -b chrome",
-    "dev:firefox": "wxt -b firefox",
+    "dev:chrome": "node scripts/mkdirp.js .wxt/chrome-data && WEB_EXT_CHROMIUM_PROFILE=.wxt/chrome-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b chrome",
+    "dev:chrome:tmp-profile": "wxt -b chrome",
+    "dev:firefox": "node scripts/mkdirp.js .wxt/firefox-data && WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
+    "dev:firefox:tmp-profile": "wxt -b firefox",
+    "prebuild:chrome": "cd .. && pnpm build",
     "build:chrome": "wxt build -b chrome",
+    "prebuild:firefox": "cd .. && pnpm build",
     "build:firefox": "wxt build -b firefox",
     "zip:chrome": "wxt zip -b chrome",
     "zip:firefox": "wxt zip -b firefox",
@@ -25,30 +29,32 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.11",
-    "@types/marked": "^6.0.0",
-    "@types/webextension-polyfill": "^0.12.3",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
-    "marked": "^16.0.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "clsx": "^2.1.1",
+    "marked-react": "^3.0.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "spark": "file:..",
-    "tailwindcss": "^4.1.11",
+    "tailwindcss": "^4.1.17",
     "webextension-polyfill": "^0.12.0",
     "yaml": "^2.8.0",
-    "zustand": "^5.0.6"
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
+    "@tailwindcss/typography": "^0.5.19",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.3",
-    "@wxt-dev/module-react": "^1.1.3",
-    "happy-dom": "^18.0.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@wxt-dev/module-react": "^1.1.5",
+    "happy-dom": "^20.0.10",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "wxt": "^0.20.6"
-  }
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14",
+    "wxt": "0.20.11"
+  },
+  "packageManager": "pnpm@9.0.0"
 }

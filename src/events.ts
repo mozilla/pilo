@@ -1,4 +1,6 @@
+import { ModelMessage, StreamTextResult } from "ai";
 import { EventEmitter } from "eventemitter3";
+import type { AwaitedProperties } from "./utils/types.js";
 
 /**
  * Enum of all possible event types in the web agent
@@ -11,6 +13,8 @@ export enum WebAgentEventType {
   TASK_ABORTED = "task:aborted",
   TASK_VALIDATED = "task:validated",
   TASK_VALIDATION_ERROR = "task:validation_error",
+  TASK_METRICS = "task:metrics",
+  TASK_METRICS_INCREMENTAL = "task:metrics_incremental",
 
   // AI events
   AI_GENERATION = "ai:generation",
@@ -89,22 +93,31 @@ export interface TaskAbortedEventData extends WebAgentEventData {
   finalAnswer: string;
 }
 
+export interface TaskMetricsEventData extends WebAgentEventData {
+  eventCounts: Record<string, number>;
+  stepCount: number;
+  aiGenerationCount: number;
+  aiGenerationErrorCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+// Get a nondescript StreamTextResult type for usage in event data
+type StreamTextResultGeneric = StreamTextResult<any, never>;
+
+// Extract and await the stream result properties we need for AI generation events
+type AIGenerationStreamData = AwaitedProperties<
+  Pick<StreamTextResultGeneric, "finishReason" | "usage" | "providerMetadata" | "warnings">
+>;
+
 /**
  * Event data when AI generation occurs
  */
-export interface AIGenerationEventData extends WebAgentEventData {
+export interface AIGenerationEventData extends WebAgentEventData, AIGenerationStreamData {
   prompt: string;
   schema: any;
-  messages?: any[];
+  messages?: ModelMessage[];
   object?: any;
-  finishReason?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  providerMetadata?: any;
-  warnings?: string[];
   temperature?: number;
 }
 
@@ -240,6 +253,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_ABORTED; data: TaskAbortedEventData }
   | { type: WebAgentEventType.TASK_VALIDATED; data: TaskValidationEventData }
   | { type: WebAgentEventType.TASK_VALIDATION_ERROR; data: ValidationErrorEventData }
+  | { type: WebAgentEventType.TASK_METRICS; data: TaskMetricsEventData }
+  | { type: WebAgentEventType.TASK_METRICS_INCREMENTAL; data: TaskMetricsEventData }
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
   | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
   | { type: WebAgentEventType.AGENT_ACTION; data: ActionExecutionEventData }

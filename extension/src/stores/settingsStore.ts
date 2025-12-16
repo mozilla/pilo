@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
+import { reviver } from "../utils/storage";
 
 export interface Settings {
   apiKey: string;
   apiEndpoint: string;
   model: string;
+  provider: "openai" | "openrouter";
 }
 
 export interface SettingsStore {
@@ -22,23 +24,29 @@ export interface SettingsStore {
 const defaultSettings: Settings = {
   apiKey: "",
   apiEndpoint: "https://api.openai.com/v1",
-  model: "gpt-4.1",
+  model: "gpt-4.1-mini",
+  provider: "openai",
 };
 
 // Create browser storage adapter for settings
-const browserStorage = createJSONStorage(() => ({
-  getItem: async (name: string): Promise<string | null> => {
-    const result = await browser.storage.local.get(name);
-    const value = result[name];
-    return typeof value === "string" ? value : null;
+const browserStorage = createJSONStorage(
+  () => ({
+    getItem: async (name: string): Promise<string | null> => {
+      const result = await browser.storage.local.get(name);
+      const value = result[name];
+      return typeof value === "string" ? value : null;
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      await browser.storage.local.set({ [name]: value });
+    },
+    removeItem: async (name: string): Promise<void> => {
+      await browser.storage.local.remove(name);
+    },
+  }),
+  {
+    reviver,
   },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await browser.storage.local.set({ [name]: value });
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await browser.storage.local.remove(name);
-  },
-}));
+);
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
@@ -62,6 +70,7 @@ export const useSettingsStore = create<SettingsStore>()(
             apiKey: settings.apiKey,
             apiEndpoint: settings.apiEndpoint,
             model: settings.model,
+            provider: settings.provider,
           });
 
           set({ saveStatus: "Settings saved successfully!" });
@@ -79,12 +88,24 @@ export const useSettingsStore = create<SettingsStore>()(
 
       loadSettings: async () => {
         try {
-          const stored = await browser.storage.local.get(["apiKey", "apiEndpoint", "model"]);
+          const stored = await browser.storage.local.get([
+            "apiKey",
+            "apiEndpoint",
+            "model",
+            "provider",
+          ]);
+
+          // Validate provider value
+          const isValidProvider = stored.provider === "openai" || stored.provider === "openrouter";
+          const provider = isValidProvider
+            ? (stored.provider as "openai" | "openrouter")
+            : defaultSettings.provider;
 
           const newSettings: Settings = {
             apiKey: (stored.apiKey as string) || defaultSettings.apiKey,
             apiEndpoint: (stored.apiEndpoint as string) || defaultSettings.apiEndpoint,
             model: (stored.model as string) || defaultSettings.model,
+            provider,
           };
 
           set({ settings: newSettings });

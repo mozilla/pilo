@@ -373,7 +373,59 @@ export class ExtensionBrowser implements AriaBrowser {
                   );
                   console.log(`DEBUG: Element in viewport:`, element.getBoundingClientRect());
 
-                  element.click();
+                  // XXXdmose The extension code sometimes breaks when clicking
+                  // links that open themselves elsewhere. For now, we hack around
+                  // this a lot of the time by simply removing the HTML `target`
+                  // attribute and overriding the `window.open` function. This
+                  // doesn't handle all the cases where the click is redirected
+                  // by JavaScript though. If we want to keep this long term,
+                  // we would want to consider:
+                  //
+                  // * Add a background script listener for
+                  // webNavigation.onCreatedNavigationTarget to catch cases
+                  // that slip through
+                  // * When a new tab is created, immediately:
+                  //   * Close it with tabs.remove()
+                  //   * Navigate the source tab with tabs.update()
+                  //
+                  // To do better, we wouldn't redirect clicks at all, we'd
+                  // actually start watching and handling new tab creation, so
+                  // we don't get repeated re-opens of the same tab.
+                  //
+                  // Ultimately, we may want to parallelize for speed by
+                  // (often?) do the opposite: intentionally force each site
+                  // in its own tab so that work can happen in parallel. That
+                  // would have various UX implications that we'd want to work
+                  // through.
+                  //
+                  const preventNewTab = () => {
+                    if (element.hasAttribute("target")) {
+                      element.removeAttribute("target");
+                    }
+
+                    const originalOpen = window.open;
+                    window.open = function (
+                      url?: string | URL,
+                      _target?: string,
+                      _features?: string,
+                    ): WindowProxy | null {
+                      if (url) {
+                        window.location.href = url.toString();
+                      }
+                      return null;
+                    };
+
+                    return () => {
+                      window.open = originalOpen;
+                    };
+                  };
+
+                  const restore = preventNewTab();
+                  try {
+                    element.click();
+                  } finally {
+                    restore();
+                  }
 
                   console.log(`DEBUG: Click executed on element ${refParam}`);
                   return { success: true, message: `Clicked element ${refParam}` };

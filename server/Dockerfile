@@ -16,9 +16,9 @@ COPY src ./src
 COPY tsconfig.json ./
 RUN pnpm install
 
-# Install Playwright browsers (Firefox and Chromium) if requested
+# Install Playwright system dependencies as root (requires apt)
 RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
-    pnpm exec playwright install --with-deps firefox chromium; \
+    npx playwright install-deps firefox chromium; \
     fi
 
 RUN pnpm run build
@@ -44,6 +44,13 @@ RUN chown -R node:node /app
 
 # Switch to non-root user (node user is already available in node:22-slim)
 USER node
+
+# Install Playwright browsers as node user (so they end up in /home/node/.cache)
+# Note: ARG must be redeclared after USER to be accessible (with same default)
+ARG INSTALL_PLAYWRIGHT_BROWSERS=false
+RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
+    npx playwright install firefox chromium; \
+    fi
 
 # Start the server
 CMD ["pnpm", "start"]

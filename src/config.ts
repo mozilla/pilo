@@ -38,6 +38,7 @@ export interface SparkConfig {
 
   // Logging Configuration
   logger?: "console" | "json";
+  metrics_incremental?: boolean;
 
   // WebAgent Configuration
   debug?: boolean;
@@ -92,7 +93,7 @@ export class ConfigManager {
 
     // Load local .env file if it exists (for development)
     try {
-      loadDotenv({ path: ".env" });
+      loadDotenv({ path: ".env", quiet: true });
     } catch {
       // Ignore if .env doesn't exist
     }
@@ -162,6 +163,9 @@ export class ConfigManager {
       // Logging Configuration
       ...(process.env.SPARK_LOGGER && {
         logger: process.env.SPARK_LOGGER as SparkConfig["logger"],
+      }),
+      ...(process.env.SPARK_METRICS_INCREMENTAL && {
+        metrics_incremental: process.env.SPARK_METRICS_INCREMENTAL === "true",
       }),
 
       // WebAgent Configuration
@@ -338,6 +342,8 @@ export class ConfigManager {
 
     // Logging Configuration
     if (process.env.SPARK_LOGGER) env.logger = process.env.SPARK_LOGGER as SparkConfig["logger"];
+    if (process.env.SPARK_METRICS_INCREMENTAL)
+      env.metrics_incremental = process.env.SPARK_METRICS_INCREMENTAL === "true";
 
     // WebAgent Configuration
     if (process.env.SPARK_DEBUG) env.debug = process.env.SPARK_DEBUG === "true";

@@ -4,6 +4,15 @@ import { EventStoreLogger } from "./EventStoreLogger";
 // Import shared code - browser-safe imports only
 import { WebAgent, Logger } from "spark/core";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
+/**
+ * OpenRouter attribution headers
+ */
+const OPENROUTER_HEADERS = {
+  "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
+  "X-Title": "Spark Web Automation Tool",
+};
 
 /**
  * AgentManager - Main entry point for running Spark tasks in the extension
@@ -12,6 +21,18 @@ import { createOpenAI } from "@ai-sdk/openai";
 export class AgentManager {
   /**
    * Run a web automation task using Spark
+   *
+   * @param task - The task description in natural language
+   * @param options - Configuration options
+   * @param options.apiKey - API key for the provider
+   * @param options.provider - AI provider to use (defaults to "openai")
+   * @param options.model - Model name (uses provider-specific defaults if not specified)
+   * @param options.apiEndpoint - Custom API endpoint (OpenAI only, ignored for OpenRouter)
+   * @param options.logger - Custom logger implementation
+   * @param options.tabId - Browser tab ID to operate on
+   * @param options.data - Additional context data
+   * @param options.abortSignal - Signal to abort the task
+   * @returns The final answer from the agent
    */
   static async runTask(
     task: string,
@@ -19,6 +40,7 @@ export class AgentManager {
       apiKey: string;
       apiEndpoint?: string;
       model?: string;
+      provider?: "openai" | "openrouter";
       logger?: Logger;
       tabId?: number;
       data?: any;
@@ -27,15 +49,15 @@ export class AgentManager {
   ): Promise<string> {
     const browser = new ExtensionBrowser(options.tabId);
 
-    // Create OpenAI provider directly for browser extension
-    const apiEndpoint = options.apiEndpoint || "https://api.openai.com/v1";
-    const modelName = options.model || "gpt-4.1-mini";
-
-    const openai = createOpenAI({
-      apiKey: options.apiKey,
-      baseURL: apiEndpoint,
-    });
-    const model = openai(modelName);
+    // Create provider-specific model
+    const provider = options.provider || "openai";
+    const modelName = options.model || this.getDefaultModel(provider);
+    const model = this.createProviderModel(
+      provider,
+      options.apiKey,
+      options.apiEndpoint,
+      modelName,
+    );
 
     // Create WebAgent - same as CLI and server
     const agent = new WebAgent(browser, {
@@ -55,6 +77,42 @@ export class AgentManager {
       return result.finalAnswer || "Task completed successfully";
     } finally {
       await agent.close();
+    }
+  }
+
+  /**
+   * Get the default model for a provider
+   */
+  private static getDefaultModel(provider: "openai" | "openrouter"): string {
+    return provider === "openrouter" ? "openai/gpt-4.1-mini" : "gpt-4.1-mini";
+  }
+
+  /**
+   * Create a provider-specific model instance
+   *
+   * Note: apiEndpoint is only used for OpenAI provider.
+   * OpenRouter uses its own fixed endpoint and ignores this parameter.
+   */
+  private static createProviderModel(
+    provider: "openai" | "openrouter",
+    apiKey: string,
+    apiEndpoint: string | undefined,
+    modelName: string,
+  ) {
+    if (provider === "openrouter") {
+      // OpenRouter has its own endpoint, apiEndpoint parameter is ignored
+      const openrouter = createOpenRouter({
+        apiKey,
+        headers: OPENROUTER_HEADERS,
+      });
+      return openrouter(modelName);
+    } else {
+      const endpoint = apiEndpoint || "https://api.openai.com/v1";
+      const openai = createOpenAI({
+        apiKey,
+        baseURL: endpoint,
+      });
+      return openai(modelName);
     }
   }
 }
