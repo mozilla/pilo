@@ -54,8 +54,8 @@ importers:
         specifier: ^5.1.6
         version: 5.1.6
       ollama-ai-provider-v2:
-        specifier: ^1.5.3
-        version: 1.5.3(zod@4.2.1)
+        specifier: ^1.5.5
+        version: 1.5.5(zod@4.2.1)
       playwright:
         specifier: 1.57.0
         version: 1.57.0
@@ -2901,8 +2901,8 @@ packages:
   ohash@2.0.11:
     resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
 
-  ollama-ai-provider-v2@1.5.3:
-    resolution: {integrity: sha512-LnpvKuxNJyE+cB03cfUjFJnaiBJoUqz3X97GFc71gz09gOdrxNh1AsVBxrpw3uX5aiMxRIWPOZ8god0dHSChsg==}
+  ollama-ai-provider-v2@1.5.5:
+    resolution: {integrity: sha512-1YwTFdPjhPNHny/DrOHO+s8oVGGIE5Jib61/KnnjPRNWQhVVimrJJdaAX3e6nNRRDXrY5zbb9cfm2+yVvgsrqw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^4.0.16
@@ -3909,7 +3909,7 @@ snapshots:
   '@ai-sdk/provider-utils@3.0.19(zod@4.2.1)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
+      '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 4.2.1
 
@@ -6211,10 +6211,10 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  ollama-ai-provider-v2@1.5.3(zod@4.2.1):
+  ollama-ai-provider-v2@1.5.5(zod@4.2.1):
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.17(zod@4.2.1)
+      '@ai-sdk/provider-utils': 3.0.19(zod@4.2.1)
       zod: 4.2.1
 
   on-exit-leak-free@2.1.2: {}
@@ -6682,7 +6682,7 @@ snapshots:
       eventemitter3: 5.0.1
       liquidjs: 10.24.0
       nanoid: 5.1.6
-      ollama-ai-provider-v2: 1.5.3(zod@4.2.1)
+      ollama-ai-provider-v2: 1.5.5(zod@4.2.1)
       playwright: 1.57.0
       turndown: 7.2.2
       zod: 4.2.1
