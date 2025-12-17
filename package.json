@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.44",
-    "@ai-sdk/google-vertex": "^3.0.62",
+    "@ai-sdk/google-vertex": "^3.0.86",
     "@ai-sdk/openai": "^2.0.76",
     "@ai-sdk/openai-compatible": "^1.0.27",
     "@ghostery/adblocker-playwright": "^2.12.5",
