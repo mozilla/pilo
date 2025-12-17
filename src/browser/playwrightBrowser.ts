@@ -19,7 +19,7 @@ import { InvalidRefException, BrowserActionException } from "../errors.js";
 // Type extension for Playwright's private AI snapshot function
 // See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
 type PageEx = Page & {
-  _snapshotForAI: () => Promise<{ full: string, incremental?: string }>;
+  _snapshotForAI: () => Promise<{ full: string; incremental?: string }>;
 };
 
 export interface PlaywrightBrowserOptions {
