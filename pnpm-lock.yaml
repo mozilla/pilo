@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^2.0.30
-        version: 2.0.31(zod@4.1.13)
+        specifier: ^2.0.44
+        version: 2.0.44(zod@4.1.13)
       '@ai-sdk/google-vertex':
         specifier: ^3.0.62
         version: 3.0.62(zod@4.1.13)
@@ -236,6 +236,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/google@2.0.44':
+    resolution: {integrity: sha512-c5dck36FjqiVoeeMJQLTEmUheoURcGTU/nBT6iJu8/nZiKFT/y8pD85KMDRB7RerRYaaQOtslR2d6/5PditiRw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/openai-compatible@1.0.27':
     resolution: {integrity: sha512-bpYruxVLhrTbVH6CCq48zMJNeHu6FmHtEedl9FXckEgcIEAi036idFhJlcRwC1jNCwlacbzb8dPD7OAH1EKJaQ==}
     engines: {node: '>=18'}
@@ -250,6 +256,12 @@ packages:
 
   '@ai-sdk/provider-utils@3.0.17':
     resolution: {integrity: sha512-TR3Gs4I3Tym4Ll+EPdzRdvo/rc8Js6c4nVhFLuvGLX/Y4V9ZcQMa/HTiYsHEgmYrf1zVi6Q145UEZUfleOwOjw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@3.0.18':
+    resolution: {integrity: sha512-ypv1xXMsgGcNKUP+hglKqtdDuMg68nWHucPPAhIENrbFAI+xCHiqPVN8Zllxyv1TNZwGWUghPxJXU+Mqps0YRQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1226,6 +1238,9 @@ packages:
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   '@tailwindcss/node@4.1.17':
     resolution: {integrity: sha512-csIkHIgLb3JisEFQ0vxr2Y57GUNYh447C8xzwj89U/8fdW8LhProdxvnVH6U8M2Y73QKiTIH+LWbK3V2BBZsAg==}
@@ -3607,6 +3622,12 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.17(zod@4.1.13)
       zod: 4.1.13
 
+  '@ai-sdk/google@2.0.44(zod@4.1.13)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.1.13)
+      zod: 4.1.13
+
   '@ai-sdk/openai-compatible@1.0.27(zod@4.1.13)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -3622,7 +3643,14 @@ snapshots:
   '@ai-sdk/provider-utils@3.0.17(zod@4.1.13)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      zod: 4.1.13
+
+  '@ai-sdk/provider-utils@3.0.18(zod@4.1.13)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 4.1.13
 
@@ -4310,6 +4338,8 @@ snapshots:
       '@sentry/types': 8.9.2
 
   '@standard-schema/spec@1.0.0': {}
+
+  '@standard-schema/spec@1.1.0': {}
 
   '@tailwindcss/node@4.1.17':
     dependencies:
@@ -6188,7 +6218,7 @@ snapshots:
 
   spark@file:(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
-      '@ai-sdk/google': 2.0.31(zod@4.1.13)
+      '@ai-sdk/google': 2.0.44(zod@4.1.13)
       '@ai-sdk/google-vertex': 3.0.62(zod@4.1.13)
       '@ai-sdk/openai': 2.0.68(zod@4.1.13)
       '@ai-sdk/openai-compatible': 1.0.27(zod@4.1.13)
