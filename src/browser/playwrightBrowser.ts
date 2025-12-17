@@ -64,7 +64,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   // Default timeouts
   // TODO: Make this configurable
-  private readonly ACTION_TIMEOUT_MS = 20000; // 20 seconds timeout for interactive actions
+  private readonly ACTION_TIMEOUT_MS = 30000; // 30 seconds timeout for interactive actions
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
