@@ -17,8 +17,9 @@ import TurndownService from "turndown";
 import { InvalidRefException, BrowserActionException } from "../errors.js";
 
 // Type extension for Playwright's private AI snapshot function
+// See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
 type PageEx = Page & {
-  _snapshotForAI: () => Promise<string>;
+  _snapshotForAI: () => Promise<{ full: string, incremental?: string }>;
 };
 
 export interface PlaywrightBrowserOptions {
@@ -310,7 +311,8 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    return await (this.page as PageEx)._snapshotForAI();
+    const snapshot = await (this.page as PageEx)._snapshotForAI();
+    return snapshot.full;
   }
 
   /**
