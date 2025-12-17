@@ -89,7 +89,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.0.14
-        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.10)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
+        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.11)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
 
   extension:
     dependencies:
@@ -152,8 +152,8 @@ importers:
         specifier: ^1.1.5
         version: 1.1.5(vite@7.2.7(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0))(wxt@0.20.11(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.53.3)(tsx@4.20.6)(yaml@2.8.0))
       happy-dom:
-        specifier: ^20.0.10
-        version: 20.0.10
+        specifier: ^20.0.11
+        version: 20.0.11
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -162,7 +162,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.0.14
-        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.10)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
+        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.11)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
       wxt:
         specifier: 0.20.11
         version: 0.20.11(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.53.3)(tsx@4.20.6)(yaml@2.8.0)
@@ -199,7 +199,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.0.14
-        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.10)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
+        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.11)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)
 
 packages:
 
@@ -1390,8 +1390,8 @@ packages:
   '@types/minimatch@3.0.5':
     resolution: {integrity: sha512-Klz949h02Gz2uZCMGwDUSDS1YBlTdDDgbWHi+81l29tQALUtvz4rAYi5uoVhE5Lagoq6DeqAUlbrHvW/mXDgdQ==}
 
-  '@types/node@20.19.23':
-    resolution: {integrity: sha512-yIdlVVVHXpmqRhtyovZAcSy0MiPcYWGkoO4CGe/+jpP0hmNuihm4XhHbADpK++MsiLHP5MVlv+bcgdF99kSiFQ==}
+  '@types/node@20.19.27':
+    resolution: {integrity: sha512-N2clP5pJhB2YnZJ3PIHFk5RkygRX5WO/5f0WC08tp0wd+sv0rsJk3MqWn3CbNmT2J505a5336jaQj4ph1AdMug==}
 
   '@types/node@24.10.1':
     resolution: {integrity: sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==}
@@ -2128,8 +2128,8 @@ packages:
     resolution: {integrity: sha512-pCcEwRi+TKpMlxAQObHDQ56KawURgyAf6jtIY046fJ5tIv3zDe/LEIubckAO8fj6JnAxLdmWkUfNyulQ2iKdEw==}
     engines: {node: '>=14.0.0'}
 
-  happy-dom@20.0.10:
-    resolution: {integrity: sha512-6umCCHcjQrhP5oXhrHQQvLB0bwb1UzHAHdsXy+FjtKoYjUhmNZsQL8NivwM1vDvNEChJabVrUYxUnp/ZdYmy2g==}
+  happy-dom@20.0.11:
+    resolution: {integrity: sha512-QsCdAUHAmiDeKeaNojb1OHOPF7NjcWPBR7obdu3NwH2a/oyQaLg5d0aaCy/9My6CdPChYF07dvz5chaXBGaD4g==}
     engines: {node: '>=20.0.0'}
 
   has-flag@3.0.0:
@@ -4466,7 +4466,7 @@ snapshots:
 
   '@types/minimatch@3.0.5': {}
 
-  '@types/node@20.19.23':
+  '@types/node@20.19.27':
     dependencies:
       undici-types: 6.21.0
 
@@ -5271,9 +5271,9 @@ snapshots:
       - encoding
       - supports-color
 
-  happy-dom@20.0.10:
+  happy-dom@20.0.11:
     dependencies:
-      '@types/node': 20.19.23
+      '@types/node': 20.19.27
       '@types/whatwg-mimetype': 3.0.2
       whatwg-mimetype: 3.0.0
 
@@ -6494,7 +6494,7 @@ snapshots:
       tsx: 4.20.6
       yaml: 2.8.0
 
-  vitest@4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.10)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0):
+  vitest@4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.11)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0):
     dependencies:
       '@vitest/expect': 4.0.14
       '@vitest/mocker': 4.0.14(vite@7.2.7(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0))
@@ -6519,7 +6519,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@types/node': 24.10.1
-      happy-dom: 20.0.10
+      happy-dom: 20.0.11
       jsdom: 27.2.0
     transitivePeerDependencies:
       - jiti
