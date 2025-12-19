@@ -634,7 +634,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           <div className="flex items-center gap-3">
             <span className="text-2xl">⚡</span>
             <div>
-              <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
+              <h1 className={`text-lg font-medium ${t.text.primary}`}>Spark</h1>
               <p className={`${t.text.muted} text-xs`}>
                 {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
               </p>
@@ -657,7 +657,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         >
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <h2 className={`text-xl font-bold ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
+              <h2 className={`text-xl font-medium ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
               <p className={`${t.text.muted} text-sm max-w-sm`}>
                 I can help you automate tasks on any webpage. Just describe what you'd like me to
                 do!
