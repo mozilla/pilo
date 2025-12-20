@@ -46,8 +46,9 @@ export function ChatMessage({
     case "user":
       liClass = "flex mb-4 justify-end";
       divClass = clsx(
-        "px-4 py-2 rounded-lg max-w-xs lg:max-w-md bg-gray-150",
+        "px-4 py-2 rounded-lg max-w-xs lg:max-w-md",
         t.text.primary,
+        t.bg.primary,
         "border",
         t.border.primary,
       );

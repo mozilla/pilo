@@ -183,7 +183,7 @@ export const theme = {
     bg: {
       sidebar: "bg-white", // Light sidebar background in light mode
       panel: "bg-white", // Main panel background - matches AI messages
-      primary: "bg-stone-75", // Message bubbles background - user messages
+      primary: "bg-gray-150", // Message bubbles background - user messages
       secondary: "bg-white", // Secondary message bubbles - AI messages pop more
       tertiary: "bg-stone-125", // Tertiary background
       input: "bg-white",
