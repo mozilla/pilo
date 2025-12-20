@@ -166,9 +166,7 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
 
   return (
     <div className="mb-2">
-      <div className={getClassName()}>
-        <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
-      </div>
+      <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
     </div>
   );
 };
