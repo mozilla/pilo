@@ -47,8 +47,8 @@ export function ChatMessage({
       liClass = "flex mb-4 justify-end";
       divClass = clsx(
         "px-4 py-2 rounded-lg max-w-xs lg:max-w-md",
-        t.bg.primary,
         t.text.primary,
+        t.bg.primary,
         "border",
         t.border.primary,
       );
@@ -94,7 +94,7 @@ export function ChatMessage({
         {/* Show content if not streaming or if streaming is finished */}
         {(!isStreaming || content) && (
           <div
-            className={`${type === "user" ? "text-message-user" : "text-message-assistant"} whitespace-pre-wrap`}
+            className={`${type === "user" ? "text-message-user" : "text-message-assistant"} whitespace-pre-wrap ${isStreaming ? t.text.accent : ""}`}
           >
             {renderContent(content)}
           </div>
@@ -103,7 +103,11 @@ export function ChatMessage({
         {/* Show loading indicator if streaming and no content yet */}
         {isStreaming && !content && (
           <div className="flex items-center gap-2 text-sm">
-            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <svg
+              className={`animate-spin ${t.stroke.accent} h-4 w-4`}
+              fill="none"
+              viewBox="0 0 24 24"
+            >
               <circle
                 className="opacity-25"
                 cx="12"

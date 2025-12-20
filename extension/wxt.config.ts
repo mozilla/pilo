@@ -40,6 +40,12 @@ let config = {
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   vite: () => ({
     plugins: [tailwindcss()] as any,
+    server: {
+      fs: {
+        // Allow serving files from parent node_modules (for @fontsource-variable/inter)
+        allow: [".."],
+      },
+    },
   }),
   manifest: ({ browser }: { browser: string }) => {
     // Common configuration for all browsers

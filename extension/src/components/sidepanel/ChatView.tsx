@@ -129,16 +129,7 @@ interface MarkdownContentProps {
 }
 
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div
-    className={clsx(
-      "markdown-content",
-      "prose",
-      "prose-chat",
-      "prose-slate",
-      "max-w-none",
-      className,
-    )}
-  >
+  <div className={clsx("markdown-content", "prose", "prose-chat", "max-w-none", className)}>
     <Markdown value={children} breaks gfm />
   </div>
 );
@@ -153,13 +144,13 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
   const getClassName = () => {
     switch (message.type) {
       case "plan":
-        return `text-message-assistant ${t.text.primary}`;
+        return `text-message-assistant ${t.text.secondary} text-xs`;
       case "reasoning":
         return `text-message-assistant ${t.text.secondary}`;
       case "error":
         return "text-message-assistant text-red-600 p-2 bg-red-50 rounded border border-red-200";
       case "result":
-        return "text-message-assistant";
+        return "text-message-assistant text-sm";
       default:
         return "text-message-assistant";
     }
@@ -167,16 +158,14 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
 
   return (
     <div className="mb-2">
-      <div className={getClassName()}>
-        <MarkdownContent>{message.content}</MarkdownContent>
-      </div>
+      <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
     </div>
   );
 };
 
 // Loading spinner component
-const LoadingSpinner = (): ReactElement => (
-  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+const LoadingSpinner = ({ theme: t }: { theme: Theme }): ReactElement => (
+  <svg className={`animate-spin ${t.stroke.accent} h-4 w-4`} fill="none" viewBox="0 0 24 24">
     <circle
       className="opacity-25"
       cx="12"
@@ -270,7 +259,7 @@ const TaskBubble = ({
           return (
             <div key={msg.id}>
               {heading && (
-                <div className="text-sm font-semibold text-gray-500 mb-2 mt-3 first:mt-0">
+                <div className={`text-sm font-semibold ${t.text.accent} mb-2 mt-3 first:mt-0`}>
                   {heading}
                 </div>
               )}
@@ -282,8 +271,8 @@ const TaskBubble = ({
         {/* Current status for active tasks or early phase status-only tasks */}
         {!resultMessage && (isActive || isEarlyPhase) && (
           <div className="flex items-center gap-2 text-sm">
-            <LoadingSpinner />
-            <span className={t.text.muted}>
+            <LoadingSpinner theme={t} />
+            <span className={t.text.accent}>
               {latestStatus ? latestStatus.content : "Starting task..."}
             </span>
           </div>
@@ -635,7 +624,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           <div className="flex items-center gap-3">
             <span className="text-2xl">⚡</span>
             <div>
-              <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
+              <h1 className={`text-lg font-medium ${t.text.primary}`}>Spark</h1>
               <p className={`${t.text.muted} text-xs`}>
                 {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
               </p>
@@ -658,7 +647,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         >
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <h2 className={`text-xl font-bold ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
+              <h2 className={`text-xl font-medium ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
               <p className={`${t.text.muted} text-sm max-w-sm`}>
                 I can help you automate tasks on any webpage. Just describe what you'd like me to
                 do!

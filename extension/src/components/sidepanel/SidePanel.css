@@ -3,6 +3,13 @@
 
 /* Custom color tokens extending Tailwind's stone palette */
 @theme {
+  /* Override default font to use Inter Variable */
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  /* letter spacing */
+  --tracking-normal: -0.1px;
+
   --color-stone-25: #fdfcfa;
   --color-stone-75: #f5f3ef;
   --color-stone-125: #ebe9e5;
@@ -10,12 +17,14 @@
   --color-stone-225: #d8d6d2;
   --color-stone-875: #2f2f2f;
   --color-stone-925: #1c1b22;
+  --color-gray-150: #e9eaec;
+  --color-purple-580: #924fe8;
   /* Prose chat typography - cloned from prose-base, customize as needed */
 
   /* Font sizes */
   --prose-chat-font-size: 0.75rem;
   --prose-chat-h1-font-size: 1.125rem;
-  --prose-chat-h2-font-size: 1.125rem;
+  --prose-chat-h2-font-size: 1rem;
   --prose-chat-h3-font-size: 1rem;
   --prose-chat-h4-font-size: 1em;
   --prose-chat-code-font-size: 0.875em;
@@ -47,16 +56,13 @@
   .text-message-user {
     font-size: 0.875rem;
     line-height: 1.5;
-    font-weight: 500;
-    font-family:
-      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-weight: 400;
   }
 
   .text-message-assistant {
     font-size: 1rem;
     line-height: 1.5;
-    font-weight: 500;
-    font-family: Georgia, "Times New Roman", Times, serif;
+    font-weight: 400;
   }
 
   /* Restore list styles for markdown content */
@@ -86,6 +92,7 @@
     line-height: var(--prose-chat-h1-line-height);
     margin-top: var(--prose-chat-h1-margin-top);
     margin-bottom: var(--prose-chat-h1-margin-bottom);
+    font-weight: 600;
   }
 
   h2 {
@@ -93,6 +100,7 @@
     line-height: var(--prose-chat-h2-line-height);
     margin-top: var(--prose-chat-h2-margin-top);
     margin-bottom: var(--prose-chat-h2-margin-bottom);
+    font-weight: 600;
   }
 
   h3 {

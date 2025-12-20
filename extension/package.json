@@ -29,6 +29,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.1.1",
     "@tailwindcss/vite": "^4.1.17",
     "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",

@@ -181,10 +181,10 @@ export const theme = {
   light: {
     // Backgrounds
     bg: {
-      sidebar: "bg-stone-175", // Light sidebar background in light mode
-      panel: "bg-stone-25", // Main panel background - matches AI messages
-      primary: "bg-stone-75", // Message bubbles background - user messages
-      secondary: "bg-stone-25", // Secondary message bubbles - AI messages pop more
+      sidebar: "bg-white", // Light sidebar background in light mode
+      panel: "bg-white", // Main panel background - matches AI messages
+      primary: "bg-gray-150", // Message bubbles background - user messages
+      secondary: "bg-white", // Secondary message bubbles - AI messages pop more
       tertiary: "bg-stone-125", // Tertiary background
       input: "bg-white",
       success: "bg-green-50",
@@ -199,7 +199,11 @@ export const theme = {
       success: "text-green-700",
       error: "text-red-700",
       warning: "text-yellow-700",
-      accent: "text-[#FF6B35]", // Orange accent for spark icon
+      accent: "text-purple-580", // Purple accent for active states
+    },
+    // Stroke colors for SVG elements
+    stroke: {
+      accent: "stroke-purple-580", // Purple accent for spinners
     },
     // Borders - Light borders for light mode
     border: {
@@ -258,7 +262,11 @@ export const theme = {
       success: "text-green-700",
       error: "text-red-700",
       warning: "text-yellow-700",
-      accent: "text-[#FF6B35]", // Orange accent
+      accent: "text-purple-580", // Purple accent for active states
+    },
+    // Stroke colors for SVG elements
+    stroke: {
+      accent: "stroke-purple-580", // Purple accent for spinners
     },
     // Borders - Dark borders for panel, light borders for bubbles
     border: {

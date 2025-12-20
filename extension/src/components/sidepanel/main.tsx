@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource-variable/inter";
 import SidePanel from "./SidePanel";
 import "./SidePanel.css";
 
