@@ -199,7 +199,11 @@ export const theme = {
       success: "text-green-700",
       error: "text-red-700",
       warning: "text-yellow-700",
-      accent: "text-[#FF6B35]", // Orange accent for spark icon
+      accent: "text-purple-580", // Purple accent for active states
+    },
+    // Stroke colors for SVG elements
+    stroke: {
+      accent: "stroke-purple-580", // Purple accent for spinners
     },
     // Borders - Light borders for light mode
     border: {
@@ -258,7 +262,11 @@ export const theme = {
       success: "text-green-700",
       error: "text-red-700",
       warning: "text-yellow-700",
-      accent: "text-[#FF6B35]", // Orange accent
+      accent: "text-purple-580", // Purple accent for active states
+    },
+    // Stroke colors for SVG elements
+    stroke: {
+      accent: "stroke-purple-580", // Purple accent for spinners
     },
     // Borders - Dark borders for panel, light borders for bubbles
     border: {
