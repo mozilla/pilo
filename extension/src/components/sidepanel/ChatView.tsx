@@ -129,15 +129,7 @@ interface MarkdownContentProps {
 }
 
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div
-    className={clsx(
-      "markdown-content",
-      "prose",
-      "prose-chat",
-      "max-w-none",
-      className,
-    )}
-  >
+  <div className={clsx("markdown-content", "prose", "prose-chat", "max-w-none", className)}>
     <Markdown value={children} breaks gfm />
   </div>
 );
