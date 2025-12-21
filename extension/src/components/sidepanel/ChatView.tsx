@@ -627,7 +627,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <SparkLogo className="w-28 h-28 text-[#b4b9c1] mb-4" />
+            <SparkLogo className="w-28 h-28 text-gray-350 mb-4" />
             <p className={`${t.text.muted} text-sm max-w-sm`}>
               I can help you automate tasks on any webpage. Just describe what you'd like me to do!
             </p>
