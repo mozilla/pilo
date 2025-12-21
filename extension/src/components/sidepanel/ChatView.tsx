@@ -247,12 +247,6 @@ const TaskBubble = ({
   return (
     <li className={liClass}>
       <div className={divClass}>
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">⚡</span>
-          <span className={`text-sm font-semibold ${t.text.primary}`}>Spark</span>
-        </div>
-
         {/* Render messages chronologically with dynamic headings */}
         {taskMessages.map((msg) => {
           const heading = getHeading(msg.type);
