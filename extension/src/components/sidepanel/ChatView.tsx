@@ -29,6 +29,7 @@ import {
   isAgentActionData,
 } from "../../utils/typeGuards";
 import type { BrowserActionStartedEventData } from "../../types/browser";
+import { SettingsGearIcon } from "../icons/SettingsGearIcon";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
@@ -617,7 +618,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
           title="Settings"
         >
-          ⚙️
+          <SettingsGearIcon className="w-5 h-5" />
         </button>
       </div>
 
