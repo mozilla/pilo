@@ -1,21 +1,16 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { INDICATOR_CSS } from "../../src/background/indicatorControl";
 
-describe("indicator CSS content script", () => {
-  const cssPath = path.join(__dirname, "../../entrypoints/indicator.content/styles.css");
+describe("indicator CSS file for dynamic registration", () => {
+  const cssPath = path.join(__dirname, "../../public/indicator.css");
 
-  it("should exist at entrypoints/indicator.content/styles.css", () => {
+  it("should exist at public/indicator.css", () => {
     expect(fs.existsSync(cssPath)).toBe(true);
   });
 
-  it("should hide indicator by default (no class)", () => {
-    const css = fs.readFileSync(cssPath, "utf-8");
-    // Default state should have opacity: 0 (regex allows multiline match)
-    expect(css).toMatch(/html::after\s*\{[\s\S]*?opacity:\s*0/);
-  });
-
-  it("should show indicator when html has spark-indicator-active class", () => {
+  it("should target html.spark-indicator-active::after", () => {
     const css = fs.readFileSync(cssPath, "utf-8");
     expect(css).toContain("html.spark-indicator-active::after");
   });
@@ -23,5 +18,23 @@ describe("indicator CSS content script", () => {
   it("should include the pulse animation keyframes", () => {
     const css = fs.readFileSync(cssPath, "utf-8");
     expect(css).toContain("@keyframes spark-pulse");
+  });
+
+  it("should use highest z-index", () => {
+    const css = fs.readFileSync(cssPath, "utf-8");
+    expect(css).toContain("z-index: 2147483647");
+  });
+});
+
+describe("CSS consistency", () => {
+  const cssPath = path.join(__dirname, "../../public/indicator.css");
+
+  it("should have matching CSS rules in file and INDICATOR_CSS constant", () => {
+    const fileCss = fs.readFileSync(cssPath, "utf-8");
+
+    // Normalize whitespace for comparison
+    const normalizeCSS = (css: string) => css.replace(/\s+/g, " ").trim();
+
+    expect(normalizeCSS(fileCss)).toEqual(normalizeCSS(INDICATOR_CSS));
   });
 });

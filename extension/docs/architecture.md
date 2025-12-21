@@ -194,6 +194,68 @@ browser.runtime.onMessage.addListener((message): Promise<{ title: string; url: s
 - Provides accessibility tree representation of page structure
 - Used by agents to understand page state
 
+### Visual Indicator System
+
+**Location**: [src/background/indicatorControl.ts](../src/background/indicatorControl.ts)
+
+The extension displays a visual indicator (purple glow border) on pages during active task execution. This system uses dynamic CSS registration to reduce flash during navigation.
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     FIRST TAB STARTS TASK                       │
+│                                                                  │
+│  1. registerContentScripts() with CSS + runAt: "document_start" │
+│     (single registration: id="spark-indicator")                 │
+│  2. Increment activeIndicators count                            │
+│  3. insertCSS() for current page (already loaded)               │
+│  4. executeScript() to add class on current page                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     NAVIGATION DURING TASK                       │
+│                                                                  │
+│  CSS auto-injected at document_start (before DOM renders)       │
+│  executeScript() adds class (via onCommitted listener)          │
+│  Result: Reduced flash - CSS already present when class added   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     TASK ENDS (or tab closes)                    │
+│                                                                  │
+│  1. executeScript() to remove class from current page           │
+│  2. removeCSS() from current page                               │
+│  3. Decrement activeIndicators count                            │
+│  4. If count == 0: unregisterContentScripts()                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Components**:
+
+1. **Dynamic CSS Registration**: Uses `chrome.scripting.registerContentScripts()` to register CSS at `document_start` for all URLs when a task starts. This ensures CSS is present before the DOM renders on navigation.
+
+2. **Reference Counting**: A single shared registration (`id: "spark-indicator"`) is used with reference counting via `activeIndicators` Set. CSS is only unregistered when no tabs have active indicators.
+
+3. **Class Toggle**: The indicator is activated/deactivated by adding/removing `spark-indicator-active` class from `<html>` element.
+
+4. **Navigation Handling**:
+   - `webNavigation.onCommitted` listener re-applies class on early navigation
+   - `tabs.onUpdated` listener provides fallback on page complete
+   - CSS is already present via registered content script
+
+5. **Cleanup**: `cleanupStaleRegistrations()` runs on startup to remove orphaned registrations from previous sessions (e.g., after crash).
+
+**CSS File**: [public/indicator.css](../public/indicator.css) - Standalone CSS file copied to build output root, used by `registerContentScripts`.
+
+**Why This Approach**:
+
+- **Reduced Flash**: Pre-registered CSS eliminates CSS injection latency during navigation
+- **Shared Registration**: Single registration prevents duplicate CSS on pages with multiple indicator tabs
+- **Graceful Degradation**: Tab closure and extension restart are handled cleanly
+
 ### Sidebar/SidePanel UI
 
 **Location**: [src/components/sidepanel/](../src/components/sidepanel/)

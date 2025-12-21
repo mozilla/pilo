@@ -1,5 +1,4 @@
-/* Indicator overlay - hidden by default */
-html::after {
+html.spark-indicator-active::after {
   content: "";
   pointer-events: none;
   position: fixed;
@@ -8,20 +7,14 @@ html::after {
   width: 100%;
   height: 100%;
   z-index: 2147483647;
-  opacity: 0;
+  opacity: 1;
   box-shadow:
     inset 60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset 60px -60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
-}
-
-/* Indicator visible when class is present */
-html.spark-indicator-active::after {
-  opacity: 1;
   animation: spark-pulse 3s ease-in-out infinite;
 }
-
 @keyframes spark-pulse {
   0%,
   100% {

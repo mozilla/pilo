@@ -47,8 +47,7 @@ let config = {
           {
             matches: ["<all_urls>"],
             run_at: "document_start",
-            css: ["content-scripts/indicator.css"],
-            js: ["content-scripts/content.js", "content-scripts/indicator.js"],
+            js: ["content-scripts/content.js"],
           },
         ];
       }
