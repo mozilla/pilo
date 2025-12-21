@@ -66,6 +66,11 @@ let config = {
         },
         action: {
           default_title: "Open Spark Sidepanel",
+          default_icon: {
+            16: "icon/16.png",
+            24: "icon/24.png",
+            32: "icon/32.png",
+          },
         },
       };
     }
