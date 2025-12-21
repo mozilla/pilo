@@ -5,6 +5,7 @@ import {
   showIndicator,
   hideIndicator,
   setupNavigationListener,
+  cleanupStaleRegistrations,
 } from "../src/background/indicatorControl";
 import type {
   ChromeBrowser,
@@ -24,6 +25,9 @@ interface StorageSettings {
 
 export default defineBackground(() => {
   console.log("Background script loaded");
+
+  // Clean up any orphaned registrations from previous session (e.g., after crash)
+  cleanupStaleRegistrations().catch(() => {});
 
   // Set up navigation listener to re-inject indicator CSS on cross-origin navigations
   setupNavigationListener();

@@ -1,7 +1,8 @@
 /**
- * Background-controlled indicator via class toggle.
- * This module handles showing/hiding the visual indicator by toggling a CSS class
- * on the html element. The CSS is pre-loaded via manifest content script.
+ * Background-controlled indicator via class toggle with dynamic CSS registration.
+ * This module handles showing/hiding the visual indicator by:
+ * 1. Registering CSS content script at document_start for future navigations
+ * 2. Injecting CSS and toggling a class on the html element for the current page
  * It also listens for navigation events to re-apply the class on navigations.
  */
 
@@ -9,6 +10,11 @@ import browser from "webextension-polyfill";
 
 // Track which tabs have active indicators
 const activeIndicators = new Set<number>();
+
+// Track if CSS content script is registered
+let cssRegistered = false;
+// Lock to prevent concurrent registration attempts
+let registrationPromise: Promise<void> | null = null;
 
 // Track if navigation listener is registered
 let navigationListenerRegistered = false;
@@ -22,10 +28,11 @@ let tabsUpdatedListener:
 let webNavCommittedListener:
   | ((details: browser.WebNavigation.OnCommittedDetailsType) => void)
   | null = null;
+let tabRemovedListener: ((tabId: number) => void) | null = null;
 
 // CSS for the indicator - injected programmatically for reliability
-const INDICATOR_CSS = `
-html.spark-indicator-active::after {
+// Exported for testing (to verify it matches public/indicator.css)
+export const INDICATOR_CSS = `html.spark-indicator-active::after {
   content: "";
   pointer-events: none;
   position: fixed;
@@ -48,24 +55,107 @@ html.spark-indicator-active::after {
 }
 `;
 
-export async function showIndicator(tabId: number): Promise<void> {
+/**
+ * Reset all indicator state. For testing only.
+ */
+export function resetIndicatorState(): void {
+  activeIndicators.clear();
+  cssRegistered = false;
+  registrationPromise = null;
+}
+
+/**
+ * Ensure the CSS content script is registered for future navigations.
+ * Uses a shared registration with reference counting.
+ */
+export async function ensureIndicatorCSSRegistered(): Promise<void> {
+  if (cssRegistered) {
+    return;
+  }
+
+  // If registration is in progress, wait for it instead of starting another
+  if (registrationPromise) {
+    await registrationPromise;
+    return;
+  }
+
+  // Start registration with lock
+  registrationPromise = (async () => {
+    try {
+      await browser.scripting.registerContentScripts([
+        {
+          id: "spark-indicator",
+          matches: ["<all_urls>"],
+          css: ["indicator.css"],
+          runAt: "document_start",
+          persistAcrossSessions: false,
+        },
+      ]);
+      cssRegistered = true;
+    } catch {
+      // May already be registered (e.g., from previous session)
+      // Check if it exists
+      try {
+        const scripts = await browser.scripting.getRegisteredContentScripts({
+          ids: ["spark-indicator"],
+        });
+        if (scripts.length > 0) {
+          cssRegistered = true;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  })();
+
+  await registrationPromise;
+  registrationPromise = null;
+}
+
+/**
+ * Unregister the CSS content script if no tabs have active indicators.
+ */
+async function unregisterIndicatorCSSIfUnused(): Promise<void> {
+  if (activeIndicators.size > 0) {
+    return;
+  }
+  if (!cssRegistered) {
+    return;
+  }
   try {
-    // Inject CSS first (idempotent - checks if already injected)
+    await browser.scripting.unregisterContentScripts({
+      ids: ["spark-indicator"],
+    });
+    cssRegistered = false;
+  } catch {
+    // Silently ignore - may not be registered
+  }
+}
+
+export async function showIndicator(tabId: number): Promise<void> {
+  // Add to activeIndicators FIRST to prevent race condition with hideIndicator
+  activeIndicators.add(tabId);
+
+  try {
+    // Register CSS for future navigations (shared across all tabs)
+    await ensureIndicatorCSSRegistered();
+
+    // Inject CSS into current page (already loaded)
     await browser.scripting.insertCSS({
       target: { tabId },
       css: INDICATOR_CSS,
     });
-    // Then add the class to activate the indicator
+
+    // Add class to activate indicator
     await browser.scripting.executeScript({
       target: { tabId },
       func: () => {
         document.documentElement.classList.add("spark-indicator-active");
       },
     });
-    // Only track if both succeeded
-    activeIndicators.add(tabId);
   } catch {
-    // Silently ignore errors (e.g., tab closed, chrome:// pages)
+    // On error, remove from activeIndicators since we failed to show
+    activeIndicators.delete(tabId);
   }
 }
 
@@ -80,11 +170,15 @@ export async function hideIndicator(tabId: number): Promise<void> {
         document.documentElement.classList.remove("spark-indicator-active");
       },
     });
-    // Then remove the CSS
+
+    // Remove CSS from current page
     await browser.scripting.removeCSS({
       target: { tabId },
       css: INDICATOR_CSS,
     });
+
+    // Unregister content script CSS if no more active indicators
+    await unregisterIndicatorCSSIfUnused();
   } catch {
     // Silently ignore errors (e.g., tab closed, chrome:// pages)
   }
@@ -98,22 +192,19 @@ export function isIndicatorActive(tabId: number): boolean {
 }
 
 /**
- * Helper to inject indicator CSS and class into a tab
+ * Helper to inject indicator class into a tab.
+ * CSS is already present via registerContentScripts at document_start.
  */
 function injectIndicator(tabId: number): void {
+  // CSS is already injected via registerContentScripts at document_start
+  // We only need to add the class to activate the indicator
   browser.scripting
-    .insertCSS({
+    .executeScript({
       target: { tabId },
-      css: INDICATOR_CSS,
+      func: () => {
+        document.documentElement.classList.add("spark-indicator-active");
+      },
     })
-    .then(() =>
-      browser.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-          document.documentElement.classList.add("spark-indicator-active");
-        },
-      }),
-    )
     .catch(() => {
       // Silently ignore errors - may fail if page not ready yet
     });
@@ -140,15 +231,24 @@ export function setupNavigationListener(): void {
 
   // Use tabs.onUpdated as a fallback for reliability
   tabsUpdatedListener = (tabId, changeInfo) => {
-    // Re-apply CSS and class for tabs with active indicators
+    // Re-apply class for tabs with active indicators
     // Only on "complete" now since webNavigation handles early injection
     if (changeInfo.status === "complete" && activeIndicators.has(tabId)) {
       injectIndicator(tabId);
     }
   };
 
+  // Handle tab closure
+  tabRemovedListener = (tabId: number) => {
+    if (activeIndicators.has(tabId)) {
+      activeIndicators.delete(tabId);
+      unregisterIndicatorCSSIfUnused().catch(() => {});
+    }
+  };
+
   browser.webNavigation.onCommitted.addListener(webNavCommittedListener);
   browser.tabs.onUpdated.addListener(tabsUpdatedListener);
+  browser.tabs.onRemoved.addListener(tabRemovedListener);
   navigationListenerRegistered = true;
 }
 
@@ -164,6 +264,28 @@ export function cleanupNavigationListener(): void {
     browser.tabs.onUpdated.removeListener(tabsUpdatedListener);
     tabsUpdatedListener = null;
   }
+  if (tabRemovedListener) {
+    browser.tabs.onRemoved.removeListener(tabRemovedListener);
+    tabRemovedListener = null;
+  }
   navigationListenerRegistered = false;
   activeIndicators.clear();
+}
+
+/**
+ * Clean up stale registrations from previous sessions.
+ * This should be called on extension startup.
+ */
+export async function cleanupStaleRegistrations(): Promise<void> {
+  try {
+    const scripts = await browser.scripting.getRegisteredContentScripts();
+    const staleIds = scripts.filter((s) => s.id === "spark-indicator").map((s) => s.id);
+
+    if (staleIds.length > 0) {
+      await browser.scripting.unregisterContentScripts({ ids: staleIds });
+      cssRegistered = false;
+    }
+  } catch {
+    // Silently ignore errors
+  }
 }
