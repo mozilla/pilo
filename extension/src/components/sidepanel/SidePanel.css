@@ -1,3 +1,10 @@
+/*
+ * Tailwind v4 CSS-first configuration.
+ * Custom color tokens are defined here via @theme blocks (not in a separate
+ * tailwind.config.js). The @tailwindcss/vite plugin is configured in
+ * extension/wxt.config.ts.
+ */
+
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
@@ -18,6 +25,7 @@
   --color-stone-875: #2f2f2f;
   --color-stone-925: #1c1b22;
   --color-gray-150: #e9eaec;
+  --color-gray-350: #b4b9c1;
   --color-purple-580: #924fe8;
   /* Prose chat typography - cloned from prose-base, customize as needed */
 

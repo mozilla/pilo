@@ -142,10 +142,12 @@ describe("ChatView", () => {
     vi.clearAllMocks();
   });
 
-  it("renders initial welcome message", () => {
+  it("renders initial welcome state with logo and description", () => {
     render(<ChatView {...defaultProps} />);
 
-    expect(screen.getByText("Welcome to Spark!")).toBeInTheDocument();
+    // Logo should be displayed (svg with aria-label)
+    expect(screen.getByRole("img", { name: "Spark logo" })).toBeInTheDocument();
+    // Description text should still be present
     expect(screen.getByText(/I can help you automate tasks/)).toBeInTheDocument();
   });
 
