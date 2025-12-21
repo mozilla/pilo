@@ -612,10 +612,10 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   return (
     <div className={`h-screen flex flex-col ${t.bg.sidebar}`}>
       {/* Header */}
-      <div className="p-4 flex items-center justify-end">
+      <div className="p-2 gap-2.5 flex items-center justify-end">
         <button
           onClick={onOpenSettings}
-          className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
+          className={`p-2.5 ${t.text.muted} ${t.hover.settings} rounded-xl transition-colors`}
           title="Settings"
         >
           <SettingsGearIcon className="w-5 h-5" />
