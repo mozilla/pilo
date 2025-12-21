@@ -1,3 +1,10 @@
+/*
+ * Tailwind v4 CSS-first configuration.
+ * Custom color tokens are defined here via @theme blocks (not in a separate
+ * tailwind.config.js). The @tailwindcss/vite plugin is configured in
+ * extension/wxt.config.ts.
+ */
+
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
