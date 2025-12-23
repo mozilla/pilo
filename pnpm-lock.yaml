@@ -18,8 +18,8 @@ importers:
         specifier: ^2.0.76
         version: 2.0.88(zod@4.2.1)
       '@ai-sdk/openai-compatible':
-        specifier: ^1.0.27
-        version: 1.0.27(zod@4.2.1)
+        specifier: ^1.0.28
+        version: 1.0.28(zod@4.2.1)
       '@ghostery/adblocker-playwright':
         specifier: ^2.12.5
         version: 2.12.5(playwright@1.57.0)
@@ -245,20 +245,14 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai-compatible@1.0.27':
-    resolution: {integrity: sha512-bpYruxVLhrTbVH6CCq48zMJNeHu6FmHtEedl9FXckEgcIEAi036idFhJlcRwC1jNCwlacbzb8dPD7OAH1EKJaQ==}
+  '@ai-sdk/openai-compatible@1.0.28':
+    resolution: {integrity: sha512-yKubDxLYtXyGUzkr9lNStf/lE/I+Okc8tmotvyABhsQHHieLKk6oV5fJeRJxhr67Ejhg+FRnwUOxAmjRoFM4dA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/openai@2.0.88':
     resolution: {integrity: sha512-LlOf83haeZIiRUH1Zw1oEmqUfw5y54227CvndFoBpIkMJwQDGAB3VARUeOJ6iwAWDJjXSz06GdnEnhRU67Yatw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider-utils@3.0.17':
-    resolution: {integrity: sha512-TR3Gs4I3Tym4Ll+EPdzRdvo/rc8Js6c4nVhFLuvGLX/Y4V9ZcQMa/HTiYsHEgmYrf1zVi6Q145UEZUfleOwOjw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3889,23 +3883,16 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.19(zod@4.2.1)
       zod: 4.2.1
 
-  '@ai-sdk/openai-compatible@1.0.27(zod@4.2.1)':
+  '@ai-sdk/openai-compatible@1.0.28(zod@4.2.1)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.17(zod@4.2.1)
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.2.1)
       zod: 4.2.1
 
   '@ai-sdk/openai@2.0.88(zod@4.2.1)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.19(zod@4.2.1)
-      zod: 4.2.1
-
-  '@ai-sdk/provider-utils@3.0.17(zod@4.2.1)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
-      eventsource-parser: 3.0.6
       zod: 4.2.1
 
   '@ai-sdk/provider-utils@3.0.18(zod@4.2.1)':
@@ -6681,7 +6668,7 @@ snapshots:
       '@ai-sdk/google': 2.0.49(zod@4.2.1)
       '@ai-sdk/google-vertex': 3.0.86(zod@4.2.1)
       '@ai-sdk/openai': 2.0.88(zod@4.2.1)
-      '@ai-sdk/openai-compatible': 1.0.27(zod@4.2.1)
+      '@ai-sdk/openai-compatible': 1.0.28(zod@4.2.1)
       '@ghostery/adblocker-playwright': 2.12.5(playwright@1.57.0)
       '@openrouter/ai-sdk-provider': 1.4.1(ai@5.0.115(zod@4.2.1))(zod@4.2.1)
       '@types/turndown': 5.0.6
