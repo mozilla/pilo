@@ -35,7 +35,7 @@
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "clsx": "^2.1.1",
     "marked-react": "^3.0.2",
-    "react": "^19.2.0",
+    "react": "^19.2.1",
     "react-dom": "^19.2.0",
     "spark": "file:..",
     "tailwindcss": "^4.1.17",
