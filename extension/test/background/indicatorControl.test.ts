@@ -11,6 +11,15 @@ import {
 } from "../../src/background/indicatorControl";
 import browser from "webextension-polyfill";
 
+// Type definitions for test mocks
+type ExecuteScriptOptions = Pick<browser.Scripting.ScriptInjection, "target"> & {
+  func: () => void;
+};
+type RegisteredContentScriptMock = Pick<
+  browser.Scripting.RegisteredContentScript,
+  "id" | "matches" | "js" | "css"
+>;
+
 vi.mock("webextension-polyfill", () => ({
   default: {
     scripting: {
@@ -69,7 +78,7 @@ describe("indicatorControl", () => {
 
       // Capture and test the injected function
       const call = vi.mocked(browser.scripting.executeScript).mock.calls[0];
-      const options = call[0] as { func: () => void };
+      const options = call[0] as ExecuteScriptOptions;
 
       // Mock document.documentElement
       const mockClassList = {
@@ -136,7 +145,7 @@ describe("indicatorControl", () => {
       // Capture and test the injected function
       const calls = vi.mocked(browser.scripting.executeScript).mock.calls;
       const lastCall = calls[calls.length - 1];
-      const options = lastCall[0] as { func: () => void };
+      const options = lastCall[0] as ExecuteScriptOptions;
 
       // Mock document.documentElement
       const mockClassList = {
@@ -728,10 +737,13 @@ describe("indicatorControl", () => {
     });
 
     it("should unregister spark-indicator script on startup", async () => {
-      vi.mocked(browser.scripting.getRegisteredContentScripts).mockResolvedValue([
+      const mockScripts: RegisteredContentScriptMock[] = [
         { id: "spark-indicator", matches: ["<all_urls>"], js: [], css: ["indicator.css"] },
         { id: "other-script", matches: ["<all_urls>"], js: [], css: [] },
-      ] as unknown as browser.Scripting.RegisteredContentScript[]);
+      ];
+      vi.mocked(browser.scripting.getRegisteredContentScripts).mockResolvedValue(
+        mockScripts as browser.Scripting.RegisteredContentScript[],
+      );
 
       await cleanupStaleRegistrations();
 
@@ -741,9 +753,12 @@ describe("indicatorControl", () => {
     });
 
     it("should not call unregister if no stale registrations exist", async () => {
-      vi.mocked(browser.scripting.getRegisteredContentScripts).mockResolvedValue([
+      const mockScripts: RegisteredContentScriptMock[] = [
         { id: "other-script", matches: ["<all_urls>"], js: [], css: [] },
-      ] as unknown as browser.Scripting.RegisteredContentScript[]);
+      ];
+      vi.mocked(browser.scripting.getRegisteredContentScripts).mockResolvedValue(
+        mockScripts as browser.Scripting.RegisteredContentScript[],
+      );
 
       await cleanupStaleRegistrations();
 
