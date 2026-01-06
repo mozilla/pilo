@@ -36,7 +36,7 @@
     "@hono/node-server": "^1.19.7",
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.3",
-    "hono": "^4.10.6",
+    "hono": "^4.11.1",
     "spark": "file:.."
   },
   "packageManager": "pnpm@9.0.0"
