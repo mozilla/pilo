@@ -66,7 +66,7 @@
     "@ai-sdk/openai": "^2.0.76",
     "@ai-sdk/openai-compatible": "^1.0.27",
     "@ghostery/adblocker-playwright": "^2.13.0",
-    "@openrouter/ai-sdk-provider": "^1.4.1",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@types/turndown": "^5.0.6",
     "ai": "^5.0.106",
     "chalk": "^5.5.0",
