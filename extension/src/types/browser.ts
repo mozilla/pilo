@@ -97,6 +97,22 @@ export interface BrowserActionStartedEventData {
   value?: string;
 }
 
+export interface TaskCompletedEventData {
+  finalAnswer: string | null;
+  success?: boolean;
+}
+
+export interface TaskAbortedEventData {
+  reason: string;
+  finalAnswer: string;
+}
+
+export interface AgentActionEventData {
+  action: string;
+  ref?: string | null;
+  value?: string | null;
+}
+
 // Generic event data for unknown event types
 export interface GenericEventData {
   [key: string]: unknown;
@@ -105,8 +121,11 @@ export interface GenericEventData {
 // Discriminated union of all event types
 export type RealtimeEvent =
   | { type: "task:started"; data: TaskStartedEventData; timestamp: number }
+  | { type: "task:completed"; data: TaskCompletedEventData; timestamp: number }
+  | { type: "task:aborted"; data: TaskAbortedEventData; timestamp: number }
   | { type: "agent:reasoned"; data: AgentReasonedEventData; timestamp: number }
   | { type: "agent:status"; data: AgentStatusEventData; timestamp: number }
+  | { type: "agent:action"; data: AgentActionEventData; timestamp: number }
   | { type: "ai:generation:error"; data: AIGenerationErrorEventData; timestamp: number }
   | { type: "task:validation_error"; data: TaskValidationErrorEventData; timestamp: number }
   | { type: "browser:action:completed"; data: BrowserActionCompletedEventData; timestamp: number }

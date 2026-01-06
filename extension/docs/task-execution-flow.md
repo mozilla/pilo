@@ -198,7 +198,7 @@ sequenceDiagram
      apiEndpoint: settings.apiEndpoint,
      model: settings.model,
      tabId: currentTab.id,
-     data: { currentUrl: currentTab.url }
+     data: { currentUrl: currentTab.url },
    };
    ```
 
@@ -252,7 +252,10 @@ const unsubscribe = logger.subscribe((events) => {
     indicatorShown = true;
     showIndicator(tabId).catch(() => {});
   }
-  if (indicatorShown && events.some((e) => e.type === "task:completed" || e.type === "task:aborted")) {
+  if (
+    indicatorShown &&
+    events.some((e) => e.type === "task:completed" || e.type === "task:aborted")
+  ) {
     hideIndicator(tabId).catch(() => {});
     unsubscribe();
   }
@@ -700,36 +703,55 @@ The indicator persists across page navigations within a task:
 
 Events flow from WebAgent through EventStoreLogger to the sidebar. Each event has a `type`, `data`, and `timestamp`.
 
+**Note**: The extension explicitly types only a subset of events in [types/browser.ts](../src/types/browser.ts). Other events from the core library pass through via the generic catch-all type. See [Event Type Mapping](#event-type-mapping) below for details.
+
 ### Task Lifecycle Events
 
-| Event Type | Description | Key Data Fields |
-|------------|-------------|-----------------|
-| `task:started` | Planning complete, execution begins | `plan`, `taskId` |
-| `task:completed` | Task finished successfully | `finalAnswer`, `timestamp` |
-| `task:aborted` | Task cancelled or failed | `reason`, `finalAnswer` |
-| `task:validation_error` | Answer validation failed | `errors[]`, `retryCount` |
+| Event Type                 | Description                         | Key Data Fields                                | Typed in Extension |
+| -------------------------- | ----------------------------------- | ---------------------------------------------- | ------------------ |
+| `task:started`             | Planning complete, execution begins | `plan`, `taskId`                               | ✅ Explicit        |
+| `task:completed`           | Task finished successfully          | `finalAnswer`, `success`                       | ✅ Explicit        |
+| `task:aborted`             | Task cancelled or failed            | `reason`, `finalAnswer`                        | ✅ Explicit        |
+| `task:validation_error`    | Answer validation failed            | `errors[]`, `retryCount`                       | ✅ Explicit        |
+| `task:setup`               | Task initialized                    | `task`, `url`, `browserName`                   | ❌ Generic         |
+| `task:validated`           | Task validation success             | `observation`, `completionQuality`             | ❌ Generic         |
+| `task:metrics`             | Task completion metrics             | `eventCounts`, `stepCount`, `totalInputTokens` | ❌ Generic         |
+| `task:metrics_incremental` | Incremental metrics                 | `eventCounts`, `stepCount`, `totalInputTokens` | ❌ Generic         |
 
 ### Agent Events
 
-| Event Type | Description | Key Data Fields |
-|------------|-------------|-----------------|
-| `agent:status` | Status update message | `message` |
-| `agent:reasoned` | Agent's reasoning/thought | `thought` |
-| `agent:action` | Action type notification | `action` (e.g., "extract", "done") |
+| Event Type         | Description                | Key Data Fields                   | Typed in Extension |
+| ------------------ | -------------------------- | --------------------------------- | ------------------ |
+| `agent:status`     | Status update message      | `message`                         | ✅ Explicit        |
+| `agent:reasoned`   | Agent's reasoning/thought  | `reasoning`                       | ✅ Explicit        |
+| `agent:action`     | Action type notification   | `action`, `ref`, `value`          | ✅ Explicit        |
+| `agent:step`       | Agent iteration step       | `iterationId`, `currentIteration` | ❌ Generic         |
+| `agent:processing` | AI processing step         | `operation`, `hasScreenshot`      | ❌ Generic         |
+| `agent:extracted`  | Extracted data event       | `extractedData`                   | ❌ Generic         |
+| `agent:waiting`    | Agent waiting notification | `seconds`                         | ❌ Generic         |
 
 ### Browser Action Events
 
-| Event Type | Description | Key Data Fields |
-|------------|-------------|-----------------|
-| `browser:action_started` | Action about to execute | `action`, `value`, `ref` |
-| `browser:action_completed` | Action finished | `success`, `error`, `isRecoverable` |
+| Event Type                    | Description             | Key Data Fields                     | Typed in Extension |
+| ----------------------------- | ----------------------- | ----------------------------------- | ------------------ |
+| `browser:action_started`      | Action about to execute | `action`, `ref`, `value`            | ✅ Explicit        |
+| `browser:action_completed`    | Action finished         | `success`, `error`, `isRecoverable` | ✅ Explicit        |
+| `browser:navigated`           | Page navigation         | `title`, `url`                      | ❌ Generic         |
+| `browser:screenshot_captured` | Screenshot capture      | `size`, `format`                    | ❌ Generic         |
 
 ### AI Events
 
-| Event Type | Description | Key Data Fields |
-|------------|-------------|-----------------|
-| `ai:generation` | LLM API call completed | `usage`, `model` |
-| `ai:generation:error` | LLM API call failed | `error`, `isToolError` |
+| Event Type            | Description            | Key Data Fields                             | Typed in Extension |
+| --------------------- | ---------------------- | ------------------------------------------- | ------------------ |
+| `ai:generation`       | LLM API call completed | `usage`, `finishReason`, `providerMetadata` | ❌ Generic         |
+| `ai:generation:error` | LLM API call failed    | `error`, `isToolError`                      | ✅ Explicit        |
+
+### System Events
+
+| Event Type                 | Description            | Key Data Fields                                        | Typed in Extension |
+| -------------------------- | ---------------------- | ------------------------------------------------------ | ------------------ |
+| `system:debug_compression` | Compression debug info | `originalSize`, `compressedSize`, `compressionPercent` | ❌ Generic         |
+| `system:debug_message`     | Message debug info     | `messages[]`                                           | ❌ Generic         |
 
 ### Event Filtering
 
@@ -739,6 +761,58 @@ The `shouldDisplayError()` function in ChatView.tsx filters which errors are sho
 - **Hidden**: Browser action errors marked as `isRecoverable: true`
 - **Hidden**: AI generation errors marked as `isToolError: true`
 - **Shown**: All other errors (fatal/non-recoverable)
+
+### Event Type Mapping
+
+The core library ([src/events.ts](../../src/events.ts)) defines a comprehensive set of event types, but the extension ([extension/src/types/browser.ts](../src/types/browser.ts)) only explicitly types the events most relevant to UI display and user interaction.
+
+**Explicitly Typed Events** (with dedicated TypeScript interfaces):
+
+- `task:started` → `TaskStartedEventData`
+- `task:completed` → `TaskCompletedEventData`
+- `task:aborted` → `TaskAbortedEventData`
+- `task:validation_error` → `TaskValidationErrorEventData`
+- `agent:status` → `AgentStatusEventData`
+- `agent:reasoned` → `AgentReasonedEventData`
+- `agent:action` → `AgentActionEventData`
+- `ai:generation:error` → `AIGenerationErrorEventData`
+- `browser:action_started` → `BrowserActionStartedEventData`
+- `browser:action_completed` → `BrowserActionCompletedEventData`
+
+**Generic Events** (handled via catch-all):
+All other core events pass through to the extension via the generic union member:
+
+```typescript
+{
+  type: string;
+  data: GenericEventData;
+  timestamp: number;
+}
+```
+
+This includes:
+
+- `task:setup`, `task:validated`, `task:metrics`, `task:metrics_incremental`
+- `agent:step`, `agent:processing`, `agent:extracted`, `agent:waiting`
+- `browser:navigated`, `browser:screenshot_captured`
+- `ai:generation`
+- `system:debug_compression`, `system:debug_message`
+
+**Why this approach?**
+
+- **Type safety where it matters**: UI components get full type checking for events they actively handle
+- **Flexibility**: New core events automatically flow through without requiring extension type updates
+- **Simplicity**: Reduces type maintenance burden for events that don't need special handling
+- **Storage compatibility**: All events (typed and generic) are stored identically in extension storage
+
+When accessing generic events in TypeScript, you'll need to cast the data or use type guards:
+
+```typescript
+if (event.type === "task:setup") {
+  const setupData = event.data as { task: string; url?: string; browserName: string };
+  // Use setupData...
+}
+```
 
 ## Key Interactions Across Components
 
