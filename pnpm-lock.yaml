@@ -18,8 +18,8 @@ importers:
         specifier: ^2.0.76
         version: 2.0.88(zod@4.2.1)
       '@ai-sdk/openai-compatible':
-        specifier: ^1.0.27
-        version: 1.0.27(zod@4.2.1)
+        specifier: ^2.0.0
+        version: 2.0.0(zod@4.2.1)
       '@ghostery/adblocker-playwright':
         specifier: ^2.13.0
         version: 2.13.0(playwright@1.57.0)
@@ -245,20 +245,14 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai-compatible@1.0.27':
-    resolution: {integrity: sha512-bpYruxVLhrTbVH6CCq48zMJNeHu6FmHtEedl9FXckEgcIEAi036idFhJlcRwC1jNCwlacbzb8dPD7OAH1EKJaQ==}
+  '@ai-sdk/openai-compatible@2.0.0':
+    resolution: {integrity: sha512-dQITHbDWLtIVB0Kpb9AXRMAZC2n4azS2T/uaVq8HOgw2Uy9x19usS0DIoXlTbj3R4rJuJXpAUhYowQ+YcK16WQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/openai@2.0.88':
     resolution: {integrity: sha512-LlOf83haeZIiRUH1Zw1oEmqUfw5y54227CvndFoBpIkMJwQDGAB3VARUeOJ6iwAWDJjXSz06GdnEnhRU67Yatw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider-utils@3.0.17':
-    resolution: {integrity: sha512-TR3Gs4I3Tym4Ll+EPdzRdvo/rc8Js6c4nVhFLuvGLX/Y4V9ZcQMa/HTiYsHEgmYrf1zVi6Q145UEZUfleOwOjw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -275,8 +269,18 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@4.0.0':
+    resolution: {integrity: sha512-HyCyOls9I3a3e38+gtvOJOEjuw9KRcvbBnCL5GBuSmJvS9Jh9v3fz7pRC6ha1EUo/ZH1zwvLWYXBMtic8MTguA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@2.0.0':
     resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@3.0.0':
+    resolution: {integrity: sha512-m9ka3ptkPQbaHHZHqDXDF9C9B5/Mav0KTdky1k2HZ3/nrW2t1AgObxIVPyGDWQNS9FXT/FS6PIoSjpcP/No8rQ==}
     engines: {node: '>=18'}
 
   '@aklinker1/rollup-plugin-visualizer@5.12.0':
@@ -3890,23 +3894,16 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.19(zod@4.2.1)
       zod: 4.2.1
 
-  '@ai-sdk/openai-compatible@1.0.27(zod@4.2.1)':
+  '@ai-sdk/openai-compatible@2.0.0(zod@4.2.1)':
     dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.17(zod@4.2.1)
+      '@ai-sdk/provider': 3.0.0
+      '@ai-sdk/provider-utils': 4.0.0(zod@4.2.1)
       zod: 4.2.1
 
   '@ai-sdk/openai@2.0.88(zod@4.2.1)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.19(zod@4.2.1)
-      zod: 4.2.1
-
-  '@ai-sdk/provider-utils@3.0.17(zod@4.2.1)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
-      eventsource-parser: 3.0.6
       zod: 4.2.1
 
   '@ai-sdk/provider-utils@3.0.18(zod@4.2.1)':
@@ -3923,7 +3920,18 @@ snapshots:
       eventsource-parser: 3.0.6
       zod: 4.2.1
 
+  '@ai-sdk/provider-utils@4.0.0(zod@4.2.1)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.0
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      zod: 4.2.1
+
   '@ai-sdk/provider@2.0.0':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@3.0.0':
     dependencies:
       json-schema: 0.4.0
 
@@ -6682,7 +6690,7 @@ snapshots:
       '@ai-sdk/google': 2.0.49(zod@4.2.1)
       '@ai-sdk/google-vertex': 3.0.86(zod@4.2.1)
       '@ai-sdk/openai': 2.0.88(zod@4.2.1)
-      '@ai-sdk/openai-compatible': 1.0.27(zod@4.2.1)
+      '@ai-sdk/openai-compatible': 2.0.0(zod@4.2.1)
       '@ghostery/adblocker-playwright': 2.13.0(playwright@1.57.0)
       '@openrouter/ai-sdk-provider': 1.5.4(ai@5.0.115(zod@4.2.1))(zod@4.2.1)
       '@types/turndown': 5.0.6
