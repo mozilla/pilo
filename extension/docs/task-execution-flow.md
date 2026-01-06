@@ -48,9 +48,80 @@ graph TB
     style Indicator fill:#f5e1ff
 ```
 
-## Detailed Component Flow
+## Overview: Complete Task Execution Flow
 
-### Phase 1: User Input & Initialization
+The task execution lifecycle has four main phases:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Sidebar
+    participant Background
+    participant WebAgent
+    participant Page
+    participant Storage
+
+    Note over User,Storage: 🎯 1. INITIATION
+    User->>Sidebar: Enter task & click send
+    Sidebar->>Sidebar: Validate & setup UI
+
+    Note over User,Storage: ⚙️ 2. SETUP
+    Sidebar->>Background: ExecuteTaskMessage
+    Background->>Background: Create AbortController
+    Background->>WebAgent: Initialize agent
+
+    Note over User,Storage: 🔄 3. EXECUTION
+    WebAgent->>WebAgent: Generate plan
+    WebAgent->>Storage: Emit task:started event
+    Storage-->>Sidebar: Broadcast event
+
+    loop Main execution loop
+        WebAgent->>Page: Capture snapshot
+        WebAgent->>WebAgent: Call LLM with context
+        WebAgent->>Page: Execute actions
+        WebAgent->>Storage: Emit progress events
+        Storage-->>Sidebar: Broadcast events
+    end
+
+    Note over User,Storage: ✅ 4. COMPLETION
+    WebAgent->>Storage: Emit task:completed
+    WebAgent->>Background: Return result
+    Background->>Sidebar: ExecuteTaskResponse
+    Sidebar->>User: Display final answer
+```
+
+---
+
+## Detailed Phase Breakdown
+
+Each section below expands a phase from the overview above.
+
+### 🎯 Phase 1: Task Initiation
+
+**Components**: Sidebar React UI
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Input as Task Input
+    participant ChatView
+    participant ConvStore as ConversationStore
+    participant State as UI State
+
+    User->>Input: Type "What is the weather in London?"
+    User->>Input: Press Enter or click Send
+    Input->>ChatView: handleExecute()
+    ChatView->>ChatView: Validate API key
+    ChatView->>ConvStore: addMessage("user", taskText)
+    ChatView->>State: startTask() - generate taskId
+    ChatView->>State: setTask("") - clear input
+    ChatView->>State: setExecutionState(true)
+    ChatView->>State: clearEvents()
+
+    Note over ChatView,State: UI now shows:<br/>- Disabled input<br/>- Stop button<br/>- User message bubble
+```
+
+#### Phase 1 Details
 
 **Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx)
 
@@ -80,7 +151,40 @@ clearEvents();
 - Log task submission with task ID and tab ID
 - Log user message addition to conversation store
 
-### Phase 2: Message to Background Script
+### ⚙️ Phase 2: Task Setup
+
+**Components**: Sidebar → Background Worker → AgentManager
+
+```mermaid
+sequenceDiagram
+    participant Sidebar
+    participant Runtime as browser.runtime
+    participant Background
+    participant Storage as browser.storage
+    participant AgentMgr as AgentManager
+    participant ExtBrowser as ExtensionBrowser
+    participant WebAgent
+
+    Sidebar->>Sidebar: Construct ExecuteTaskMessage
+    Sidebar->>Runtime: sendMessage(executeTask)
+
+    Runtime->>Background: onMessage listener
+    Background->>Storage: Get settings (API key, model)
+    Background->>Background: Create AbortController
+    Background->>Background: Check runningTasks Map
+    Background->>Background: Cancel existing task (if any)
+    Background->>Background: Store new AbortController
+
+    Background->>AgentMgr: runTask(options)
+    AgentMgr->>ExtBrowser: new ExtensionBrowser(tabId)
+    AgentMgr->>AgentMgr: Select provider & model
+    AgentMgr->>WebAgent: new WebAgent(browser, config)
+    AgentMgr->>WebAgent: agent.execute(task, options)
+
+    Note over WebAgent: Ready to begin execution
+```
+
+#### Phase 2 Details
 
 **Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx) — inside `handleExecute()`
 
@@ -108,7 +212,7 @@ clearEvents();
 - Log message send timestamp
 - Log current tab URL and ID
 
-### Phase 3: Background Script Processing
+#### Continuation: Background Script Processing
 
 **Location**: [background.ts](../entrypoints/background.ts)
 
@@ -168,7 +272,7 @@ runningTasks.set(tabId, abortController);
 - Log cancellation of previous task (if applicable)
 - Log settings retrieval success/failure
 
-### Phase 4: Agent Manager Initialization
+#### Continuation: Agent Manager Initialization
 
 **Location**: [AgentManager.ts](../src/AgentManager.ts)
 
@@ -216,7 +320,59 @@ const agent = new WebAgent(browser, {
 - Log provider selection and model name
 - Log WebAgent initialization
 
-### Phase 5: Task Planning (WebAgent Core)
+### 🔄 Phase 3: Execution
+
+**Components**: WebAgent → Page → EventStoreLogger → Sidebar
+
+```mermaid
+sequenceDiagram
+    participant WebAgent
+    participant LLM as LLM Provider
+    participant Page
+    participant Logger as EventStoreLogger
+    participant Runtime as browser.runtime
+    participant Sidebar
+
+    Note over WebAgent,Sidebar: Planning Phase
+    WebAgent->>LLM: Planning prompt
+    LLM->>WebAgent: Return plan
+    WebAgent->>Logger: Emit task:started
+    Logger->>Runtime: Broadcast event
+    Runtime->>Sidebar: Display plan
+
+    Note over WebAgent,Sidebar: Main Execution Loop
+    loop Until task complete (max 50 iterations)
+        WebAgent->>Page: Capture ARIA snapshot
+        WebAgent->>WebAgent: Compress snapshot
+        WebAgent->>LLM: Context + tools
+        LLM->>WebAgent: Tool calls
+
+        loop For each tool call
+            WebAgent->>Logger: Emit browser:action_started
+            Logger->>Runtime: Broadcast
+            Runtime->>Sidebar: Show action status
+
+            WebAgent->>Page: Execute action
+            Page->>WebAgent: Action result
+
+            WebAgent->>Logger: Emit browser:action_completed
+            Logger->>Runtime: Broadcast
+            Runtime->>Sidebar: Update status
+        end
+
+        WebAgent->>Logger: Emit agent:status/reasoned
+        Logger->>Runtime: Broadcast
+        Runtime->>Sidebar: Display reasoning
+
+        alt Task complete
+            WebAgent->>WebAgent: Exit loop
+        else Continue
+            WebAgent->>WebAgent: Next iteration
+        end
+    end
+```
+
+#### Phase 3 Details: Task Planning
 
 **Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
 
@@ -262,7 +418,7 @@ const agent = new WebAgent(browser, {
 - Log navigation to starting URL
 - Log system prompt construction
 
-### Phase 6: Main Execution Loop
+#### Continuation: Main Execution Loop
 
 **Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
 
@@ -292,27 +448,6 @@ const agent = new WebAgent(browser, {
     - `goto(url: "https://weather.com")` → Navigates to URL
     - `task_complete(answer: "...")` → Submits final answer
 
-**Event Broadcasting Flow**:
-
-```mermaid
-sequenceDiagram
-    participant WA as WebAgent
-    participant ESL as EventStoreLogger
-    participant BR as browser.runtime
-    participant SB as Sidebar
-    participant CS as ConversationStore
-    participant UI as React UI
-
-    WA->>ESL: emit event
-    ESL->>ESL: handleEvent()
-    ESL->>ESL: store in events array
-    ESL->>ESL: notify subscribers (for indicator)
-    ESL->>BR: sendMessage({type: "realtimeEvent", tabId, event})
-    BR->>SB: broadcast message
-    SB->>CS: add to conversation store
-    CS->>UI: trigger re-render
-```
-
 **Logging Opportunities**:
 
 - Log each iteration start with iteration number and page URL
@@ -323,7 +458,7 @@ sequenceDiagram
 - Log action repetition detection
 - Log error recovery attempts
 
-### Phase 7: Real-Time Event Display
+#### Continuation: Real-Time Event Display
 
 **Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx)
 
@@ -377,7 +512,43 @@ sequenceDiagram
 - Log message additions to conversation store
 - Log UI render cycles
 
-### Phase 8: Task Completion & Validation
+### ✅ Phase 4: Completion
+
+**Components**: WebAgent → Background → Sidebar → User
+
+```mermaid
+sequenceDiagram
+    participant WebAgent
+    participant Logger as EventStoreLogger
+    participant Runtime as browser.runtime
+    participant Background
+    participant Sidebar
+    participant User
+
+    Note over WebAgent,User: Task Completion
+    WebAgent->>WebAgent: task_complete tool called
+    WebAgent->>WebAgent: Validate answer
+    WebAgent->>Logger: Emit task:completed
+    Logger->>Runtime: Broadcast event
+    Runtime->>Sidebar: Update UI
+
+    Note over WebAgent,User: Return Result
+    WebAgent->>Background: Return TaskExecutionResult
+    Background->>Background: Construct response
+
+    Note over WebAgent,User: Cleanup
+    Background->>Background: hideIndicator(tabId)
+    Background->>Background: Remove from runningTasks
+    Background->>Sidebar: ExecuteTaskResponse (Promise)
+
+    Note over WebAgent,User: Final UI Update
+    Sidebar->>Sidebar: addMessage("result", answer)
+    Sidebar->>Sidebar: setExecutionState(false)
+    Sidebar->>Sidebar: endTask()
+    Sidebar->>User: Display complete response
+```
+
+#### Phase 4 Details: Task Completion & Validation
 
 **Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
 
@@ -405,7 +576,7 @@ sequenceDiagram
 - Log retry attempts for failed validation
 - Log final result construction with stats
 
-### Phase 9: Response Back to Sidebar
+#### Continuation: Response Back to Sidebar
 
 **Location**: [background.ts](../entrypoints/background.ts) — inside the `executeTask` case handler
 
@@ -443,7 +614,7 @@ sequenceDiagram
 - Log cleanup of running tasks
 - Log response size and event count
 
-### Phase 10: Final UI Update
+#### Continuation: Final UI Update
 
 **Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx) — inside `handleExecute()` after `await` resolves
 
