@@ -1,4 +1,5 @@
-import { defineConfig, type WebExtConfig } from "wxt";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { defineConfig, type WebExtConfig, type Wxt } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
@@ -38,6 +39,21 @@ function generateWebExtJSON(): WebExtConfig {
 // See https://wxt.dev/api/config.html
 let config = {
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
+  hooks: {
+    // WXT dev mode strips content_scripts from manifest even with registration: "manifest".
+    // This hook ensures content scripts are included in the manifest during dev mode.
+    "build:manifestGenerated": (wxt: Wxt, manifest: Browser.runtime.Manifest) => {
+      if (wxt.config.command === "serve") {
+        manifest.content_scripts = [
+          {
+            matches: ["<all_urls>"],
+            run_at: "document_start",
+            js: ["content-scripts/content.js"],
+          },
+        ];
+      }
+    },
+  },
   vite: () => ({
     plugins: [tailwindcss()] as any,
     server: {
@@ -52,7 +68,7 @@ let config = {
     const baseManifest = {
       name: "Spark Extension",
       description: "AI-powered web automation browser extension",
-      permissions: ["activeTab", "storage", "scripting", "tabs"],
+      permissions: ["activeTab", "storage", "scripting", "tabs", "webNavigation"],
       host_permissions: ["*://*/*"],
     };
 

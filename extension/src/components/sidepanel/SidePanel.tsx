@@ -8,6 +8,12 @@ import { useConversationStore } from "../../stores/conversationStore";
 
 type View = "chat" | "settings";
 
+// Helper to check if a URL is a valid web page (not a special Chrome page)
+const isWebPageUrl = (url: string | undefined): boolean => {
+  if (!url) return false;
+  return url.startsWith("http://") || url.startsWith("https://");
+};
+
 export default function SidePanel(): ReactElement {
   const [currentView, setCurrentView] = useState<View>("chat");
   const [currentTab, setCurrentTab] = useState<browser.Tabs.Tab | null>(null);
@@ -31,7 +37,8 @@ export default function SidePanel(): ReactElement {
       changeInfo: browser.Tabs.OnUpdatedChangeInfoType,
       tab: browser.Tabs.Tab,
     ) => {
-      if (changeInfo.status === "complete" && tab.active) {
+      // Only update for valid web pages (not extension or chrome:// pages)
+      if (changeInfo.status === "complete" && tab.active && isWebPageUrl(tab.url)) {
         setCurrentTab(tab);
       }
     };
@@ -40,7 +47,10 @@ export default function SidePanel(): ReactElement {
       browser.tabs
         .get(activeInfo.tabId)
         .then((tab) => {
-          setCurrentTab(tab);
+          // Only update for valid web pages (not extension or chrome:// pages)
+          if (isWebPageUrl(tab.url)) {
+            setCurrentTab(tab);
+          }
         })
         .catch(console.error);
     };
@@ -70,9 +80,14 @@ export default function SidePanel(): ReactElement {
 
   const loadCurrentTab = async () => {
     try {
-      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      // Filter out extension pages and Chrome internal pages, find the first real web page
+      const activeTab = tabs.find((tab) => isWebPageUrl(tab.url));
       if (activeTab) {
         setCurrentTab(activeTab);
+      } else if (tabs.length > 0) {
+        // Fall back to first tab if no web page tab found
+        setCurrentTab(tabs[0]);
       }
     } catch (error) {
       console.error("Failed to load current tab:", error);

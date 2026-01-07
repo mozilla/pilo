@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
 import type { WebAgentEventType } from "spark/core";
 import { reviver } from "../utils/storage";
-import type { RealtimeEventMessage } from "../types/browser";
 
 export interface EventData {
   id: string;
@@ -65,24 +64,10 @@ export const useEventStore = create<EventStore>()(
           events: [...state.events, event],
         }));
 
-        // Send real-time event to SidePanel if in background script context
-        if (typeof browser !== "undefined" && browser.runtime) {
-          try {
-            const message: RealtimeEventMessage = {
-              type: "realtimeEvent",
-              event: {
-                type: event.type,
-                data: event.data as Record<string, unknown>,
-                timestamp: event.timestamp.getTime(),
-              },
-            };
-            browser.runtime.sendMessage(message).catch(() => {
-              // Ignore errors if SidePanel isn't listening
-            });
-          } catch (error) {
-            // Ignore errors in case we're not in background script context
-          }
-        }
+        // Note: We intentionally do NOT broadcast events from the sidepanel.
+        // Events are broadcast by EventStoreLogger in the background script
+        // with the correct tabId. Re-broadcasting here would create duplicate
+        // events with tabId: -1, breaking indicator forwarding.
       },
 
       clearEvents: () => {

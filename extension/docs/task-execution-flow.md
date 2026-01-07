@@ -27,42 +27,117 @@ graph TB
     ExtBrowser[ExtensionBrowser]
     WebAgent[WebAgent<br/>Core Logic]
     Logger[EventStoreLogger]
+    Indicator[Indicator Control<br/>Visual Feedback]
 
     Sidebar -->|ExecuteTaskMessage| Background
     Background -->|Script Execution| Content
     Background --> AgentMgr
+    Background --> Indicator
     AgentMgr --> ExtBrowser
     ExtBrowser <-->|Page Interactions| Content
     ExtBrowser --> WebAgent
     WebAgent --> Logger
     Logger -->|Real-time Events| Sidebar
+    Logger -->|Subscribers| Background
+    Indicator -->|CSS Injection| Content
 
     style Sidebar fill:#e1f5ff
     style Background fill:#fff4e1
     style Content fill:#f0ffe1
     style WebAgent fill:#ffe1f5
+    style Indicator fill:#f5e1ff
 ```
 
-## Detailed Component Flow
+## Overview: Complete Task Execution Flow
 
-### Phase 1: User Input & Initialization
+The task execution lifecycle has four main phases:
 
-**Location**: [extension/src/components/sidepanel/ChatView.tsx](../src/components/sidepanel/ChatView.tsx)
+```mermaid
+sequenceDiagram
+    participant User
+    participant Sidebar
+    participant Background
+    participant WebAgent
+    participant Page
+    participant Storage
+
+    Note over User,Storage: 🎯 1. INITIATION
+    User->>Sidebar: Enter task & click send
+    Sidebar->>Sidebar: Validate & setup UI
+
+    Note over User,Storage: ⚙️ 2. SETUP
+    Sidebar->>Background: ExecuteTaskMessage
+    Background->>Background: Create AbortController
+    Background->>WebAgent: Initialize agent
+
+    Note over User,Storage: 🔄 3. EXECUTION
+    WebAgent->>WebAgent: Generate plan
+    WebAgent->>Storage: Emit task:started event
+    Storage-->>Sidebar: Broadcast event
+
+    loop Main execution loop
+        WebAgent->>Page: Capture snapshot
+        WebAgent->>WebAgent: Call LLM with context
+        WebAgent->>Page: Execute actions
+        WebAgent->>Storage: Emit progress events
+        Storage-->>Sidebar: Broadcast events
+    end
+
+    Note over User,Storage: ✅ 4. COMPLETION
+    WebAgent->>Storage: Emit task:completed
+    WebAgent->>Background: Return result
+    Background->>Sidebar: ExecuteTaskResponse
+    Sidebar->>User: Display final answer
+```
+
+---
+
+## Detailed Phase Breakdown
+
+Each section below expands a phase from the overview above.
+
+### 🎯 Phase 1: Task Initiation
+
+**Components**: Sidebar React UI
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Input as Task Input
+    participant ChatView
+    participant ConvStore as ConversationStore
+    participant State as UI State
+
+    User->>Input: Type "What is the weather in London?"
+    User->>Input: Press Enter or click Send
+    Input->>ChatView: handleExecute()
+    ChatView->>ChatView: Validate API key
+    ChatView->>ConvStore: addMessage("user", taskText)
+    ChatView->>State: startTask() - generate taskId
+    ChatView->>State: setTask("") - clear input
+    ChatView->>State: setExecutionState(true)
+    ChatView->>State: clearEvents()
+
+    Note over ChatView,State: UI now shows:<br/>- Disabled input<br/>- Stop button<br/>- User message bubble
+```
+
+#### Phase 1 Details
+
+**Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx)
 
 1. **User enters task** in textarea: "What is the weather in London?"
 2. **User presses Enter** or clicks "Send" button
-3. **ChatView.handleExecute()** is triggered:
-   - Validates API key is configured ([ChatView.tsx:355-361](../src/components/sidepanel/ChatView.tsx#L355-L361))
-   - Adds user message to conversation store
+3. **`handleExecute()` async function** is triggered:
+   - Validates API key is configured (checks `settings.apiKey`, opens settings if missing)
+   - Adds user message to conversation store via `addMessage("user", taskText)`
    - Calls `startTask()` to generate unique task ID
    - Clears input field immediately for better UX
    - Sets execution state to `true` (disables input, shows "Stop" button)
-   - Clears previous event logs
+   - Clears previous event logs via `clearEvents()`
 
-**Key Code**:
+**Key Code** (in `handleExecute()`):
 
 ```typescript
-// ChatView.tsx:355-374
 const taskText = task.trim();
 addMessage("user", taskText);
 const taskId = startTask();
@@ -76,26 +151,59 @@ clearEvents();
 - Log task submission with task ID and tab ID
 - Log user message addition to conversation store
 
-### Phase 2: Message to Background Script
+### ⚙️ Phase 2: Task Setup
 
-**Location**: [ChatView.tsx:384-394](../src/components/sidepanel/ChatView.tsx#L384-L394)
+**Components**: Sidebar → Background Worker → AgentManager
 
-4. **ChatView constructs ExecuteTaskMessage**:
+```mermaid
+sequenceDiagram
+    participant Sidebar
+    participant Runtime as browser.runtime
+    participant Background
+    participant Storage as browser.storage
+    participant AgentMgr as AgentManager
+    participant ExtBrowser as ExtensionBrowser
+    participant WebAgent
+
+    Sidebar->>Sidebar: Construct ExecuteTaskMessage
+    Sidebar->>Runtime: sendMessage(executeTask)
+
+    Runtime->>Background: onMessage listener
+    Background->>Storage: Get settings (API key, model)
+    Background->>Background: Create AbortController
+    Background->>Background: Check runningTasks Map
+    Background->>Background: Cancel existing task (if any)
+    Background->>Background: Store new AbortController
+
+    Background->>AgentMgr: runTask(options)
+    AgentMgr->>ExtBrowser: new ExtensionBrowser(tabId)
+    AgentMgr->>AgentMgr: Select provider & model
+    AgentMgr->>WebAgent: new WebAgent(browser, config)
+    AgentMgr->>WebAgent: agent.execute(task, options)
+
+    Note over WebAgent: Ready to begin execution
+```
+
+#### Phase 2 Details
+
+**Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx) — inside `handleExecute()`
+
+4. **ChatView constructs `ExecuteTaskMessage`**:
 
    ```typescript
-   {
+   const message: ExecuteTaskMessage = {
      type: "executeTask",
-     task: "What is the weather in London?",
+     task: taskText,
      apiKey: settings.apiKey,
      apiEndpoint: settings.apiEndpoint,
      model: settings.model,
      tabId: currentTab.id,
-     data: { currentUrl: currentTab.url }
-   }
+     data: { currentUrl: currentTab.url },
+   };
    ```
 
-5. **Message sent via browser.runtime.sendMessage()**
-   - Uses Promise.race() with 5-minute timeout ([ChatView.tsx:401-404](../src/components/sidepanel/ChatView.tsx#L401-L404))
+5. **Message sent via `browser.runtime.sendMessage()`**
+   - Uses `Promise.race()` with 5-minute timeout to prevent hanging
    - Prevents hanging in Firefox, where `browser.runtime.sendMessage` may never resolve if the background script is unloaded. See [Mozilla Bug 1579093](https://bugzilla.mozilla.org/show_bug.cgi?id=1579093) for details.
 
 **Logging Opportunity**:
@@ -104,36 +212,54 @@ clearEvents();
 - Log message send timestamp
 - Log current tab URL and ID
 
-### Phase 3: Background Script Processing
+#### Continuation: Background Script Processing
 
-**Location**: [extension/entrypoints/background.ts](../entrypoints/background.ts)
+**Location**: [background.ts](../entrypoints/background.ts)
 
-6. **Background receives message** via `browser.runtime.onMessage` listener ([background.ts:60-224](../entrypoints/background.ts#L60-L224))
+6. **Background receives message** via `browser.runtime.onMessage` listener (inside `defineBackground()`)
 
 7. **Message validation**:
-   - Type guard ensures valid message structure ([background.ts:62-64](../entrypoints/background.ts#L62-L64))
+   - Type guard ensures valid message structure (checks for `type` property)
    - Ignores `realtimeEvent` messages (meant for sidebar only)
 
-8. **Settings retrieval** from browser.storage.local:
-   - API key, endpoint, model, provider ([background.ts:88-94](../entrypoints/background.ts#L88-L94))
-   - Validates API key exists
+8. **Settings retrieval** from `browser.storage.local`:
+   - API key, endpoint, model, provider
+   - Validates API key exists, returns error if missing
 
-9. **Task lifecycle setup**:
-   - Creates `EventStoreLogger` instance ([background.ts:105](../entrypoints/background.ts#L105))
-   - Creates `AbortController` for cancellation support ([background.ts:108](../entrypoints/background.ts#L108))
-   - **Task replacement strategy**: Cancels any existing task for this tab ([background.ts:120-122](../entrypoints/background.ts#L120-L122))
+9. **Task lifecycle setup** (inside `case "executeTask":`):
+   - Creates `AbortController` for cancellation support
+   - Validates `tabId` exists
+   - Creates `EventStoreLogger` instance with `tabId` for event routing
+   - **Subscribes to logger events** for indicator control (see [Indicator System](#indicator-system))
+   - **Task replacement strategy**: Cancels any existing task for this tab via `runningTasks` Map
      - Note: Tasks are NOT queued - only one task runs per tab at a time
      - New tasks automatically cancel and replace existing tasks for the same tab
-   - Stores controller in `runningTasks` Map ([background.ts:124](../entrypoints/background.ts#L124))
-     - `runningTasks` is a `Map<number, AbortController>` tracking one task per tabId ([background.ts:24](../entrypoints/background.ts#L24))
+   - Stores controller in `runningTasks` Map
+     - `runningTasks` is a `Map<number, AbortController>` tracking one task per tabId
 
-**Key Code**:
+**Key Code** (in the `executeTask` case handler):
 
 ```typescript
-// background.ts:105-124
-const logger = new EventStoreLogger();
 const abortController = new AbortController();
 const tabId = executeMessage.tabId;
+
+// Create event store logger with tabId to enable indicator forwarding
+const logger = new EventStoreLogger(tabId);
+
+// Subscribe to logger events to show/hide indicator
+const unsubscribe = logger.subscribe((events) => {
+  if (!indicatorShown && events.some((e) => e.type === "task:started")) {
+    indicatorShown = true;
+    showIndicator(tabId).catch(() => {});
+  }
+  if (
+    indicatorShown &&
+    events.some((e) => e.type === "task:completed" || e.type === "task:aborted")
+  ) {
+    hideIndicator(tabId).catch(() => {});
+    unsubscribe();
+  }
+});
 
 // Cancel any existing task for this tab
 if (runningTasks.has(tabId)) {
@@ -149,36 +275,37 @@ runningTasks.set(tabId, abortController);
 - Log cancellation of previous task (if applicable)
 - Log settings retrieval success/failure
 
-### Phase 4: Agent Manager Initialization
+#### Continuation: Agent Manager Initialization
 
-**Location**: [extension/src/AgentManager.ts](../src/AgentManager.ts)
+**Location**: [AgentManager.ts](../src/AgentManager.ts)
 
-10. **AgentManager.runTask()** called with:
+10. **`AgentManager.runTask()` static method** called from background.ts with:
     - Task text
-    - API credentials
+    - API credentials (apiKey, apiEndpoint)
+    - Model and provider settings
     - Logger instance
     - Tab ID
-    - Abort signal ([background.ts:133-142](../entrypoints/background.ts#L133-L142))
+    - Abort signal
 
 11. **ExtensionBrowser instantiation**:
-    - Creates browser abstraction for the target tab ([AgentManager.ts:50](../src/AgentManager.ts#L50))
+    - Creates browser abstraction for the target tab via `new ExtensionBrowser(options.tabId)`
     - Wraps WebExtension APIs (tabs, scripting) in `AriaBrowser` interface
 
-12. **Provider-specific model creation** ([AgentManager.ts:54-60](../src/AgentManager.ts#L54-60)):
+12. **Provider-specific model creation** (via `createProviderModel()` private method):
     - Determines provider (OpenAI or OpenRouter)
-    - Gets default model if not specified
+    - Gets default model if not specified (`gpt-4.1-mini` for OpenAI, `openai/gpt-4.1-mini` for OpenRouter)
     - Creates provider instance with credentials and headers
 
-13. **WebAgent instantiation** ([AgentManager.ts:63-70](../src/AgentManager.ts#L63-L70)):
+13. **WebAgent instantiation**:
     - Injects ExtensionBrowser
     - Configures provider, logger, debug settings
     - Initializes snapshot compressor and event emitter
 
-**Key Code**:
+**Key Code** (in `runTask()`):
 
 ```typescript
-// AgentManager.ts:50-70
 const browser = new ExtensionBrowser(options.tabId);
+
 const provider = options.provider || "openai";
 const modelName = options.model || this.getDefaultModel(provider);
 const model = this.createProviderModel(provider, options.apiKey, options.apiEndpoint, modelName);
@@ -196,27 +323,79 @@ const agent = new WebAgent(browser, {
 - Log provider selection and model name
 - Log WebAgent initialization
 
-### Phase 5: Task Planning (WebAgent Core)
+### 🔄 Phase 3: Execution
 
-**Location**: [src/webAgent.ts](../../src/webAgent.ts)
+**Components**: WebAgent → Page → EventStoreLogger → Sidebar
 
-14. **agent.execute()** begins ([webAgent.ts:173-194](../../src/webAgent.ts#L173-L194)):
-    - Validates input parameters ([webAgent.ts:175](../../src/webAgent.ts#L175))
-    - Initializes browser and internal state ([webAgent.ts:178](../../src/webAgent.ts#L178))
-    - Creates execution state tracking object ([webAgent.ts:180](../../src/webAgent.ts#L180))
+```mermaid
+sequenceDiagram
+    participant WebAgent
+    participant LLM as LLM Provider
+    participant Page
+    participant Logger as EventStoreLogger
+    participant Runtime as browser.runtime
+    participant Sidebar
 
-15. **Planning phase** - `planTask()` ([webAgent.ts:184](../../src/webAgent.ts#L184)):
+    Note over WebAgent,Sidebar: Planning Phase
+    WebAgent->>LLM: Planning prompt
+    LLM->>WebAgent: Return plan
+    WebAgent->>Logger: Emit task:started
+    Logger->>Runtime: Broadcast event
+    Runtime->>Sidebar: Display plan
+
+    Note over WebAgent,Sidebar: Main Execution Loop
+    loop Until task complete (max 50 iterations)
+        WebAgent->>Page: Capture ARIA snapshot
+        WebAgent->>WebAgent: Compress snapshot
+        WebAgent->>LLM: Context + tools
+        LLM->>WebAgent: Tool calls
+
+        loop For each tool call
+            WebAgent->>Logger: Emit browser:action_started
+            Logger->>Runtime: Broadcast
+            Runtime->>Sidebar: Show action status
+
+            WebAgent->>Page: Execute action
+            Page->>WebAgent: Action result
+
+            WebAgent->>Logger: Emit browser:action_completed
+            Logger->>Runtime: Broadcast
+            Runtime->>Sidebar: Update status
+        end
+
+        WebAgent->>Logger: Emit agent:status/reasoned
+        Logger->>Runtime: Broadcast
+        Runtime->>Sidebar: Display reasoning
+
+        alt Task complete
+            WebAgent->>WebAgent: Exit loop
+        else Continue
+            WebAgent->>WebAgent: Next iteration
+        end
+    end
+```
+
+#### Phase 3 Details: Task Planning
+
+**Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
+
+14. **`agent.execute()` method** begins:
+    - Validates input parameters
+    - Initializes browser and internal state
+    - Creates execution state tracking object
+
+15. **Planning phase** via `planTask()`:
     - Determines starting URL (provided URL or current page)
     - Constructs planning prompt with task and URL
-    - Calls LLM with planning tools (submit_plan)
+    - Calls LLM with planning tools (`submit_plan`)
     - Extracts plan and success criteria from response
-    - **Emits `task:started` event** with plan ([EventStoreLogger:58-60](../src/EventStoreLogger.ts#L58-L60))
+    - **Emits `task:started` event** with plan (handled by EventStoreLogger)
 
-16. **Navigation phase** - `navigateToStart()` ([webAgent.ts:187](../../src/webAgent.ts#L187)):
+16. **Navigation phase** via `navigateToStart()`:
     - Navigates to starting URL if needed
     - Waits for page load
 
-17. **System prompt initialization** ([webAgent.ts:188](../../src/webAgent.ts#L188)):
+17. **System prompt initialization**:
     - Builds action loop system prompt with guardrails
     - Initializes task prompt with success criteria
 
@@ -242,53 +421,35 @@ const agent = new WebAgent(browser, {
 - Log navigation to starting URL
 - Log system prompt construction
 
-### Phase 6: Main Execution Loop
+#### Continuation: Main Execution Loop
 
-**Location**: [src/webAgent.ts](../../src/webAgent.ts)
+**Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
 
-18. **Main loop begins** - `runMainLoop()`:
+18. **Main loop begins** via `runMainLoop()`:
     - Iterates up to `maxIterations` (default: 50)
     - Each iteration:
       - Generates unique iteration ID
-      - Captures page snapshot (ARIA tree)
+      - Captures page snapshot (ARIA tree) via `browser.getTreeWithRefs()`
       - Constructs context with compressed snapshot
       - Calls LLM with web action tools
-      - Processes tool calls (click, type, navigate, etc.)
+      - Processes tool calls (click, fill, navigate, etc.)
       - **Emits events for each action**
       - Checks for task completion
 
-19. **Per-iteration events**:
+19. **Per-iteration events** (see [Event Types Reference](#event-types-reference)):
+    - `browser:action_started` - Action about to execute (e.g., "click", "fill", "goto")
+    - `browser:action_completed` - Results of browser actions (success/failure)
     - `agent:status` - Status updates like "Clicking search button"
     - `agent:reasoned` - Agent's reasoning/thought process
-    - `browser:action:completed` - Results of browser actions
+    - `agent:action` - Action type notifications (e.g., "extract", "done")
     - `ai:generation:error` - LLM errors (recoverable and non-recoverable)
     - `task:validation_error` - Task validation failures
 
 20. **Tool execution examples**:
-    - `click_element(ref: "a")` → Clicks element, waits for navigation
-    - `type_text(ref: "b", text: "London")` → Types into input field
+    - `click_element(ref: "s1e5")` → Clicks element, waits for navigation
+    - `type_text(ref: "s1e3", text: "London")` → Types into input field
     - `goto(url: "https://weather.com")` → Navigates to URL
     - `task_complete(answer: "...")` → Submits final answer
-
-**Event Broadcasting Flow**:
-
-```mermaid
-sequenceDiagram
-    participant WA as WebAgent
-    participant ESL as EventStoreLogger
-    participant BR as browser.runtime
-    participant SB as Sidebar
-    participant CS as ConversationStore
-    participant UI as React UI
-
-    WA->>ESL: emit event
-    ESL->>ESL: handleEvent()
-    ESL->>ESL: store in events array
-    ESL->>BR: sendMessage({type: "realtimeEvent"})
-    BR->>SB: broadcast message
-    SB->>CS: add to conversation store
-    CS->>UI: trigger re-render
-```
 
 **Logging Opportunities**:
 
@@ -300,27 +461,29 @@ sequenceDiagram
 - Log action repetition detection
 - Log error recovery attempts
 
-### Phase 7: Real-Time Event Display
+#### Continuation: Real-Time Event Display
 
-**Location**: [ChatView.tsx:274-353](../src/components/sidepanel/ChatView.tsx#L274-L353)
+**Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx)
 
-21. **Sidebar event listener** processes real-time events:
+21. **Sidebar event listener** (in `useEffect` hook with `browser.runtime.onMessage`) processes real-time events:
 
-22. **Event type handling**:
-    - `task:started` → Displays plan in chat bubble ([ChatView.tsx:282-289](../src/components/sidepanel/ChatView.tsx#L282-L289))
-    - `agent:reasoned` → Streams reasoning messages ([ChatView.tsx:292-299](../src/components/sidepanel/ChatView.tsx#L292-L299))
-    - `agent:status` → Updates status spinner text ([ChatView.tsx:302-309](../src/components/sidepanel/ChatView.tsx#L302-L309))
-    - `ai:generation:error` → Shows errors (filtered) ([ChatView.tsx:312-320](../src/components/sidepanel/ChatView.tsx#L312-L320))
-    - `task:validation_error` → Shows validation failures (filtered) ([ChatView.tsx:323-332](../src/components/sidepanel/ChatView.tsx#L323-L332))
-    - `browser:action:completed` → Shows action failures (filtered) ([ChatView.tsx:335-344](../src/components/sidepanel/ChatView.tsx#L335-L344))
+22. **Event type handling** (inside `handleMessage` callback):
+    - `task:started` → Displays plan in chat bubble via `addMessage("plan", ...)`
+    - `agent:reasoned` → Streams reasoning messages via `addMessage("reasoning", ...)`
+    - `agent:status` → Updates status spinner text via `addMessage("status", ...)`
+    - `browser:action_started` → Shows action status via `formatBrowserAction()` helper
+    - `agent:action` → Shows action-specific status (e.g., "Extracting data" for extract action)
+    - `ai:generation:error` → Shows errors (filtered via `shouldDisplayError()`)
+    - `task:validation_error` → Shows validation failures (filtered)
+    - `browser:action:completed` → Shows action failures (filtered, only non-recoverable)
 
-23. **Error filtering** via `shouldDisplayError()` ([ChatView.tsx:59-79](../src/components/sidepanel/ChatView.tsx#L59-L79)):
+23. **Error filtering** via `shouldDisplayError()` function:
     - Hides recoverable errors during retry attempts
-    - Hides validation errors below MAX_VALIDATION_RETRIES (3)
-    - Hides tool errors that will be auto-retried
+    - Hides validation errors below `MAX_VALIDATION_RETRIES` (3)
+    - Hides tool errors that will be auto-retried (`isToolError: true`)
     - Only shows fatal/non-recoverable errors
 
-24. **Task bubble rendering** ([ChatView.tsx:158-235](../src/components/sidepanel/ChatView.tsx#L158-L235)):
+24. **Task bubble rendering** via `TaskBubble` component:
     - Groups messages by task ID
     - Shows section headings: "📋 Plan", "💭 Actions", "✨ Answer"
     - Displays loading spinner for active tasks
@@ -352,22 +515,59 @@ sequenceDiagram
 - Log message additions to conversation store
 - Log UI render cycles
 
-### Phase 8: Task Completion & Validation
+### ✅ Phase 4: Completion
 
-**Location**: [src/webAgent.ts](../../src/webAgent.ts)
+**Components**: WebAgent → Background → Sidebar → User
+
+```mermaid
+sequenceDiagram
+    participant WebAgent
+    participant Logger as EventStoreLogger
+    participant Runtime as browser.runtime
+    participant Background
+    participant Sidebar
+    participant User
+
+    Note over WebAgent,User: Task Completion
+    WebAgent->>WebAgent: task_complete tool called
+    WebAgent->>WebAgent: Validate answer
+    WebAgent->>Logger: Emit task:completed
+    Logger->>Runtime: Broadcast event
+    Runtime->>Sidebar: Update UI
+
+    Note over WebAgent,User: Return Result
+    WebAgent->>Background: Return TaskExecutionResult
+    Background->>Background: Construct response
+
+    Note over WebAgent,User: Cleanup
+    Background->>Background: hideIndicator(tabId)
+    Background->>Background: Remove from runningTasks
+    Background->>Sidebar: ExecuteTaskResponse (Promise)
+
+    Note over WebAgent,User: Final UI Update
+    Sidebar->>Sidebar: addMessage("result", answer)
+    Sidebar->>Sidebar: setExecutionState(false)
+    Sidebar->>Sidebar: endTask()
+    Sidebar->>User: Display complete response
+```
+
+#### Phase 4 Details: Task Completion & Validation
+
+**Location**: [src/webAgent.ts](../../src/webAgent.ts) (shared core library)
 
 25. **Task completion detection**:
     - Agent calls `task_complete` tool with final answer
     - WebAgent captures answer and exits loop
+    - **Emits `task:completed` event** (triggers indicator hide)
 
 26. **Validation phase**:
     - Checks if answer meets success criteria
     - Uses validation prompt to assess quality
-    - Retries if validation fails (up to maxValidationAttempts)
+    - Retries if validation fails (up to `maxValidationAttempts`)
     - **Emits `task:validation_error` if insufficient**
 
 27. **Final result construction**:
-    - Builds TaskExecutionResult with success flag
+    - Builds `TaskExecutionResult` with success flag
     - Includes execution statistics (iterations, duration, action count)
     - Returns to AgentManager
 
@@ -379,26 +579,36 @@ sequenceDiagram
 - Log retry attempts for failed validation
 - Log final result construction with stats
 
-### Phase 9: Response Back to Sidebar
+#### Continuation: Response Back to Sidebar
 
-**Location**: [background.ts:144-174](../entrypoints/background.ts#L144-L174)
+**Location**: [background.ts](../entrypoints/background.ts) — inside the `executeTask` case handler
 
-28. **AgentManager returns result** to background script
-29. **Background constructs ExecuteTaskResponse**:
+28. **AgentManager returns result** to background script (or throws error)
+
+29. **Background constructs `ExecuteTaskResponse`**:
 
     ```typescript
-    {
-      success: true,
-      result: "Current weather in London...",
-      events: [...] // Optional fallback events
-    }
+    // On success:
+    { success: true, result: "Current weather in London..." }
+
+    // On cancellation (treated as success for UX):
+    { success: true, result: "Task cancelled" }
+
+    // On error:
+    { success: false, message: "Task execution failed: ..." }
     ```
 
-30. **Cleanup**:
-    - Removes task from runningTasks Map ([background.ts:173](../entrypoints/background.ts#L173))
+30. **Error/cancellation handling**:
+    - On cancellation: Emits `task:aborted` event with reason "Task cancelled by user"
+    - On error: Emits `task:aborted` event with error message
+    - Both trigger indicator hide via the logger subscription
+
+31. **Cleanup** (in `finally` block):
+    - Hides indicator via `hideIndicator(tabId)`
+    - Removes task from `runningTasks` Map via `runningTasks.delete(tabId)`
     - AbortController garbage collected
 
-31. **Response sent back** to ChatView via Promise resolution
+32. **Response sent back** to ChatView via Promise resolution
 
 **Logging Opportunities**:
 
@@ -407,21 +617,21 @@ sequenceDiagram
 - Log cleanup of running tasks
 - Log response size and event count
 
-### Phase 10: Final UI Update
+#### Continuation: Final UI Update
 
-**Location**: [ChatView.tsx:415-438](../src/components/sidepanel/ChatView.tsx#L415-L438)
+**Location**: [ChatView.tsx](../src/components/sidepanel/ChatView.tsx) — inside `handleExecute()` after `await` resolves
 
-32. **ChatView receives response**:
-    - Checks success flag
+33. **ChatView receives response**:
+    - Checks `response.success` flag
     - Extracts result text or error message
-    - Adds final result message to conversation ([ChatView.tsx:417](../src/components/sidepanel/ChatView.tsx#L417))
+    - Adds final result message to conversation via `addMessage("result", resultText, taskId)`
 
-33. **Final state updates**:
+34. **Final state updates** (in `finally` block):
     - `setExecutionState(false)` → Re-enables input, hides "Stop" button
     - `endTask()` → Clears currentTaskId
     - TaskBubble removes spinner, shows timestamp
 
-34. **User sees complete response**:
+35. **User sees complete response**:
     ```
     ⚡ Spark
     📋 Plan: [...]
@@ -446,7 +656,7 @@ sequenceDiagram
 
 The extension uses a simple **task replacement strategy** rather than a traditional queue:
 
-- **Single Map**: `runningTasks` is a `Map<number, AbortController>` ([background.ts:24](../entrypoints/background.ts#L24))
+- **Single Map**: `runningTasks` is a `Map<number, AbortController>` defined at the top of the `defineBackground()` function
 - **One task per tab**: Each browser tab can have at most one running task
 - **Automatic cancellation**: New tasks automatically abort existing tasks for the same tab
 - **No queuing**: Tasks are never queued or waiting - they execute immediately or replace the current task
@@ -455,45 +665,211 @@ The extension uses a simple **task replacement strategy** rather than a traditio
 
 **Multi-tab support**: Different tabs can run tasks concurrently since they're keyed by unique `tabId` values.
 
+## Indicator System
+
+**Location**: [indicatorControl.ts](../src/background/indicatorControl.ts)
+
+The indicator system provides visual feedback during task execution by showing a purple glowing border around the page.
+
+### How It Works
+
+1. **Trigger**: When `task:started` event is emitted, the indicator is shown via `showIndicator(tabId)`
+2. **CSS Injection**: Injects indicator CSS into the current page via `browser.scripting.insertCSS()`
+3. **Class Toggle**: Adds `spark-indicator-active` class to `<html>` element
+4. **Animation**: CSS creates a pulsing purple glow effect using `box-shadow` and `@keyframes`
+5. **Hide**: When `task:completed` or `task:aborted` event is emitted, the indicator is hidden via `hideIndicator(tabId)`
+
+### Navigation Persistence
+
+The indicator persists across page navigations within a task:
+
+- **CSS Registration**: `ensureIndicatorCSSRegistered()` registers a content script that injects CSS at `document_start`
+- **Fast Re-injection**: `webNavigation.onCommitted` listener re-applies the class immediately on navigation
+- **Fallback**: `tabs.onUpdated` listener re-applies on `complete` status as a reliability fallback
+
+### Key Functions
+
+- `showIndicator(tabId)` — Injects CSS and adds activation class
+- `hideIndicator(tabId)` — Removes class and CSS, unregisters if no active indicators
+- `setupNavigationListener()` — Sets up listeners for navigation persistence
+- `cleanupStaleRegistrations()` — Cleans up orphaned registrations from previous sessions
+
+### Indicator State Tracking
+
+- `activeIndicators: Set<number>` — Tracks which tabs have active indicators
+- `cssRegistered: boolean` — Tracks if the CSS content script is registered
+
+## Event Type Mapping
+
+The core library ([src/events.ts](../../src/events.ts)) defines a comprehensive set of event types, but the extension ([extension/src/types/browser.ts](../src/types/browser.ts)) only explicitly types the events most relevant to UI display and user interaction.
+
+**Explicitly Typed Events** (with dedicated TypeScript interfaces):
+
+- `task:started` → `TaskStartedEventData`
+- `task:completed` → `TaskCompletedEventData`
+- `task:aborted` → `TaskAbortedEventData`
+- `task:validation_error` → `TaskValidationErrorEventData`
+- `agent:status` → `AgentStatusEventData`
+- `agent:reasoned` → `AgentReasonedEventData`
+- `agent:action` → `AgentActionEventData`
+- `ai:generation:error` → `AIGenerationErrorEventData`
+- `browser:action_started` → `BrowserActionStartedEventData`
+- `browser:action_completed` → `BrowserActionCompletedEventData`
+
+**Generic Events** (handled via catch-all):
+All other core events pass through to the extension via the generic union member:
+
+```typescript
+{
+  type: string;
+  data: GenericEventData;
+  timestamp: number;
+}
+```
+
+This includes:
+
+- `task:setup`, `task:validated`, `task:metrics`, `task:metrics_incremental`
+- `agent:step`, `agent:processing`, `agent:extracted`, `agent:waiting`
+- `browser:navigated`, `browser:screenshot_captured`
+- `ai:generation`
+- `system:debug_compression`, `system:debug_message`
+
+**Why this approach?**
+
+- **Type safety where it matters**: UI components get full type checking for events they actively handle
+- **Flexibility**: New core events automatically flow through without requiring extension type updates
+- **Simplicity**: Reduces type maintenance burden for events that don't need special handling
+- **Storage compatibility**: All events (typed and generic) are stored identically in extension storage
+
+When accessing generic events in TypeScript, you'll need to cast the data or use type guards:
+
+```typescript
+if (event.type === "task:setup") {
+  const setupData = event.data as { task: string; url?: string; browserName: string };
+  // Use setupData...
+}
+```
+
+## Event Types Reference
+
+Events flow from WebAgent through EventStoreLogger to the sidebar. Each event has a `type`, `data`, and `timestamp`.
+
+**Note**: The extension explicitly types only a subset of events in [types/browser.ts](../src/types/browser.ts). Other events from the core library pass through via the generic catch-all type. See [Event Type Mapping](#event-type-mapping) below for details.
+
+### Task Lifecycle Events
+
+| Event Type                 | Description                         | Key Data Fields                                | Typed in Extension |
+| -------------------------- | ----------------------------------- | ---------------------------------------------- | ------------------ |
+| `task:started`             | Planning complete, execution begins | `plan`, `taskId`                               | ✅ Explicit        |
+| `task:completed`           | Task finished successfully          | `finalAnswer`, `success`                       | ✅ Explicit        |
+| `task:aborted`             | Task cancelled or failed            | `reason`, `finalAnswer`                        | ✅ Explicit        |
+| `task:validation_error`    | Answer validation failed            | `errors[]`, `retryCount`                       | ✅ Explicit        |
+| `task:setup`               | Task initialized                    | `task`, `url`, `browserName`                   | ❌ Generic         |
+| `task:validated`           | Task validation success             | `observation`, `completionQuality`             | ❌ Generic         |
+| `task:metrics`             | Task completion metrics             | `eventCounts`, `stepCount`, `totalInputTokens` | ❌ Generic         |
+| `task:metrics_incremental` | Incremental metrics                 | `eventCounts`, `stepCount`, `totalInputTokens` | ❌ Generic         |
+
+### Agent Events
+
+| Event Type         | Description                | Key Data Fields                   | Typed in Extension |
+| ------------------ | -------------------------- | --------------------------------- | ------------------ |
+| `agent:status`     | Status update message      | `message`                         | ✅ Explicit        |
+| `agent:reasoned`   | Agent's reasoning/thought  | `reasoning`                       | ✅ Explicit        |
+| `agent:action`     | Action type notification   | `action`, `ref`, `value`          | ✅ Explicit        |
+| `agent:step`       | Agent iteration step       | `iterationId`, `currentIteration` | ❌ Generic         |
+| `agent:processing` | AI processing step         | `operation`, `hasScreenshot`      | ❌ Generic         |
+| `agent:extracted`  | Extracted data event       | `extractedData`                   | ❌ Generic         |
+| `agent:waiting`    | Agent waiting notification | `seconds`                         | ❌ Generic         |
+
+### Browser Action Events
+
+| Event Type                    | Description             | Key Data Fields                     | Typed in Extension |
+| ----------------------------- | ----------------------- | ----------------------------------- | ------------------ |
+| `browser:action_started`      | Action about to execute | `action`, `ref`, `value`            | ✅ Explicit        |
+| `browser:action_completed`    | Action finished         | `success`, `error`, `isRecoverable` | ✅ Explicit        |
+| `browser:navigated`           | Page navigation         | `title`, `url`                      | ❌ Generic         |
+| `browser:screenshot_captured` | Screenshot capture      | `size`, `format`                    | ❌ Generic         |
+
+### AI Events
+
+| Event Type            | Description            | Key Data Fields                             | Typed in Extension |
+| --------------------- | ---------------------- | ------------------------------------------- | ------------------ |
+| `ai:generation`       | LLM API call completed | `usage`, `finishReason`, `providerMetadata` | ❌ Generic         |
+| `ai:generation:error` | LLM API call failed    | `error`, `isToolError`                      | ✅ Explicit        |
+
+### System Events
+
+| Event Type                 | Description            | Key Data Fields                                        | Typed in Extension |
+| -------------------------- | ---------------------- | ------------------------------------------------------ | ------------------ |
+| `system:debug_compression` | Compression debug info | `originalSize`, `compressedSize`, `compressionPercent` | ❌ Generic         |
+| `system:debug_message`     | Message debug info     | `messages[]`                                           | ❌ Generic         |
+
+### Event Filtering
+
+The `shouldDisplayError()` function in ChatView.tsx filters which errors are shown to users:
+
+- **Hidden**: Validation errors below `MAX_VALIDATION_RETRIES` (3)
+- **Hidden**: Browser action errors marked as `isRecoverable: true`
+- **Hidden**: AI generation errors marked as `isToolError: true`
+- **Shown**: All other errors (fatal/non-recoverable)
+
 ## Key Interactions Across Components
 
 ### Sidebar ↔ Background Script
 
-**Messages**:
+**Messages** (defined in [types/browser.ts](../src/types/browser.ts)):
 
-1. `ExecuteTaskMessage` (Sidebar → Background)
-2. `RealtimeEventMessage` (Background → Sidebar, broadcast)
-3. `CancelTaskMessage` (Sidebar → Background)
-4. `ExecuteTaskResponse` (Background → Sidebar, Promise result)
+1. `ExecuteTaskMessage` (Sidebar → Background) — Start task execution
+2. `RealtimeEventMessage` (Background → Sidebar, broadcast) — Real-time event updates
+3. `CancelTaskMessage` (Sidebar → Background) — Cancel running task
+4. `ExecuteTaskResponse` (Background → Sidebar, Promise result) — Final result
+
+**RealtimeEventMessage Structure**:
+
+```typescript
+{
+  type: "realtimeEvent",
+  tabId: number,        // Tab ID for routing
+  event: {
+    type: string,       // Event type (e.g., "task:started", "agent:status")
+    data: unknown,      // Event-specific data
+    timestamp: number
+  }
+}
+```
 
 **Data Flow**:
 
 - Task parameters flow from Sidebar to Background
-- Real-time events broadcast from Background to all extension contexts
+- Real-time events broadcast from Background to all extension contexts (includes `tabId` for routing)
 - Final result flows back via Promise resolution
 
 ### Background Script ↔ Content Script
 
 **Interactions**:
 
-1. **Page info retrieval**: `browser.tabs.sendMessage({ type: "getPageInfo" })`
-2. **Script execution**: `browser.scripting.executeScript()` for ARIA snapshots
-3. **Navigation**: `browser.tabs.update()` for URL changes
+1. **Script execution**: `browser.scripting.executeScript()` for ARIA snapshots and actions
+2. **Navigation**: `browser.tabs.update()` for URL changes
+3. **CSS injection**: `browser.scripting.insertCSS()` / `removeCSS()` for indicator
 
-**ExtensionBrowser Methods** ([extension/src/ExtensionBrowser.ts](../src/ExtensionBrowser.ts)):
+**ExtensionBrowser Methods** ([ExtensionBrowser.ts](../src/ExtensionBrowser.ts)):
 
-- `goto(url)` → browser.tabs.update()
-- `snapshot()` → browser.scripting.executeScript(generateAriaTree)
-- `evaluate(script)` → browser.scripting.executeScript()
-- `click(selector)` → Executes script in page context
+- `goto(url)` → `browser.tabs.update()` + `handlePageTransition()`
+- `getTreeWithRefs()` → `browser.scripting.executeScript(generateAriaTree)` — Returns ARIA tree as string
+- `getSimpleHtml()` → `browser.scripting.executeScript()` — Returns cleaned HTML
+- `getMarkdown()` → Converts HTML to markdown via Turndown
+- `performAction(ref, action, value)` → Executes actions (click, fill, select, etc.) in page context
+- `waitForLoadState(state)` → Waits for DOM/load/networkidle states
+- `goBack()` / `goForward()` → Browser history navigation
 
 ### AgentManager ↔ WebAgent
 
-**Initialization**:
+**Initialization** (in `AgentManager.runTask()`):
 
 ```typescript
 const agent = new WebAgent(extensionBrowser, {
-  providerConfig: { model },
+  providerConfig: { model, providerOptions: undefined },
   logger: eventStoreLogger,
   debug: false,
 });
@@ -506,6 +882,7 @@ const result = await agent.execute(task, {
   data: { currentUrl },
   abortSignal: controller.signal,
 });
+return result.finalAnswer || "Task completed successfully";
 ```
 
 **Event Flow**:
@@ -514,25 +891,29 @@ const result = await agent.execute(task, {
 graph LR
     WA[WebAgent] --> L[Logger]
     L --> ESL[EventStoreLogger]
+    ESL --> SUB[Subscribers]
     ESL --> BR[browser.runtime.sendMessage]
+    SUB --> IND[Indicator Control]
 ```
 
 ### EventStoreLogger ↔ Sidebar
 
-**Real-time Broadcasting**:
+**Real-time Broadcasting** (in `EventStoreLogger.handleEvent()`):
 
-1. WebAgent emits event via logger.log()
-2. EventStoreLogger.handleEvent() stores and broadcasts
-3. browser.runtime.sendMessage() sends to all contexts
-4. Sidebar's onMessage listener receives
-5. Event added to conversation store
-6. React re-renders with new event
+1. WebAgent emits event via logger callback
+2. `EventStoreLogger.handleEvent()` stores event in array
+3. Notifies subscribers (for indicator control in background.ts)
+4. `browser.runtime.sendMessage()` broadcasts to all contexts
+5. Sidebar's `onMessage` listener receives
+6. Event added to conversation store
+7. React re-renders with new event
 
 **Event Structure**:
 
 ```typescript
 {
   type: "realtimeEvent",
+  tabId: 123,  // Required for routing to correct sidebar instance
   event: {
     type: "agent:status",
     data: { message: "Clicking search button" },
@@ -547,25 +928,26 @@ graph LR
 
 These areas would significantly benefit from additional logging:
 
-#### 1. **ExtensionBrowser Actions** ([extension/src/ExtensionBrowser.ts](../src/ExtensionBrowser.ts))
+#### 1. **ExtensionBrowser Actions** ([ExtensionBrowser.ts](../src/ExtensionBrowser.ts))
 
-Currently no logging in browser abstraction layer. Recommend:
+The ExtensionBrowser now includes logging via `createLogger("ExtensionBrowser")`. Key logged operations:
+
+- `goto()` — Logs URL, current URL, tab ID, and completion status
+- `getTreeWithRefs()` — Logs content script availability and ARIA tree generation
+- `getSimpleHtml()` / `getMarkdown()` — Logs content retrieval status
+
+Additional logging could be added for:
 
 ```typescript
-async goto(url: string): Promise<void> {
-  this.logger.info("Navigating to URL", { url, tabId: this.tabId });
-  await browser.tabs.update(this.tabId, { url });
-  this.logger.info("Navigation initiated", { url, tabId: this.tabId });
-  await this.waitForLoadState("networkidle");
-  this.logger.info("Navigation complete", { url, tabId: this.tabId });
-}
+// In performAction()
+this.logger.info("Performing action", { ref, action, value, tabId: this.tabId });
 ```
 
-**Why**: Critical for debugging navigation timing issues, failed page loads, and understanding agent behavior.
+**Why**: Critical for debugging action failures, navigation timing issues, and understanding agent behavior.
 
-#### 2. **Event Broadcasting** ([extension/src/EventStoreLogger.ts:71-88](../src/EventStoreLogger.ts#L71-L88))
+#### 2. **Event Broadcasting** ([EventStoreLogger.ts](../src/EventStoreLogger.ts))
 
-Currently swallows errors silently:
+Currently swallows errors silently in `handleEvent()`:
 
 ```typescript
 browser.runtime.sendMessage(message).catch(() => {
@@ -573,14 +955,13 @@ browser.runtime.sendMessage(message).catch(() => {
 });
 ```
 
-Recommend:
+Consider logging for debugging:
 
 ```typescript
 browser.runtime.sendMessage(message).catch((error) => {
   this.logger.warn("Failed to broadcast event", {
     eventType: event.type,
     error: error.message,
-    hasListeners: browser.runtime.hasListeners,
   });
 });
 ```
@@ -690,7 +1071,7 @@ addMessage: (tabId, type, content, taskId) => {
 
 ### Low Priority: Nice-to-Have
 
-#### 8. **Auto-scroll Behavior** ([extension/src/hooks/useAutoScroll.ts](../src/hooks/useAutoScroll.ts))
+#### 8. **Auto-scroll Behavior** ([useAutoScroll.ts](../src/hooks/useAutoScroll.ts))
 
 ```typescript
 const handleScroll = () => {
