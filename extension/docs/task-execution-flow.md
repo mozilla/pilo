@@ -699,6 +699,58 @@ The indicator persists across page navigations within a task:
 - `activeIndicators: Set<number>` — Tracks which tabs have active indicators
 - `cssRegistered: boolean` — Tracks if the CSS content script is registered
 
+## Event Type Mapping
+
+The core library ([src/events.ts](../../src/events.ts)) defines a comprehensive set of event types, but the extension ([extension/src/types/browser.ts](../src/types/browser.ts)) only explicitly types the events most relevant to UI display and user interaction.
+
+**Explicitly Typed Events** (with dedicated TypeScript interfaces):
+
+- `task:started` → `TaskStartedEventData`
+- `task:completed` → `TaskCompletedEventData`
+- `task:aborted` → `TaskAbortedEventData`
+- `task:validation_error` → `TaskValidationErrorEventData`
+- `agent:status` → `AgentStatusEventData`
+- `agent:reasoned` → `AgentReasonedEventData`
+- `agent:action` → `AgentActionEventData`
+- `ai:generation:error` → `AIGenerationErrorEventData`
+- `browser:action_started` → `BrowserActionStartedEventData`
+- `browser:action_completed` → `BrowserActionCompletedEventData`
+
+**Generic Events** (handled via catch-all):
+All other core events pass through to the extension via the generic union member:
+
+```typescript
+{
+  type: string;
+  data: GenericEventData;
+  timestamp: number;
+}
+```
+
+This includes:
+
+- `task:setup`, `task:validated`, `task:metrics`, `task:metrics_incremental`
+- `agent:step`, `agent:processing`, `agent:extracted`, `agent:waiting`
+- `browser:navigated`, `browser:screenshot_captured`
+- `ai:generation`
+- `system:debug_compression`, `system:debug_message`
+
+**Why this approach?**
+
+- **Type safety where it matters**: UI components get full type checking for events they actively handle
+- **Flexibility**: New core events automatically flow through without requiring extension type updates
+- **Simplicity**: Reduces type maintenance burden for events that don't need special handling
+- **Storage compatibility**: All events (typed and generic) are stored identically in extension storage
+
+When accessing generic events in TypeScript, you'll need to cast the data or use type guards:
+
+```typescript
+if (event.type === "task:setup") {
+  const setupData = event.data as { task: string; url?: string; browserName: string };
+  // Use setupData...
+}
+```
+
 ## Event Types Reference
 
 Events flow from WebAgent through EventStoreLogger to the sidebar. Each event has a `type`, `data`, and `timestamp`.
@@ -761,58 +813,6 @@ The `shouldDisplayError()` function in ChatView.tsx filters which errors are sho
 - **Hidden**: Browser action errors marked as `isRecoverable: true`
 - **Hidden**: AI generation errors marked as `isToolError: true`
 - **Shown**: All other errors (fatal/non-recoverable)
-
-### Event Type Mapping
-
-The core library ([src/events.ts](../../src/events.ts)) defines a comprehensive set of event types, but the extension ([extension/src/types/browser.ts](../src/types/browser.ts)) only explicitly types the events most relevant to UI display and user interaction.
-
-**Explicitly Typed Events** (with dedicated TypeScript interfaces):
-
-- `task:started` → `TaskStartedEventData`
-- `task:completed` → `TaskCompletedEventData`
-- `task:aborted` → `TaskAbortedEventData`
-- `task:validation_error` → `TaskValidationErrorEventData`
-- `agent:status` → `AgentStatusEventData`
-- `agent:reasoned` → `AgentReasonedEventData`
-- `agent:action` → `AgentActionEventData`
-- `ai:generation:error` → `AIGenerationErrorEventData`
-- `browser:action_started` → `BrowserActionStartedEventData`
-- `browser:action_completed` → `BrowserActionCompletedEventData`
-
-**Generic Events** (handled via catch-all):
-All other core events pass through to the extension via the generic union member:
-
-```typescript
-{
-  type: string;
-  data: GenericEventData;
-  timestamp: number;
-}
-```
-
-This includes:
-
-- `task:setup`, `task:validated`, `task:metrics`, `task:metrics_incremental`
-- `agent:step`, `agent:processing`, `agent:extracted`, `agent:waiting`
-- `browser:navigated`, `browser:screenshot_captured`
-- `ai:generation`
-- `system:debug_compression`, `system:debug_message`
-
-**Why this approach?**
-
-- **Type safety where it matters**: UI components get full type checking for events they actively handle
-- **Flexibility**: New core events automatically flow through without requiring extension type updates
-- **Simplicity**: Reduces type maintenance burden for events that don't need special handling
-- **Storage compatibility**: All events (typed and generic) are stored identically in extension storage
-
-When accessing generic events in TypeScript, you'll need to cast the data or use type guards:
-
-```typescript
-if (event.type === "task:setup") {
-  const setupData = event.data as { task: string; url?: string; browserName: string };
-  // Use setupData...
-}
-```
 
 ## Key Interactions Across Components
 
