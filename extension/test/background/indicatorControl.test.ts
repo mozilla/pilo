@@ -658,7 +658,7 @@ describe("indicatorControl", () => {
 
     it("should handle hideIndicator called while showIndicator is in progress", async () => {
       // Simulate slow registration
-      let registrationResolve: () => void;
+      let registrationResolve: () => void = () => {};
       vi.mocked(browser.scripting.registerContentScripts).mockImplementation(() => {
         return new Promise((resolve) => {
           registrationResolve = resolve as () => void;
