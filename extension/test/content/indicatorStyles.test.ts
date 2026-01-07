@@ -29,12 +29,18 @@ describe("indicator CSS file for dynamic registration", () => {
 describe("CSS consistency", () => {
   const cssPath = path.join(__dirname, "../../public/indicator.css");
 
-  it("should have matching CSS rules in file and INDICATOR_CSS constant", () => {
+  it("should have structurally matching CSS between file and INDICATOR_CSS constant", () => {
     const fileCss = fs.readFileSync(cssPath, "utf-8");
 
-    // Normalize whitespace for comparison
-    const normalizeCSS = (css: string) => css.replace(/\s+/g, " ").trim();
+    // Normalize horizontal whitespace but preserve line structure
+    const normalizeStructure = (css: string): string => {
+      return css
+        .split("\n")
+        .map((line) => line.trim())
+        .map((line) => line.replace(/\s+/g, " "))
+        .join("\n");
+    };
 
-    expect(normalizeCSS(fileCss)).toEqual(normalizeCSS(INDICATOR_CSS));
+    expect(normalizeStructure(fileCss)).toEqual(normalizeStructure(INDICATOR_CSS));
   });
 });

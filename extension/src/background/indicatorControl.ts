@@ -50,8 +50,13 @@ export const INDICATOR_CSS = `html.spark-indicator-active::after {
   animation: spark-pulse 3s ease-in-out infinite;
 }
 @keyframes spark-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 `;
 
