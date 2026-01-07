@@ -404,36 +404,6 @@ describe("Background Script - Cleanup Ordering", () => {
   });
 });
 
-describe("Background Script - Indicator Control via isIndicatorActive", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should check actual indicator state using isIndicatorActive before hiding", () => {
-    // This test verifies that the background script checks the actual indicator state
-    // using isIndicatorActive() instead of relying on a local flag.
-    //
-    // This is important because:
-    // 1. It avoids race conditions if events arrive in unexpected order
-    // 2. It checks the source of truth (browser state) rather than local state
-    // 3. It's more robust against edge cases
-    //
-    // Expected behavior:
-    // The logger subscription callback should:
-    // 1. Check if (isIndicatorActive(tabId)) before calling hideIndicator
-    // 2. Only hide if the indicator is actually active
-    // 3. Not use a local `indicatorShown` flag
-
-    // This test documents the contract that background.ts should follow.
-    // Since we can't easily test the actual background.ts callback directly (it's within a WXT
-    // defineBackground closure), this test serves as documentation of expected behavior.
-
-    // The refactored code will look like:
-    // if (isIndicatorActive(tabId) && events.some(e => e.type === "task:completed" || e.type === "task:aborted")) {
-    //   hideIndicator(tabId).catch(() => {});
-    //   unsubscribe();
-    // }
-
-    expect(true).toBe(true); // Placeholder assertion
-  });
-});
+// Note: Indicator control via isIndicatorActive() is implemented in background.ts:147-160
+// The background script checks actual indicator state before hiding to avoid race conditions.
+// See background.ts logger.subscribe() callback for implementation details.
