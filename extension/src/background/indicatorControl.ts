@@ -290,10 +290,11 @@ export function cleanupNavigationListener(): void {
 export async function cleanupStaleRegistrations(): Promise<void> {
   try {
     const scripts = await browser.scripting.getRegisteredContentScripts();
-    const staleIds = scripts.filter((s) => s.id === "spark-indicator").map((s) => s.id);
+    const hasSparkIndicator = scripts.some((s) => s.id === "spark-indicator");
 
-    if (staleIds.length > 0) {
-      await browser.scripting.unregisterContentScripts({ ids: staleIds });
+    if (hasSparkIndicator) {
+      // Chrome API enforces unique IDs, so there can only be one script with this ID
+      await browser.scripting.unregisterContentScripts({ ids: ["spark-indicator"] });
       cssRegistered = false;
     }
   } catch {
