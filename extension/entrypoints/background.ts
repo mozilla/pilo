@@ -4,6 +4,7 @@ import { useConversationStore } from "../src/stores/conversationStore";
 import {
   showIndicator,
   hideIndicator,
+  isIndicatorActive,
   setupNavigationListener,
   cleanupStaleRegistrations,
 } from "../src/background/indicatorControl";
@@ -143,16 +144,14 @@ export default defineBackground(() => {
 
             // Subscribe to logger events to show/hide indicator
             // This is needed because runtime.sendMessage doesn't deliver to the sender's own listener
-            let indicatorShown = false;
             const unsubscribe = logger.subscribe((events) => {
               // Show indicator on task:started (planning complete)
-              if (!indicatorShown && events.some((e) => e.type === "task:started")) {
-                indicatorShown = true;
+              if (!isIndicatorActive(tabId) && events.some((e) => e.type === "task:started")) {
                 showIndicator(tabId).catch(() => {});
               }
               // Hide indicator on task completion or abort
               if (
-                indicatorShown &&
+                isIndicatorActive(tabId) &&
                 events.some((e) => e.type === "task:completed" || e.type === "task:aborted")
               ) {
                 hideIndicator(tabId).catch(() => {});
