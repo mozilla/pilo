@@ -1,4 +1,5 @@
-import { defineConfig, type WebExtConfig } from "wxt";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { defineConfig, type WebExtConfig, type Wxt } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
@@ -41,7 +42,7 @@ let config = {
   hooks: {
     // WXT dev mode strips content_scripts from manifest even with registration: "manifest".
     // This hook ensures content scripts are included in the manifest during dev mode.
-    "build:manifestGenerated": (wxt: any, manifest: any) => {
+    "build:manifestGenerated": (wxt: Wxt, manifest: Browser.runtime.Manifest) => {
       if (wxt.config.command === "serve") {
         manifest.content_scripts = [
           {
