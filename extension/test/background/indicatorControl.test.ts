@@ -608,12 +608,11 @@ describe("indicatorControl", () => {
     });
 
     it("should handle calling showIndicator twice for same tab", async () => {
-      vi.mocked(browser.scripting.registerContentScripts)
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error("Duplicate script ID"));
-
       await showIndicator(123);
-      await expect(showIndicator(123)).resolves.toBeUndefined();
+      await showIndicator(123);
+
+      // Verify registerContentScripts was only called once due to cssRegistered flag
+      expect(browser.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
     });
 
     it("should not double-register for same tab", async () => {
