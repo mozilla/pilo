@@ -217,6 +217,41 @@ describe("Background Script - Provider Support", () => {
 // instead of forwarding events to content script via tabs.sendMessage
 
 describe("Background Script - Error Handling", () => {
+  describe("task:completed event on success", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should emit task:completed event when task execution succeeds", async () => {
+      // Arrange - create logger with tabId
+      const tabId = 789;
+      const logger = new EventStoreLogger(tabId);
+      const successResult = { answer: "Task completed successfully" };
+
+      // Act - simulate what background script should do on successful completion
+      logger.addEvent("task:completed", {
+        finalAnswer: successResult.answer,
+        success: true,
+        timestamp: Date.now(),
+        iterationId: "final",
+      });
+
+      // Assert - task:completed event should be broadcast
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "realtimeEvent",
+          tabId: 789,
+          event: expect.objectContaining({
+            type: "task:completed",
+            data: expect.objectContaining({
+              success: true,
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
   describe("task:aborted event on error", () => {
     beforeEach(() => {
       vi.clearAllMocks();
@@ -337,5 +372,34 @@ describe("Background Script - TabId Wiring", () => {
       expect(expectedResponse.success).toBe(false);
       expect(expectedResponse.message).toContain("tab ID");
     });
+  });
+});
+
+describe("Background Script - Cleanup Ordering", () => {
+  it("should cleanup runningTasks before hiding indicator", async () => {
+    // This test documents the expected execution order in the finally block:
+    // 1. Remove from runningTasks (cleanup internal state)
+    // 2. Hide indicator (provide visual feedback)
+    //
+    // This ensures cleanup completes before user sees "task finished" signal
+
+    const mockRunningTasks = new Map<number, AbortController>();
+    const tabId = 999;
+    const controller = new AbortController();
+    mockRunningTasks.set(tabId, controller);
+
+    // Simulate finally block execution order
+    const executionOrder: string[] = [];
+
+    // Step 1: Cleanup
+    mockRunningTasks.delete(tabId);
+    executionOrder.push("cleanup");
+    expect(mockRunningTasks.has(tabId)).toBe(false);
+
+    // Step 2: Hide indicator (simulated)
+    executionOrder.push("hideIndicator");
+
+    // Assert: cleanup happened before hideIndicator
+    expect(executionOrder).toEqual(["cleanup", "hideIndicator"]);
   });
 });

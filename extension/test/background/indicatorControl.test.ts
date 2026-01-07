@@ -12,9 +12,7 @@ import {
 import browser from "webextension-polyfill";
 
 // Type definitions for test mocks
-type ExecuteScriptOptions = Pick<browser.Scripting.ScriptInjection, "target"> & {
-  func: () => void;
-};
+type ExecuteScriptOptions = browser.Scripting.ScriptInjection;
 type RegisteredContentScriptMock = Pick<
   browser.Scripting.RegisteredContentScript,
   "id" | "matches" | "js" | "css"
@@ -93,7 +91,8 @@ describe("indicatorControl", () => {
       });
 
       // Execute the function
-      options.func();
+      expect(options.func).toBeDefined();
+      options.func!();
 
       expect(mockClassList.add).toHaveBeenCalledWith("spark-indicator-active");
 
@@ -160,7 +159,8 @@ describe("indicatorControl", () => {
       });
 
       // Execute the function
-      options.func();
+      expect(options.func).toBeDefined();
+      options.func!();
 
       expect(mockClassList.remove).toHaveBeenCalledWith("spark-indicator-active");
 

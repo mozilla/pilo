@@ -187,6 +187,14 @@ export default defineBackground(() => {
 
               console.log(`Task completed successfully:`, result);
 
+              // Emit task:completed event to trigger indicator hide via subscription
+              logger.addEvent("task:completed", {
+                finalAnswer: result,
+                success: true,
+                timestamp: Date.now(),
+                iterationId: "completed",
+              });
+
               response = {
                 success: true,
                 result: result,
@@ -228,9 +236,9 @@ export default defineBackground(() => {
                 };
               }
             } finally {
-              // Hide indicator and clean up the task tracking
-              await hideIndicator(tabId);
+              // Clean up the task tracking, then hide indicator
               runningTasks.delete(tabId);
+              await hideIndicator(tabId);
             }
             break;
 

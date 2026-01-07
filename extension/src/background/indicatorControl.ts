@@ -197,8 +197,14 @@ export function isIndicatorActive(tabId: number): boolean {
 }
 
 /**
- * Helper to inject indicator class into a tab.
- * CSS is already present via registerContentScripts at document_start.
+ * Inject the indicator CSS class into a specific tab.
+ *
+ * This helper assumes that the indicator CSS has already been registered and
+ * loaded via {@link browser.scripting.registerContentScripts} at
+ * {@code document_start}. It only toggles the visual indicator by adding the
+ * {@code spark-indicator-active} class to the tab's root HTML element.
+ *
+ * @param tabId - The ID of the tab into which the indicator class should be injected.
  */
 function injectIndicator(tabId: number): void {
   // CSS is already injected via registerContentScripts at document_start
