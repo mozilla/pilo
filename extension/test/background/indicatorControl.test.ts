@@ -107,7 +107,7 @@ describe("indicatorControl", () => {
       }
     });
 
-    it("should not throw when executeScript fails", async () => {
+    it("should not throw when insertCSS fails", async () => {
       vi.mocked(browser.scripting.insertCSS).mockRejectedValue(new Error("Tab not found"));
       await expect(showIndicator(123)).resolves.toBeUndefined();
     });
@@ -145,7 +145,7 @@ describe("indicatorControl", () => {
       // Capture and test the injected function
       const calls = vi.mocked(browser.scripting.executeScript).mock.calls;
       const lastCall = calls[calls.length - 1];
-      const options = lastCall[0] as ExecuteScriptOptions;
+      const options: ExecuteScriptOptions = lastCall[0];
 
       // Mock document.documentElement
       const mockClassList = {
