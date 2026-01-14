@@ -78,11 +78,33 @@ export interface ExecuteOptions {
   abortSignal?: AbortSignal;
 }
 
+/** Error codes for task failures */
+export enum TaskErrorCode {
+  /** Task was aborted by user */
+  TASK_ABORTED = "TASK_ABORTED",
+  /** Maximum iterations reached without completion */
+  MAX_ITERATIONS = "MAX_ITERATIONS",
+  /** Too many consecutive or total errors */
+  MAX_ERRORS = "MAX_ERRORS",
+  /** Generic task failure */
+  TASK_FAILED = "TASK_FAILED",
+}
+
+/** Structured error information for failed tasks */
+export interface TaskError {
+  /** Error code for programmatic handling */
+  code: TaskErrorCode;
+  /** Human-readable error message */
+  message: string;
+}
+
 export interface TaskExecutionResult {
   /** Whether the task completed successfully */
   success: boolean;
   /** Final answer or result from the agent */
   finalAnswer: string | null;
+  /** Error details when success is false */
+  error?: TaskError;
   /** Execution statistics */
   stats: {
     iterations: number;
@@ -99,6 +121,7 @@ interface ExecutionState {
   startTime: number;
   success: boolean;
   finalAnswer: string | null;
+  error?: TaskError;
   lastAction?: string;
   actionRepeatCount: number;
   validationAttempts: number;
@@ -196,7 +219,11 @@ export class WebAgent {
       // Check if aborted
       if (this.abortSignal?.aborted) {
         return this.buildResult(
-          { success: false, finalAnswer: "Task aborted by user" },
+          {
+            success: false,
+            finalAnswer: "Task aborted by user",
+            error: { code: TaskErrorCode.TASK_ABORTED, message: "Task aborted by user" },
+          },
           executionState,
         );
       }
@@ -207,10 +234,12 @@ export class WebAgent {
       }
 
       // Convert runtime errors to results
+      const message = `Task failed: ${this.extractErrorMessage(error)}`;
       return this.buildResult(
         {
           success: false,
-          finalAnswer: `Task failed: ${this.extractErrorMessage(error)}`,
+          finalAnswer: message,
+          error: { code: TaskErrorCode.TASK_FAILED, message },
         },
         executionState,
       );
@@ -223,7 +252,7 @@ export class WebAgent {
   private async runMainLoop(
     task: string,
     executionState: ExecutionState,
-  ): Promise<{ success: boolean; finalAnswer: string | null }> {
+  ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
@@ -250,7 +279,11 @@ export class WebAgent {
       // Check abort signal once at the start of each iteration
       if (this.abortSignal?.aborted) {
         console.warn("[WebAgent] Task aborted by user signal");
-        return { success: false, finalAnswer: "Task aborted by user" };
+        return {
+          success: false,
+          finalAnswer: "Task aborted by user",
+          error: { code: TaskErrorCode.TASK_ABORTED, message: "Task aborted by user" },
+        };
       }
 
       // Generate unique iteration ID
@@ -278,6 +311,7 @@ export class WebAgent {
         if (result.isTerminal) {
           executionState.success = result.success;
           executionState.finalAnswer = result.finalAnswer;
+          executionState.error = result.error;
           break;
         }
 
@@ -304,11 +338,16 @@ export class WebAgent {
             );
           }
 
+          const message = isNonRecoverable
+            ? `Task failed: ${errorMessage}`
+            : `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`;
           return {
             success: false,
-            finalAnswer: isNonRecoverable
-              ? `Task failed: ${errorMessage}`
-              : `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`,
+            finalAnswer: message,
+            error: {
+              code: isNonRecoverable ? TaskErrorCode.TASK_FAILED : TaskErrorCode.MAX_ERRORS,
+              message,
+            },
           };
         }
 
@@ -322,16 +361,22 @@ export class WebAgent {
 
     // Check final state
     if (executionState.finalAnswer !== null) {
-      return { success: executionState.success, finalAnswer: executionState.finalAnswer };
+      return {
+        success: executionState.success,
+        finalAnswer: executionState.finalAnswer,
+        error: executionState.error,
+      };
     }
 
     // Max iterations reached
     console.error(
       `[WebAgent] Max iterations (${this.maxIterations}) reached without completing task`,
     );
+    const message = "Maximum iterations reached without completing the task.";
     return {
       success: false,
-      finalAnswer: "Maximum iterations reached without completing the task.",
+      finalAnswer: message,
+      error: { code: TaskErrorCode.MAX_ITERATIONS, message },
     };
   }
 
@@ -558,6 +603,7 @@ export class WebAgent {
     finalAnswer: string | null;
     pageChanged: boolean;
     actionExecuted: boolean;
+    error?: TaskError;
   }> {
     // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -741,12 +787,14 @@ export class WebAgent {
           iterationId: this.currentIterationId,
         });
 
+        const message = `Aborted: ${actionOutput.reason}`;
         return {
           isTerminal: true,
           success: false,
-          finalAnswer: `Aborted: ${actionOutput.reason}`,
+          finalAnswer: message,
           pageChanged: false,
           actionExecuted: true,
+          error: { code: TaskErrorCode.TASK_ABORTED, message },
         };
       }
     }
@@ -780,6 +828,7 @@ export class WebAgent {
     finalAnswer: string | null;
     pageChanged: boolean;
     actionExecuted: boolean;
+    error?: TaskError;
   } | null {
     // Define explicit thresholds for warning and abort
     const REPETITION_WARNING_THRESHOLD = this.maxRepeatedActions + 1;
@@ -839,6 +888,7 @@ export class WebAgent {
             finalAnswer: abortMessage,
             pageChanged: false,
             actionExecuted: false,
+            error: { code: TaskErrorCode.TASK_ABORTED, message: abortMessage },
           };
         }
       }
@@ -1287,7 +1337,7 @@ export class WebAgent {
   }
 
   private buildResult(
-    executionOutcome: { success: boolean; finalAnswer: string | null },
+    executionOutcome: { success: boolean; finalAnswer: string | null; error?: TaskError },
     executionState: ExecutionState,
   ): TaskExecutionResult {
     const endTime = Date.now();
@@ -1300,6 +1350,7 @@ export class WebAgent {
     return {
       success: executionOutcome.success,
       finalAnswer: executionOutcome.finalAnswer,
+      ...(executionOutcome.error && { error: executionOutcome.error }),
       stats: {
         iterations: executionState.currentIteration,
         actions: executionState.actionCount,
