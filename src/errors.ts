@@ -6,6 +6,7 @@
  * InvalidRefException: When an element reference is invalid
  * ElementNotFoundException: When an element cannot be found
  * BrowserActionException: When a browser action fails
+ * NavigationTimeoutException: When navigation times out (triggers retry with longer timeout)
  */
 
 /**
@@ -91,5 +92,42 @@ export class ToolExecutionError extends RecoverableError {
     this.name = "ToolExecutionError";
     this.toolName = context?.action;
     this.toolOutput = context?.output;
+  }
+}
+
+/**
+ * Thrown when navigation times out after all retry attempts.
+ * This is the only navigation-specific error we handle specially (for retries).
+ * Other navigation errors (connection refused, SSL errors, etc.) bubble up as-is.
+ *
+ * @see browser/navigationRetry.ts for retry configuration (timeouts, attempts, etc.)
+ */
+export class NavigationTimeoutException extends BrowserException {
+  public readonly url: string;
+  public readonly timeoutMs: number;
+  public readonly attempt: number;
+  public readonly maxAttempts: number;
+
+  constructor(
+    url: string,
+    timeoutMs: number,
+    context?: { attempt?: number; maxAttempts?: number },
+  ) {
+    const attempt = context?.attempt ?? 1;
+    const maxAttempts = context?.maxAttempts ?? 1;
+    super(
+      `Navigation to '${url}' timed out after ${timeoutMs}ms (attempt ${attempt}/${maxAttempts})`,
+      {
+        url,
+        timeoutMs,
+        attempt,
+        maxAttempts,
+      },
+    );
+    this.name = "NavigationTimeoutException";
+    this.url = url;
+    this.timeoutMs = timeoutMs;
+    this.attempt = attempt;
+    this.maxAttempts = maxAttempts;
   }
 }

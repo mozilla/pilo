@@ -57,6 +57,14 @@ export interface SparkConfig {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   bypass_csp?: boolean;
+
+  // Navigation Retry Configuration
+  navigation_timeout_ms?: number;
+  navigation_max_attempts?: number;
+  navigation_timeout_multiplier?: number;
+
+  // Action Timeout Configuration
+  action_timeout_ms?: number;
 }
 
 export class ConfigManager {
@@ -214,6 +222,22 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_BYPASS_CSP && {
         bypass_csp: process.env.SPARK_BYPASS_CSP === "true",
+      }),
+
+      // Navigation Retry Configuration
+      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MS && {
+        navigation_timeout_ms: parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10),
+      }),
+      ...(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS && {
+        navigation_max_attempts: parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10),
+      }),
+      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER && {
+        navigation_timeout_multiplier: parseFloat(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER),
+      }),
+
+      // Action Timeout Configuration
+      ...(process.env.SPARK_ACTION_TIMEOUT_MS && {
+        action_timeout_ms: parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10),
       }),
     };
 
@@ -374,6 +398,20 @@ export class ConfigManager {
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;
     if (process.env.SPARK_PW_CDP_ENDPOINT) env.pw_cdp_endpoint = process.env.SPARK_PW_CDP_ENDPOINT;
     if (process.env.SPARK_BYPASS_CSP) env.bypass_csp = process.env.SPARK_BYPASS_CSP === "true";
+
+    // Navigation Retry Configuration
+    if (process.env.SPARK_NAVIGATION_TIMEOUT_MS)
+      env.navigation_timeout_ms = parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10);
+    if (process.env.SPARK_NAVIGATION_MAX_ATTEMPTS)
+      env.navigation_max_attempts = parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10);
+    if (process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER)
+      env.navigation_timeout_multiplier = parseFloat(
+        process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER,
+      );
+
+    // Action Timeout Configuration
+    if (process.env.SPARK_ACTION_TIMEOUT_MS)
+      env.action_timeout_ms = parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10);
 
     const merged = this.getConfig();
 
