@@ -285,6 +285,33 @@ describe("CLI Run Command", () => {
       );
     });
 
+    it("should pass navigation retry and action timeout options correctly", async () => {
+      const args = [
+        "--navigation-timeout-ms",
+        "20000",
+        "--navigation-max-attempts",
+        "5",
+        "--navigation-timeout-multiplier",
+        "1.5",
+        "--action-timeout-ms",
+        "15000",
+        "test task",
+      ];
+
+      await command.parseAsync(args, { from: "user" });
+
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionTimeoutMs: 15000,
+          navigationRetry: expect.objectContaining({
+            baseTimeoutMs: 20000,
+            maxAttempts: 5,
+            timeoutMultiplier: 1.5,
+          }),
+        }),
+      );
+    });
+
     it("should pass WebAgent options correctly", async () => {
       const args = [
         "--debug",
