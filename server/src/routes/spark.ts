@@ -71,6 +71,14 @@ interface SparkTaskRequest {
   proxyUsername?: string;
   proxyPassword?: string;
 
+  // Navigation retry configuration overrides
+  navigationTimeoutMs?: number;
+  navigationMaxAttempts?: number;
+  navigationTimeoutMultiplier?: number;
+
+  // Action timeout configuration
+  actionTimeoutMs?: number;
+
   // Logging configuration
   logger?: "console" | "json";
 }
@@ -145,6 +153,13 @@ spark.post("/run", async (c) => {
           proxyServer: body.proxy || serverConfig.proxy,
           proxyUsername: body.proxyUsername || serverConfig.proxy_username,
           proxyPassword: body.proxyPassword || serverConfig.proxy_password,
+          actionTimeoutMs: body.actionTimeoutMs || serverConfig.action_timeout_ms,
+          navigationRetry: {
+            baseTimeoutMs: body.navigationTimeoutMs || serverConfig.navigation_timeout_ms,
+            maxAttempts: body.navigationMaxAttempts || serverConfig.navigation_max_attempts,
+            timeoutMultiplier:
+              body.navigationTimeoutMultiplier || serverConfig.navigation_timeout_multiplier,
+          },
         };
 
         const webAgentConfig = {
