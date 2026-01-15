@@ -60,7 +60,7 @@ export interface PlaywrightBrowserOptions {
   pwEndpoint?: string;
   /** Navigation retry configuration */
   navigationRetry?: Partial<NavigationRetryConfig>;
-  /** Timeout for page load and element actions in milliseconds (default: 10000) */
+  /** Timeout for page load and element actions in milliseconds (default: 30000) */
   actionTimeoutMs?: number;
 }
 
@@ -85,7 +85,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   // Default timeout for element actions (clicks, fills, etc.)
   // Navigation timeouts and network errors are handled by navigationRetry
-  private static readonly DEFAULT_ACTION_TIMEOUT_MS = 10000; // 10 seconds
+  private static readonly DEFAULT_ACTION_TIMEOUT_MS = 30000; // 30 seconds
 
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
