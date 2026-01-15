@@ -51,6 +51,8 @@ interface SparkTaskRequest {
 
   // Browser configuration overrides
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  channel?: string;
+  executablePath?: string;
   headless?: boolean;
   vision?: boolean;
   debug?: boolean;
@@ -68,6 +70,14 @@ interface SparkTaskRequest {
   proxy?: string;
   proxyUsername?: string;
   proxyPassword?: string;
+
+  // Navigation retry configuration overrides
+  navigationTimeoutMs?: number;
+  navigationMaxAttempts?: number;
+  navigationTimeoutMultiplier?: number;
+
+  // Action timeout configuration
+  actionTimeoutMs?: number;
 
   // Logging configuration
   logger?: "console" | "json";
@@ -122,6 +132,8 @@ spark.post("/run", async (c) => {
         // Merge server config with request overrides
         const browserConfig = {
           browser: body.browser || serverConfig.browser || "firefox",
+          channel: body.channel || serverConfig.channel,
+          executablePath: body.executablePath || serverConfig.executable_path,
           headless:
             body.headless !== undefined
               ? body.headless
@@ -141,6 +153,13 @@ spark.post("/run", async (c) => {
           proxyServer: body.proxy || serverConfig.proxy,
           proxyUsername: body.proxyUsername || serverConfig.proxy_username,
           proxyPassword: body.proxyPassword || serverConfig.proxy_password,
+          actionTimeoutMs: body.actionTimeoutMs || serverConfig.action_timeout_ms,
+          navigationRetry: {
+            baseTimeoutMs: body.navigationTimeoutMs || serverConfig.navigation_timeout_ms,
+            maxAttempts: body.navigationMaxAttempts || serverConfig.navigation_max_attempts,
+            timeoutMultiplier:
+              body.navigationTimeoutMultiplier || serverConfig.navigation_timeout_multiplier,
+          },
         };
 
         const webAgentConfig = {

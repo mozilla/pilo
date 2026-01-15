@@ -1,4 +1,5 @@
-import { defineConfig, type WebExtConfig } from "wxt";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { defineConfig, type WebExtConfig, type Wxt } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
@@ -38,15 +39,36 @@ function generateWebExtJSON(): WebExtConfig {
 // See https://wxt.dev/api/config.html
 let config = {
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
+  hooks: {
+    // WXT dev mode strips content_scripts from manifest even with registration: "manifest".
+    // This hook ensures content scripts are included in the manifest during dev mode.
+    "build:manifestGenerated": (wxt: Wxt, manifest: Browser.runtime.Manifest) => {
+      if (wxt.config.command === "serve") {
+        manifest.content_scripts = [
+          {
+            matches: ["<all_urls>"],
+            run_at: "document_start",
+            js: ["content-scripts/content.js"],
+          },
+        ];
+      }
+    },
+  },
   vite: () => ({
     plugins: [tailwindcss()] as any,
+    server: {
+      fs: {
+        // Allow serving files from parent node_modules (for @fontsource-variable/inter)
+        allow: [".."],
+      },
+    },
   }),
   manifest: ({ browser }: { browser: string }) => {
     // Common configuration for all browsers
     const baseManifest = {
       name: "Spark Extension",
       description: "AI-powered web automation browser extension",
-      permissions: ["activeTab", "storage", "scripting", "tabs"],
+      permissions: ["activeTab", "storage", "scripting", "tabs", "webNavigation"],
       host_permissions: ["*://*/*"],
     };
 
@@ -60,6 +82,11 @@ let config = {
         },
         action: {
           default_title: "Open Spark Sidepanel",
+          default_icon: {
+            16: "icon/16.png",
+            24: "icon/24.png",
+            32: "icon/32.png",
+          },
         },
       };
     }

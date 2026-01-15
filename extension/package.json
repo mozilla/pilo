@@ -29,18 +29,19 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.1.1",
     "@tailwindcss/vite": "^4.1.17",
     "@types/webextension-polyfill": "^0.12.4",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "clsx": "^2.1.1",
     "marked-react": "^3.0.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "spark": "file:..",
-    "tailwindcss": "^4.1.17",
+    "tailwindcss": "^4.1.18",
     "webextension-polyfill": "^0.12.0",
-    "yaml": "^2.8.0",
-    "zustand": "^5.0.8"
+    "yaml": "^2.8.2",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
@@ -50,8 +51,8 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
-    "happy-dom": "^20.0.10",
-    "prettier": "^3.6.2",
+    "happy-dom": "^20.0.11",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.14",
     "wxt": "0.20.11"

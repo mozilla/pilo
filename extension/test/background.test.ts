@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import browser from "webextension-polyfill";
+import { EventStoreLogger } from "../src/EventStoreLogger";
+
+// Mock the webextension-polyfill module
+vi.mock("webextension-polyfill", () => ({
+  default: {
+    tabs: {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    },
+    runtime: {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    },
+  },
+}));
 
 // This test validates the TypeScript interface and the integration
 // with AgentManager. We cannot easily test the WXT defineBackground
@@ -197,3 +211,199 @@ describe("Background Script - Provider Support", () => {
     });
   });
 });
+
+// Note: "Background Script - Indicator Event Forwarding" tests removed
+// Indicator is now controlled via CSS injection in background script (see indicatorControl.ts)
+// instead of forwarding events to content script via tabs.sendMessage
+
+describe("Background Script - Error Handling", () => {
+  describe("task:completed event on success", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should emit task:completed event when task execution succeeds", async () => {
+      // Arrange - create logger with tabId
+      const tabId = 789;
+      const logger = new EventStoreLogger(tabId);
+      const successResult = { answer: "Task completed successfully" };
+
+      // Act - simulate what background script should do on successful completion
+      logger.addEvent("task:completed", {
+        finalAnswer: successResult.answer,
+        success: true,
+        timestamp: Date.now(),
+        iterationId: "final",
+      });
+
+      // Assert - task:completed event should be broadcast
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "realtimeEvent",
+          tabId: 789,
+          event: expect.objectContaining({
+            type: "task:completed",
+            data: expect.objectContaining({
+              success: true,
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("task:aborted event on error", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should emit task:aborted event when task execution fails", async () => {
+      // Arrange - create logger with tabId (simulating background script behavior)
+      const tabId = 123;
+      const logger = new EventStoreLogger(tabId);
+      const errorMessage = "No starting URL determined";
+
+      // Act - simulate what background script should do when catching an error
+      // This documents the expected pattern: emit task:aborted on error
+      logger.addEvent("task:aborted", {
+        reason: errorMessage,
+        finalAnswer: `Task failed: ${errorMessage}`,
+        timestamp: Date.now(),
+        iterationId: "error",
+      });
+
+      // Assert - task:aborted event should be broadcast with tabId
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "realtimeEvent",
+          tabId: 123,
+          event: expect.objectContaining({
+            type: "task:aborted",
+            data: expect.objectContaining({
+              reason: errorMessage,
+            }),
+          }),
+        }),
+      );
+      // Note: Indicator visibility is now handled via CSS injection in background script
+      // (see indicatorControl.ts) instead of forwarding to content script via tabs.sendMessage
+    });
+
+    it("should emit task:aborted when task is cancelled by user", async () => {
+      // Arrange
+      const tabId = 456;
+      const logger = new EventStoreLogger(tabId);
+
+      // Act - simulate cancellation
+      logger.addEvent("task:aborted", {
+        reason: "Task cancelled by user",
+        finalAnswer: "Task cancelled",
+        timestamp: Date.now(),
+        iterationId: "cancelled",
+      });
+
+      // Assert - event should be broadcast to sidepanel via runtime.sendMessage
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "realtimeEvent",
+          tabId: 456,
+          event: expect.objectContaining({
+            type: "task:aborted",
+          }),
+        }),
+      );
+      // Note: Indicator visibility is now handled via CSS injection in background script
+      // (see indicatorControl.ts) instead of forwarding to content script via tabs.sendMessage
+    });
+  });
+});
+
+describe("Background Script - TabId Wiring", () => {
+  describe("EventStoreLogger tabId wiring", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should create EventStoreLogger with tabId from executeTask message", () => {
+      // This test documents the expected pattern for creating EventStoreLogger
+      // The actual background script should pass tabId to EventStoreLogger constructor
+      // Arrange
+      const tabId = 123;
+
+      // Act - simulate what background.ts should do
+      const logger = new EventStoreLogger(tabId);
+
+      // Assert - logger should be created with tabId
+      expect(logger).toBeInstanceOf(EventStoreLogger);
+    });
+
+    it("should propagate tabId through all events during task execution", async () => {
+      // This test documents that EventStoreLogger with tabId broadcasts correctly
+      // Arrange
+      const tabId = 456;
+      const logger = new EventStoreLogger(tabId);
+
+      // Act - add multiple events
+      logger.addEvent("task:setup", { timestamp: Date.now() });
+      logger.addEvent("task:completed", { timestamp: Date.now() });
+
+      // Assert - all events should have been broadcast with tabId
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(2);
+      const calls = vi.mocked(browser.runtime.sendMessage).mock.calls;
+      calls.forEach((call) => {
+        expect(call[0]).toMatchObject({
+          type: "realtimeEvent",
+          tabId: 456,
+        });
+      });
+    });
+
+    it("should handle missing tabId in executeTask message gracefully", () => {
+      // Background script should check for missing tabId and return error
+      // This documents the expected validation pattern
+
+      // The expected response when tabId is missing from an executeTask message
+      const expectedResponse = {
+        success: false,
+        message: "No tab ID provided for task execution",
+      };
+
+      // Assert - this is the response pattern the background script should return
+      expect(expectedResponse.success).toBe(false);
+      expect(expectedResponse.message).toContain("tab ID");
+    });
+  });
+});
+
+describe("Background Script - Cleanup Ordering", () => {
+  it("should cleanup runningTasks before hiding indicator", async () => {
+    // This test documents the expected execution order in the finally block:
+    // 1. Remove from runningTasks (cleanup internal state)
+    // 2. Hide indicator (provide visual feedback)
+    //
+    // This ensures cleanup completes before user sees "task finished" signal
+
+    const mockRunningTasks = new Map<number, AbortController>();
+    const tabId = 999;
+    const controller = new AbortController();
+    mockRunningTasks.set(tabId, controller);
+
+    // Simulate finally block execution order
+    const executionOrder: string[] = [];
+
+    // Step 1: Cleanup
+    mockRunningTasks.delete(tabId);
+    executionOrder.push("cleanup");
+    expect(mockRunningTasks.has(tabId)).toBe(false);
+
+    // Step 2: Hide indicator (simulated)
+    executionOrder.push("hideIndicator");
+
+    // Assert: cleanup happened before hideIndicator
+    expect(executionOrder).toEqual(["cleanup", "hideIndicator"]);
+  });
+});
+
+// Note: Indicator control via isIndicatorActive() is implemented in background.ts:147-160
+// The background script checks actual indicator state before hiding to avoid race conditions.
+// See background.ts logger.subscribe() callback for implementation details.

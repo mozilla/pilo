@@ -9,16 +9,28 @@ import {
   BrowserContextOptions,
   ConnectOptions,
   Locator,
+  errors as playwrightErrors,
 } from "playwright";
 import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
-import { InvalidRefException, BrowserActionException } from "../errors.js";
+import {
+  InvalidRefException,
+  BrowserActionException,
+  NavigationTimeoutException,
+  NavigationNetworkException,
+} from "../errors.js";
+import {
+  NavigationRetryConfig,
+  DEFAULT_NAVIGATION_RETRY_CONFIG,
+  calculateTimeout,
+} from "./navigationRetry.js";
 
 // Type extension for Playwright's private AI snapshot function
+// See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
 type PageEx = Page & {
-  _snapshotForAI: () => Promise<string>;
+  _snapshotForAI: () => Promise<{ full: string; incremental?: string }>;
 };
 
 export interface PlaywrightBrowserOptions {
@@ -28,20 +40,28 @@ export interface PlaywrightBrowserOptions {
   blockAds?: boolean;
   /** Block specific resource types to improve performance */
   blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
-  /** Playwright endpoint URL to connect to remote browser */
-  pwEndpoint?: string;
-  /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
-  pwCdpEndpoint?: string;
-  /** Run browser in headless mode (maps to launchOptions.headless) */
-  headless?: boolean;
   /** Bypass Content Security Policy (maps to contextOptions.bypassCSP) */
   bypassCSP?: boolean;
+  /** Browser channel to use (e.g. 'chrome', 'msedge', 'chrome-beta', 'firefox') */
+  channel?: string;
+  /** Path to a browser executable to use instead of the bundled browser (maps to launchOptions.executablePath) */
+  executablePath?: string;
+  /** Run browser in headless mode (maps to launchOptions.headless) */
+  headless?: boolean;
   /** Proxy server URL (http://host:port, https://host:port, socks5://host:port) */
   proxyServer?: string;
   /** Proxy authentication username */
   proxyUsername?: string;
   /** Proxy authentication password */
   proxyPassword?: string;
+  /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
+  pwCdpEndpoint?: string;
+  /** Playwright endpoint URL to connect to remote browser */
+  pwEndpoint?: string;
+  /** Navigation retry configuration */
+  navigationRetry?: Partial<NavigationRetryConfig>;
+  /** Timeout for page load and element actions in milliseconds (default: 10000) */
+  actionTimeoutMs?: number;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -58,16 +78,33 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
  */
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
+  public channel: string | undefined;
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
 
-  // Default timeouts
-  // TODO: Make this configurable
-  private readonly ACTION_TIMEOUT_MS = 30000; // 30 seconds timeout for interactive actions
+  // Default timeout for element actions (clicks, fills, etc.)
+  // Navigation timeouts and network errors are handled by navigationRetry
+  private static readonly DEFAULT_ACTION_TIMEOUT_MS = 10000; // 10 seconds
+
+  // Timeout for page load and element actions (configurable)
+  private readonly actionTimeoutMs: number;
+
+  // Navigation retry configuration
+  private readonly navigationConfig: NavigationRetryConfig;
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
+    this.channel = this.options.channel ?? this.getDefaultChannel();
+
+    // Initialize action timeout from options or use default
+    this.actionTimeoutMs = options.actionTimeoutMs ?? PlaywrightBrowser.DEFAULT_ACTION_TIMEOUT_MS;
+
+    // Initialize navigation retry config with defaults and overrides
+    this.navigationConfig = {
+      ...DEFAULT_NAVIGATION_RETRY_CONFIG,
+      ...options.navigationRetry,
+    };
   }
 
   get pwEndpoint(): string | undefined {
@@ -83,6 +120,29 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
+   * Get the default channel based on browser type
+   */
+  private getDefaultChannel(): string | undefined {
+    const browserType = this.options.browser ?? "firefox";
+
+    switch (browserType) {
+      case "edge":
+        // Edge uses the "msedge" channel in Playwright
+        return "msedge";
+      case "chrome":
+        return "chrome";
+      case "firefox":
+        return "firefox";
+      case "chromium":
+      case "safari":
+      case "webkit":
+      default:
+        // These browsers don't use channels or use bundled versions
+        return undefined;
+    }
+  }
+
+  /**
    * Maps Spark's top-level options into the appropriate Playwright options
    * Top-level options take precedence over Playwright options
    */
@@ -93,6 +153,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   } {
     const launchOptions: LaunchOptions = {
       headless: false, // Spark default
+      channel: this.options.channel ?? this.getDefaultChannel(),
       ...this.options.launchOptions, // User-provided Playwright options
     };
 
@@ -116,6 +177,12 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
     if (this.options.bypassCSP !== undefined) {
       contextOptions.bypassCSP = this.options.bypassCSP;
+    }
+    if (this.options.channel !== undefined) {
+      launchOptions.channel = this.options.channel;
+    }
+    if (this.options.executablePath !== undefined) {
+      launchOptions.executablePath = this.options.executablePath;
     }
     if (this.options.proxyServer) {
       launchOptions.proxy = {
@@ -166,13 +233,13 @@ export class PlaywrightBrowser implements AriaBrowser {
         break;
 
       case "edge":
-        // Edge uses chromium with channel setting
+        // Edge uses chromium with channel setting (defaults to "msedge")
         if (this.options.pwCdpEndpoint) {
           this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
         } else if (this.options.pwEndpoint) {
           this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
         } else {
-          this.browser = await chromium.launch({ ...launchOptions, channel: "msedge" });
+          this.browser = await chromium.launch(launchOptions);
         }
         break;
 
@@ -186,7 +253,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.page = await this.context.newPage();
 
     // Set consistent default timeout for all operations
-    this.page.setDefaultTimeout(this.ACTION_TIMEOUT_MS);
+    this.page.setDefaultTimeout(this.actionTimeoutMs);
 
     // Enable ad blocking if requested
     if (this.options.blockAds) {
@@ -233,44 +300,126 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
   }
 
+  /**
+   * Navigate to URL with smart retry and tiered timeouts
+   */
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    try {
-      // Use "commit" for fastest initial navigation (just waits for document to start loading)
-      await this.page.goto(url, {
-        waitUntil: "commit",
-        timeout: this.ACTION_TIMEOUT_MS,
-      });
-      await this.ensureOptimizedPageLoad();
-    } catch (error) {
-      throw error; // Re-throw to allow caller to handle
-    }
+    await this.executeNavigationWithRetry((timeoutMs) => this.performGoto(url, timeoutMs), url);
   }
 
+  /**
+   * Go back with smart retry
+   */
   async goBack(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    try {
-      await this.page.goBack({
-        waitUntil: "commit",
-        timeout: this.ACTION_TIMEOUT_MS,
-      });
-      await this.ensureOptimizedPageLoad();
-    } catch (error) {
-      throw error; // Re-throw to allow caller to handle
+    await this.executeNavigationWithRetry(
+      (timeoutMs) => this.performGoBack(timeoutMs),
+      "history.back()",
+    );
+  }
+
+  /**
+   * Go forward with smart retry
+   */
+  async goForward(): Promise<void> {
+    if (!this.page) throw new Error("Browser not started");
+    await this.executeNavigationWithRetry(
+      (timeoutMs) => this.performGoForward(timeoutMs),
+      "history.forward()",
+    );
+  }
+
+  /**
+   * Execute navigation with tiered retry logic.
+   * Retries on timeout errors and network errors (net::ERR_*).
+   */
+  private async executeNavigationWithRetry(
+    operation: (timeoutMs: number) => Promise<void>,
+    url: string,
+  ): Promise<void> {
+    const maxAttempts = this.navigationConfig.maxAttempts;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const timeoutMs = calculateTimeout(attempt, this.navigationConfig);
+
+      try {
+        await operation(timeoutMs);
+        return; // Success
+      } catch (error) {
+        const isTimeout = error instanceof playwrightErrors.TimeoutError;
+        const isNetworkError = error instanceof Error && this.isNetworkError(error);
+        const isRetryable = isTimeout || isNetworkError;
+
+        if (!isRetryable) {
+          throw error;
+        }
+
+        // Last attempt - throw appropriate exception
+        if (attempt >= maxAttempts) {
+          if (isTimeout) {
+            throw new NavigationTimeoutException(url, timeoutMs, { attempt, maxAttempts });
+          } else {
+            throw new NavigationNetworkException(url, (error as Error).message, {
+              attempt,
+              maxAttempts,
+            });
+          }
+        }
+
+        // More attempts remaining - call retry callback and continue
+        if (this.navigationConfig.onRetry) {
+          const nextTimeout = calculateTimeout(attempt + 1, this.navigationConfig);
+          this.navigationConfig.onRetry(attempt, error as Error, nextTimeout);
+        }
+      }
     }
   }
 
-  async goForward(): Promise<void> {
-    if (!this.page) throw new Error("Browser not started");
-    try {
-      await this.page.goForward({
-        waitUntil: "commit",
-        timeout: this.ACTION_TIMEOUT_MS,
-      });
-      await this.ensureOptimizedPageLoad();
-    } catch (error) {
-      throw error; // Re-throw to allow caller to handle
-    }
+  /**
+   * Check if an error is a retryable network error.
+   * Covers Chromium (net::ERR_*) and Firefox (NS_ERROR_*, NS_BINDING_*) patterns.
+   */
+  private isNetworkError(error: Error): boolean {
+    const message = error.message;
+    return (
+      message.includes("net::") || // Chromium: net::ERR_CONNECTION_REFUSED, etc.
+      message.includes("NS_ERROR_") || // Firefox: NS_ERROR_NET_RESET, etc.
+      message.includes("NS_BINDING_") // Firefox: NS_BINDING_ABORTED, etc.
+    );
+  }
+
+  /**
+   * Internal goto implementation
+   */
+  private async performGoto(url: string, timeoutMs: number): Promise<void> {
+    await this.page!.goto(url, {
+      waitUntil: "commit",
+      timeout: timeoutMs,
+    });
+    await this.ensureOptimizedPageLoad();
+  }
+
+  /**
+   * Internal goBack implementation
+   */
+  private async performGoBack(timeoutMs: number): Promise<void> {
+    await this.page!.goBack({
+      waitUntil: "commit",
+      timeout: timeoutMs,
+    });
+    await this.ensureOptimizedPageLoad();
+  }
+
+  /**
+   * Internal goForward implementation
+   */
+  private async performGoForward(timeoutMs: number): Promise<void> {
+    await this.page!.goForward({
+      waitUntil: "commit",
+      timeout: timeoutMs,
+    });
+    await this.ensureOptimizedPageLoad();
   }
 
   // Private helper method to ensure page is usable with appropriate timeouts
@@ -284,11 +433,11 @@ export class PlaywrightBrowser implements AriaBrowser {
       // Still continue since we might be able to interact with what's loaded
     }
 
-    // 2. Try to wait for full load, but cap at 10 seconds
+    // 2. Try to wait for full load, but don't block forever
     // We catch and ignore timeout errors since the page is usable after domcontentloaded
     try {
       await this.page.waitForLoadState("load", {
-        timeout: this.ACTION_TIMEOUT_MS,
+        timeout: this.actionTimeoutMs,
       });
     } catch (error) {
       // Page load timed out - continue anyway
@@ -310,7 +459,8 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    return await (this.page as PageEx)._snapshotForAI();
+    const snapshot = await (this.page as PageEx)._snapshotForAI();
+    return snapshot.full;
   }
 
   /**
@@ -421,44 +571,44 @@ export class PlaywrightBrowser implements AriaBrowser {
       switch (action) {
         // Element interactions
         case PageAction.Click:
-          await locator!.click({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.click({ timeout: this.actionTimeoutMs });
           // Ensure page is usable after click that may cause navigation
           await this.ensureOptimizedPageLoad();
           break;
 
         case PageAction.Hover:
-          await locator!.hover({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.hover({ timeout: this.actionTimeoutMs });
           break;
 
         case PageAction.Fill:
           if (!value) throw new BrowserActionException("fill", "Value required for fill action");
-          await locator!.fill(value, { timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.fill(value, { timeout: this.actionTimeoutMs });
           break;
 
         case PageAction.Focus:
-          await locator!.focus({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.focus({ timeout: this.actionTimeoutMs });
           break;
 
         case PageAction.Check:
-          await locator!.check({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.check({ timeout: this.actionTimeoutMs });
           break;
 
         case PageAction.Uncheck:
-          await locator!.uncheck({ timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.uncheck({ timeout: this.actionTimeoutMs });
           break;
 
         case PageAction.Select:
           if (!value)
             throw new BrowserActionException("select", "Value required for select action");
           await locator!.selectOption(value, {
-            timeout: this.ACTION_TIMEOUT_MS,
+            timeout: this.actionTimeoutMs,
           });
           // Forms might trigger page reloads on select
           await this.ensureOptimizedPageLoad();
           break;
 
         case PageAction.Enter:
-          await locator!.press("Enter", { timeout: this.ACTION_TIMEOUT_MS });
+          await locator!.press("Enter", { timeout: this.actionTimeoutMs });
           // Forms might trigger page reloads on enter
           await this.ensureOptimizedPageLoad();
           break;

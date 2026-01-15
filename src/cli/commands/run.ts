@@ -42,6 +42,16 @@ export function createRunCommand(): Command {
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
       config.get("browser", "firefox"),
     )
+    .option(
+      "--channel <channel>",
+      "Browser channel to use (e.g., chrome, msedge, chrome-beta, moz-firefox)",
+      config.get("channel"),
+    )
+    .option(
+      "--executable-path <path>",
+      "Path to browser executable (e.g., /usr/bin/firefox, /Applications/Firefox.app/Contents/MacOS/firefox)",
+      config.get("executable_path"),
+    )
     .option("--headless", "Run browser in headless mode", config.get("headless", false))
     .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
     .option(
@@ -101,6 +111,26 @@ export function createRunCommand(): Command {
       "Proxy authentication password",
       config.get("proxy_password"),
     )
+    .option(
+      "--navigation-timeout-ms <number>",
+      "Base navigation timeout in milliseconds",
+      String(config.get("navigation_timeout_ms", 15000)),
+    )
+    .option(
+      "--navigation-max-attempts <number>",
+      "Maximum navigation attempts (e.g., 3 means try up to 3 times)",
+      String(config.get("navigation_max_attempts", 3)),
+    )
+    .option(
+      "--navigation-timeout-multiplier <number>",
+      "Timeout multiplier for each retry (e.g., 2 means 15s -> 30s -> 60s)",
+      String(config.get("navigation_timeout_multiplier", 2)),
+    )
+    .option(
+      "--action-timeout-ms <number>",
+      "Timeout for page load and element actions in milliseconds",
+      String(config.get("action_timeout_ms", 10000)),
+    )
     .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
     .option(
       "--metrics-incremental",
@@ -152,18 +182,38 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       ),
     );
 
-    // Create browser instance
+    // Create browser instance with navigation retry config
     const browser = new PlaywrightBrowser({
       browser: options.browser,
+      bypassCSP: options.bypassCsp,
+      channel: options.channel,
+      executablePath: options.executablePath,
       blockAds: options.blockAds ?? config.get("block_ads", true),
       blockResources,
-      pwEndpoint: options.pwEndpoint,
-      pwCdpEndpoint: options.pwCdpEndpoint,
       headless: options.headless,
-      bypassCSP: options.bypassCsp,
       proxyServer: options.proxy,
       proxyUsername: options.proxyUsername,
       proxyPassword: options.proxyPassword,
+      pwEndpoint: options.pwEndpoint,
+      pwCdpEndpoint: options.pwCdpEndpoint,
+      actionTimeoutMs: options.actionTimeoutMs ? parseInt(options.actionTimeoutMs) : undefined,
+      navigationRetry: {
+        baseTimeoutMs: options.navigationTimeoutMs
+          ? parseInt(options.navigationTimeoutMs)
+          : undefined,
+        maxAttempts: options.navigationMaxAttempts
+          ? parseInt(options.navigationMaxAttempts)
+          : undefined,
+        timeoutMultiplier: options.navigationTimeoutMultiplier
+          ? parseFloat(options.navigationTimeoutMultiplier)
+          : undefined,
+        onRetry: (attempt, error, nextTimeout) => {
+          console.log(
+            chalk.yellow(`⚠️ Navigation retry ${attempt}: ${error.message}`),
+            chalk.gray(`(next timeout: ${Math.round(nextTimeout / 1000)}s)`),
+          );
+        },
+      },
     });
 
     // Create AI provider with CLI overrides

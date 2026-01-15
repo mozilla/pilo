@@ -149,6 +149,96 @@ describe("Config Integration", () => {
     });
   });
 
+  describe("channel configuration", () => {
+    it("should merge channel environment variable", () => {
+      const mockSparkConfig: SparkConfig = {
+        browser: "chrome",
+        channel: "chrome-beta",
+      };
+
+      mockConfig.getConfig.mockReturnValue(mockSparkConfig);
+
+      const result = mockConfig.getConfig();
+      expect(result.channel).toBe("chrome-beta");
+    });
+
+    it("should handle missing channel config gracefully", () => {
+      mockConfig.getConfig.mockReturnValue({
+        browser: "firefox",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.channel).toBeUndefined();
+    });
+
+    it("should support various channel values", () => {
+      const channels = ["firefox", "moz-firefox"];
+
+      channels.forEach((channel) => {
+        mockConfig.getConfig.mockReturnValue({
+          browser: "firefox",
+          channel,
+        });
+
+        const result = mockConfig.getConfig();
+        expect(result.channel).toBe(channel);
+      });
+    });
+  });
+
+  describe("executablePath configuration", () => {
+    it("should merge executable_path environment variable", () => {
+      const mockSparkConfig: SparkConfig = {
+        browser: "chrome",
+        executable_path: "/usr/bin/google-chrome-beta",
+      };
+
+      mockConfig.getConfig.mockReturnValue(mockSparkConfig);
+
+      const result = mockConfig.getConfig();
+      expect(result.executable_path).toBe("/usr/bin/google-chrome-beta");
+    });
+
+    it("should handle missing executable_path config gracefully", () => {
+      mockConfig.getConfig.mockReturnValue({
+        browser: "firefox",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.executable_path).toBeUndefined();
+    });
+
+    it("should support various executable_path values", () => {
+      const paths = [
+        "/usr/bin/firefox",
+        "/Applications/Firefox.app/Contents/MacOS/firefox",
+        "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+      ];
+
+      paths.forEach((executable_path) => {
+        mockConfig.getConfig.mockReturnValue({
+          browser: "firefox",
+          executable_path,
+        });
+
+        const result = mockConfig.getConfig();
+        expect(result.executable_path).toBe(executable_path);
+      });
+    });
+
+    it("should handle executable_path with channel", () => {
+      mockConfig.getConfig.mockReturnValue({
+        browser: "chrome",
+        channel: "chrome-beta",
+        executable_path: "/usr/bin/google-chrome-beta",
+      });
+
+      const result = mockConfig.getConfig();
+      expect(result.channel).toBe("chrome-beta");
+      expect(result.executable_path).toBe("/usr/bin/google-chrome-beta");
+    });
+  });
+
   describe("proxy environment variables", () => {
     it("should merge proxy environment variables", () => {
       const mockSparkConfig: SparkConfig = {

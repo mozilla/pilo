@@ -210,17 +210,19 @@ describe("CLI Run Command", () => {
       const args = ["test task"];
       await command.parseAsync(args, { from: "user" });
 
-      expect(mockPlaywrightBrowser).toHaveBeenCalledWith({
-        browser: "firefox",
-        blockAds: true, // Default from --no-block-ads option
-        blockResources: ["media", "manifest"], // Default from config
-        pwEndpoint: undefined,
-        headless: false,
-        bypassCSP: false, // Default from config
-        proxyServer: undefined,
-        proxyUsername: undefined,
-        proxyPassword: undefined,
-      });
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          browser: "firefox",
+          blockAds: true, // Default from --no-block-ads option
+          blockResources: ["media", "manifest"], // Default from config
+          pwEndpoint: undefined,
+          headless: false,
+          bypassCSP: false, // Default from config
+          proxyServer: undefined,
+          proxyUsername: undefined,
+          proxyPassword: undefined,
+        }),
+      );
 
       expect(mockCreateAIProvider).toHaveBeenCalledWith({
         provider: "openai",
@@ -268,17 +270,46 @@ describe("CLI Run Command", () => {
 
       await command.parseAsync(args, { from: "user" });
 
-      expect(mockPlaywrightBrowser).toHaveBeenCalledWith({
-        browser: "chromium",
-        blockAds: true, // Default from --no-block-ads option
-        blockResources: ["image", "stylesheet"],
-        pwEndpoint: "ws://localhost:9222",
-        headless: true,
-        bypassCSP: true,
-        proxyServer: undefined,
-        proxyUsername: undefined,
-        proxyPassword: undefined,
-      });
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          browser: "chromium",
+          blockAds: true, // Default from --no-block-ads option
+          blockResources: ["image", "stylesheet"],
+          pwEndpoint: "ws://localhost:9222",
+          headless: true,
+          bypassCSP: true,
+          proxyServer: undefined,
+          proxyUsername: undefined,
+          proxyPassword: undefined,
+        }),
+      );
+    });
+
+    it("should pass navigation retry and action timeout options correctly", async () => {
+      const args = [
+        "--navigation-timeout-ms",
+        "20000",
+        "--navigation-max-attempts",
+        "5",
+        "--navigation-timeout-multiplier",
+        "1.5",
+        "--action-timeout-ms",
+        "15000",
+        "test task",
+      ];
+
+      await command.parseAsync(args, { from: "user" });
+
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionTimeoutMs: 15000,
+          navigationRetry: expect.objectContaining({
+            baseTimeoutMs: 20000,
+            maxAttempts: 5,
+            timeoutMultiplier: 1.5,
+          }),
+        }),
+      );
     });
 
     it("should pass WebAgent options correctly", async () => {
@@ -389,17 +420,19 @@ describe("CLI Run Command", () => {
 
       await command.parseAsync(args, { from: "user" });
 
-      expect(mockPlaywrightBrowser).toHaveBeenCalledWith({
-        browser: "firefox",
-        blockAds: true, // Default from --no-block-ads option
-        blockResources: ["media", "manifest"], // Default from config
-        pwEndpoint: undefined,
-        headless: false,
-        bypassCSP: false, // Default from config
-        proxyServer: "http://proxy.company.com:8080",
-        proxyUsername: "user",
-        proxyPassword: "pass",
-      });
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          browser: "firefox",
+          blockAds: true, // Default from --no-block-ads option
+          blockResources: ["media", "manifest"], // Default from config
+          pwEndpoint: undefined,
+          headless: false,
+          bypassCSP: false, // Default from config
+          proxyServer: "http://proxy.company.com:8080",
+          proxyUsername: "user",
+          proxyPassword: "pass",
+        }),
+      );
     });
 
     it("should use JSON logger when specified", async () => {

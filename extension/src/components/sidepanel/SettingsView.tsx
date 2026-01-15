@@ -31,7 +31,7 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl">⚡</span>
             <div>
-              <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark Settings</h1>
+              <h1 className={`text-lg font-medium ${t.text.primary}`}>Spark Settings</h1>
               <p className={`${t.text.secondary} text-xs`}>Configure your AI provider</p>
             </div>
           </div>

@@ -1,5 +1,79 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventStoreLogger } from "../src/EventStoreLogger";
+import browser from "webextension-polyfill";
+
+// Mock the webextension-polyfill module
+vi.mock("webextension-polyfill", () => ({
+  default: {
+    runtime: {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    },
+  },
+}));
+
+describe("EventStoreLogger tabId support", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should accept tabId in constructor for tab-specific logging", () => {
+    // Arrange & Act
+    const tabId = 123;
+    const logger = new EventStoreLogger(tabId);
+
+    // Assert - logger should be created without error
+    expect(logger).toBeInstanceOf(EventStoreLogger);
+  });
+
+  it("should include tabId in all broadcast messages when provided", () => {
+    // Arrange
+    const tabId = 456;
+    const logger = new EventStoreLogger(tabId);
+
+    // Act
+    logger.addEvent("task:setup", { timestamp: Date.now() });
+
+    // Assert
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "realtimeEvent",
+        tabId: 456,
+      }),
+    );
+  });
+
+  it("should not broadcast messages when tabId is not provided", () => {
+    // Arrange - create logger without tabId for backwards compatibility
+    const logger = new EventStoreLogger();
+
+    // Act
+    logger.addEvent("task:setup", { timestamp: Date.now() });
+
+    // Assert - sendMessage should not be called
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("should handle rapid sequential events without losing tabId", () => {
+    // Arrange
+    const tabId = 789;
+    const logger = new EventStoreLogger(tabId);
+
+    // Act - fire multiple events rapidly
+    logger.addEvent("task:setup", { timestamp: Date.now() });
+    logger.addEvent("agent:status", { message: "Working...", timestamp: Date.now() });
+    logger.addEvent("task:completed", { timestamp: Date.now() });
+
+    // Assert - all three should have been called with correct tabId
+    expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(3);
+    const calls = vi.mocked(browser.runtime.sendMessage).mock.calls;
+    calls.forEach((call) => {
+      expect(call[0]).toMatchObject({
+        type: "realtimeEvent",
+        tabId: 789,
+      });
+    });
+  });
+});
 
 describe("EventStoreLogger error logging", () => {
   let consoleErrorSpy: any;

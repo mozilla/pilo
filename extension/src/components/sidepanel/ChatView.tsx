@@ -29,6 +29,8 @@ import {
   isAgentActionData,
 } from "../../utils/typeGuards";
 import type { BrowserActionStartedEventData } from "../../types/browser";
+import { SettingsGearIcon } from "../icons/SettingsGearIcon";
+import { SparkLogo } from "../icons/SparkLogo";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
@@ -129,16 +131,7 @@ interface MarkdownContentProps {
 }
 
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div
-    className={clsx(
-      "markdown-content",
-      "prose",
-      "prose-chat",
-      "prose-slate",
-      "max-w-none",
-      className,
-    )}
-  >
+  <div className={clsx("markdown-content", "prose", "prose-chat", "max-w-none", className)}>
     <Markdown value={children} breaks gfm />
   </div>
 );
@@ -153,13 +146,13 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
   const getClassName = () => {
     switch (message.type) {
       case "plan":
-        return `text-message-assistant ${t.text.primary}`;
+        return `text-message-assistant ${t.text.secondary} text-xs`;
       case "reasoning":
         return `text-message-assistant ${t.text.secondary}`;
       case "error":
         return "text-message-assistant text-red-600 p-2 bg-red-50 rounded border border-red-200";
       case "result":
-        return "text-message-assistant";
+        return "text-message-assistant text-sm";
       default:
         return "text-message-assistant";
     }
@@ -167,16 +160,14 @@ const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
 
   return (
     <div className="mb-2">
-      <div className={getClassName()}>
-        <MarkdownContent>{message.content}</MarkdownContent>
-      </div>
+      <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
     </div>
   );
 };
 
 // Loading spinner component
-const LoadingSpinner = (): ReactElement => (
-  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+const LoadingSpinner = ({ theme: t }: { theme: Theme }): ReactElement => (
+  <svg className={`animate-spin ${t.stroke.accent} h-4 w-4`} fill="none" viewBox="0 0 24 24">
     <circle
       className="opacity-25"
       cx="12"
@@ -258,19 +249,13 @@ const TaskBubble = ({
   return (
     <li className={liClass}>
       <div className={divClass}>
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">⚡</span>
-          <span className={`text-sm font-semibold ${t.text.primary}`}>Spark</span>
-        </div>
-
         {/* Render messages chronologically with dynamic headings */}
         {taskMessages.map((msg) => {
           const heading = getHeading(msg.type);
           return (
             <div key={msg.id}>
               {heading && (
-                <div className="text-sm font-semibold text-gray-500 mb-2 mt-3 first:mt-0">
+                <div className={`text-sm font-semibold ${t.text.accent} mb-2 mt-3 first:mt-0`}>
                   {heading}
                 </div>
               )}
@@ -282,8 +267,8 @@ const TaskBubble = ({
         {/* Current status for active tasks or early phase status-only tasks */}
         {!resultMessage && (isActive || isEarlyPhase) && (
           <div className="flex items-center gap-2 text-sm">
-            <LoadingSpinner />
-            <span className={t.text.muted}>
+            <LoadingSpinner theme={t} />
+            <span className={t.text.accent}>
               {latestStatus ? latestStatus.content : "Starting task..."}
             </span>
           </div>
@@ -627,84 +612,66 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
 
   return (
     <div className={`h-screen flex flex-col ${t.bg.sidebar}`}>
-      <div
-        className={`${t.bg.panel} m-6 rounded-2xl flex flex-col flex-1 overflow-hidden shadow-lg`}
-      >
-        {/* Header */}
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⚡</span>
-            <div>
-              <h1 className={`text-lg font-bold ${t.text.primary}`}>Spark</h1>
-              <p className={`${t.text.muted} text-xs`}>
-                {currentTab?.url ? new URL(currentTab.url).hostname : "AI-powered web automation"}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onOpenSettings}
-            className={`p-2 ${t.text.muted} ${t.hover.settings} rounded-lg transition-colors`}
-            title="Settings"
-          >
-            ⚙️
-          </button>
-        </div>
-
-        {/* Chat Messages */}
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-4"
+      {/* Header */}
+      <div className="p-2 gap-2.5 flex items-center justify-end">
+        <button
+          onClick={onOpenSettings}
+          className={`p-2.5 ${t.text.muted} ${t.hover.settings} rounded-xl transition-colors`}
+          title="Settings"
         >
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <h2 className={`text-xl font-bold ${t.text.primary} mb-2`}>Welcome to Spark!</h2>
-              <p className={`${t.text.muted} text-sm max-w-sm`}>
-                I can help you automate tasks on any webpage. Just describe what you'd like me to
-                do!
-              </p>
-            </div>
+          <SettingsGearIcon className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Chat Messages */}
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <SparkLogo className="w-28 h-28 text-gray-350 mb-4" />
+            <p className={`${t.text.muted} text-sm max-w-sm`}>
+              I can help you automate tasks on any webpage. Just describe what you'd like me to do!
+            </p>
+          </div>
+        )}
+
+        <ul className="space-y-4" role="list">
+          {renderMessages()}
+        </ul>
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className={`border-t ${t.border.primary} p-4`}>
+        <div className="flex items-center gap-2">
+          <textarea
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What would you like me to do?"
+            rows={2}
+            disabled={isExecuting}
+            className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
+          />
+          {isExecuting ? (
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={handleExecute}
+              disabled={!task.trim()}
+              className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              Send
+            </button>
           )}
-
-          <ul className="space-y-4" role="list">
-            {renderMessages()}
-          </ul>
-
-          <div ref={messagesEndRef} />
         </div>
-
-        {/* Input Area */}
-        <div className={`border-t ${t.border.primary} p-4`}>
-          <div className="flex items-center gap-2">
-            <textarea
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="What would you like me to do?"
-              rows={2}
-              disabled={isExecuting}
-              className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
-            />
-            {isExecuting ? (
-              <button
-                onClick={handleCancel}
-                className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
-              >
-                Stop
-              </button>
-            ) : (
-              <button
-                onClick={handleExecute}
-                disabled={!task.trim()}
-                className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Send
-              </button>
-            )}
-          </div>
-          <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
-            Press Enter to send • Shift+Enter for new line
-          </div>
+        <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
+          Press Enter to send • Shift+Enter for new line
         </div>
       </div>
     </div>

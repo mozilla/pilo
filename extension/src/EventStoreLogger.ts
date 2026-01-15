@@ -28,11 +28,13 @@ export class EventStoreLogger extends GenericLogger {
   private events: EventData[] = [];
   private subscribers: Set<(events: EventData[]) => void> = new Set();
   private logger = createLogger("EventStoreLogger");
+  private tabId?: number;
 
-  constructor() {
+  constructor(tabId?: number) {
     super((eventType: string, data: unknown) => {
       this.handleEvent(eventType, data);
     });
+    this.tabId = tabId;
   }
 
   /**
@@ -68,19 +70,22 @@ export class EventStoreLogger extends GenericLogger {
 
     this.events.push(event);
 
-    // Send real-time event to SidePanel
-    // Note: When in background script, we broadcast to all extension contexts
-    if (typeof browser !== "undefined" && browser.runtime) {
+    // Send real-time event to SidePanel and content script
+    // Only broadcast when tabId is provided (required for routing to correct tab)
+    if (typeof browser !== "undefined" && browser.runtime && this.tabId !== undefined) {
       try {
         if (isValidRealtimeEvent(event)) {
           const message: RealtimeEventMessage = {
             type: "realtimeEvent",
+            tabId: this.tabId,
             event,
           };
-          // Use runtime.sendMessage to broadcast to all contexts (including sidepanel)
+          // Use runtime.sendMessage to broadcast to sidepanel
           browser.runtime.sendMessage(message).catch(() => {
             // Ignore errors if no listeners or sidepanel isn't open
           });
+          // Note: Indicator events are now handled via CSS injection in background script
+          // (see indicatorControl.ts) instead of forwarding to content script
         }
       } catch (error) {
         // Ignore errors in case we're not in background script context

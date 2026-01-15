@@ -1,6 +1,13 @@
 import browser from "webextension-polyfill";
 import { AgentManager, EventStoreLogger } from "../src/AgentManager";
 import { useConversationStore } from "../src/stores/conversationStore";
+import {
+  showIndicator,
+  hideIndicator,
+  isIndicatorActive,
+  setupNavigationListener,
+  cleanupStaleRegistrations,
+} from "../src/background/indicatorControl";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -19,6 +26,12 @@ interface StorageSettings {
 
 export default defineBackground(() => {
   console.log("Background script loaded");
+
+  // Clean up any orphaned registrations from previous session (e.g., after crash)
+  cleanupStaleRegistrations().catch(() => {});
+
+  // Set up navigation listener to re-inject indicator CSS on cross-origin navigations
+  setupNavigationListener();
 
   // Track running tasks by tab ID and their abort controllers
   const runningTasks = new Map<number, AbortController>();
@@ -57,7 +70,7 @@ export default defineBackground(() => {
   }
 
   // Handle messages from sidebar and other parts of the extension
-  browser.runtime.onMessage.addListener((message: unknown, _sender: any) => {
+  browser.runtime.onMessage.addListener((message: unknown) => {
     // Type guard to validate message structure
     if (!message || typeof message !== "object" || !("type" in message)) {
       return Promise.resolve({ success: false, message: "Invalid message format" });
@@ -65,11 +78,14 @@ export default defineBackground(() => {
 
     const typedMessage = message as ExtensionMessage;
 
-    // Handle realtimeEvent messages immediately - just ignore them
+    // Note: Indicator events are now handled via CSS injection (see indicatorControl.ts)
+    // The indicator is shown via logger.subscribe() in the executeTask handler below,
+    // not via realtimeEvent messages (which don't reach the background script since
+    // runtime.sendMessage doesn't deliver to the sender's own onMessage listener).
+
+    // realtimeEvent messages are consumed by sidepanel via runtime.sendMessage from EventStoreLogger
     if (typedMessage.type === "realtimeEvent") {
-      // These are meant for sidepanel consumption, not background handling
-      console.log("Background received message: realtimeEvent", typedMessage.event);
-      // Return undefined to indicate no response
+      // Return undefined to indicate no response (sidepanel consumes these)
       return;
     }
 
@@ -93,6 +109,16 @@ export default defineBackground(() => {
               "provider",
             ])) as StorageSettings;
 
+            // Debug: Log what settings we got (without the full API key for security)
+            console.log("Settings loaded:", {
+              hasApiKey: !!settings.apiKey,
+              apiKeyLength: settings.apiKey?.length || 0,
+              apiKeyPrefix: settings.apiKey?.substring(0, 8) || "none",
+              provider: settings.provider,
+              model: settings.model,
+              apiEndpoint: settings.apiEndpoint,
+            });
+
             if (!settings.apiKey) {
               response = {
                 success: false,
@@ -100,9 +126,6 @@ export default defineBackground(() => {
               };
               break;
             }
-
-            // Create event store logger to capture events for React
-            const logger = new EventStoreLogger();
 
             // Create AbortController for this task
             const abortController = new AbortController();
@@ -115,6 +138,26 @@ export default defineBackground(() => {
               };
               break;
             }
+
+            // Create event store logger with tabId to enable indicator forwarding
+            const logger = new EventStoreLogger(tabId);
+
+            // Subscribe to logger events to show/hide indicator
+            // This is needed because runtime.sendMessage doesn't deliver to the sender's own listener
+            const unsubscribe = logger.subscribe((events) => {
+              // Show indicator on task:started (planning complete)
+              if (!isIndicatorActive(tabId) && events.some((e) => e.type === "task:started")) {
+                showIndicator(tabId).catch(() => {});
+              }
+              // Hide indicator on task completion or abort
+              if (
+                isIndicatorActive(tabId) &&
+                events.some((e) => e.type === "task:completed" || e.type === "task:aborted")
+              ) {
+                hideIndicator(tabId).catch(() => {});
+                unsubscribe();
+              }
+            });
 
             // Cancel any existing task for this tab
             if (runningTasks.has(tabId)) {
@@ -143,6 +186,14 @@ export default defineBackground(() => {
 
               console.log(`Task completed successfully:`, result);
 
+              // Emit task:completed event to trigger indicator hide via subscription
+              logger.addEvent("task:completed", {
+                finalAnswer: result,
+                success: true,
+                timestamp: Date.now(),
+                iterationId: "completed",
+              });
+
               response = {
                 success: true,
                 result: result,
@@ -158,19 +209,35 @@ export default defineBackground(() => {
                     (error.message.includes("cancelled") || error.message.includes("aborted"))));
 
               if (isCancellation) {
+                // Emit task:aborted event for cancellation to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: "Task cancelled by user",
+                  finalAnswer: "Task cancelled",
+                  timestamp: Date.now(),
+                  iterationId: "cancelled",
+                });
                 response = {
                   success: true, // Treat cancellation as success to avoid error styling
                   result: "Task cancelled",
                 };
               } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                // Emit task:aborted event for errors to hide indicator
+                logger.addEvent("task:aborted", {
+                  reason: errorMessage,
+                  finalAnswer: `Task failed: ${errorMessage}`,
+                  timestamp: Date.now(),
+                  iterationId: "error",
+                });
                 response = {
                   success: false,
-                  message: `Task execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                  message: `Task execution failed: ${errorMessage}`,
                 };
               }
             } finally {
-              // Clean up the task tracking
+              // Clean up the task tracking, then hide indicator
               runningTasks.delete(tabId);
+              await hideIndicator(tabId);
             }
             break;
 
@@ -232,6 +299,9 @@ export default defineBackground(() => {
       runningTasks.delete(tabId);
     }
   });
+
+  // Note: Indicator now persists across navigations automatically via CSS injection
+  // (see indicatorControl.ts) - no need for tabs.onUpdated listener
 
   // Start cleanup timer for conversations
   setInterval(async () => {

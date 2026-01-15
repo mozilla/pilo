@@ -27,6 +27,8 @@ export interface SparkConfig {
 
   // Browser Configuration
   browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  channel?: string;
+  executable_path?: string;
   headless?: boolean;
   block_ads?: boolean;
   block_resources?: string;
@@ -55,6 +57,14 @@ export interface SparkConfig {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   bypass_csp?: boolean;
+
+  // Navigation Retry Configuration
+  navigation_timeout_ms?: number;
+  navigation_max_attempts?: number;
+  navigation_timeout_multiplier?: number;
+
+  // Action Timeout Configuration
+  action_timeout_ms?: number;
 }
 
 export class ConfigManager {
@@ -139,6 +149,12 @@ export class ConfigManager {
       ...(process.env.SPARK_BROWSER && {
         browser: process.env.SPARK_BROWSER as SparkConfig["browser"],
       }),
+      ...(process.env.SPARK_CHANNEL && {
+        channel: process.env.SPARK_CHANNEL,
+      }),
+      ...(process.env.SPARK_EXECUTABLE_PATH && {
+        executable_path: process.env.SPARK_EXECUTABLE_PATH,
+      }),
       ...(process.env.SPARK_HEADLESS && {
         headless: process.env.SPARK_HEADLESS === "true",
       }),
@@ -206,6 +222,22 @@ export class ConfigManager {
       }),
       ...(process.env.SPARK_BYPASS_CSP && {
         bypass_csp: process.env.SPARK_BYPASS_CSP === "true",
+      }),
+
+      // Navigation Retry Configuration
+      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MS && {
+        navigation_timeout_ms: parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10),
+      }),
+      ...(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS && {
+        navigation_max_attempts: parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10),
+      }),
+      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER && {
+        navigation_timeout_multiplier: parseFloat(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER),
+      }),
+
+      // Action Timeout Configuration
+      ...(process.env.SPARK_ACTION_TIMEOUT_MS && {
+        action_timeout_ms: parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10),
       }),
     };
 
@@ -331,6 +363,8 @@ export class ConfigManager {
     // Browser Configuration
     if (process.env.SPARK_BROWSER)
       env.browser = process.env.SPARK_BROWSER as SparkConfig["browser"];
+    if (process.env.SPARK_CHANNEL) env.channel = process.env.SPARK_CHANNEL;
+    if (process.env.SPARK_EXECUTABLE_PATH) env.executable_path = process.env.SPARK_EXECUTABLE_PATH;
     if (process.env.SPARK_HEADLESS) env.headless = process.env.SPARK_HEADLESS === "true";
     if (process.env.SPARK_BLOCK_ADS) env.block_ads = process.env.SPARK_BLOCK_ADS === "true";
     if (process.env.SPARK_BLOCK_RESOURCES) env.block_resources = process.env.SPARK_BLOCK_RESOURCES;
@@ -364,6 +398,20 @@ export class ConfigManager {
     if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;
     if (process.env.SPARK_PW_CDP_ENDPOINT) env.pw_cdp_endpoint = process.env.SPARK_PW_CDP_ENDPOINT;
     if (process.env.SPARK_BYPASS_CSP) env.bypass_csp = process.env.SPARK_BYPASS_CSP === "true";
+
+    // Navigation Retry Configuration
+    if (process.env.SPARK_NAVIGATION_TIMEOUT_MS)
+      env.navigation_timeout_ms = parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10);
+    if (process.env.SPARK_NAVIGATION_MAX_ATTEMPTS)
+      env.navigation_max_attempts = parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10);
+    if (process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER)
+      env.navigation_timeout_multiplier = parseFloat(
+        process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER,
+      );
+
+    // Action Timeout Configuration
+    if (process.env.SPARK_ACTION_TIMEOUT_MS)
+      env.action_timeout_ms = parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10);
 
     const merged = this.getConfig();
 
