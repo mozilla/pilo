@@ -114,7 +114,7 @@ export function createRunCommand(): Command {
     .option(
       "--navigation-timeout-ms <number>",
       "Base navigation timeout in milliseconds",
-      String(config.get("navigation_timeout_ms", 15000)),
+      String(config.get("navigation_timeout_ms", 30000)),
     )
     .option(
       "--navigation-max-attempts <number>",
@@ -123,13 +123,13 @@ export function createRunCommand(): Command {
     )
     .option(
       "--navigation-timeout-multiplier <number>",
-      "Timeout multiplier for each retry (e.g., 2 means 15s -> 30s -> 60s)",
+      "Timeout multiplier for each retry (e.g., 2 means 30s -> 60s -> 120s)",
       String(config.get("navigation_timeout_multiplier", 2)),
     )
     .option(
       "--action-timeout-ms <number>",
       "Timeout for page load and element actions in milliseconds",
-      String(config.get("action_timeout_ms", 10000)),
+      String(config.get("action_timeout_ms", 30000)),
     )
     .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
     .option(

@@ -14,17 +14,17 @@ describe("Navigation Retry Utilities", () => {
   describe("calculateTimeout", () => {
     it("should return base timeout for first attempt", () => {
       const timeout = calculateTimeout(1, DEFAULT_NAVIGATION_RETRY_CONFIG);
-      expect(timeout).toBe(15000);
+      expect(timeout).toBe(30000);
     });
 
     it("should double timeout for second attempt with default config", () => {
       const timeout = calculateTimeout(2, DEFAULT_NAVIGATION_RETRY_CONFIG);
-      expect(timeout).toBe(30000);
+      expect(timeout).toBe(60000);
     });
 
     it("should quadruple timeout for third attempt with default config", () => {
       const timeout = calculateTimeout(3, DEFAULT_NAVIGATION_RETRY_CONFIG);
-      expect(timeout).toBe(60000);
+      expect(timeout).toBe(120000);
     });
 
     it("should use custom base timeout", () => {
@@ -92,8 +92,8 @@ describe("Navigation Retry Utilities", () => {
 
   describe("DEFAULT_NAVIGATION_RETRY_CONFIG", () => {
     it("should have sensible defaults", () => {
-      expect(DEFAULT_NAVIGATION_RETRY_CONFIG.baseTimeoutMs).toBe(15000);
-      expect(DEFAULT_NAVIGATION_RETRY_CONFIG.maxTimeoutMs).toBe(60000);
+      expect(DEFAULT_NAVIGATION_RETRY_CONFIG.baseTimeoutMs).toBe(30000);
+      expect(DEFAULT_NAVIGATION_RETRY_CONFIG.maxTimeoutMs).toBe(120000);
       expect(DEFAULT_NAVIGATION_RETRY_CONFIG.maxAttempts).toBe(3);
       expect(DEFAULT_NAVIGATION_RETRY_CONFIG.timeoutMultiplier).toBe(2);
     });
