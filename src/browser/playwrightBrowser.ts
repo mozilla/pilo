@@ -101,9 +101,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.actionTimeoutMs = options.actionTimeoutMs ?? PlaywrightBrowser.DEFAULT_ACTION_TIMEOUT_MS;
 
     // Initialize navigation retry config with defaults and overrides
+    // Filter out null/undefined values to prevent them from overwriting defaults
+    const retryOverrides = options.navigationRetry
+      ? Object.fromEntries(Object.entries(options.navigationRetry).filter(([, v]) => v != null))
+      : {};
     this.navigationConfig = {
       ...DEFAULT_NAVIGATION_RETRY_CONFIG,
-      ...options.navigationRetry,
+      ...retryOverrides,
     };
   }
 
@@ -301,7 +305,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Navigate to URL with smart retry and tiered timeouts
+   * Navigate to URL with retry on timeout/network errors
    */
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
@@ -309,7 +313,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Go back with smart retry
+   * Go back with retry on timeout/network errors
    */
   async goBack(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
@@ -320,7 +324,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Go forward with smart retry
+   * Go forward with retry on timeout/network errors
    */
   async goForward(): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
