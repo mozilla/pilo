@@ -19,6 +19,7 @@ import {
   InvalidRefException,
   BrowserActionException,
   NavigationTimeoutException,
+  NavigationNetworkException,
 } from "../errors.js";
 import {
   NavigationRetryConfig,
@@ -82,8 +83,8 @@ export class PlaywrightBrowser implements AriaBrowser {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
 
-  // Default timeout for page load and element actions (clicks, fills, etc.)
-  // Navigation connection issues are handled separately by navigationRetry
+  // Default timeout for element actions (clicks, fills, etc.)
+  // Navigation timeouts and network errors are handled by navigationRetry
   private static readonly DEFAULT_ACTION_TIMEOUT_MS = 10000; // 10 seconds
 
   // Timeout for page load and element actions (configurable)
@@ -331,7 +332,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   /**
    * Execute navigation with tiered retry logic.
-   * Only retries on timeout errors - other errors fail fast.
+   * Retries on timeout errors and network errors (net::ERR_*).
    */
   private async executeNavigationWithRetry(
     operation: (timeoutMs: number) => Promise<void>,
@@ -346,27 +347,46 @@ export class PlaywrightBrowser implements AriaBrowser {
         await operation(timeoutMs);
         return; // Success
       } catch (error) {
-        // Use Playwright's exported TimeoutError type for reliable detection
         const isTimeout = error instanceof playwrightErrors.TimeoutError;
+        const isNetworkError = error instanceof Error && this.isNetworkError(error);
+        const isRetryable = isTimeout || isNetworkError;
 
-        // Non-timeout errors fail fast - just re-throw
-        if (!isTimeout) {
+        if (!isRetryable) {
           throw error;
         }
 
-        // Last attempt - throw our timeout exception
+        // Last attempt - throw appropriate exception
         if (attempt >= maxAttempts) {
-          throw new NavigationTimeoutException(url, timeoutMs, { attempt, maxAttempts });
+          if (isTimeout) {
+            throw new NavigationTimeoutException(url, timeoutMs, { attempt, maxAttempts });
+          } else {
+            throw new NavigationNetworkException(url, (error as Error).message, {
+              attempt,
+              maxAttempts,
+            });
+          }
         }
 
         // More attempts remaining - call retry callback and continue
         if (this.navigationConfig.onRetry) {
           const nextTimeout = calculateTimeout(attempt + 1, this.navigationConfig);
-          // We know error is a TimeoutError (an Error subclass) from the instanceof check above
           this.navigationConfig.onRetry(attempt, error as Error, nextTimeout);
         }
       }
     }
+  }
+
+  /**
+   * Check if an error is a retryable network error.
+   * Covers Chromium (net::ERR_*) and Firefox (NS_ERROR_*, NS_BINDING_*) patterns.
+   */
+  private isNetworkError(error: Error): boolean {
+    const message = error.message;
+    return (
+      message.includes("net::") || // Chromium: net::ERR_CONNECTION_REFUSED, etc.
+      message.includes("NS_ERROR_") || // Firefox: NS_ERROR_NET_RESET, etc.
+      message.includes("NS_BINDING_") // Firefox: NS_BINDING_ABORTED, etc.
+    );
   }
 
   /**

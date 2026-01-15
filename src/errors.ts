@@ -7,6 +7,7 @@
  * ElementNotFoundException: When an element cannot be found
  * BrowserActionException: When a browser action fails
  * NavigationTimeoutException: When navigation times out (triggers retry with longer timeout)
+ * NavigationNetworkException: When navigation fails due to network errors (triggers retry)
  */
 
 /**
@@ -97,10 +98,9 @@ export class ToolExecutionError extends RecoverableError {
 
 /**
  * Thrown when navigation times out after all retry attempts.
- * This is the only navigation-specific error we handle specially (for retries).
- * Other navigation errors (connection refused, SSL errors, etc.) bubble up as-is.
  *
- * @see browser/navigationRetry.ts for retry configuration (timeouts, attempts, etc.)
+ * @see browser/navigationRetry.ts for retry configuration
+ * @see NavigationNetworkException for network-related failures
  */
 export class NavigationTimeoutException extends BrowserException {
   public readonly url: string;
@@ -127,6 +127,39 @@ export class NavigationTimeoutException extends BrowserException {
     this.name = "NavigationTimeoutException";
     this.url = url;
     this.timeoutMs = timeoutMs;
+    this.attempt = attempt;
+    this.maxAttempts = maxAttempts;
+  }
+}
+
+/**
+ * Thrown when navigation fails due to network errors after all retry attempts.
+ * Covers errors like net::ERR_CONNECTION_REFUSED, net::ERR_NAME_NOT_RESOLVED, etc.
+ *
+ * @see browser/navigationRetry.ts for retry configuration
+ */
+export class NavigationNetworkException extends BrowserException {
+  public readonly url: string;
+  public readonly networkError: string;
+  public readonly attempt: number;
+  public readonly maxAttempts: number;
+
+  constructor(
+    url: string,
+    networkError: string,
+    context?: { attempt?: number; maxAttempts?: number },
+  ) {
+    const attempt = context?.attempt ?? 1;
+    const maxAttempts = context?.maxAttempts ?? 1;
+    super(`Navigation to '${url}' failed: ${networkError} (attempt ${attempt}/${maxAttempts})`, {
+      url,
+      networkError,
+      attempt,
+      maxAttempts,
+    });
+    this.name = "NavigationNetworkException";
+    this.url = url;
+    this.networkError = networkError;
     this.attempt = attempt;
     this.maxAttempts = maxAttempts;
   }
