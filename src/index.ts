@@ -21,3 +21,19 @@ export { config, ConfigManager } from "./config.js";
 export type { SparkConfig } from "./config.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
+
+// Config merge utilities
+export { mergeWithDefaults, createNavigationRetryConfig } from "./utils/configMerge.js";
+
+// Config schema utilities
+export {
+  CONFIG_SCHEMA,
+  getSchemaField,
+  getSchemaFieldsByCategory,
+  getCliFields,
+  getEnvFields,
+  parseEnvConfig,
+  addSchemaOptions,
+  parseCliOptions,
+} from "./config/index.js";
+export type { ConfigField, ConfigFieldType, ConfigCategory } from "./config/index.js";

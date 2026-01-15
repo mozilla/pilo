@@ -13,6 +13,27 @@ import * as path from "path";
 import { MetricsCollector } from "../../loggers/metricsCollector.js";
 import { Logger } from "../../loggers/types.js";
 import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
+import {
+  DEFAULT_BROWSER,
+  DEFAULT_PROVIDER,
+  DEFAULT_HEADLESS,
+  DEFAULT_DEBUG,
+  DEFAULT_VISION,
+  DEFAULT_BLOCK_ADS,
+  DEFAULT_BLOCK_RESOURCES,
+  DEFAULT_BYPASS_CSP,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS,
+  DEFAULT_MAX_REPEATED_ACTIONS,
+  DEFAULT_REASONING_EFFORT,
+  DEFAULT_NAVIGATION_BASE_TIMEOUT_MS,
+  DEFAULT_NAVIGATION_MAX_TIMEOUT_MS,
+  DEFAULT_NAVIGATION_MAX_ATTEMPTS,
+  DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER,
+  DEFAULT_ACTION_TIMEOUT_MS,
+  DEFAULT_LOGGER,
+  DEFAULT_METRICS_INCREMENTAL,
+} from "../../defaults.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks
@@ -32,7 +53,7 @@ export function createRunCommand(): Command {
     .option(
       "--provider <provider>",
       "AI provider to use (openai, openrouter)",
-      config.get("provider", "openai"),
+      config.get("provider", DEFAULT_PROVIDER),
     )
     .option("--model <model>", "AI model to use", config.get("model"))
     .option("--openai-api-key <key>", "OpenAI API key", config.get("openai_api_key"))
@@ -40,7 +61,7 @@ export function createRunCommand(): Command {
     .option(
       "-b, --browser <browser>",
       "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
-      config.get("browser", "firefox"),
+      config.get("browser", DEFAULT_BROWSER),
     )
     .option(
       "--channel <channel>",
@@ -52,18 +73,18 @@ export function createRunCommand(): Command {
       "Path to browser executable (e.g., /usr/bin/firefox, /Applications/Firefox.app/Contents/MacOS/firefox)",
       config.get("executable_path"),
     )
-    .option("--headless", "Run browser in headless mode", config.get("headless", false))
-    .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
+    .option("--headless", "Run browser in headless mode", config.get("headless", DEFAULT_HEADLESS))
+    .option("--debug", "Enable debug mode with page snapshots", config.get("debug", DEFAULT_DEBUG))
     .option(
       "--vision",
       "Enable vision capabilities to include screenshots",
-      config.get("vision", false),
+      config.get("vision", DEFAULT_VISION),
     )
     .option("--no-block-ads", "Disable ad blocking")
     .option(
       "--block-resources <resources>",
       "Comma-separated list of resources to block",
-      config.get("block_resources", "media,manifest"),
+      config.get("block_resources", DEFAULT_BLOCK_RESOURCES),
     )
     .option(
       "--pw-endpoint <endpoint>",
@@ -75,26 +96,30 @@ export function createRunCommand(): Command {
       "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
       config.get("pw_cdp_endpoint"),
     )
-    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp", false))
+    .option(
+      "--bypass-csp",
+      "Bypass Content Security Policy",
+      config.get("bypass_csp", DEFAULT_BYPASS_CSP),
+    )
     .option(
       "--max-iterations <number>",
       "Maximum total iterations to prevent infinite loops",
-      String(config.get("max_iterations", 50)),
+      String(config.get("max_iterations", DEFAULT_MAX_ITERATIONS)),
     )
     .option(
       "--max-validation-attempts <number>",
       "Maximum validation attempts",
-      String(config.get("max_validation_attempts", 3)),
+      String(config.get("max_validation_attempts", DEFAULT_MAX_VALIDATION_ATTEMPTS)),
     )
     .option(
       "--max-repeated-actions <number>",
       "Maximum times an action can be repeated before warning/aborting",
-      String(config.get("max_repeated_actions", 2)),
+      String(config.get("max_repeated_actions", DEFAULT_MAX_REPEATED_ACTIONS)),
     )
     .option(
       "--reasoning-effort <effort>",
       "Reasoning effort level (none, low, medium, high)",
-      config.get("reasoning_effort", "none"),
+      config.get("reasoning_effort", DEFAULT_REASONING_EFFORT),
     )
     .option(
       "--proxy <url>",
@@ -114,28 +139,37 @@ export function createRunCommand(): Command {
     .option(
       "--navigation-timeout-ms <number>",
       "Base navigation timeout in milliseconds",
-      String(config.get("navigation_timeout_ms", 30000)),
+      String(config.get("navigation_timeout_ms", DEFAULT_NAVIGATION_BASE_TIMEOUT_MS)),
+    )
+    .option(
+      "--navigation-max-timeout-ms <number>",
+      "Maximum timeout for navigation retries in milliseconds",
+      String(config.get("navigation_max_timeout_ms", DEFAULT_NAVIGATION_MAX_TIMEOUT_MS)),
     )
     .option(
       "--navigation-max-attempts <number>",
       "Maximum navigation attempts (e.g., 3 means try up to 3 times)",
-      String(config.get("navigation_max_attempts", 3)),
+      String(config.get("navigation_max_attempts", DEFAULT_NAVIGATION_MAX_ATTEMPTS)),
     )
     .option(
       "--navigation-timeout-multiplier <number>",
       "Timeout multiplier for each retry (e.g., 2 means 30s -> 60s -> 120s)",
-      String(config.get("navigation_timeout_multiplier", 2)),
+      String(config.get("navigation_timeout_multiplier", DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER)),
     )
     .option(
       "--action-timeout-ms <number>",
       "Timeout for page load and element actions in milliseconds",
-      String(config.get("action_timeout_ms", 30000)),
+      String(config.get("action_timeout_ms", DEFAULT_ACTION_TIMEOUT_MS)),
     )
-    .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
+    .option(
+      "--logger <logger>",
+      "Logger to use (console, json)",
+      config.get("logger", DEFAULT_LOGGER),
+    )
     .option(
       "--metrics-incremental",
       "Show incremental metrics updates during task execution",
-      config.get("metrics_incremental", false),
+      config.get("metrics_incremental", DEFAULT_METRICS_INCREMENTAL),
     )
     .action(executeRunCommand);
 }
@@ -188,7 +222,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       bypassCSP: options.bypassCsp,
       channel: options.channel,
       executablePath: options.executablePath,
-      blockAds: options.blockAds ?? config.get("block_ads", true),
+      blockAds: options.blockAds ?? config.get("block_ads", DEFAULT_BLOCK_ADS),
       blockResources,
       headless: options.headless,
       proxyServer: options.proxy,
@@ -200,6 +234,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       navigationRetry: {
         baseTimeoutMs: options.navigationTimeoutMs
           ? parseInt(options.navigationTimeoutMs)
+          : undefined,
+        maxTimeoutMs: options.navigationMaxTimeoutMs
+          ? parseInt(options.navigationMaxTimeoutMs)
           : undefined,
         maxAttempts: options.navigationMaxAttempts
           ? parseInt(options.navigationMaxAttempts)

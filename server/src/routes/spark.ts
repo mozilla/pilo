@@ -1,6 +1,19 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { WebAgent, PlaywrightBrowser, createAIProvider, getAIProviderInfo } from "spark";
+import {
+  WebAgent,
+  PlaywrightBrowser,
+  createAIProvider,
+  getAIProviderInfo,
+  createNavigationRetryConfig,
+  DEFAULT_BROWSER,
+  DEFAULT_HEADLESS,
+  DEFAULT_BLOCK_ADS,
+  DEFAULT_DEBUG,
+  DEFAULT_VISION,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS,
+} from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
@@ -73,6 +86,7 @@ interface SparkTaskRequest {
 
   // Navigation retry configuration overrides
   navigationTimeoutMs?: number;
+  navigationMaxTimeoutMs?: number;
   navigationMaxAttempts?: number;
   navigationTimeoutMultiplier?: number;
 
@@ -130,43 +144,44 @@ spark.post("/run", async (c) => {
         });
 
         // Merge server config with request overrides
+        // Use ?? (nullish coalescing) to correctly handle 0/false values
         const browserConfig = {
-          browser: body.browser || serverConfig.browser || "firefox",
-          channel: body.channel || serverConfig.channel,
-          executablePath: body.executablePath || serverConfig.executable_path,
-          headless:
-            body.headless !== undefined
-              ? body.headless
-              : serverConfig.headless !== undefined
-                ? serverConfig.headless
-                : true,
-          blockAds: body.blockAds !== undefined ? body.blockAds : serverConfig.block_ads,
-          blockResources: (body.blockResources ||
+          browser: body.browser ?? serverConfig.browser ?? DEFAULT_BROWSER,
+          channel: body.channel ?? serverConfig.channel,
+          executablePath: body.executablePath ?? serverConfig.executable_path,
+          headless: body.headless ?? serverConfig.headless ?? DEFAULT_HEADLESS,
+          blockAds: body.blockAds ?? serverConfig.block_ads ?? DEFAULT_BLOCK_ADS,
+          blockResources: (body.blockResources ??
             (serverConfig.block_resources
               ? serverConfig.block_resources.split(",")
               : undefined)) as
             | Array<"image" | "stylesheet" | "font" | "media" | "manifest">
             | undefined,
-          pwEndpoint: body.pwEndpoint || serverConfig.pw_endpoint,
-          pwCdpEndpoint: body.pwCdpEndpoint || serverConfig.pw_cdp_endpoint,
-          bypassCSP: body.bypassCSP !== undefined ? body.bypassCSP : serverConfig.bypass_csp,
-          proxyServer: body.proxy || serverConfig.proxy,
-          proxyUsername: body.proxyUsername || serverConfig.proxy_username,
-          proxyPassword: body.proxyPassword || serverConfig.proxy_password,
-          actionTimeoutMs: body.actionTimeoutMs || serverConfig.action_timeout_ms,
-          navigationRetry: {
-            baseTimeoutMs: body.navigationTimeoutMs || serverConfig.navigation_timeout_ms,
-            maxAttempts: body.navigationMaxAttempts || serverConfig.navigation_max_attempts,
+          pwEndpoint: body.pwEndpoint ?? serverConfig.pw_endpoint,
+          pwCdpEndpoint: body.pwCdpEndpoint ?? serverConfig.pw_cdp_endpoint,
+          bypassCSP: body.bypassCSP ?? serverConfig.bypass_csp,
+          proxyServer: body.proxy ?? serverConfig.proxy,
+          proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,
+          proxyPassword: body.proxyPassword ?? serverConfig.proxy_password,
+          actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
+          // Use createNavigationRetryConfig which safely handles undefined values
+          navigationRetry: createNavigationRetryConfig({
+            baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
+            maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
+            maxAttempts: body.navigationMaxAttempts ?? serverConfig.navigation_max_attempts,
             timeoutMultiplier:
-              body.navigationTimeoutMultiplier || serverConfig.navigation_timeout_multiplier,
-          },
+              body.navigationTimeoutMultiplier ?? serverConfig.navigation_timeout_multiplier,
+          }),
         };
 
         const webAgentConfig = {
-          debug: body.debug !== undefined ? body.debug : serverConfig.debug,
-          vision: body.vision !== undefined ? body.vision : serverConfig.vision,
-          maxIterations: body.maxIterations || serverConfig.max_iterations,
-          maxValidationAttempts: body.maxValidationAttempts || serverConfig.max_validation_attempts,
+          debug: body.debug ?? serverConfig.debug ?? DEFAULT_DEBUG,
+          vision: body.vision ?? serverConfig.vision ?? DEFAULT_VISION,
+          maxIterations: body.maxIterations ?? serverConfig.max_iterations ?? DEFAULT_MAX_ITERATIONS,
+          maxValidationAttempts:
+            body.maxValidationAttempts ??
+            serverConfig.max_validation_attempts ??
+            DEFAULT_MAX_VALIDATION_ATTEMPTS,
           guardrails: body.guardrails,
         };
 

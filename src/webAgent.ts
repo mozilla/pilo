@@ -31,16 +31,16 @@ import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-
-// === Configuration Constants ===
-const DEFAULT_MAX_ITERATIONS = 50;
-const DEFAULT_GENERATION_MAX_TOKENS = 3000;
-const DEFAULT_PLANNING_MAX_TOKENS = 1500;
-const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
-const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
-const DEFAULT_MAX_TOTAL_ERRORS = 15;
-const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
-const DEFAULT_MAX_REPEATED_ACTIONS = 2;
+import {
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_GENERATION_MAX_TOKENS,
+  DEFAULT_PLANNING_MAX_TOKENS,
+  DEFAULT_VALIDATION_MAX_TOKENS,
+  DEFAULT_MAX_CONSECUTIVE_ERRORS,
+  DEFAULT_MAX_TOTAL_ERRORS,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS,
+  DEFAULT_MAX_REPEATED_ACTIONS,
+} from "./defaults.js";
 
 // === Type Definitions ===
 

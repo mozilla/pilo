@@ -29,6 +29,22 @@ vi.mock("spark", () => ({
     hasApiKey: true,
     keySource: "env",
   })),
+  // Config merge utilities
+  createNavigationRetryConfig: vi.fn((overrides) => ({
+    baseTimeoutMs: overrides?.baseTimeoutMs ?? 30000,
+    maxTimeoutMs: overrides?.maxTimeoutMs ?? 120000,
+    maxAttempts: overrides?.maxAttempts ?? 3,
+    timeoutMultiplier: overrides?.timeoutMultiplier ?? 2,
+    ...(overrides?.onRetry && { onRetry: overrides.onRetry }),
+  })),
+  // Default constants
+  DEFAULT_BROWSER: "firefox",
+  DEFAULT_HEADLESS: false,
+  DEFAULT_BLOCK_ADS: true,
+  DEFAULT_DEBUG: false,
+  DEFAULT_VISION: false,
+  DEFAULT_MAX_ITERATIONS: 50,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS: 3,
 }));
 
 // Mock the AI SDK

@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { config as loadDotenv } from "dotenv";
+import { parseEnvConfig } from "./config/envParser.js";
 
 export interface SparkConfig {
   // AI Configuration
@@ -60,6 +61,7 @@ export interface SparkConfig {
 
   // Navigation Retry Configuration
   navigation_timeout_ms?: number;
+  navigation_max_timeout_ms?: number;
   navigation_max_attempts?: number;
   navigation_timeout_multiplier?: number;
 
@@ -108,140 +110,14 @@ export class ConfigManager {
       // Ignore if .env doesn't exist
     }
 
-    // Merge with environment variables (highest priority)
-    const config: SparkConfig = {
+    // Use schema-driven env parsing (handles all env vars automatically)
+    const envConfig = parseEnvConfig();
+
+    // Merge: global config < env vars (env has higher priority)
+    return {
       ...globalConfig,
-      // Override with environment variables if they exist
-      // AI Configuration
-      ...(process.env.SPARK_PROVIDER && {
-        provider: process.env.SPARK_PROVIDER as SparkConfig["provider"],
-      }),
-      ...(process.env.SPARK_MODEL && { model: process.env.SPARK_MODEL }),
-      ...(process.env.OPENAI_API_KEY && { openai_api_key: process.env.OPENAI_API_KEY }),
-      ...(process.env.OPENROUTER_API_KEY && { openrouter_api_key: process.env.OPENROUTER_API_KEY }),
-      ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY && {
-        google_generative_ai_api_key: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      }),
-      ...((process.env.GOOGLE_VERTEX_PROJECT ||
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCP_PROJECT) && {
-        vertex_project:
-          process.env.GOOGLE_VERTEX_PROJECT ||
-          process.env.GOOGLE_CLOUD_PROJECT ||
-          process.env.GCP_PROJECT,
-      }),
-      ...((process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) && {
-        vertex_location: process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION,
-      }),
-
-      // Local AI Provider Configuration
-      ...(process.env.SPARK_OLLAMA_BASE_URL && {
-        ollama_base_url: process.env.SPARK_OLLAMA_BASE_URL,
-      }),
-      ...(process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL && {
-        openai_compatible_base_url: process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL,
-      }),
-      ...(process.env.SPARK_OPENAI_COMPATIBLE_NAME && {
-        openai_compatible_name: process.env.SPARK_OPENAI_COMPATIBLE_NAME,
-      }),
-
-      // Browser Configuration
-      ...(process.env.SPARK_BROWSER && {
-        browser: process.env.SPARK_BROWSER as SparkConfig["browser"],
-      }),
-      ...(process.env.SPARK_CHANNEL && {
-        channel: process.env.SPARK_CHANNEL,
-      }),
-      ...(process.env.SPARK_EXECUTABLE_PATH && {
-        executable_path: process.env.SPARK_EXECUTABLE_PATH,
-      }),
-      ...(process.env.SPARK_HEADLESS && {
-        headless: process.env.SPARK_HEADLESS === "true",
-      }),
-      ...(process.env.SPARK_BLOCK_ADS && {
-        block_ads: process.env.SPARK_BLOCK_ADS === "true",
-      }),
-      ...(process.env.SPARK_BLOCK_RESOURCES && {
-        block_resources: process.env.SPARK_BLOCK_RESOURCES,
-      }),
-
-      // Proxy Configuration
-      ...(process.env.SPARK_PROXY && {
-        proxy: process.env.SPARK_PROXY,
-      }),
-      ...(process.env.SPARK_PROXY_USERNAME && {
-        proxy_username: process.env.SPARK_PROXY_USERNAME,
-      }),
-      ...(process.env.SPARK_PROXY_PASSWORD && {
-        proxy_password: process.env.SPARK_PROXY_PASSWORD,
-      }),
-
-      // Logging Configuration
-      ...(process.env.SPARK_LOGGER && {
-        logger: process.env.SPARK_LOGGER as SparkConfig["logger"],
-      }),
-      ...(process.env.SPARK_METRICS_INCREMENTAL && {
-        metrics_incremental: process.env.SPARK_METRICS_INCREMENTAL === "true",
-      }),
-
-      // WebAgent Configuration
-      ...(process.env.SPARK_DEBUG && {
-        debug: process.env.SPARK_DEBUG === "true",
-      }),
-      ...(process.env.SPARK_VISION && {
-        vision: process.env.SPARK_VISION === "true",
-      }),
-      ...(process.env.SPARK_MAX_ITERATIONS && {
-        max_iterations: parseInt(process.env.SPARK_MAX_ITERATIONS, 10),
-      }),
-      ...(process.env.SPARK_MAX_VALIDATION_ATTEMPTS && {
-        max_validation_attempts: parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10),
-      }),
-      ...(process.env.SPARK_MAX_REPEATED_ACTIONS && {
-        max_repeated_actions: parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10),
-      }),
-      ...(process.env.SPARK_REASONING_EFFORT && {
-        reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
-      }),
-      ...(process.env.SPARK_STARTING_URL && {
-        starting_url: process.env.SPARK_STARTING_URL,
-      }),
-      ...(process.env.SPARK_DATA && {
-        data: process.env.SPARK_DATA,
-      }),
-      ...(process.env.SPARK_GUARDRAILS && {
-        guardrails: process.env.SPARK_GUARDRAILS,
-      }),
-
-      // Playwright Configuration
-      ...(process.env.SPARK_PW_ENDPOINT && {
-        pw_endpoint: process.env.SPARK_PW_ENDPOINT,
-      }),
-      ...(process.env.SPARK_PW_CDP_ENDPOINT && {
-        pw_cdp_endpoint: process.env.SPARK_PW_CDP_ENDPOINT,
-      }),
-      ...(process.env.SPARK_BYPASS_CSP && {
-        bypass_csp: process.env.SPARK_BYPASS_CSP === "true",
-      }),
-
-      // Navigation Retry Configuration
-      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MS && {
-        navigation_timeout_ms: parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10),
-      }),
-      ...(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS && {
-        navigation_max_attempts: parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10),
-      }),
-      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER && {
-        navigation_timeout_multiplier: parseFloat(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER),
-      }),
-
-      // Action Timeout Configuration
-      ...(process.env.SPARK_ACTION_TIMEOUT_MS && {
-        action_timeout_ms: parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10),
-      }),
+      ...envConfig,
     };
-
-    return config;
   }
 
   /**
@@ -337,81 +213,8 @@ export class ConfigManager {
   } {
     const global = this.getGlobalConfig();
 
-    const env: Partial<SparkConfig> = {};
-    // AI Configuration
-    if (process.env.SPARK_PROVIDER)
-      env.provider = process.env.SPARK_PROVIDER as SparkConfig["provider"];
-    if (process.env.SPARK_MODEL) env.model = process.env.SPARK_MODEL;
-    if (process.env.OPENAI_API_KEY) env.openai_api_key = process.env.OPENAI_API_KEY;
-    if (process.env.OPENROUTER_API_KEY) env.openrouter_api_key = process.env.OPENROUTER_API_KEY;
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY)
-      env.google_generative_ai_api_key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (
-      process.env.GOOGLE_VERTEX_PROJECT ||
-      process.env.GOOGLE_CLOUD_PROJECT ||
-      process.env.GCP_PROJECT
-    ) {
-      env.vertex_project =
-        process.env.GOOGLE_VERTEX_PROJECT ||
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCP_PROJECT;
-    }
-    if (process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) {
-      env.vertex_location = process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION;
-    }
-
-    // Browser Configuration
-    if (process.env.SPARK_BROWSER)
-      env.browser = process.env.SPARK_BROWSER as SparkConfig["browser"];
-    if (process.env.SPARK_CHANNEL) env.channel = process.env.SPARK_CHANNEL;
-    if (process.env.SPARK_EXECUTABLE_PATH) env.executable_path = process.env.SPARK_EXECUTABLE_PATH;
-    if (process.env.SPARK_HEADLESS) env.headless = process.env.SPARK_HEADLESS === "true";
-    if (process.env.SPARK_BLOCK_ADS) env.block_ads = process.env.SPARK_BLOCK_ADS === "true";
-    if (process.env.SPARK_BLOCK_RESOURCES) env.block_resources = process.env.SPARK_BLOCK_RESOURCES;
-
-    // Proxy Configuration
-    if (process.env.SPARK_PROXY) env.proxy = process.env.SPARK_PROXY;
-    if (process.env.SPARK_PROXY_USERNAME) env.proxy_username = process.env.SPARK_PROXY_USERNAME;
-    if (process.env.SPARK_PROXY_PASSWORD) env.proxy_password = process.env.SPARK_PROXY_PASSWORD;
-
-    // Logging Configuration
-    if (process.env.SPARK_LOGGER) env.logger = process.env.SPARK_LOGGER as SparkConfig["logger"];
-    if (process.env.SPARK_METRICS_INCREMENTAL)
-      env.metrics_incremental = process.env.SPARK_METRICS_INCREMENTAL === "true";
-
-    // WebAgent Configuration
-    if (process.env.SPARK_DEBUG) env.debug = process.env.SPARK_DEBUG === "true";
-    if (process.env.SPARK_VISION) env.vision = process.env.SPARK_VISION === "true";
-    if (process.env.SPARK_MAX_ITERATIONS)
-      env.max_iterations = parseInt(process.env.SPARK_MAX_ITERATIONS, 10);
-    if (process.env.SPARK_MAX_VALIDATION_ATTEMPTS)
-      env.max_validation_attempts = parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10);
-    if (process.env.SPARK_MAX_REPEATED_ACTIONS)
-      env.max_repeated_actions = parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10);
-    if (process.env.SPARK_REASONING_EFFORT)
-      env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
-    if (process.env.SPARK_STARTING_URL) env.starting_url = process.env.SPARK_STARTING_URL;
-    if (process.env.SPARK_DATA) env.data = process.env.SPARK_DATA;
-    if (process.env.SPARK_GUARDRAILS) env.guardrails = process.env.SPARK_GUARDRAILS;
-
-    // Playwright Configuration
-    if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;
-    if (process.env.SPARK_PW_CDP_ENDPOINT) env.pw_cdp_endpoint = process.env.SPARK_PW_CDP_ENDPOINT;
-    if (process.env.SPARK_BYPASS_CSP) env.bypass_csp = process.env.SPARK_BYPASS_CSP === "true";
-
-    // Navigation Retry Configuration
-    if (process.env.SPARK_NAVIGATION_TIMEOUT_MS)
-      env.navigation_timeout_ms = parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10);
-    if (process.env.SPARK_NAVIGATION_MAX_ATTEMPTS)
-      env.navigation_max_attempts = parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10);
-    if (process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER)
-      env.navigation_timeout_multiplier = parseFloat(
-        process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER,
-      );
-
-    // Action Timeout Configuration
-    if (process.env.SPARK_ACTION_TIMEOUT_MS)
-      env.action_timeout_ms = parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10);
+    // Use schema-driven env parsing (no manual env var listing needed)
+    const env = parseEnvConfig();
 
     const merged = this.getConfig();
 

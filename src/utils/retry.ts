@@ -6,14 +6,12 @@
  */
 
 import { generateText } from "ai";
-
-/**
- * Default retry configuration
- */
-const DEFAULT_MAX_ATTEMPTS = 3;
-const DEFAULT_INITIAL_DELAY = 1000; // 1 second
-const DEFAULT_MAX_DELAY = 10000; // 10 seconds
-const DEFAULT_BACKOFF_FACTOR = 2;
+import {
+  DEFAULT_RETRY_MAX_ATTEMPTS,
+  DEFAULT_RETRY_INITIAL_DELAY_MS,
+  DEFAULT_RETRY_MAX_DELAY_MS,
+  DEFAULT_RETRY_BACKOFF_FACTOR,
+} from "../defaults.js";
 
 /**
  * Check if an error is retryable
@@ -82,10 +80,10 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   retryOptions?: RetryOptions,
 ): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
   const {
-    maxAttempts = DEFAULT_MAX_ATTEMPTS,
-    initialDelay = DEFAULT_INITIAL_DELAY,
-    maxDelay = DEFAULT_MAX_DELAY,
-    backoffFactor = DEFAULT_BACKOFF_FACTOR,
+    maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
+    initialDelay = DEFAULT_RETRY_INITIAL_DELAY_MS,
+    maxDelay = DEFAULT_RETRY_MAX_DELAY_MS,
+    backoffFactor = DEFAULT_RETRY_BACKOFF_FACTOR,
     onRetry,
   } = retryOptions || {};
 
