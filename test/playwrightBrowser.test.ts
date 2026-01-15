@@ -91,6 +91,39 @@ describe("PlaywrightBrowser", () => {
       expect(browser).toBeDefined();
       expect(browser).toBeInstanceOf(PlaywrightBrowser);
     });
+
+    it("should preserve default timeouts when undefined values are passed", () => {
+      // Simulates what CLI/server does when options aren't set
+      const browser = new PlaywrightBrowser({
+        actionTimeoutMs: undefined,
+        navigationRetry: {
+          baseTimeoutMs: undefined,
+          maxAttempts: undefined,
+          timeoutMultiplier: undefined,
+        },
+      });
+
+      expect((browser as any).actionTimeoutMs).toBe(30000);
+
+      const config = (browser as any).navigationConfig;
+      expect(config.baseTimeoutMs).toBe(30000);
+      expect(config.maxAttempts).toBe(3);
+      expect(config.timeoutMultiplier).toBe(2);
+    });
+
+    it("should allow partial overrides of navigation config", () => {
+      const browser = new PlaywrightBrowser({
+        navigationRetry: {
+          baseTimeoutMs: 15000,
+          maxAttempts: undefined, // Keep default
+          timeoutMultiplier: 3,
+        },
+      });
+      const config = (browser as any).navigationConfig;
+      expect(config.baseTimeoutMs).toBe(15000);
+      expect(config.maxAttempts).toBe(3); // Default preserved
+      expect(config.timeoutMultiplier).toBe(3);
+    });
   });
 
   describe("error handling without browser started", () => {
