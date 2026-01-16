@@ -32,10 +32,16 @@ export const test = base.extend<ExtensionFixtures>({
   // Launch Chrome with the extension loaded
   context: async ({}, use) => {
     const extensionPath = findExtensionPath();
+    const headless = process.env.HEADLESS === "true";
 
     const context = await chromium.launchPersistentContext("", {
-      headless: false, // Chrome extensions require headed mode
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+      headless,
+      ...(headless ? { channel: "chromium" } : {}),
+      args: [
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
+        ...(headless ? ["--disable-gpu", "--disable-dev-shm-usage"] : []),
+      ],
     });
 
     await use(context);
@@ -47,8 +53,11 @@ export const test = base.extend<ExtensionFixtures>({
     // Wait for service worker to register (MV3)
     let serviceWorker = context.serviceWorkers()[0];
     if (!serviceWorker) {
-      serviceWorker = await context.waitForEvent("serviceworker");
+      serviceWorker = await context.waitForEvent("serviceworker", { timeout: 10000 });
     }
+
+    // Wait for service worker to activate (critical for MV3 in headless mode)
+    await serviceWorker.evaluate(() => self.registration.active);
 
     // Extract extension ID from service worker URL: chrome-extension://<id>/background.js
     const url = serviceWorker.url();

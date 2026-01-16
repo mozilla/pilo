@@ -28,6 +28,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:e2e:headless": "HEADLESS=true playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
