@@ -11,7 +11,7 @@ import {
   DEFAULT_RETRY_INITIAL_DELAY_MS,
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
-} from "../config/constants.js";
+} from "../constants.js";
 
 /**
  * Check if an error is retryable

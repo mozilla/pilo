@@ -31,14 +31,14 @@ import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-import { getConfigDefaults } from "./config/schema.js";
+import { getConfigDefaults } from "./config.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
   DEFAULT_MAX_CONSECUTIVE_ERRORS,
   DEFAULT_MAX_TOTAL_ERRORS,
-} from "./config/constants.js";
+} from "./constants.js";
 
 // === Type Definitions ===
 

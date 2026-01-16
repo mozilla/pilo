@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createRunCommand } from "../../../src/cli/commands/run.js";
-import { getConfigDefaults } from "../../../src/config/schema.js";
+import { getConfigDefaults } from "../../../src/config.js";
 
 // Get defaults from schema
 const schemaDefaults = getConfigDefaults();
@@ -29,17 +29,9 @@ vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
   }),
 }));
 
-// Mock the config manager to avoid fs dependencies
-vi.mock("../../../src/config/manager.js", () => ({
-  config: {
-    get: vi.fn(),
-    getConfig: vi.fn(() => ({})),
-  },
-  ConfigManager: vi.fn(),
-}));
-
-vi.mock("../../../src/config/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/config/index.js")>();
+// Mock the config module to avoid fs dependencies
+vi.mock("../../../src/config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/config.js")>();
   return {
     ...actual,
     config: {
@@ -101,7 +93,7 @@ vi.mock("../../../src/events.js", () => ({
 
 import { WebAgent } from "../../../src/webAgent.js";
 import { PlaywrightBrowser } from "../../../src/browser/playwrightBrowser.js";
-import { config } from "../../../src/config/index.js";
+import { config } from "../../../src/config.js";
 import { createAIProvider } from "../../../src/provider.js";
 import { ChalkConsoleLogger } from "../../../src/loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "../../../src/loggers/json.js";

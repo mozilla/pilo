@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { WebAgent } from "../../webAgent.js";
 import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
-import { config } from "../../config/index.js";
+import { config, addConfigOptions } from "../../config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
@@ -13,7 +13,6 @@ import * as path from "path";
 import { MetricsCollector } from "../../loggers/metricsCollector.js";
 import { Logger } from "../../loggers/types.js";
 import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
-import { addSchemaOptions } from "../../config/cliGenerator.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks.
@@ -26,7 +25,7 @@ export function createRunCommand(): Command {
     .argument("<task>", "Natural language description of the task to perform");
 
   // Add all CLI options from schema
-  addSchemaOptions(command);
+  addConfigOptions(command);
 
   // Set action handler
   command.action(executeRunCommand);

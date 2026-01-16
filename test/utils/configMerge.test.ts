@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mergeWithDefaults, createNavigationRetryConfig } from "../../src/utils/configMerge.js";
-import { getConfigDefaults } from "../../src/config/schema.js";
+import { getConfigDefaults } from "../../src/config.js";
 
 // Get navigation defaults from schema
 const defaults = getConfigDefaults();

@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync, unlinkSync } from "fs";
-import { config } from "../../config/index.js";
+import { config } from "../../config.js";
 import { getAIProviderInfo } from "../provider.js";
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";
 

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { type SparkConfigResolved } from "../../src/cli/config.js";
-import { getConfigDefaults } from "../../src/config/schema.js";
+import { type SparkConfigResolved, getConfigDefaults } from "../../src/cli/config.js";
 
 // Get defaults for creating complete mock configs
 const defaults = getConfigDefaults();
 
 // Mock the entire config module to test the interface
-vi.mock("../../src/cli/config.js", () => {
+vi.mock("../../src/cli/config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/cli/config.js")>();
   const mockConfig = {
     getConfig: vi.fn(),
     getGlobalConfig: vi.fn(),
@@ -19,9 +19,9 @@ vi.mock("../../src/cli/config.js", () => {
   };
 
   return {
+    ...actual,
     ConfigManager: vi.fn(() => mockConfig),
     config: mockConfig,
-    getConfigDefaults: vi.fn(),
   };
 });
 

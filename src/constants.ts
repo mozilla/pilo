@@ -4,7 +4,7 @@
  * These are implementation details used internally but not configurable
  * via environment variables or CLI options.
  *
- * For configurable defaults, see schema.ts (Zod schema is the single source of truth).
+ * For configurable defaults, see config.ts (FIELDS is the single source of truth).
  */
 
 // ============================================================================

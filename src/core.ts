@@ -43,7 +43,7 @@ export type { NavigationRetryConfig } from "./browser/navigationRetry.js";
 export { calculateTimeout, DEFAULT_NAVIGATION_RETRY_CONFIG } from "./browser/navigationRetry.js";
 
 // Config system - single source of truth
-export { getConfigDefaults } from "./config/schema.js";
+export { getConfigDefaults } from "./config.js";
 
 // Internal constants (not configurable via env/CLI)
 export {
@@ -56,11 +56,11 @@ export {
   DEFAULT_RETRY_INITIAL_DELAY_MS,
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
-} from "./config/constants.js";
+} from "./constants.js";
 
 // Backward-compatible default exports (derived from schema)
 // Use getConfigDefaults() for programmatic access to all defaults
-import { getConfigDefaults as _getDefaults } from "./config/schema.js";
+import { getConfigDefaults as _getDefaults } from "./config.js";
 const _defaults = _getDefaults();
 export const DEFAULT_NAVIGATION_BASE_TIMEOUT_MS = _defaults.navigation_timeout_ms;
 export const DEFAULT_NAVIGATION_MAX_TIMEOUT_MS = _defaults.navigation_max_timeout_ms;

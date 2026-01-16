@@ -2,7 +2,7 @@
 export {
   config,
   ConfigManager,
+  getConfigDefaults,
   type SparkConfig,
   type SparkConfigResolved,
-} from "../config/index.js";
-export { getConfigDefaults } from "../config/schema.js";
+} from "../config.js";

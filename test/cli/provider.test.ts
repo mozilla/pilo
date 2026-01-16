@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
 
-// Mock the shared config module that CLI now imports from
-vi.mock("../../src/config/index.js", () => ({
+// Mock the config module
+vi.mock("../../src/config.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
+  getConfigDefaults: vi.fn(() => ({
+    provider: "openai",
+    browser: "firefox",
+    headless: false,
+    block_ads: true,
+    block_resources: "media,manifest",
+    logger: "console",
+    metrics_incremental: false,
+    debug: false,
+    vision: false,
+    max_iterations: 50,
+    max_validation_attempts: 3,
+    max_repeated_actions: 2,
+    bypass_csp: true,
+    navigation_timeout_ms: 30000,
+    navigation_max_timeout_ms: 120000,
+    navigation_max_attempts: 3,
+    navigation_timeout_multiplier: 2,
+    action_timeout_ms: 30000,
+    reasoning_effort: "none",
+  })),
 }));
 
 // Mock AI SDK modules
@@ -64,14 +85,13 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config } from "../../src/config/index.js";
+import { config, getConfigDefaults } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOllama } from "ollama-ai-provider-v2";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { getConfigDefaults } from "../../src/config/schema.js";
 
 const mockConfig = vi.mocked(config);
 const mockOpenai = vi.mocked(openai);
