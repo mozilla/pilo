@@ -38,64 +38,74 @@ export function createRunCommand(): Command {
  */
 async function executeRunCommand(task: string, options: any): Promise<void> {
   try {
+    // Get merged config (defaults < global config < env vars)
+    const cfg = config.getConfig();
+
     // Parse JSON data if provided
     let parsedData = null;
-    if (options.data) {
+    const dataOption = options.data ?? cfg.data;
+    if (dataOption) {
       try {
-        parsedData = parseJsonData(options.data);
+        parsedData = parseJsonData(dataOption);
       } catch (error) {
         console.error(chalk.red.bold("❌ Error: Invalid JSON in --data option"));
-        console.log(chalk.gray(`Data: ${options.data}`));
+        console.log(chalk.gray(`Data: ${dataOption}`));
         console.log(chalk.gray(`Error: ${error instanceof Error ? error.message : String(error)}`));
         process.exit(1);
       }
     }
 
-    // Parse blocked resources
-    const blockResources = options.blockResources
-      ? (parseResourcesList(options.blockResources) as Array<
+    // Parse blocked resources (CLI option overrides config)
+    const blockResourcesOption = options.blockResources ?? cfg.block_resources;
+    const blockResources = blockResourcesOption
+      ? (parseResourcesList(blockResourcesOption) as Array<
           "image" | "stylesheet" | "font" | "media" | "manifest"
         >)
       : [];
 
+    // Merge CLI options with config (CLI takes precedence)
+    const browserOption = options.browser ?? cfg.browser;
+
     // Validate browser option
-    if (!validateBrowser(options.browser)) {
+    if (!validateBrowser(browserOption)) {
       console.error(chalk.red.bold("❌ Error: Invalid browser option"));
-      console.log(chalk.gray(`Browser: ${options.browser}`));
+      console.log(chalk.gray(`Browser: ${browserOption}`));
       console.log(chalk.gray(`Valid browsers: ${getValidBrowsers().join(", ")}`));
       process.exit(1);
     }
 
     // Create logger
+    const loggerType = options.logger ?? cfg.logger;
+    const metricsIncremental = options.metricsIncremental ?? cfg.metrics_incremental;
     const logger: Logger = new MetricsCollector(
       new SecretsRedactor(
-        options.logger === "json"
+        loggerType === "json"
           ? new JSONConsoleLogger()
-          : new ChalkConsoleLogger({ metricsIncremental: options.metricsIncremental }),
+          : new ChalkConsoleLogger({ metricsIncremental }),
       ),
     );
 
     // Create browser instance with navigation retry config
-    // Note: Numeric options are already parsed by Commander's argParser
+    // CLI options take precedence over config values
     const browser = new PlaywrightBrowser({
-      browser: options.browser,
-      bypassCSP: options.bypassCsp,
-      channel: options.channel,
-      executablePath: options.executablePath,
-      blockAds: options.blockAds ?? config.get("block_ads"),
+      browser: browserOption,
+      bypassCSP: options.bypassCsp ?? cfg.bypass_csp,
+      channel: options.channel ?? cfg.channel,
+      executablePath: options.executablePath ?? cfg.executable_path,
+      blockAds: options.blockAds ?? cfg.block_ads,
       blockResources,
-      headless: options.headless,
-      proxyServer: options.proxy,
-      proxyUsername: options.proxyUsername,
-      proxyPassword: options.proxyPassword,
-      pwEndpoint: options.pwEndpoint,
-      pwCdpEndpoint: options.pwCdpEndpoint,
-      actionTimeoutMs: options.actionTimeoutMs,
+      headless: options.headless ?? cfg.headless,
+      proxyServer: options.proxy ?? cfg.proxy,
+      proxyUsername: options.proxyUsername ?? cfg.proxy_username,
+      proxyPassword: options.proxyPassword ?? cfg.proxy_password,
+      pwEndpoint: options.pwEndpoint ?? cfg.pw_endpoint,
+      pwCdpEndpoint: options.pwCdpEndpoint ?? cfg.pw_cdp_endpoint,
+      actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
       navigationRetry: {
-        baseTimeoutMs: options.navigationTimeoutMs,
-        maxTimeoutMs: options.navigationMaxTimeoutMs,
-        maxAttempts: options.navigationMaxAttempts,
-        timeoutMultiplier: options.navigationTimeoutMultiplier,
+        baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,
+        maxTimeoutMs: options.navigationMaxTimeoutMs ?? cfg.navigation_max_timeout_ms,
+        maxAttempts: options.navigationMaxAttempts ?? cfg.navigation_max_attempts,
+        timeoutMultiplier: options.navigationTimeoutMultiplier ?? cfg.navigation_timeout_multiplier,
         onRetry: (attempt, error, nextTimeout) => {
           console.log(
             chalk.yellow(`⚠️ Navigation retry ${attempt}: ${error.message}`),
@@ -105,8 +115,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       },
     });
 
-    // Create AI provider with CLI overrides
-    const providerOverrides: any = {};
+    // Create AI provider with CLI overrides (only pass if explicitly set on CLI)
+    // Unlike other options, we use explicit undefined checks here because
+    // createAIProvider() has its own config merging logic - we only want to
+    // pass true overrides, not values that would shadow the config system.
+    const providerOverrides: Partial<Parameters<typeof createAIProvider>[0]> = {};
     if (options.provider !== undefined) {
       providerOverrides.provider = options.provider;
     }
@@ -128,8 +141,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Create event emitter for handling events
     const eventEmitter = new WebAgentEventEmitter();
 
+    // Check debug mode (used for logging setup and WebAgent config)
+    const debugMode = options.debug ?? cfg.debug;
+
     // Set up generation logging if debug mode is enabled
-    if (options.debug) {
+    if (debugMode) {
       // Create debug/generations directory if it doesn't exist
       const debugDir = path.join(process.cwd(), "debug", "generations");
       fs.mkdirSync(debugDir, { recursive: true });
@@ -149,12 +165,12 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
-      debug: options.debug,
-      vision: options.vision,
-      guardrails: options.guardrails,
-      maxIterations: options.maxIterations,
-      maxValidationAttempts: options.maxValidationAttempts,
-      maxRepeatedActions: options.maxRepeatedActions,
+      debug: debugMode,
+      vision: options.vision ?? cfg.vision,
+      guardrails: options.guardrails ?? cfg.guardrails,
+      maxIterations: options.maxIterations ?? cfg.max_iterations,
+      maxValidationAttempts: options.maxValidationAttempts ?? cfg.max_validation_attempts,
+      maxRepeatedActions: options.maxRepeatedActions ?? cfg.max_repeated_actions,
       providerConfig,
       logger,
       eventEmitter,
@@ -162,7 +178,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Execute the task
     await webAgent.execute(task, {
-      startingUrl: options.url,
+      startingUrl: options.url ?? cfg.starting_url,
       data: parsedData,
     });
 

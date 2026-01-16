@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { Command } from "commander";
 import type { SparkConfig } from "../src/config.js";
-import { getSchemaConfigKeys } from "../src/config.js";
+import { getSchemaConfigKeys, addConfigOptions, DEFAULTS } from "../src/config.js";
 
 describe("ConfigManager", () => {
   describe("get() method with default values", () => {
@@ -198,6 +199,47 @@ describe("ConfigManager", () => {
           `CONFIG_SCHEMA key "${key}" not in SparkConfig`,
         ).toBe(true);
       }
+    });
+  });
+
+  describe("addConfigOptions", () => {
+    it("should NOT set default values on Commander options", () => {
+      // This test ensures that addConfigOptions does not set Commander defaults
+      // If Commander sets defaults, they would override env/config values
+      // because the run command checks `if (options.xxx !== undefined)`
+      const cmd = new Command("test");
+      addConfigOptions(cmd);
+
+      // Parse with no arguments
+      cmd.parse([], { from: "user" });
+      const opts = cmd.opts();
+
+      // Key options that have defaults in FIELDS should be undefined in Commander
+      // because we don't want Commander defaults to override .env config
+      expect(opts.provider).toBeUndefined();
+      expect(opts.browser).toBeUndefined();
+      expect(opts.headless).toBeUndefined();
+      expect(opts.maxIterations).toBeUndefined();
+
+      // Verify that DEFAULTS still has these values (they just shouldn't be on Commander)
+      expect(DEFAULTS.provider).toBe("openai");
+      expect(DEFAULTS.browser).toBe("firefox");
+      expect(DEFAULTS.headless).toBe(false);
+      expect(DEFAULTS.max_iterations).toBe(50);
+    });
+
+    it("should preserve user-provided CLI options", () => {
+      const cmd = new Command("test");
+      addConfigOptions(cmd);
+
+      // Parse with explicit options
+      cmd.parse(["--provider", "vertex", "--browser", "chrome", "--headless"], { from: "user" });
+      const opts = cmd.opts();
+
+      // User-provided options should be present
+      expect(opts.provider).toBe("vertex");
+      expect(opts.browser).toBe("chrome");
+      expect(opts.headless).toBe(true);
     });
   });
 });

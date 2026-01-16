@@ -3,12 +3,8 @@ import { Command } from "commander";
 import { createRunCommand } from "../../../src/cli/commands/run.js";
 import { getConfigDefaults } from "../../../src/config.js";
 
-// Get defaults from schema
+// Get defaults from schema (used for mocking config.getConfig)
 const schemaDefaults = getConfigDefaults();
-const DEFAULT_PROVIDER = schemaDefaults.provider;
-const DEFAULT_BROWSER = schemaDefaults.browser;
-const DEFAULT_MAX_ITERATIONS = schemaDefaults.max_iterations;
-const DEFAULT_MAX_VALIDATION_ATTEMPTS = schemaDefaults.max_validation_attempts;
 
 // Mock all the dependencies
 vi.mock("../../../src/webAgent.js", () => ({
@@ -32,11 +28,12 @@ vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
 // Mock the config module to avoid fs dependencies
 vi.mock("../../../src/config.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/config.js")>();
+  // Return DEFAULTS from getConfig so run command gets proper default values
   return {
     ...actual,
     config: {
-      get: vi.fn(),
-      getConfig: vi.fn(() => ({})),
+      get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
+      getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
     },
   };
 });
@@ -188,23 +185,24 @@ describe("CLI Run Command", () => {
       expect(optionFlags).toContain("--logger <type>");
     });
 
-    it("should have correct default values", () => {
+    it("should NOT have Commander defaults (defaults come from config)", () => {
+      // Defaults should come from config.getConfig(), not Commander options
+      // This prevents CLI options from overriding .env and config file values
       const options = command.options;
 
       const providerOption = options.find((opt) => opt.flags === "--provider <name>");
-      expect(providerOption?.defaultValue).toBe(DEFAULT_PROVIDER);
+      expect(providerOption?.defaultValue).toBeUndefined();
 
       const browserOption = options.find((opt) => opt.flags === "-b, --browser <name>");
-      expect(browserOption?.defaultValue).toBe(DEFAULT_BROWSER);
+      expect(browserOption?.defaultValue).toBeUndefined();
 
-      // Numeric defaults are actual numbers (not strings) thanks to argParser
       const maxIterationsOption = options.find((opt) => opt.flags === "--max-iterations <n>");
-      expect(maxIterationsOption?.defaultValue).toBe(DEFAULT_MAX_ITERATIONS);
+      expect(maxIterationsOption?.defaultValue).toBeUndefined();
 
       const maxValidationOption = options.find(
         (opt) => opt.flags === "--max-validation-attempts <n>",
       );
-      expect(maxValidationOption?.defaultValue).toBe(DEFAULT_MAX_VALIDATION_ATTEMPTS);
+      expect(maxValidationOption?.defaultValue).toBeUndefined();
     });
   });
 
@@ -224,6 +222,7 @@ describe("CLI Run Command", () => {
       const args = ["test task"];
       await command.parseAsync(args, { from: "user" });
 
+      // Browser options come from config.getConfig() which returns DEFAULTS
       expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
         expect.objectContaining({
           browser: "firefox",
@@ -238,10 +237,9 @@ describe("CLI Run Command", () => {
         }),
       );
 
-      expect(mockCreateAIProvider).toHaveBeenCalledWith({
-        provider: "openai",
-        reasoning_effort: "none",
-      });
+      // createAIProvider is called with empty object when no CLI options specified
+      // (defaults come from config.getConfig() inside createAIProvider)
+      expect(mockCreateAIProvider).toHaveBeenCalledWith({});
       expect(mockWebAgent).toHaveBeenCalled();
     });
 
@@ -260,12 +258,13 @@ describe("CLI Run Command", () => {
 
       await command.parseAsync(args, { from: "user" });
 
+      // Only explicitly set CLI options are passed as overrides
+      // (reasoning_effort not specified, so not in overrides)
       expect(mockCreateAIProvider).toHaveBeenCalledWith({
         provider: "openrouter",
         model: "anthropic/claude-3-sonnet",
         openai_api_key: "sk-test123",
         openrouter_api_key: "sk-or-test123",
-        reasoning_effort: "none",
       });
     });
 
@@ -295,6 +294,26 @@ describe("CLI Run Command", () => {
           proxyServer: undefined,
           proxyUsername: undefined,
           proxyPassword: undefined,
+        }),
+      );
+    });
+
+    it("should preserve boolean false from config when CLI option not specified", async () => {
+      // Mock config returning headless=false (as if from .env SPARK_HEADLESS=false)
+      // This ensures the ?? operator doesn't override explicit false values
+      mockConfig.getConfig.mockReturnValueOnce({
+        ...schemaDefaults,
+        headless: false, // Explicitly false from .env
+        block_ads: false, // Another boolean that's false
+      });
+
+      const args = ["test task"]; // Note: no --headless or --block-ads flags
+      await command.parseAsync(args, { from: "user" });
+
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headless: false, // Should preserve the config value
+          blockAds: false, // Should preserve the config value
         }),
       );
     });

@@ -183,10 +183,8 @@ export function addConfigOptions(command: Command, exclude: string[] = []): Comm
       option.argParser(parseFloat);
     }
 
-    // Set default value
-    if (field.default !== undefined) {
-      option.default(field.default);
-    }
+    // Don't set Commander defaults - our config system handles defaults via
+    // DEFAULTS, and setting them here would override env vars and config file values
 
     command.addOption(option);
 
