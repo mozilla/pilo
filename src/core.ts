@@ -42,8 +42,8 @@ export { RecoverableError, BrowserException, NavigationTimeoutException } from "
 export type { NavigationRetryConfig } from "./browser/navigationRetry.js";
 export { calculateTimeout, DEFAULT_NAVIGATION_RETRY_CONFIG } from "./browser/navigationRetry.js";
 
-// Config system - single source of truth
-export { getConfigDefaults } from "./config.js";
+// Config system - single source of truth (browser-compatible)
+export { getConfigDefaults } from "./configDefaults.js";
 
 // Internal constants (not configurable via env/CLI)
 export {
@@ -60,7 +60,7 @@ export {
 
 // Backward-compatible default exports (derived from schema)
 // Use getConfigDefaults() for programmatic access to all defaults
-import { getConfigDefaults as _getDefaults } from "./config.js";
+import { getConfigDefaults as _getDefaults } from "./configDefaults.js";
 const _defaults = _getDefaults();
 export const DEFAULT_NAVIGATION_BASE_TIMEOUT_MS = _defaults.navigation_timeout_ms;
 export const DEFAULT_NAVIGATION_MAX_TIMEOUT_MS = _defaults.navigation_max_timeout_ms;

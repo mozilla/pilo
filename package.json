@@ -27,6 +27,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc",
     "typecheck": "tsc --project tsconfig.check.json",
     "prepare": "npm run build",

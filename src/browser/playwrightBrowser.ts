@@ -22,7 +22,7 @@ import {
   NavigationNetworkException,
 } from "../errors.js";
 import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
-import { getConfigDefaults } from "../config.js";
+import { getConfigDefaults } from "../configDefaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 
 // Type extension for Playwright's private AI snapshot function

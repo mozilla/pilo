@@ -57,7 +57,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build core package
-        run: pnpm run build
+        run: pnpm run clean && pnpm run build
 
       # Re-run install to resolve package exports now that dist/ exists.
       # pnpm resolves exports during install, but dist/ is only created

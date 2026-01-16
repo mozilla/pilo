@@ -6,7 +6,7 @@
  */
 
 import type { NavigationRetryConfig } from "../browser/navigationRetry.js";
-import { getConfigDefaults } from "../config.js";
+import { getConfigDefaults } from "../configDefaults.js";
 
 /**
  * Merge configuration with defaults, only overriding with defined values.

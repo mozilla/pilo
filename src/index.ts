@@ -21,6 +21,12 @@ export {
   config,
   ConfigManager,
   CONFIG_SCHEMA,
+  FIELDS,
+  DEFAULTS,
+  PROVIDERS,
+  BROWSERS,
+  REASONING_LEVELS,
+  LOGGERS,
   getSchemaField,
   getSchemaFieldsByCategory,
   getCliFields,
@@ -34,8 +40,13 @@ export type {
   SparkConfig,
   SparkConfigResolved,
   ConfigField,
+  FieldDef,
   ConfigFieldType,
   ConfigCategory,
+  Provider,
+  Browser,
+  ReasoningLevel,
+  LoggerType,
 } from "./config.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
