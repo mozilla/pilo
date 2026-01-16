@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { WebAgent } from "../../webAgent.js";
 import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
-import { config } from "../config.js";
+import { config, addConfigOptions } from "../../config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
@@ -15,129 +15,22 @@ import { Logger } from "../../loggers/types.js";
 import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
 
 /**
- * Creates the 'run' command for executing web automation tasks
+ * Creates the 'run' command for executing web automation tasks.
+ * Options are generated from CONFIG_SCHEMA via addSchemaOptions().
  */
 export function createRunCommand(): Command {
-  return new Command("run")
+  const command = new Command("run")
     .alias("r")
     .description("Execute a web automation task")
-    .argument("<task>", "Natural language description of the task to perform")
-    .option("-u, --url <url>", "Starting URL for the task", config.get("starting_url"))
-    .option("-d, --data <json>", "JSON data to provide context for the task", config.get("data"))
-    .option(
-      "-g, --guardrails <text>",
-      "Safety constraints for the task execution",
-      config.get("guardrails"),
-    )
-    .option(
-      "--provider <provider>",
-      "AI provider to use (openai, openrouter)",
-      config.get("provider", "openai"),
-    )
-    .option("--model <model>", "AI model to use", config.get("model"))
-    .option("--openai-api-key <key>", "OpenAI API key", config.get("openai_api_key"))
-    .option("--openrouter-api-key <key>", "OpenRouter API key", config.get("openrouter_api_key"))
-    .option(
-      "-b, --browser <browser>",
-      "Browser to use (firefox, chrome, chromium, safari, webkit, edge)",
-      config.get("browser", "firefox"),
-    )
-    .option(
-      "--channel <channel>",
-      "Browser channel to use (e.g., chrome, msedge, chrome-beta, moz-firefox)",
-      config.get("channel"),
-    )
-    .option(
-      "--executable-path <path>",
-      "Path to browser executable (e.g., /usr/bin/firefox, /Applications/Firefox.app/Contents/MacOS/firefox)",
-      config.get("executable_path"),
-    )
-    .option("--headless", "Run browser in headless mode", config.get("headless", false))
-    .option("--debug", "Enable debug mode with page snapshots", config.get("debug", false))
-    .option(
-      "--vision",
-      "Enable vision capabilities to include screenshots",
-      config.get("vision", false),
-    )
-    .option("--no-block-ads", "Disable ad blocking")
-    .option(
-      "--block-resources <resources>",
-      "Comma-separated list of resources to block",
-      config.get("block_resources", "media,manifest"),
-    )
-    .option(
-      "--pw-endpoint <endpoint>",
-      "Playwright endpoint URL to connect to remote browser",
-      config.get("pw_endpoint"),
-    )
-    .option(
-      "--pw-cdp-endpoint <endpoint>",
-      "Chrome DevTools Protocol endpoint URL (chromium browsers only)",
-      config.get("pw_cdp_endpoint"),
-    )
-    .option("--bypass-csp", "Bypass Content Security Policy", config.get("bypass_csp", false))
-    .option(
-      "--max-iterations <number>",
-      "Maximum total iterations to prevent infinite loops",
-      String(config.get("max_iterations", 50)),
-    )
-    .option(
-      "--max-validation-attempts <number>",
-      "Maximum validation attempts",
-      String(config.get("max_validation_attempts", 3)),
-    )
-    .option(
-      "--max-repeated-actions <number>",
-      "Maximum times an action can be repeated before warning/aborting",
-      String(config.get("max_repeated_actions", 2)),
-    )
-    .option(
-      "--reasoning-effort <effort>",
-      "Reasoning effort level (none, low, medium, high)",
-      config.get("reasoning_effort", "none"),
-    )
-    .option(
-      "--proxy <url>",
-      "Proxy server URL (http://host:port, https://host:port, socks5://host:port)",
-      config.get("proxy"),
-    )
-    .option(
-      "--proxy-username <username>",
-      "Proxy authentication username",
-      config.get("proxy_username"),
-    )
-    .option(
-      "--proxy-password <password>",
-      "Proxy authentication password",
-      config.get("proxy_password"),
-    )
-    .option(
-      "--navigation-timeout-ms <number>",
-      "Base navigation timeout in milliseconds",
-      String(config.get("navigation_timeout_ms", 30000)),
-    )
-    .option(
-      "--navigation-max-attempts <number>",
-      "Maximum navigation attempts (e.g., 3 means try up to 3 times)",
-      String(config.get("navigation_max_attempts", 3)),
-    )
-    .option(
-      "--navigation-timeout-multiplier <number>",
-      "Timeout multiplier for each retry (e.g., 2 means 30s -> 60s -> 120s)",
-      String(config.get("navigation_timeout_multiplier", 2)),
-    )
-    .option(
-      "--action-timeout-ms <number>",
-      "Timeout for page load and element actions in milliseconds",
-      String(config.get("action_timeout_ms", 30000)),
-    )
-    .option("--logger <logger>", "Logger to use (console, json)", config.get("logger", "console"))
-    .option(
-      "--metrics-incremental",
-      "Show incremental metrics updates during task execution",
-      config.get("metrics_incremental", false),
-    )
-    .action(executeRunCommand);
+    .argument("<task>", "Natural language description of the task to perform");
+
+  // Add all CLI options from schema
+  addConfigOptions(command);
+
+  // Set action handler
+  command.action(executeRunCommand);
+
+  return command;
 }
 
 /**
@@ -183,12 +76,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     );
 
     // Create browser instance with navigation retry config
+    // Note: Numeric options are already parsed by Commander's argParser
     const browser = new PlaywrightBrowser({
       browser: options.browser,
       bypassCSP: options.bypassCsp,
       channel: options.channel,
       executablePath: options.executablePath,
-      blockAds: options.blockAds ?? config.get("block_ads", true),
+      blockAds: options.blockAds ?? config.get("block_ads"),
       blockResources,
       headless: options.headless,
       proxyServer: options.proxy,
@@ -196,17 +90,12 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       proxyPassword: options.proxyPassword,
       pwEndpoint: options.pwEndpoint,
       pwCdpEndpoint: options.pwCdpEndpoint,
-      actionTimeoutMs: options.actionTimeoutMs ? parseInt(options.actionTimeoutMs) : undefined,
+      actionTimeoutMs: options.actionTimeoutMs,
       navigationRetry: {
-        baseTimeoutMs: options.navigationTimeoutMs
-          ? parseInt(options.navigationTimeoutMs)
-          : undefined,
-        maxAttempts: options.navigationMaxAttempts
-          ? parseInt(options.navigationMaxAttempts)
-          : undefined,
-        timeoutMultiplier: options.navigationTimeoutMultiplier
-          ? parseFloat(options.navigationTimeoutMultiplier)
-          : undefined,
+        baseTimeoutMs: options.navigationTimeoutMs,
+        maxTimeoutMs: options.navigationMaxTimeoutMs,
+        maxAttempts: options.navigationMaxAttempts,
+        timeoutMultiplier: options.navigationTimeoutMultiplier,
         onRetry: (attempt, error, nextTimeout) => {
           console.log(
             chalk.yellow(`⚠️ Navigation retry ${attempt}: ${error.message}`),
@@ -263,13 +152,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       debug: options.debug,
       vision: options.vision,
       guardrails: options.guardrails,
-      maxIterations: options.maxIterations ? parseInt(options.maxIterations) : undefined,
-      maxValidationAttempts: options.maxValidationAttempts
-        ? parseInt(options.maxValidationAttempts)
-        : undefined,
-      maxRepeatedActions: options.maxRepeatedActions
-        ? parseInt(options.maxRepeatedActions)
-        : undefined,
+      maxIterations: options.maxIterations,
+      maxValidationAttempts: options.maxValidationAttempts,
+      maxRepeatedActions: options.maxRepeatedActions,
       providerConfig,
       logger,
       eventEmitter,

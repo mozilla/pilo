@@ -15,15 +15,18 @@ export interface NavigationRetryConfig {
   onRetry?: (attempt: number, error: Error, nextTimeoutMs: number) => void;
 }
 
-/**
- * Default navigation retry configuration
- */
-export const DEFAULT_NAVIGATION_RETRY_CONFIG: NavigationRetryConfig = {
-  baseTimeoutMs: 30000,
-  maxTimeoutMs: 120000,
-  maxAttempts: 3,
-  timeoutMultiplier: 2,
-};
+import { getConfigDefaults } from "../configDefaults.js";
+
+/** Default navigation retry configuration derived from schema defaults */
+export const DEFAULT_NAVIGATION_RETRY_CONFIG: NavigationRetryConfig = (() => {
+  const defaults = getConfigDefaults();
+  return {
+    baseTimeoutMs: defaults.navigation_timeout_ms,
+    maxTimeoutMs: defaults.navigation_max_timeout_ms,
+    maxAttempts: defaults.navigation_max_attempts,
+    timeoutMultiplier: defaults.navigation_timeout_multiplier,
+  };
+})();
 
 /**
  * Calculate timeout for a given retry attempt.

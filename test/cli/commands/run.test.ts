@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createRunCommand } from "../../../src/cli/commands/run.js";
+import { getConfigDefaults } from "../../../src/config.js";
+
+// Get defaults from schema
+const schemaDefaults = getConfigDefaults();
+const DEFAULT_PROVIDER = schemaDefaults.provider;
+const DEFAULT_BROWSER = schemaDefaults.browser;
+const DEFAULT_MAX_ITERATIONS = schemaDefaults.max_iterations;
+const DEFAULT_MAX_VALIDATION_ATTEMPTS = schemaDefaults.max_validation_attempts;
 
 // Mock all the dependencies
 vi.mock("../../../src/webAgent.js", () => ({
@@ -21,12 +29,17 @@ vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
   }),
 }));
 
-vi.mock("../../../src/config.js", () => ({
-  config: {
-    get: vi.fn(),
-    getConfig: vi.fn(() => ({})),
-  },
-}));
+// Mock the config module to avoid fs dependencies
+vi.mock("../../../src/config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/config.js")>();
+  return {
+    ...actual,
+    config: {
+      get: vi.fn(),
+      getConfig: vi.fn(() => ({})),
+    },
+  };
+});
 
 vi.mock("../../../src/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
@@ -51,11 +64,19 @@ vi.mock("../../../src/cli/utils.js", () => ({
   parseResourcesList: vi.fn((resources) => resources.split(",")),
 }));
 
-// Mock fs module
-vi.mock("fs", () => ({
-  mkdirSync: vi.fn(),
-  writeFileSync: vi.fn(),
-}));
+// Mock fs module - include all functions used by manager.ts
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    default: actual,
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    // Type assertion needed for overloaded fs functions in test mocks
+    readFileSync: vi.fn().mockReturnValue("{}") as typeof actual.readFileSync,
+    existsSync: vi.fn().mockReturnValue(false) as typeof actual.existsSync,
+  };
+});
 
 // Mock WebAgentEventEmitter
 vi.mock("../../../src/events.js", () => ({
@@ -100,18 +121,9 @@ describe("CLI Run Command", () => {
     command = createRunCommand();
     vi.clearAllMocks();
 
-    // Set up default config mock
-    mockConfig.get.mockImplementation((key: string, defaultValue?: any) => {
-      const defaults: Record<string, any> = {
-        browser: "firefox",
-        headless: false,
-        block_resources: "media,manifest",
-        max_iterations: 50,
-        max_validation_attempts: 3,
-        bypass_csp: false,
-        logger: "console",
-      };
-      return defaults[key] ?? defaultValue;
+    // Set up default config mock - use schema defaults
+    mockConfig.get.mockImplementation((key: string) => {
+      return schemaDefaults[key as keyof typeof schemaDefaults];
     });
   });
 
@@ -147,50 +159,52 @@ describe("CLI Run Command", () => {
       expect(optionFlags).toContain("-g, --guardrails <text>");
 
       // AI provider options
-      expect(optionFlags).toContain("--provider <provider>");
-      expect(optionFlags).toContain("--model <model>");
+      expect(optionFlags).toContain("--provider <name>");
+      expect(optionFlags).toContain("--model <name>");
       expect(optionFlags).toContain("--openai-api-key <key>");
       expect(optionFlags).toContain("--openrouter-api-key <key>");
 
       // Browser options
-      expect(optionFlags).toContain("-b, --browser <browser>");
+      expect(optionFlags).toContain("-b, --browser <name>");
       expect(optionFlags).toContain("--headless");
       expect(optionFlags).toContain("--debug");
       expect(optionFlags).toContain("--vision");
-      expect(optionFlags).toContain("--no-block-ads");
-      expect(optionFlags).toContain("--block-resources <resources>");
-      expect(optionFlags).toContain("--pw-endpoint <endpoint>");
+      expect(optionFlags).toContain("--block-ads");
+      expect(optionFlags).toContain("--no-block-ads"); // Negation option
+      expect(optionFlags).toContain("--block-resources <types>");
+      expect(optionFlags).toContain("--pw-endpoint <url>");
       expect(optionFlags).toContain("--bypass-csp");
 
       // WebAgent options
-      expect(optionFlags).toContain("--max-iterations <number>");
-      expect(optionFlags).toContain("--max-validation-attempts <number>");
+      expect(optionFlags).toContain("--max-iterations <n>");
+      expect(optionFlags).toContain("--max-validation-attempts <n>");
 
       // Proxy options
       expect(optionFlags).toContain("--proxy <url>");
-      expect(optionFlags).toContain("--proxy-username <username>");
-      expect(optionFlags).toContain("--proxy-password <password>");
+      expect(optionFlags).toContain("--proxy-username <user>");
+      expect(optionFlags).toContain("--proxy-password <pass>");
 
       // Logging options
-      expect(optionFlags).toContain("--logger <logger>");
+      expect(optionFlags).toContain("--logger <type>");
     });
 
     it("should have correct default values", () => {
       const options = command.options;
 
-      const providerOption = options.find((opt) => opt.flags === "--provider <provider>");
-      expect(providerOption?.defaultValue).toBe("openai");
+      const providerOption = options.find((opt) => opt.flags === "--provider <name>");
+      expect(providerOption?.defaultValue).toBe(DEFAULT_PROVIDER);
 
-      const browserOption = options.find((opt) => opt.flags === "-b, --browser <browser>");
-      expect(browserOption?.defaultValue).toBe("firefox");
+      const browserOption = options.find((opt) => opt.flags === "-b, --browser <name>");
+      expect(browserOption?.defaultValue).toBe(DEFAULT_BROWSER);
 
-      const maxIterationsOption = options.find((opt) => opt.flags === "--max-iterations <number>");
-      expect(maxIterationsOption?.defaultValue).toBe("50");
+      // Numeric defaults are actual numbers (not strings) thanks to argParser
+      const maxIterationsOption = options.find((opt) => opt.flags === "--max-iterations <n>");
+      expect(maxIterationsOption?.defaultValue).toBe(DEFAULT_MAX_ITERATIONS);
 
       const maxValidationOption = options.find(
-        (opt) => opt.flags === "--max-validation-attempts <number>",
+        (opt) => opt.flags === "--max-validation-attempts <n>",
       );
-      expect(maxValidationOption?.defaultValue).toBe("3");
+      expect(maxValidationOption?.defaultValue).toBe(DEFAULT_MAX_VALIDATION_ATTEMPTS);
     });
   });
 
@@ -213,11 +227,11 @@ describe("CLI Run Command", () => {
       expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
         expect.objectContaining({
           browser: "firefox",
-          blockAds: true, // Default from --no-block-ads option
-          blockResources: ["media", "manifest"], // Default from config
+          blockAds: true,
+          blockResources: ["media", "manifest"],
           pwEndpoint: undefined,
           headless: false,
-          bypassCSP: false, // Default from config
+          bypassCSP: true, // Schema default
           proxyServer: undefined,
           proxyUsername: undefined,
           proxyPassword: undefined,
@@ -423,11 +437,11 @@ describe("CLI Run Command", () => {
       expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
         expect.objectContaining({
           browser: "firefox",
-          blockAds: true, // Default from --no-block-ads option
-          blockResources: ["media", "manifest"], // Default from config
+          blockAds: true,
+          blockResources: ["media", "manifest"],
           pwEndpoint: undefined,
           headless: false,
-          bypassCSP: false, // Default from config
+          bypassCSP: true, // Schema default
           proxyServer: "http://proxy.company.com:8080",
           proxyUsername: "user",
           proxyPassword: "pass",
@@ -500,14 +514,12 @@ describe("CLI Run Command", () => {
     });
 
     it("should handle invalid browser option", async () => {
-      // Mock validateBrowser to return false
-      const { validateBrowser } = await import("../../../src/cli/utils.js");
-      vi.mocked(validateBrowser).mockReturnValue(false);
-
       const args = ["--browser", "invalid", "test task"];
-      await command.parseAsync(args, { from: "user" });
 
-      expect(mockExit).toHaveBeenCalledWith(1);
+      // Commander's .choices() validation throws with "Allowed choices are" message
+      await expect(command.parseAsync(args, { from: "user" })).rejects.toThrow(
+        /Allowed choices are/i,
+      );
     });
 
     it("should handle WebAgent execution errors", async () => {

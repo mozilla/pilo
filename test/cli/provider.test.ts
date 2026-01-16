@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
 
-// Mock the shared config module that CLI now imports from
+// Mock the config module
 vi.mock("../../src/config.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
+  getConfigDefaults: vi.fn(() => ({
+    provider: "openai",
+    browser: "firefox",
+    headless: false,
+    block_ads: true,
+    block_resources: "media,manifest",
+    logger: "console",
+    metrics_incremental: false,
+    debug: false,
+    vision: false,
+    max_iterations: 50,
+    max_validation_attempts: 3,
+    max_repeated_actions: 2,
+    bypass_csp: true,
+    navigation_timeout_ms: 30000,
+    navigation_max_timeout_ms: 120000,
+    navigation_max_attempts: 3,
+    navigation_timeout_multiplier: 2,
+    action_timeout_ms: 30000,
+    reasoning_effort: "none",
+  })),
 }));
 
 // Mock AI SDK modules
@@ -64,7 +85,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config } from "../../src/config.js";
+import { config, getConfigDefaults } from "../../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -80,6 +101,8 @@ const mockCreateGoogleGenerativeAI = vi.mocked(createGoogleGenerativeAI);
 const mockCreateVertex = vi.mocked(createVertex);
 const mockCreateOllama = vi.mocked(createOllama);
 const mockCreateOpenAICompatible = vi.mocked(createOpenAICompatible);
+
+const defaults = getConfigDefaults();
 
 describe("Provider", () => {
   const originalEnv = process.env;
@@ -101,6 +124,7 @@ describe("Provider", () => {
   describe("createAIProvider", () => {
     it("should create OpenAI provider with default model", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         openai_api_key: "sk-test123",
       });
@@ -118,6 +142,7 @@ describe("Provider", () => {
       process.env.OPENAI_API_KEY = "sk-test123";
 
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         openai_api_key: "sk-test123",
       });
@@ -130,6 +155,7 @@ describe("Provider", () => {
 
     it("should create OpenRouter provider", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openrouter",
         model: "openai/gpt-4.1",
         openrouter_api_key: "sk-or-test123",
@@ -148,6 +174,7 @@ describe("Provider", () => {
 
     it("should create Google provider with API key", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "google",
         model: "gemini-2.5-flash",
         google_generative_ai_api_key: "test-google-key",
@@ -162,6 +189,7 @@ describe("Provider", () => {
 
     it("should create Google provider with default model", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "google",
         google_generative_ai_api_key: "test-google-key",
       });
@@ -174,9 +202,7 @@ describe("Provider", () => {
     });
 
     it("should throw error when Google API key is missing", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "google",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "google" });
 
       expect(() => createAIProvider()).toThrow(
         "No Google Generative AI API key found. To get started:",
@@ -185,6 +211,7 @@ describe("Provider", () => {
 
     it("should use custom model when specified", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         model: "gpt-4-turbo",
         openai_api_key: "sk-test123",
@@ -198,23 +225,20 @@ describe("Provider", () => {
     });
 
     it("should throw error when OpenAI API key is missing", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai" });
 
       expect(() => createAIProvider()).toThrow("No OpenAI API key found. To get started:");
     });
 
     it("should throw error when OpenRouter API key is missing", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openrouter",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openrouter" });
 
       expect(() => createAIProvider()).toThrow("No OpenRouter API key found. To get started:");
     });
 
     it("should create Vertex AI provider with project and location", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         vertex_project: "test-project",
         vertex_location: "us-west1",
@@ -231,6 +255,7 @@ describe("Provider", () => {
 
     it("should create Vertex AI provider with default location", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         vertex_project: "test-project",
       });
@@ -247,9 +272,7 @@ describe("Provider", () => {
       process.env.GOOGLE_CLOUD_PROJECT = "env-project";
       process.env.GOOGLE_CLOUD_REGION = "europe-west1";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       createAIProvider();
 
@@ -263,9 +286,7 @@ describe("Provider", () => {
       process.env.GOOGLE_VERTEX_PROJECT = "vertex-project";
       process.env.GOOGLE_CLOUD_PROJECT = "cloud-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       createAIProvider();
 
@@ -278,9 +299,7 @@ describe("Provider", () => {
     it("should use GCP_PROJECT as fallback", () => {
       process.env.GCP_PROJECT = "gcp-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       createAIProvider();
 
@@ -291,15 +310,14 @@ describe("Provider", () => {
     });
 
     it("should throw error when Vertex AI project is missing", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       expect(() => createAIProvider()).toThrow("No Google Cloud project ID found. To get started:");
     });
 
     it("should use default gemini model for Vertex AI", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         vertex_project: "test-project",
       });
@@ -314,6 +332,7 @@ describe("Provider", () => {
 
     it("should throw error for unsupported provider", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "unsupported" as any,
         openai_api_key: "sk-test123",
       });
@@ -322,9 +341,7 @@ describe("Provider", () => {
     });
 
     it("should default to openai provider when none specified", () => {
-      mockConfig.getConfig.mockReturnValue({
-        openai_api_key: "sk-test123",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, openai_api_key: "sk-test123" });
 
       createAIProvider();
 
@@ -335,6 +352,7 @@ describe("Provider", () => {
 
     it("should accept provider override", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         openai_api_key: "sk-test123",
         openrouter_api_key: "sk-or-test123",
@@ -353,6 +371,7 @@ describe("Provider", () => {
 
     it("should accept model override", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         model: "gpt-4.1",
         openai_api_key: "sk-test123",
@@ -366,9 +385,7 @@ describe("Provider", () => {
     });
 
     it("should accept API key overrides", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai" });
 
       createAIProvider({ openai_api_key: "sk-override123" });
 
@@ -378,9 +395,7 @@ describe("Provider", () => {
     });
 
     it("should accept OpenRouter API key override", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openrouter",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openrouter" });
 
       createAIProvider({ openrouter_api_key: "sk-or-override123" });
 
@@ -395,6 +410,7 @@ describe("Provider", () => {
 
     it("should combine multiple overrides", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         model: "gpt-4.1",
         openai_api_key: "sk-config123",
@@ -416,9 +432,7 @@ describe("Provider", () => {
     });
 
     it("should create Ollama provider with default settings", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "ollama",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "ollama" });
 
       createAIProvider();
 
@@ -428,10 +442,7 @@ describe("Provider", () => {
     });
 
     it("should create Ollama provider with custom model", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "ollama",
-        model: "phi3",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "ollama", model: "phi3" });
 
       createAIProvider();
 
@@ -442,6 +453,7 @@ describe("Provider", () => {
 
     it("should create Ollama provider with custom base URL", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "ollama",
         model: "llama3.2",
         ollama_base_url: "http://localhost:8080/api",
@@ -455,9 +467,7 @@ describe("Provider", () => {
     });
 
     it("should create LMStudio provider", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "lmstudio",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "lmstudio" });
 
       createAIProvider();
 
@@ -469,6 +479,7 @@ describe("Provider", () => {
 
     it("should create LMStudio provider with custom model", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "lmstudio",
         model: "my-local-model",
       });
@@ -483,6 +494,7 @@ describe("Provider", () => {
 
     it("should create OpenAI-compatible provider with base URL", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai-compatible",
         openai_compatible_base_url: "http://localhost:8080/v1",
       });
@@ -497,6 +509,7 @@ describe("Provider", () => {
 
     it("should create OpenAI-compatible provider with custom name", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai-compatible",
         openai_compatible_base_url: "http://localhost:8080/v1",
         openai_compatible_name: "my-provider",
@@ -511,17 +524,13 @@ describe("Provider", () => {
     });
 
     it("should throw error when OpenAI-compatible provider lacks base URL", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai-compatible",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai-compatible" });
 
       expect(() => createAIProvider()).toThrow("OpenAI-compatible provider requires a base URL");
     });
 
     it("should use Ollama base URL from override", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "ollama",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "ollama" });
 
       createAIProvider({
         ollama_base_url: "http://remote-ollama:11434/api",
@@ -533,9 +542,7 @@ describe("Provider", () => {
     });
 
     it("should use OpenAI-compatible base URL from override", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai-compatible",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai-compatible" });
 
       createAIProvider({
         openai_compatible_base_url: "http://my-server:8080/v1",
@@ -553,6 +560,7 @@ describe("Provider", () => {
       process.env.OPENAI_API_KEY = "sk-test123";
 
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai",
         model: "gpt-4-turbo",
       });
@@ -569,6 +577,7 @@ describe("Provider", () => {
 
     it("should return OpenRouter provider info with global key", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openrouter",
         openrouter_api_key: "sk-or-test123",
       });
@@ -587,6 +596,7 @@ describe("Provider", () => {
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google-key";
 
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "google",
         model: "gemini-2.5-flash",
       });
@@ -603,6 +613,7 @@ describe("Provider", () => {
 
     it("should return Google provider info with global key", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "google",
         google_generative_ai_api_key: "test-google-key",
       });
@@ -618,9 +629,7 @@ describe("Provider", () => {
     });
 
     it("should return Google provider info without API key", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "google",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "google" });
 
       const info = getAIProviderInfo();
 
@@ -633,9 +642,7 @@ describe("Provider", () => {
     });
 
     it("should return info with no API key", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai" });
 
       const info = getAIProviderInfo();
 
@@ -648,7 +655,7 @@ describe("Provider", () => {
     });
 
     it("should use default values when not configured", () => {
-      mockConfig.getConfig.mockReturnValue({});
+      mockConfig.getConfig.mockReturnValue({ ...defaults });
 
       const info = getAIProviderInfo();
 
@@ -664,6 +671,7 @@ describe("Provider", () => {
       process.env.OPENROUTER_API_KEY = "sk-or-env123";
 
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openrouter",
         openrouter_api_key: "sk-or-global123",
       });
@@ -680,6 +688,7 @@ describe("Provider", () => {
 
     it("should return Vertex AI provider info with project configured", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         vertex_project: "test-project",
         vertex_location: "us-west1",
@@ -699,9 +708,7 @@ describe("Provider", () => {
     it("should return Vertex AI provider info with env project", () => {
       process.env.GOOGLE_CLOUD_PROJECT = "env-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       const info = getAIProviderInfo();
 
@@ -716,9 +723,7 @@ describe("Provider", () => {
     it("should return Vertex AI provider info with GOOGLE_VERTEX_PROJECT", () => {
       process.env.GOOGLE_VERTEX_PROJECT = "vertex-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       const info = getAIProviderInfo();
 
@@ -733,9 +738,7 @@ describe("Provider", () => {
     it("should return Vertex AI provider info with GCP_PROJECT fallback", () => {
       process.env.GCP_PROJECT = "gcp-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       const info = getAIProviderInfo();
 
@@ -748,9 +751,7 @@ describe("Provider", () => {
     });
 
     it("should return Vertex AI provider info without project", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       const info = getAIProviderInfo();
 
@@ -767,9 +768,7 @@ describe("Provider", () => {
       process.env.GOOGLE_CLOUD_PROJECT = "cloud-project";
       process.env.GCP_PROJECT = "gcp-project";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "vertex",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "vertex" });
 
       const info = getAIProviderInfo();
 
@@ -782,10 +781,7 @@ describe("Provider", () => {
     });
 
     it("should return Ollama provider info", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "ollama",
-        model: "llama3.2",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "ollama", model: "llama3.2" });
 
       const info = getAIProviderInfo();
 
@@ -798,9 +794,7 @@ describe("Provider", () => {
     });
 
     it("should return Ollama provider info with default model", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "ollama",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "ollama" });
 
       const info = getAIProviderInfo();
 
@@ -814,6 +808,7 @@ describe("Provider", () => {
 
     it("should return LMStudio provider info", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "lmstudio",
         model: "my-model",
       });
@@ -829,9 +824,7 @@ describe("Provider", () => {
     });
 
     it("should return LMStudio provider info with default model", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "lmstudio",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "lmstudio" });
 
       const info = getAIProviderInfo();
 
@@ -845,6 +838,7 @@ describe("Provider", () => {
 
     it("should return OpenAI-compatible provider info with base URL configured", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "openai-compatible",
         openai_compatible_base_url: "http://localhost:8080/v1",
         model: "custom-model",
@@ -863,9 +857,7 @@ describe("Provider", () => {
     it("should return OpenAI-compatible provider info with env base URL", () => {
       process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL = "http://localhost:8080/v1";
 
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai-compatible",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai-compatible" });
 
       const info = getAIProviderInfo();
 
@@ -878,9 +870,7 @@ describe("Provider", () => {
     });
 
     it("should return OpenAI-compatible provider info without base URL", () => {
-      mockConfig.getConfig.mockReturnValue({
-        provider: "openai-compatible",
-      });
+      mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai-compatible" });
 
       const info = getAIProviderInfo();
 
