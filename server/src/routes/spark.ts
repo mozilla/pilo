@@ -6,13 +6,6 @@ import {
   createAIProvider,
   getAIProviderInfo,
   createNavigationRetryConfig,
-  DEFAULT_BROWSER,
-  DEFAULT_HEADLESS,
-  DEFAULT_BLOCK_ADS,
-  DEFAULT_DEBUG,
-  DEFAULT_VISION,
-  DEFAULT_MAX_ITERATIONS,
-  DEFAULT_MAX_VALIDATION_ATTEMPTS,
 } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
@@ -144,13 +137,13 @@ spark.post("/run", async (c) => {
         });
 
         // Merge server config with request overrides
-        // Use ?? (nullish coalescing) to correctly handle 0/false values
+        // serverConfig already has Zod defaults applied, so request body overrides are optional
         const browserConfig = {
-          browser: body.browser ?? serverConfig.browser ?? DEFAULT_BROWSER,
+          browser: body.browser ?? serverConfig.browser,
           channel: body.channel ?? serverConfig.channel,
           executablePath: body.executablePath ?? serverConfig.executable_path,
-          headless: body.headless ?? serverConfig.headless ?? DEFAULT_HEADLESS,
-          blockAds: body.blockAds ?? serverConfig.block_ads ?? DEFAULT_BLOCK_ADS,
+          headless: body.headless ?? serverConfig.headless,
+          blockAds: body.blockAds ?? serverConfig.block_ads,
           blockResources: (body.blockResources ??
             (serverConfig.block_resources
               ? serverConfig.block_resources.split(",")
@@ -175,13 +168,10 @@ spark.post("/run", async (c) => {
         };
 
         const webAgentConfig = {
-          debug: body.debug ?? serverConfig.debug ?? DEFAULT_DEBUG,
-          vision: body.vision ?? serverConfig.vision ?? DEFAULT_VISION,
-          maxIterations: body.maxIterations ?? serverConfig.max_iterations ?? DEFAULT_MAX_ITERATIONS,
-          maxValidationAttempts:
-            body.maxValidationAttempts ??
-            serverConfig.max_validation_attempts ??
-            DEFAULT_MAX_VALIDATION_ATTEMPTS,
+          debug: body.debug ?? serverConfig.debug,
+          vision: body.vision ?? serverConfig.vision,
+          maxIterations: body.maxIterations ?? serverConfig.max_iterations,
+          maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
           guardrails: body.guardrails,
         };
 

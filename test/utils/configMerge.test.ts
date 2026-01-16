@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { mergeWithDefaults, createNavigationRetryConfig } from "../../src/utils/configMerge.js";
-import {
-  DEFAULT_NAVIGATION_BASE_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_ATTEMPTS,
-  DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER,
-} from "../../src/defaults.js";
+import { getConfigDefaults } from "../../src/config/schema.js";
+
+// Get navigation defaults from schema
+const defaults = getConfigDefaults();
+const DEFAULT_NAVIGATION_BASE_TIMEOUT_MS = defaults.navigation_timeout_ms;
+const DEFAULT_NAVIGATION_MAX_TIMEOUT_MS = defaults.navigation_max_timeout_ms;
+const DEFAULT_NAVIGATION_MAX_ATTEMPTS = defaults.navigation_max_attempts;
+const DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER = defaults.navigation_timeout_multiplier;
 
 describe("mergeWithDefaults", () => {
   it("should return defaults when overrides is undefined", () => {

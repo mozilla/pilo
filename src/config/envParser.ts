@@ -4,8 +4,9 @@
  * Replaces manual env var parsing with a data-driven approach based on CONFIG_SCHEMA.
  */
 
-import type { SparkConfig } from "./schema.js";
-import { CONFIG_SCHEMA, type ConfigField, type ConfigFieldType } from "./schema.js";
+import type { SparkConfig, ConfigFieldType } from "./schema.js";
+import { CONFIG_SCHEMA, type ConfigField } from "./metadata.js";
+import type { FieldTypeToTS } from "./types.js";
 
 /**
  * Coerce a string value to the appropriate type based on field definition.
@@ -15,20 +16,25 @@ import { CONFIG_SCHEMA, type ConfigField, type ConfigFieldType } from "./schema.
  * @param type - The target type
  * @param envVar - Optional env var name for warning messages
  */
-export function coerceValue(value: string, type: ConfigFieldType, envVar?: string): unknown {
+export function coerceValue<T extends ConfigFieldType>(
+  value: string,
+  type: T,
+  envVar?: string,
+): FieldTypeToTS<T> | undefined {
+  // Type assertions needed because TypeScript can't narrow conditional types through control flow
   switch (type) {
     case "boolean": {
       const lower = value.toLowerCase();
       const truthy = ["true", "1", "yes", "on"];
       const falsy = ["false", "0", "no", "off"];
-      if (truthy.includes(lower)) return true;
-      if (falsy.includes(lower)) return false;
+      if (truthy.includes(lower)) return true as FieldTypeToTS<T>;
+      if (falsy.includes(lower)) return false as FieldTypeToTS<T>;
       if (envVar) {
         console.warn(
-          `Config warning: ${envVar}="${value}" is not a valid boolean (true/false), treating as false`,
+          `Config warning: ${envVar}="${value}" is not a valid boolean (true/false), using default`,
         );
       }
-      return false;
+      return undefined;
     }
     case "number": {
       const num = parseFloat(value);
@@ -38,13 +44,13 @@ export function coerceValue(value: string, type: ConfigFieldType, envVar?: strin
         }
         return undefined;
       }
-      return num;
+      return num as FieldTypeToTS<T>;
     }
     case "string":
     case "enum":
-      return value;
+      return value as FieldTypeToTS<T>;
     default:
-      return value;
+      return value as FieldTypeToTS<T>;
   }
 }
 

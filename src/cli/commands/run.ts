@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { WebAgent } from "../../webAgent.js";
 import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
-import { config } from "../config.js";
+import { config } from "../../config/index.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
@@ -13,7 +13,6 @@ import * as path from "path";
 import { MetricsCollector } from "../../loggers/metricsCollector.js";
 import { Logger } from "../../loggers/types.js";
 import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
-import { DEFAULT_BLOCK_ADS } from "../../defaults.js";
 import { addSchemaOptions } from "../../config/cliGenerator.js";
 
 /**
@@ -84,7 +83,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       bypassCSP: options.bypassCsp,
       channel: options.channel,
       executablePath: options.executablePath,
-      blockAds: options.blockAds ?? config.get("block_ads", DEFAULT_BLOCK_ADS),
+      blockAds: options.blockAds ?? config.get("block_ads"),
       blockResources,
       headless: options.headless,
       proxyServer: options.proxy,

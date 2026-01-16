@@ -31,16 +31,14 @@ import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
+import { getConfigDefaults } from "./config/schema.js";
 import {
-  DEFAULT_MAX_ITERATIONS,
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
   DEFAULT_MAX_CONSECUTIVE_ERRORS,
   DEFAULT_MAX_TOTAL_ERRORS,
-  DEFAULT_MAX_VALIDATION_ATTEMPTS,
-  DEFAULT_MAX_REPEATED_ACTIONS,
-} from "./defaults.js";
+} from "./config/constants.js";
 
 // === Type Definitions ===
 
@@ -171,14 +169,15 @@ export class WebAgent {
     options: WebAgentOptions,
   ) {
     // Initialize configuration
+    const defaults = getConfigDefaults();
     this.providerConfig = options.providerConfig;
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
-    this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+    this.maxIterations = options.maxIterations ?? defaults.max_iterations;
     this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
     this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
-    this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
-    this.maxRepeatedActions = options.maxRepeatedActions ?? DEFAULT_MAX_REPEATED_ACTIONS;
+    this.maxValidationAttempts = options.maxValidationAttempts ?? defaults.max_validation_attempts;
+    this.maxRepeatedActions = options.maxRepeatedActions ?? defaults.max_repeated_actions;
     this.guardrails = options.guardrails ?? null;
 
     // Initialize services

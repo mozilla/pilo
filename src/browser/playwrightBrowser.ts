@@ -22,7 +22,7 @@ import {
   NavigationNetworkException,
 } from "../errors.js";
 import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
-import { DEFAULT_ACTION_TIMEOUT_MS } from "../defaults.js";
+import { getConfigDefaults } from "../config/schema.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 
 // Type extension for Playwright's private AI snapshot function
@@ -92,7 +92,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.channel = this.options.channel ?? this.getDefaultChannel();
 
     // Initialize action timeout from options or use default
-    this.actionTimeoutMs = options.actionTimeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS;
+    this.actionTimeoutMs = options.actionTimeoutMs ?? getConfigDefaults().action_timeout_ms;
 
     // Initialize navigation retry config with defaults and overrides
     // Uses createNavigationRetryConfig which safely handles undefined values

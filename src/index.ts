@@ -17,8 +17,8 @@ export type {
 export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 
 // Configuration and Provider System
-export { config, ConfigManager } from "./config.js";
-export type { SparkConfig } from "./config.js";
+export { config, ConfigManager } from "./config/index.js";
+export type { SparkConfig, SparkConfigResolved } from "./config/index.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
 

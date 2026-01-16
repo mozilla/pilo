@@ -1,13 +1,19 @@
+/**
+ * Configuration Manager
+ *
+ * Handles loading, merging, and persisting configuration from multiple sources:
+ * - Global config file (~/.spark/config.json)
+ * - Environment variables
+ * - Local .env files
+ */
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { config as loadDotenv } from "dotenv";
-import { parseEnvConfig } from "./config/envParser.js";
-import { SparkConfigSchema } from "./config/schema.js";
-import type { SparkConfig, SparkConfigResolved } from "./config/schema.js";
-
-// Re-export types from schema (single source of truth)
-export type { SparkConfig, SparkConfigResolved } from "./config/schema.js";
+import { parseEnvConfig } from "./envParser.js";
+import { SparkConfigSchema } from "./schema.js";
+import type { SparkConfig, SparkConfigResolved } from "./schema.js";
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -101,7 +107,7 @@ export class ConfigManager {
   /**
    * Set a value in the global config file
    */
-  public setGlobalConfig(key: keyof SparkConfig, value: any): void {
+  public setGlobalConfig(key: keyof SparkConfig, value: unknown): void {
     // Ensure config directory exists
     if (!existsSync(this.configDir)) {
       mkdirSync(this.configDir, { recursive: true });
@@ -127,15 +133,12 @@ export class ConfigManager {
   }
 
   /**
-   * Get a specific config value with fallback hierarchy.
-   * Since getConfig() returns SparkConfigResolved, defaults are already applied.
+   * Get a specific config value.
+   * Since getConfig() returns SparkConfigResolved, all defaults are already applied by Zod.
    */
-  public get<K extends keyof SparkConfigResolved>(
-    key: K,
-    defaultValue?: SparkConfigResolved[K],
-  ): SparkConfigResolved[K] {
+  public get<K extends keyof SparkConfigResolved>(key: K): SparkConfigResolved[K] {
     const config = this.getConfig();
-    return config[key] ?? (defaultValue as SparkConfigResolved[K]);
+    return config[key];
   }
 
   /**
@@ -187,5 +190,5 @@ export class ConfigManager {
   }
 }
 
-// Export singleton instance
+/** Singleton config manager instance */
 export const config = ConfigManager.getInstance();

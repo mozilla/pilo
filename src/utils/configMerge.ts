@@ -6,12 +6,7 @@
  */
 
 import type { NavigationRetryConfig } from "../browser/navigationRetry.js";
-import {
-  DEFAULT_NAVIGATION_BASE_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_ATTEMPTS,
-  DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER,
-} from "../defaults.js";
+import { getConfigDefaults } from "../config/schema.js";
 
 /**
  * Merge configuration with defaults, only overriding with defined values.
@@ -50,11 +45,12 @@ export function mergeWithDefaults<T extends object>(
 export function createNavigationRetryConfig(
   overrides?: Partial<NavigationRetryConfig> | null,
 ): NavigationRetryConfig {
+  const defaults = getConfigDefaults();
   return {
-    baseTimeoutMs: overrides?.baseTimeoutMs ?? DEFAULT_NAVIGATION_BASE_TIMEOUT_MS,
-    maxTimeoutMs: overrides?.maxTimeoutMs ?? DEFAULT_NAVIGATION_MAX_TIMEOUT_MS,
-    maxAttempts: overrides?.maxAttempts ?? DEFAULT_NAVIGATION_MAX_ATTEMPTS,
-    timeoutMultiplier: overrides?.timeoutMultiplier ?? DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER,
+    baseTimeoutMs: overrides?.baseTimeoutMs ?? defaults.navigation_timeout_ms,
+    maxTimeoutMs: overrides?.maxTimeoutMs ?? defaults.navigation_max_timeout_ms,
+    maxAttempts: overrides?.maxAttempts ?? defaults.navigation_max_attempts,
+    timeoutMultiplier: overrides?.timeoutMultiplier ?? defaults.navigation_timeout_multiplier,
     ...(overrides?.onRetry && { onRetry: overrides.onRetry }),
   };
 }

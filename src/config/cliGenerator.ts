@@ -5,8 +5,8 @@
  */
 
 import { Command, Option } from "commander";
-import { CONFIG_SCHEMA, type ConfigField, getCliFields } from "./schema.js";
-import { config } from "../config.js";
+import { CONFIG_SCHEMA, type ConfigField, getCliFields } from "./metadata.js";
+import { config } from "./manager.js";
 
 /**
  * Build CLI option flags from a config field definition.
@@ -45,7 +45,7 @@ export function buildOptionFlags(field: ConfigField): string {
  * Checks config file first, then falls back to schema default.
  */
 export function getCliDefault(field: ConfigField): unknown {
-  const configValue = config.get(field.configKey as any);
+  const configValue = config.get(field.configKey);
   if (configValue !== undefined) {
     return configValue;
   }

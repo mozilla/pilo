@@ -1,11 +1,12 @@
 /**
  * Configuration type utilities.
  *
- * Note: SparkConfig interface is defined in ../config.ts for backward compatibility.
- * This file provides helper types and guards for working with the schema.
+ * Provides helper types and guards for working with the config schema.
  */
 
-import type { ConfigFieldType, ConfigCategory } from "./schema.js";
+import type { ConfigFieldType } from "./schema.js";
+import type { ConfigCategory } from "./metadata.js";
+import { CONFIG_METADATA } from "./metadata.js";
 
 /**
  * Extract the TypeScript type from a ConfigFieldType
@@ -27,18 +28,12 @@ export function isValidFieldType(type: string): type is ConfigFieldType {
   return ["string", "number", "boolean", "enum"].includes(type);
 }
 
+// Derive valid categories from CONFIG_METADATA to avoid hardcoding
+const VALID_CATEGORIES = new Set(Object.values(CONFIG_METADATA).map((m) => m.category));
+
 /**
  * Type guard for checking if a value is a valid config category
  */
 export function isValidCategory(category: string): category is ConfigCategory {
-  return [
-    "ai",
-    "browser",
-    "proxy",
-    "logging",
-    "agent",
-    "playwright",
-    "navigation",
-    "action",
-  ].includes(category);
+  return VALID_CATEGORIES.has(category as ConfigCategory);
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../../src/provider.js";
 
 // Mock the shared config module that CLI now imports from
-vi.mock("../../src/config.js", () => ({
+vi.mock("../../src/config/index.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
@@ -64,7 +64,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config } from "../../src/config.js";
+import { config } from "../../src/config/index.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

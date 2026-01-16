@@ -40,46 +40,47 @@ export { RecoverableError, BrowserException, NavigationTimeoutException } from "
 
 // Navigation retry configuration
 export type { NavigationRetryConfig } from "./browser/navigationRetry.js";
-export { calculateTimeout } from "./browser/navigationRetry.js";
+export { calculateTimeout, DEFAULT_NAVIGATION_RETRY_CONFIG } from "./browser/navigationRetry.js";
 
-// Centralized defaults (single source of truth)
+// Config system - single source of truth
+export { getConfigDefaults } from "./config/schema.js";
+
+// Internal constants (not configurable via env/CLI)
 export {
-  // Navigation
-  DEFAULT_NAVIGATION_BASE_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_TIMEOUT_MS,
-  DEFAULT_NAVIGATION_MAX_ATTEMPTS,
-  DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER,
-  DEFAULT_NAVIGATION_RETRY_CONFIG,
-  // Browser
-  DEFAULT_BROWSER,
-  DEFAULT_ACTION_TIMEOUT_MS,
-  DEFAULT_HEADLESS,
-  DEFAULT_BLOCK_ADS,
-  DEFAULT_BLOCK_RESOURCES,
-  DEFAULT_BYPASS_CSP,
-  // WebAgent
-  DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_CONSECUTIVE_ERRORS,
   DEFAULT_MAX_TOTAL_ERRORS,
-  DEFAULT_MAX_VALIDATION_ATTEMPTS,
-  DEFAULT_MAX_REPEATED_ACTIONS,
-  DEFAULT_DEBUG,
-  DEFAULT_VISION,
-  // AI Provider
-  DEFAULT_PROVIDER,
-  DEFAULT_REASONING_EFFORT,
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
-  // Retry
   DEFAULT_RETRY_MAX_ATTEMPTS,
   DEFAULT_RETRY_INITIAL_DELAY_MS,
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
-  // Logging
-  DEFAULT_LOGGER,
-  DEFAULT_METRICS_INCREMENTAL,
-} from "./defaults.js";
+} from "./config/constants.js";
+
+// Backward-compatible default exports (derived from schema)
+// Use getConfigDefaults() for programmatic access to all defaults
+import { getConfigDefaults as _getDefaults } from "./config/schema.js";
+const _defaults = _getDefaults();
+export const DEFAULT_NAVIGATION_BASE_TIMEOUT_MS = _defaults.navigation_timeout_ms;
+export const DEFAULT_NAVIGATION_MAX_TIMEOUT_MS = _defaults.navigation_max_timeout_ms;
+export const DEFAULT_NAVIGATION_MAX_ATTEMPTS = _defaults.navigation_max_attempts;
+export const DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER = _defaults.navigation_timeout_multiplier;
+export const DEFAULT_BROWSER = _defaults.browser;
+export const DEFAULT_ACTION_TIMEOUT_MS = _defaults.action_timeout_ms;
+export const DEFAULT_HEADLESS = _defaults.headless;
+export const DEFAULT_BLOCK_ADS = _defaults.block_ads;
+export const DEFAULT_BLOCK_RESOURCES = _defaults.block_resources;
+export const DEFAULT_BYPASS_CSP = _defaults.bypass_csp;
+export const DEFAULT_MAX_ITERATIONS = _defaults.max_iterations;
+export const DEFAULT_MAX_VALIDATION_ATTEMPTS = _defaults.max_validation_attempts;
+export const DEFAULT_MAX_REPEATED_ACTIONS = _defaults.max_repeated_actions;
+export const DEFAULT_DEBUG = _defaults.debug;
+export const DEFAULT_VISION = _defaults.vision;
+export const DEFAULT_PROVIDER = _defaults.provider;
+export const DEFAULT_REASONING_EFFORT = _defaults.reasoning_effort;
+export const DEFAULT_LOGGER = _defaults.logger;
+export const DEFAULT_METRICS_INCREMENTAL = _defaults.metrics_incremental;
 
 // Note: createProvider not exported in core to avoid Node.js dependencies in browser
 // Use provider libraries directly in browser environments
