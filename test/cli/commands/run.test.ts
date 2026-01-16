@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createRunCommand } from "../../../src/cli/commands/run.js";
+import {
+  DEFAULT_PROVIDER,
+  DEFAULT_BROWSER,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_MAX_VALIDATION_ATTEMPTS,
+} from "../../../src/defaults.js";
 
 // Mock all the dependencies
 vi.mock("../../../src/webAgent.js", () => ({
@@ -147,50 +153,52 @@ describe("CLI Run Command", () => {
       expect(optionFlags).toContain("-g, --guardrails <text>");
 
       // AI provider options
-      expect(optionFlags).toContain("--provider <provider>");
-      expect(optionFlags).toContain("--model <model>");
+      expect(optionFlags).toContain("--provider <name>");
+      expect(optionFlags).toContain("--model <name>");
       expect(optionFlags).toContain("--openai-api-key <key>");
       expect(optionFlags).toContain("--openrouter-api-key <key>");
 
       // Browser options
-      expect(optionFlags).toContain("-b, --browser <browser>");
+      expect(optionFlags).toContain("-b, --browser <name>");
       expect(optionFlags).toContain("--headless");
       expect(optionFlags).toContain("--debug");
       expect(optionFlags).toContain("--vision");
-      expect(optionFlags).toContain("--no-block-ads");
-      expect(optionFlags).toContain("--block-resources <resources>");
-      expect(optionFlags).toContain("--pw-endpoint <endpoint>");
+      expect(optionFlags).toContain("--block-ads");
+      expect(optionFlags).toContain("--no-block-ads"); // Negation option
+      expect(optionFlags).toContain("--block-resources <types>");
+      expect(optionFlags).toContain("--pw-endpoint <url>");
       expect(optionFlags).toContain("--bypass-csp");
 
       // WebAgent options
-      expect(optionFlags).toContain("--max-iterations <number>");
-      expect(optionFlags).toContain("--max-validation-attempts <number>");
+      expect(optionFlags).toContain("--max-iterations <n>");
+      expect(optionFlags).toContain("--max-validation-attempts <n>");
 
       // Proxy options
       expect(optionFlags).toContain("--proxy <url>");
-      expect(optionFlags).toContain("--proxy-username <username>");
-      expect(optionFlags).toContain("--proxy-password <password>");
+      expect(optionFlags).toContain("--proxy-username <user>");
+      expect(optionFlags).toContain("--proxy-password <pass>");
 
       // Logging options
-      expect(optionFlags).toContain("--logger <logger>");
+      expect(optionFlags).toContain("--logger <type>");
     });
 
     it("should have correct default values", () => {
       const options = command.options;
 
-      const providerOption = options.find((opt) => opt.flags === "--provider <provider>");
-      expect(providerOption?.defaultValue).toBe("openai");
+      const providerOption = options.find((opt) => opt.flags === "--provider <name>");
+      expect(providerOption?.defaultValue).toBe(DEFAULT_PROVIDER);
 
-      const browserOption = options.find((opt) => opt.flags === "-b, --browser <browser>");
-      expect(browserOption?.defaultValue).toBe("firefox");
+      const browserOption = options.find((opt) => opt.flags === "-b, --browser <name>");
+      expect(browserOption?.defaultValue).toBe(DEFAULT_BROWSER);
 
-      const maxIterationsOption = options.find((opt) => opt.flags === "--max-iterations <number>");
-      expect(maxIterationsOption?.defaultValue).toBe("50");
+      // Numeric defaults are actual numbers (not strings) thanks to argParser
+      const maxIterationsOption = options.find((opt) => opt.flags === "--max-iterations <n>");
+      expect(maxIterationsOption?.defaultValue).toBe(DEFAULT_MAX_ITERATIONS);
 
       const maxValidationOption = options.find(
-        (opt) => opt.flags === "--max-validation-attempts <number>",
+        (opt) => opt.flags === "--max-validation-attempts <n>",
       );
-      expect(maxValidationOption?.defaultValue).toBe("3");
+      expect(maxValidationOption?.defaultValue).toBe(DEFAULT_MAX_VALIDATION_ATTEMPTS);
     });
   });
 
@@ -500,14 +508,13 @@ describe("CLI Run Command", () => {
     });
 
     it("should handle invalid browser option", async () => {
-      // Mock validateBrowser to return false
-      const { validateBrowser } = await import("../../../src/cli/utils.js");
-      vi.mocked(validateBrowser).mockReturnValue(false);
-
+      // Commander validates enum choices and throws InvalidArgumentError
       const args = ["--browser", "invalid", "test task"];
-      await command.parseAsync(args, { from: "user" });
 
-      expect(mockExit).toHaveBeenCalledWith(1);
+      // Commander's .choices() validation will throw before our custom validation
+      await expect(command.parseAsync(args, { from: "user" })).rejects.toThrow(
+        /Allowed choices are/i,
+      );
     });
 
     it("should handle WebAgent execution errors", async () => {

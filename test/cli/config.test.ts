@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { type SparkConfig } from "../../src/cli/config.js";
+import { type SparkConfigResolved } from "../../src/cli/config.js";
+import { getConfigDefaults } from "../../src/config/schema.js";
+
+// Get defaults for creating complete mock configs
+const defaults = getConfigDefaults();
 
 // Mock the entire config module to test the interface
 vi.mock("../../src/cli/config.js", () => {
@@ -17,6 +21,7 @@ vi.mock("../../src/cli/config.js", () => {
   return {
     ConfigManager: vi.fn(() => mockConfig),
     config: mockConfig,
+    getConfigDefaults: vi.fn(),
   };
 });
 
@@ -49,7 +54,8 @@ describe("Config Integration", () => {
     });
 
     it("should merge environment variables correctly", () => {
-      const mockSparkConfig: SparkConfig = {
+      const mockSparkConfig: SparkConfigResolved = {
+        ...defaults,
         provider: "openai",
         model: "gpt-4",
         browser: "firefox",
@@ -81,7 +87,7 @@ describe("Config Integration", () => {
       const mockSources = {
         global: { provider: "openai" as const },
         env: { browser: "chrome" as const },
-        merged: { provider: "openai" as const, browser: "chrome" as const },
+        merged: { ...defaults, provider: "openai" as const, browser: "chrome" as const },
       };
 
       mockConfig.listSources.mockReturnValue(mockSources);
@@ -96,17 +102,17 @@ describe("Config Integration", () => {
 
   describe("config validation", () => {
     it("should validate provider values", () => {
-      const validProviders: SparkConfig["provider"][] = ["openai", "openrouter", "vertex"];
+      const validProviders: SparkConfigResolved["provider"][] = ["openai", "openrouter", "vertex"];
 
       validProviders.forEach((provider) => {
-        mockConfig.getConfig.mockReturnValue({ provider });
+        mockConfig.getConfig.mockReturnValue({ ...defaults, provider });
         const result = mockConfig.getConfig();
         expect(["openai", "openrouter", "vertex"]).toContain(result.provider);
       });
     });
 
     it("should validate browser values", () => {
-      const validBrowsers: SparkConfig["browser"][] = [
+      const validBrowsers: SparkConfigResolved["browser"][] = [
         "firefox",
         "chrome",
         "chromium",
@@ -116,7 +122,7 @@ describe("Config Integration", () => {
       ];
 
       validBrowsers.forEach((browser) => {
-        mockConfig.getConfig.mockReturnValue({ browser });
+        mockConfig.getConfig.mockReturnValue({ ...defaults, browser });
         const result = mockConfig.getConfig();
         expect(["firefox", "chrome", "chromium", "safari", "webkit", "edge"]).toContain(
           result.browser,
@@ -126,6 +132,7 @@ describe("Config Integration", () => {
 
     it("should handle boolean config values", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         headless: true,
         block_ads: false,
       });
@@ -137,6 +144,7 @@ describe("Config Integration", () => {
 
     it("should handle proxy config values", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         proxy: "http://proxy.example.com:8080",
         proxy_username: "testuser",
         proxy_password: "testpass",
@@ -151,7 +159,8 @@ describe("Config Integration", () => {
 
   describe("channel configuration", () => {
     it("should merge channel environment variable", () => {
-      const mockSparkConfig: SparkConfig = {
+      const mockSparkConfig: SparkConfigResolved = {
+        ...defaults,
         browser: "chrome",
         channel: "chrome-beta",
       };
@@ -164,6 +173,7 @@ describe("Config Integration", () => {
 
     it("should handle missing channel config gracefully", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         browser: "firefox",
       });
 
@@ -176,6 +186,7 @@ describe("Config Integration", () => {
 
       channels.forEach((channel) => {
         mockConfig.getConfig.mockReturnValue({
+          ...defaults,
           browser: "firefox",
           channel,
         });
@@ -188,7 +199,8 @@ describe("Config Integration", () => {
 
   describe("executablePath configuration", () => {
     it("should merge executable_path environment variable", () => {
-      const mockSparkConfig: SparkConfig = {
+      const mockSparkConfig: SparkConfigResolved = {
+        ...defaults,
         browser: "chrome",
         executable_path: "/usr/bin/google-chrome-beta",
       };
@@ -201,6 +213,7 @@ describe("Config Integration", () => {
 
     it("should handle missing executable_path config gracefully", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         browser: "firefox",
       });
 
@@ -217,6 +230,7 @@ describe("Config Integration", () => {
 
       paths.forEach((executable_path) => {
         mockConfig.getConfig.mockReturnValue({
+          ...defaults,
           browser: "firefox",
           executable_path,
         });
@@ -228,6 +242,7 @@ describe("Config Integration", () => {
 
     it("should handle executable_path with channel", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         browser: "chrome",
         channel: "chrome-beta",
         executable_path: "/usr/bin/google-chrome-beta",
@@ -241,7 +256,8 @@ describe("Config Integration", () => {
 
   describe("proxy environment variables", () => {
     it("should merge proxy environment variables", () => {
-      const mockSparkConfig: SparkConfig = {
+      const mockSparkConfig: SparkConfigResolved = {
+        ...defaults,
         proxy: "http://env-proxy.example.com:8080",
         proxy_username: "env-user",
         proxy_password: "env-pass",
@@ -257,6 +273,7 @@ describe("Config Integration", () => {
 
     it("should handle missing proxy config gracefully", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         browser: "firefox",
         // No proxy config
       });
@@ -271,6 +288,7 @@ describe("Config Integration", () => {
   describe("vertex ai configuration", () => {
     it("should handle vertex ai config values", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         vertex_project: "test-project-123",
         vertex_location: "us-west1",
@@ -285,7 +303,8 @@ describe("Config Integration", () => {
     });
 
     it("should merge vertex ai environment variables", () => {
-      const mockSparkConfig: SparkConfig = {
+      const mockSparkConfig: SparkConfigResolved = {
+        ...defaults,
         provider: "vertex",
         vertex_project: "env-project-456",
         vertex_location: "europe-west1",
@@ -301,6 +320,7 @@ describe("Config Integration", () => {
 
     it("should handle missing vertex ai config gracefully", () => {
       mockConfig.getConfig.mockReturnValue({
+        ...defaults,
         provider: "vertex",
         // No vertex_project or vertex_location
       });
@@ -312,10 +332,10 @@ describe("Config Integration", () => {
     });
 
     it("should handle all supported providers", () => {
-      const providers: SparkConfig["provider"][] = ["openai", "openrouter", "vertex"];
+      const providers: SparkConfigResolved["provider"][] = ["openai", "openrouter", "vertex"];
 
       providers.forEach((provider) => {
-        mockConfig.getConfig.mockReturnValue({ provider });
+        mockConfig.getConfig.mockReturnValue({ ...defaults, provider });
         const result = mockConfig.getConfig();
         expect(result.provider).toBe(provider);
       });

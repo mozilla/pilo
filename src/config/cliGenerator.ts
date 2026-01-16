@@ -13,8 +13,11 @@ import { config } from "../config.js";
  * Combines short and long options with value placeholder.
  *
  * @example
- * buildOptionFlags({ cliOption: "--browser", cliShortOption: "-b", type: "string" })
- * // Returns: "-b, --browser <value>"
+ * buildOptionFlags({ cliOption: "--browser", cliShortOption: "-b", placeholder: "name" })
+ * // Returns: "-b, --browser <name>"
+ *
+ * buildOptionFlags({ cliOption: "--block-ads", type: "boolean" })
+ * // Returns: "--block-ads"
  */
 export function buildOptionFlags(field: ConfigField): string {
   const parts: string[] = [];
@@ -24,14 +27,13 @@ export function buildOptionFlags(field: ConfigField): string {
   }
 
   if (field.cliOption) {
-    // Boolean options don't need <value> placeholder
-    if (field.type === "boolean" && !field.negatable) {
-      parts.push(field.cliOption);
-    } else if (field.type === "boolean" && field.negatable) {
-      // Negatable booleans use --no-option format
+    if (field.type === "boolean") {
+      // Boolean flags don't need placeholder
       parts.push(field.cliOption);
     } else {
-      parts.push(`${field.cliOption} <value>`);
+      // Non-boolean options use placeholder (defaults to "value")
+      const placeholder = field.placeholder || "value";
+      parts.push(`${field.cliOption} <${placeholder}>`);
     }
   }
 
@@ -59,18 +61,18 @@ export function createOption(field: ConfigField): Option {
 
   // Set choices for enum types
   if (field.type === "enum" && field.enumValues) {
-    option.choices(field.enumValues as string[]);
+    option.choices([...field.enumValues]);
+  }
+
+  // For numbers, use argParser to return actual numbers instead of strings
+  if (field.type === "number") {
+    option.argParser(parseFloat);
   }
 
   // Set default value (from config or schema default)
   const defaultValue = getCliDefault(field);
   if (defaultValue !== undefined) {
-    // For numbers, convert to string as Commander expects string defaults for display
-    if (field.type === "number") {
-      option.default(String(defaultValue));
-    } else {
-      option.default(defaultValue);
-    }
+    option.default(defaultValue);
   }
 
   return option;
@@ -100,6 +102,17 @@ export function addSchemaOptions(command: Command, exclude: string[] = []): Comm
 
     const option = createOption(field);
     command.addOption(option);
+
+    // For negatable booleans, add a --no-* option to allow disabling
+    // Commander 14 requires explicit --no-* options for negation
+    if (field.type === "boolean" && field.negatable && field.cliOption) {
+      const optionName = field.cliOption.replace(/^--/, "");
+      const negatedOption = new Option(
+        `--no-${optionName}`,
+        `Disable ${optionName.replace(/-/g, " ")}`,
+      );
+      command.addOption(negatedOption);
+    }
   }
 
   return command;

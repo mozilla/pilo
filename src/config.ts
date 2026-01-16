@@ -3,71 +3,11 @@ import { join } from "path";
 import { homedir } from "os";
 import { config as loadDotenv } from "dotenv";
 import { parseEnvConfig } from "./config/envParser.js";
+import { SparkConfigSchema } from "./config/schema.js";
+import type { SparkConfig, SparkConfigResolved } from "./config/schema.js";
 
-export interface SparkConfig {
-  // AI Configuration
-  provider?:
-    | "openai"
-    | "openrouter"
-    | "vertex"
-    | "ollama"
-    | "openai-compatible"
-    | "lmstudio"
-    | "google";
-  model?: string;
-  openai_api_key?: string;
-  openrouter_api_key?: string;
-  google_generative_ai_api_key?: string;
-  vertex_project?: string;
-  vertex_location?: string;
-
-  // Local AI Provider Configuration
-  ollama_base_url?: string;
-  openai_compatible_base_url?: string;
-  openai_compatible_name?: string;
-
-  // Browser Configuration
-  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
-  channel?: string;
-  executable_path?: string;
-  headless?: boolean;
-  block_ads?: boolean;
-  block_resources?: string;
-
-  // Proxy Configuration
-  proxy?: string;
-  proxy_username?: string;
-  proxy_password?: string;
-
-  // Logging Configuration
-  logger?: "console" | "json";
-  metrics_incremental?: boolean;
-
-  // WebAgent Configuration
-  debug?: boolean;
-  vision?: boolean;
-  max_iterations?: number;
-  max_validation_attempts?: number;
-  max_repeated_actions?: number;
-  reasoning_effort?: "none" | "low" | "medium" | "high";
-  starting_url?: string;
-  data?: string;
-  guardrails?: string;
-
-  // Playwright Configuration
-  pw_endpoint?: string;
-  pw_cdp_endpoint?: string;
-  bypass_csp?: boolean;
-
-  // Navigation Retry Configuration
-  navigation_timeout_ms?: number;
-  navigation_max_timeout_ms?: number;
-  navigation_max_attempts?: number;
-  navigation_timeout_multiplier?: number;
-
-  // Action Timeout Configuration
-  action_timeout_ms?: number;
-}
+// Re-export types from schema (single source of truth)
+export type { SparkConfig, SparkConfigResolved } from "./config/schema.js";
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -96,10 +36,11 @@ export class ConfigManager {
   }
 
   /**
-   * Get the full merged configuration from all sources
+   * Get the full merged configuration from all sources, validated through Zod.
    * Priority: Environment Variables > Local .env > Global Config
+   * Returns resolved config with defaults applied.
    */
-  public getConfig(): SparkConfig {
+  public getConfig(): SparkConfigResolved {
     // Start with global config as base
     const globalConfig = this.getGlobalConfig();
 
@@ -114,10 +55,30 @@ export class ConfigManager {
     const envConfig = parseEnvConfig();
 
     // Merge: global config < env vars (env has higher priority)
-    return {
+    const merged = {
       ...globalConfig,
       ...envConfig,
     };
+
+    // Validate through Zod and apply defaults
+    const result = SparkConfigSchema.safeParse(merged);
+
+    if (!result.success) {
+      // Log validation issues but don't fail - use defaults for invalid fields
+      const errors = result.error.flatten();
+      for (const [field, messages] of Object.entries(errors.fieldErrors)) {
+        console.warn(`Config warning: ${field} - ${messages?.join(", ")}`);
+      }
+      // Parse again allowing Zod to use defaults for invalid fields
+      // by stripping invalid values
+      const sanitized = { ...merged };
+      for (const field of Object.keys(errors.fieldErrors)) {
+        delete sanitized[field as keyof typeof sanitized];
+      }
+      return SparkConfigSchema.parse(sanitized);
+    }
+
+    return result.data;
   }
 
   /**
@@ -166,11 +127,15 @@ export class ConfigManager {
   }
 
   /**
-   * Get a specific config value with fallback hierarchy
+   * Get a specific config value with fallback hierarchy.
+   * Since getConfig() returns SparkConfigResolved, defaults are already applied.
    */
-  public get<K extends keyof SparkConfig>(key: K, defaultValue?: SparkConfig[K]): SparkConfig[K] {
+  public get<K extends keyof SparkConfigResolved>(
+    key: K,
+    defaultValue?: SparkConfigResolved[K],
+  ): SparkConfigResolved[K] {
     const config = this.getConfig();
-    return config[key] ?? defaultValue;
+    return config[key] ?? (defaultValue as SparkConfigResolved[K]);
   }
 
   /**
@@ -208,8 +173,8 @@ export class ConfigManager {
    */
   public listSources(): {
     global: SparkConfig;
-    env: Partial<SparkConfig>;
-    merged: SparkConfig;
+    env: SparkConfig;
+    merged: SparkConfigResolved;
   } {
     const global = this.getGlobalConfig();
 
