@@ -57,7 +57,10 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     // Wait for service worker to activate (critical for MV3 in headless mode)
-    await serviceWorker.evaluate(() => self.registration.active);
+    await serviceWorker.evaluate(() => {
+      const sw = self as unknown as ServiceWorkerGlobalScope;
+      return sw.registration.active;
+    });
 
     // Extract extension ID from service worker URL: chrome-extension://<id>/background.js
     const url = serviceWorker.url();
