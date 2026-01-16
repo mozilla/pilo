@@ -618,6 +618,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           onClick={onOpenSettings}
           className={`p-2.5 ${t.text.muted} ${t.hover.settings} rounded-xl transition-colors`}
           title="Settings"
+          data-testid="settings-button"
         >
           <SettingsGearIcon className="w-5 h-5" />
         </button>
@@ -626,7 +627,10 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       {/* Chat Messages */}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <div
+            className="flex flex-col items-center justify-center h-full text-center"
+            data-testid="welcome-message"
+          >
             <SparkLogo className="w-28 h-28 text-gray-350 mb-4" />
             <p className={`${t.text.muted} text-sm max-w-sm`}>
               I can help you automate tasks on any webpage. Just describe what you'd like me to do!
@@ -652,11 +656,13 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             rows={2}
             disabled={isExecuting}
             className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
+            data-testid="task-input"
           />
           {isExecuting ? (
             <button
               onClick={handleCancel}
               className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
+              data-testid="stop-button"
             >
               Stop
             </button>
@@ -665,6 +671,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
               onClick={handleExecute}
               disabled={!task.trim()}
               className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              data-testid="send-button"
             >
               Send
             </button>
