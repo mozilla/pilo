@@ -8,16 +8,6 @@
  */
 
 // ============================================================================
-// WebAgent Error Handling
-// ============================================================================
-
-/** Maximum consecutive errors before failing */
-export const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
-
-/** Maximum total errors before failing */
-export const DEFAULT_MAX_TOTAL_ERRORS = 15;
-
-// ============================================================================
 // AI Generation Token Limits
 // ============================================================================
 

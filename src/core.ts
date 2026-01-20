@@ -47,8 +47,6 @@ export { getConfigDefaults } from "./configDefaults.js";
 
 // Internal constants (not configurable via env/CLI)
 export {
-  DEFAULT_MAX_CONSECUTIVE_ERRORS,
-  DEFAULT_MAX_TOTAL_ERRORS,
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
@@ -75,6 +73,9 @@ export const DEFAULT_BYPASS_CSP = _defaults.bypass_csp;
 export const DEFAULT_MAX_ITERATIONS = _defaults.max_iterations;
 export const DEFAULT_MAX_VALIDATION_ATTEMPTS = _defaults.max_validation_attempts;
 export const DEFAULT_MAX_REPEATED_ACTIONS = _defaults.max_repeated_actions;
+export const DEFAULT_MAX_CONSECUTIVE_ERRORS = _defaults.max_consecutive_errors;
+export const DEFAULT_MAX_TOTAL_ERRORS = _defaults.max_total_errors;
+export const DEFAULT_INITIAL_NAVIGATION_RETRIES = _defaults.initial_navigation_retries;
 export const DEFAULT_DEBUG = _defaults.debug;
 export const DEFAULT_VISION = _defaults.vision;
 export const DEFAULT_PROVIDER = _defaults.provider;
