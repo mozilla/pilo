@@ -171,6 +171,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxIterations: options.maxIterations ?? cfg.max_iterations,
       maxValidationAttempts: options.maxValidationAttempts ?? cfg.max_validation_attempts,
       maxRepeatedActions: options.maxRepeatedActions ?? cfg.max_repeated_actions,
+      initialNavigationRetries: options.initialNavigationRetries ?? cfg.initial_navigation_retries,
       providerConfig,
       logger,
       eventEmitter,

@@ -86,6 +86,7 @@ export interface SparkConfig {
   max_iterations?: number;
   max_validation_attempts?: number;
   max_repeated_actions?: number;
+  initial_navigation_retries?: number;
   starting_url?: string;
   data?: string;
   guardrails?: string;
@@ -143,6 +144,7 @@ export interface SparkConfigResolved {
   max_iterations: number;
   max_validation_attempts: number;
   max_repeated_actions: number;
+  initial_navigation_retries: number;
   starting_url?: string;
   data?: string;
   guardrails?: string;
@@ -420,6 +422,15 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Maximum times an action can be repeated before warning",
     category: "agent",
   },
+  initial_navigation_retries: {
+    default: 1,
+    type: "number",
+    cli: "--initial-navigation-retries",
+    placeholder: "n",
+    env: ["SPARK_INITIAL_NAVIGATION_RETRIES"],
+    description: "Retries for initial navigation with browser restart (0 = no retries)",
+    category: "agent",
+  },
   starting_url: {
     type: "string",
     cli: "--url",
@@ -551,6 +562,7 @@ function buildDefaults(): SparkConfigResolved {
     "max_iterations",
     "max_validation_attempts",
     "max_repeated_actions",
+    "initial_navigation_retries",
     "bypass_csp",
     "navigation_timeout_ms",
     "navigation_max_timeout_ms",
