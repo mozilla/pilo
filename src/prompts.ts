@@ -262,6 +262,7 @@ Analyze the current page state and determine your next action based on previous 
 - Submit forms via enter() or submit button after filling
 - Find alternative elements if primary ones aren't available
 - Adapt your approach based on what's actually available
+- If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
 - Use abort() only after trying reasonable alternatives (site down, access blocked, required data unavailable)
 - For research: Use extract() immediately when finding relevant data
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
