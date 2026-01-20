@@ -26,7 +26,10 @@
     "check": "pnpm run format && pnpm run typecheck && pnpm run test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:e2e:chrome": "playwright test",
+    "test:e2e:headless:chrome": "HEADLESS=true playwright test",
+    "test:e2e:ui:chrome": "playwright test --ui"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
@@ -44,6 +47,7 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
