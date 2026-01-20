@@ -36,8 +36,6 @@ import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
-  DEFAULT_MAX_CONSECUTIVE_ERRORS,
-  DEFAULT_MAX_TOTAL_ERRORS,
 } from "./constants.js";
 
 // === Type Definitions ===
@@ -177,8 +175,8 @@ export class WebAgent {
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
     this.maxIterations = options.maxIterations ?? defaults.max_iterations;
-    this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
-    this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
+    this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? defaults.max_consecutive_errors;
+    this.maxTotalErrors = options.maxTotalErrors ?? defaults.max_total_errors;
     this.maxValidationAttempts = options.maxValidationAttempts ?? defaults.max_validation_attempts;
     this.maxRepeatedActions = options.maxRepeatedActions ?? defaults.max_repeated_actions;
     this.initialNavigationRetries =

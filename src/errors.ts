@@ -116,7 +116,7 @@ export class NavigationTimeoutException extends BrowserException {
     const attempt = context?.attempt ?? 1;
     const maxAttempts = context?.maxAttempts ?? 1;
     super(
-      `The page at '${url}' is unreachable (timed out after ${timeoutMs}ms across ${maxAttempts} attempts). Try a different URL or approach.`,
+      `The page at '${url}' is unreachable (timed out after ${timeoutMs}ms on attempt ${attempt}/${maxAttempts}). Try a different URL or approach.`,
       {
         url,
         timeoutMs,
@@ -152,7 +152,7 @@ export class NavigationNetworkException extends BrowserException {
     const attempt = context?.attempt ?? 1;
     const maxAttempts = context?.maxAttempts ?? 1;
     super(
-      `The page at '${url}' is unreachable (${networkError} after ${maxAttempts} attempts). Try a different URL or approach.`,
+      `The page at '${url}' is unreachable (${networkError} on attempt ${attempt}/${maxAttempts}). Try a different URL or approach.`,
       {
         url,
         networkError,

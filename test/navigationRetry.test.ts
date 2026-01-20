@@ -131,7 +131,7 @@ describe("Navigation Retry Utilities", () => {
       });
 
       expect(error.message).toBe(
-        "The page at 'https://example.com' is unreachable (timed out after 15000ms across 3 attempts). Try a different URL or approach.",
+        "The page at 'https://example.com' is unreachable (timed out after 15000ms on attempt 1/3). Try a different URL or approach.",
       );
     });
 
@@ -142,7 +142,7 @@ describe("Navigation Retry Utilities", () => {
       });
 
       expect(error.message).toBe(
-        "The page at 'https://example.com' is unreachable (timed out after 60000ms across 3 attempts). Try a different URL or approach.",
+        "The page at 'https://example.com' is unreachable (timed out after 60000ms on attempt 3/3). Try a different URL or approach.",
       );
     });
   });

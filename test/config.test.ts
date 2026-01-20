@@ -171,6 +171,8 @@ describe("ConfigManager", () => {
         "max_iterations",
         "max_validation_attempts",
         "max_repeated_actions",
+        "max_consecutive_errors",
+        "max_total_errors",
         "initial_navigation_retries",
         "reasoning_effort",
         "starting_url",
