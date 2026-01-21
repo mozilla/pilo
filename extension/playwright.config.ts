@@ -6,7 +6,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   forbidOnly: !!process.env.CI,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "html",
+  reporter: [["html", { outputFolder: "playwright-report" }]],
+  outputDir: "test-results",
   use: {
     trace: "on-first-retry",
   },
