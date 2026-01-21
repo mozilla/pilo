@@ -1,2 +1,8 @@
 // Re-export shared config system
-export { config, ConfigManager, type SparkConfig } from "../config.js";
+export {
+  config,
+  ConfigManager,
+  getConfigDefaults,
+  type SparkConfig,
+  type SparkConfigResolved,
+} from "../config.js";

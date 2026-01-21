@@ -6,6 +6,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "jsx": "react-jsx",
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "paths": {
       "spark/core": ["../src/core.ts"]
     }

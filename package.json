@@ -1,6 +1,6 @@
 {
   "name": "spark",
-  "version": "0.11.4",
+  "version": "0.12.0",
   "description": "AI-powered web automation library and CLI tool",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,6 +27,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc",
     "typecheck": "tsc --project tsconfig.check.json",
     "prepare": "npm run build",
@@ -52,24 +53,24 @@
   "license": "MIT",
   "devDependencies": {
     "@types/jsdom": "^27.0.0",
-    "@types/node": "^25.0.3",
-    "jsdom": "^27.3.0",
+    "@types/node": "^25.0.9",
+    "jsdom": "^27.4.0",
     "nodemon": "^3.1.11",
-    "prettier": "^3.7.4",
+    "prettier": "^3.8.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@ai-sdk/google": "^2.0.44",
-    "@ai-sdk/google-vertex": "^3.0.86",
-    "@ai-sdk/openai": "^2.0.76",
-    "@ai-sdk/openai-compatible": "^1.0.27",
-    "@ghostery/adblocker-playwright": "^2.13.0",
+    "@ai-sdk/google": "^2.0.52",
+    "@ai-sdk/google-vertex": "^3.0.97",
+    "@ai-sdk/openai": "^2.0.89",
+    "@ai-sdk/openai-compatible": "^1.0.30",
+    "@ghostery/adblocker-playwright": "^2.13.4",
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@types/turndown": "^5.0.6",
-    "ai": "^5.0.106",
-    "chalk": "^5.5.0",
+    "ai": "^5.0.121",
+    "chalk": "^5.6.2",
     "commander": "^14.0.2",
     "cross-fetch": "^4.1.0",
     "dotenv": "^17.2.3",
@@ -79,7 +80,7 @@
     "ollama-ai-provider-v2": "^1.5.5",
     "playwright": "1.57.0",
     "turndown": "^7.2.2",
-    "zod": "^4.1.13"
+    "zod": "^4.3.5"
   },
   "packageManager": "pnpm@9.0.0"
 }

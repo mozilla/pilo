@@ -1,71 +1,212 @@
+/**
+ * Configuration System - Node.js
+ *
+ * Full config functionality including file I/O, env parsing, and CLI generation.
+ * Re-exports browser-compatible types and defaults from configDefaults.ts.
+ */
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { config as loadDotenv } from "dotenv";
+import { Command, Option } from "commander";
 
-export interface SparkConfig {
-  // AI Configuration
-  provider?:
-    | "openai"
-    | "openrouter"
-    | "vertex"
-    | "ollama"
-    | "openai-compatible"
-    | "lmstudio"
-    | "google";
-  model?: string;
-  openai_api_key?: string;
-  openrouter_api_key?: string;
-  google_generative_ai_api_key?: string;
-  vertex_project?: string;
-  vertex_location?: string;
+// Re-export everything from browser-compatible module
+export {
+  PROVIDERS,
+  BROWSERS,
+  REASONING_LEVELS,
+  LOGGERS,
+  FIELDS,
+  DEFAULTS,
+  CONFIG_SCHEMA,
+  getConfigDefaults,
+  getSchemaField,
+  getSchemaFieldsByCategory,
+  getCliFields,
+  getEnvFields,
+  getSchemaConfigKeys,
+} from "./configDefaults.js";
 
-  // Local AI Provider Configuration
-  ollama_base_url?: string;
-  openai_compatible_base_url?: string;
-  openai_compatible_name?: string;
+export type {
+  Provider,
+  Browser,
+  ReasoningLevel,
+  LoggerType,
+  ConfigFieldType,
+  ConfigCategory,
+  SparkConfig,
+  SparkConfigResolved,
+  ConfigKey,
+  FieldDef,
+  ConfigField,
+} from "./configDefaults.js";
 
-  // Browser Configuration
-  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
-  channel?: string;
-  executable_path?: string;
-  headless?: boolean;
-  block_ads?: boolean;
-  block_resources?: string;
+// Import for internal use
+import {
+  FIELDS,
+  DEFAULTS,
+  type SparkConfig,
+  type SparkConfigResolved,
+  type ConfigFieldType,
+  type FieldDef,
+} from "./configDefaults.js";
 
-  // Proxy Configuration
-  proxy?: string;
-  proxy_username?: string;
-  proxy_password?: string;
+// =============================================================================
+// Environment Variable Parsing (Node.js only - uses process.env)
+// =============================================================================
 
-  // Logging Configuration
-  logger?: "console" | "json";
-  metrics_incremental?: boolean;
-
-  // WebAgent Configuration
-  debug?: boolean;
-  vision?: boolean;
-  max_iterations?: number;
-  max_validation_attempts?: number;
-  max_repeated_actions?: number;
-  reasoning_effort?: "none" | "low" | "medium" | "high";
-  starting_url?: string;
-  data?: string;
-  guardrails?: string;
-
-  // Playwright Configuration
-  pw_endpoint?: string;
-  pw_cdp_endpoint?: string;
-  bypass_csp?: boolean;
-
-  // Navigation Retry Configuration
-  navigation_timeout_ms?: number;
-  navigation_max_attempts?: number;
-  navigation_timeout_multiplier?: number;
-
-  // Action Timeout Configuration
-  action_timeout_ms?: number;
+/**
+ * Coerce a string value to the appropriate type.
+ */
+function coerceValue(
+  value: string,
+  type: ConfigFieldType,
+  envVar?: string,
+): string | number | boolean | undefined {
+  switch (type) {
+    case "boolean": {
+      const lower = value.toLowerCase();
+      const truthy = ["true", "1", "yes", "on"];
+      const falsy = ["false", "0", "no", "off"];
+      if (truthy.includes(lower)) return true;
+      if (falsy.includes(lower)) return false;
+      if (envVar) {
+        console.warn(
+          `Config warning: ${envVar}="${value}" is not a valid boolean (true/false), using default`,
+        );
+      }
+      return undefined;
+    }
+    case "number": {
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        if (envVar) {
+          console.warn(`Config warning: ${envVar}="${value}" is not a valid number, using default`);
+        }
+        return undefined;
+      }
+      return num;
+    }
+    case "string":
+    case "enum":
+      return value;
+    default:
+      return value;
+  }
 }
+
+/**
+ * Parse environment variables into a partial SparkConfig object.
+ */
+export function parseEnvConfig(): Partial<SparkConfig> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, field] of Object.entries(FIELDS)) {
+    // Find first set env var
+    let envValue: string | undefined;
+    let envVarName: string | undefined;
+    for (const envVar of field.env) {
+      const val = process.env[envVar];
+      if (val !== undefined) {
+        envValue = val;
+        envVarName = envVar;
+        break;
+      }
+    }
+
+    if (envValue !== undefined && envVarName) {
+      // Validate enum values
+      if (field.type === "enum" && field.values) {
+        if (!field.values.includes(envValue)) {
+          console.warn(
+            `Config warning: ${envVarName}="${envValue}" is not valid. ` +
+              `Allowed values: ${field.values.join(", ")}. Using default.`,
+          );
+          continue;
+        }
+      }
+
+      const coerced = coerceValue(envValue, field.type, envVarName);
+      if (coerced !== undefined) {
+        result[key] = coerced;
+      }
+    }
+  }
+
+  return result as Partial<SparkConfig>;
+}
+
+// =============================================================================
+// CLI Option Generation (Node.js only - uses Commander)
+// =============================================================================
+
+/**
+ * Build CLI option flags from a field definition.
+ */
+function buildOptionFlags(field: FieldDef): string {
+  const parts: string[] = [];
+
+  if (field.cliShort) {
+    parts.push(field.cliShort);
+  }
+
+  if (field.cli) {
+    if (field.type === "boolean") {
+      parts.push(field.cli);
+    } else {
+      const placeholder = field.placeholder || "value";
+      parts.push(`${field.cli} <${placeholder}>`);
+    }
+  }
+
+  return parts.join(", ");
+}
+
+/**
+ * Add all config options to a Commander command.
+ */
+export function addConfigOptions(command: Command, exclude: string[] = []): Command {
+  for (const [key, field] of Object.entries(FIELDS)) {
+    if (!field.cli || exclude.includes(key)) continue;
+
+    const flags = buildOptionFlags(field);
+    const option = new Option(flags, field.description);
+
+    // Set choices for enum types
+    if (field.type === "enum" && field.values) {
+      option.choices([...field.values]);
+    }
+
+    // For numbers, use argParser to return actual numbers
+    if (field.type === "number") {
+      option.argParser(parseFloat);
+    }
+
+    // Don't set Commander defaults - our config system handles defaults via
+    // DEFAULTS, and setting them here would override env vars and config file values
+
+    command.addOption(option);
+
+    // For negatable booleans, add --no-* option
+    if (field.type === "boolean" && field.negatable && field.cli) {
+      const optionName = field.cli.replace(/^--/, "");
+      const negatedOption = new Option(
+        `--no-${optionName}`,
+        `Disable ${optionName.replace(/-/g, " ")}`,
+      );
+      command.addOption(negatedOption);
+    }
+  }
+
+  return command;
+}
+
+export const addSchemaOptions = addConfigOptions;
+
+// =============================================================================
+// Config Manager (Node.js only - uses fs, path, os, dotenv)
+// =============================================================================
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -73,16 +214,12 @@ export class ConfigManager {
   private configDir: string;
 
   private constructor() {
-    // Determine config directory based on platform
     const platform = process.platform;
     if (platform === "win32") {
-      // Windows: %APPDATA%\spark\
       this.configDir = join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "spark");
     } else {
-      // Unix/Linux/macOS: ~/.spark/
       this.configDir = join(homedir(), ".spark");
     }
-
     this.configPath = join(this.configDir, "config.json");
   }
 
@@ -94,154 +231,29 @@ export class ConfigManager {
   }
 
   /**
-   * Get the full merged configuration from all sources
+   * Get the full merged configuration from all sources.
    * Priority: Environment Variables > Local .env > Global Config
    */
-  public getConfig(): SparkConfig {
-    // Start with global config as base
+  public getConfig(): SparkConfigResolved {
     const globalConfig = this.getGlobalConfig();
 
-    // Load local .env file if it exists (for development)
+    // Load local .env file if it exists
     try {
       loadDotenv({ path: ".env", quiet: true });
     } catch {
       // Ignore if .env doesn't exist
     }
 
-    // Merge with environment variables (highest priority)
-    const config: SparkConfig = {
+    const envConfig = parseEnvConfig();
+
+    // Merge: defaults < global config < env vars
+    const merged = {
+      ...DEFAULTS,
       ...globalConfig,
-      // Override with environment variables if they exist
-      // AI Configuration
-      ...(process.env.SPARK_PROVIDER && {
-        provider: process.env.SPARK_PROVIDER as SparkConfig["provider"],
-      }),
-      ...(process.env.SPARK_MODEL && { model: process.env.SPARK_MODEL }),
-      ...(process.env.OPENAI_API_KEY && { openai_api_key: process.env.OPENAI_API_KEY }),
-      ...(process.env.OPENROUTER_API_KEY && { openrouter_api_key: process.env.OPENROUTER_API_KEY }),
-      ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY && {
-        google_generative_ai_api_key: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      }),
-      ...((process.env.GOOGLE_VERTEX_PROJECT ||
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCP_PROJECT) && {
-        vertex_project:
-          process.env.GOOGLE_VERTEX_PROJECT ||
-          process.env.GOOGLE_CLOUD_PROJECT ||
-          process.env.GCP_PROJECT,
-      }),
-      ...((process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) && {
-        vertex_location: process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION,
-      }),
-
-      // Local AI Provider Configuration
-      ...(process.env.SPARK_OLLAMA_BASE_URL && {
-        ollama_base_url: process.env.SPARK_OLLAMA_BASE_URL,
-      }),
-      ...(process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL && {
-        openai_compatible_base_url: process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL,
-      }),
-      ...(process.env.SPARK_OPENAI_COMPATIBLE_NAME && {
-        openai_compatible_name: process.env.SPARK_OPENAI_COMPATIBLE_NAME,
-      }),
-
-      // Browser Configuration
-      ...(process.env.SPARK_BROWSER && {
-        browser: process.env.SPARK_BROWSER as SparkConfig["browser"],
-      }),
-      ...(process.env.SPARK_CHANNEL && {
-        channel: process.env.SPARK_CHANNEL,
-      }),
-      ...(process.env.SPARK_EXECUTABLE_PATH && {
-        executable_path: process.env.SPARK_EXECUTABLE_PATH,
-      }),
-      ...(process.env.SPARK_HEADLESS && {
-        headless: process.env.SPARK_HEADLESS === "true",
-      }),
-      ...(process.env.SPARK_BLOCK_ADS && {
-        block_ads: process.env.SPARK_BLOCK_ADS === "true",
-      }),
-      ...(process.env.SPARK_BLOCK_RESOURCES && {
-        block_resources: process.env.SPARK_BLOCK_RESOURCES,
-      }),
-
-      // Proxy Configuration
-      ...(process.env.SPARK_PROXY && {
-        proxy: process.env.SPARK_PROXY,
-      }),
-      ...(process.env.SPARK_PROXY_USERNAME && {
-        proxy_username: process.env.SPARK_PROXY_USERNAME,
-      }),
-      ...(process.env.SPARK_PROXY_PASSWORD && {
-        proxy_password: process.env.SPARK_PROXY_PASSWORD,
-      }),
-
-      // Logging Configuration
-      ...(process.env.SPARK_LOGGER && {
-        logger: process.env.SPARK_LOGGER as SparkConfig["logger"],
-      }),
-      ...(process.env.SPARK_METRICS_INCREMENTAL && {
-        metrics_incremental: process.env.SPARK_METRICS_INCREMENTAL === "true",
-      }),
-
-      // WebAgent Configuration
-      ...(process.env.SPARK_DEBUG && {
-        debug: process.env.SPARK_DEBUG === "true",
-      }),
-      ...(process.env.SPARK_VISION && {
-        vision: process.env.SPARK_VISION === "true",
-      }),
-      ...(process.env.SPARK_MAX_ITERATIONS && {
-        max_iterations: parseInt(process.env.SPARK_MAX_ITERATIONS, 10),
-      }),
-      ...(process.env.SPARK_MAX_VALIDATION_ATTEMPTS && {
-        max_validation_attempts: parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10),
-      }),
-      ...(process.env.SPARK_MAX_REPEATED_ACTIONS && {
-        max_repeated_actions: parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10),
-      }),
-      ...(process.env.SPARK_REASONING_EFFORT && {
-        reasoning_effort: process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"],
-      }),
-      ...(process.env.SPARK_STARTING_URL && {
-        starting_url: process.env.SPARK_STARTING_URL,
-      }),
-      ...(process.env.SPARK_DATA && {
-        data: process.env.SPARK_DATA,
-      }),
-      ...(process.env.SPARK_GUARDRAILS && {
-        guardrails: process.env.SPARK_GUARDRAILS,
-      }),
-
-      // Playwright Configuration
-      ...(process.env.SPARK_PW_ENDPOINT && {
-        pw_endpoint: process.env.SPARK_PW_ENDPOINT,
-      }),
-      ...(process.env.SPARK_PW_CDP_ENDPOINT && {
-        pw_cdp_endpoint: process.env.SPARK_PW_CDP_ENDPOINT,
-      }),
-      ...(process.env.SPARK_BYPASS_CSP && {
-        bypass_csp: process.env.SPARK_BYPASS_CSP === "true",
-      }),
-
-      // Navigation Retry Configuration
-      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MS && {
-        navigation_timeout_ms: parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10),
-      }),
-      ...(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS && {
-        navigation_max_attempts: parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10),
-      }),
-      ...(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER && {
-        navigation_timeout_multiplier: parseFloat(process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER),
-      }),
-
-      // Action Timeout Configuration
-      ...(process.env.SPARK_ACTION_TIMEOUT_MS && {
-        action_timeout_ms: parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10),
-      }),
+      ...envConfig,
     };
 
-    return config;
+    return merged as SparkConfigResolved;
   }
 
   /**
@@ -264,22 +276,14 @@ export class ConfigManager {
   /**
    * Set a value in the global config file
    */
-  public setGlobalConfig(key: keyof SparkConfig, value: any): void {
-    // Ensure config directory exists
+  public setGlobalConfig(key: keyof SparkConfig, value: unknown): void {
     if (!existsSync(this.configDir)) {
       mkdirSync(this.configDir, { recursive: true });
     }
 
-    // Read existing config
     const currentConfig = this.getGlobalConfig();
+    const newConfig = { ...currentConfig, [key]: value };
 
-    // Update the value
-    const newConfig = {
-      ...currentConfig,
-      [key]: value,
-    };
-
-    // Write back to file
     try {
       writeFileSync(this.configPath, JSON.stringify(newConfig, null, 2), "utf-8");
     } catch (error) {
@@ -290,11 +294,10 @@ export class ConfigManager {
   }
 
   /**
-   * Get a specific config value with fallback hierarchy
+   * Get a specific config value
    */
-  public get<K extends keyof SparkConfig>(key: K, defaultValue?: SparkConfig[K]): SparkConfig[K] {
-    const config = this.getConfig();
-    return config[key] ?? defaultValue;
+  public get<K extends keyof SparkConfigResolved>(key: K): SparkConfigResolved[K] {
+    return this.getConfig()[key];
   }
 
   /**
@@ -328,96 +331,19 @@ export class ConfigManager {
   }
 
   /**
-   * List all config sources and their values for debugging
+   * List all config sources and their values
    */
   public listSources(): {
-    global: SparkConfig;
+    global: Partial<SparkConfig>;
     env: Partial<SparkConfig>;
-    merged: SparkConfig;
+    merged: SparkConfigResolved;
   } {
     const global = this.getGlobalConfig();
-
-    const env: Partial<SparkConfig> = {};
-    // AI Configuration
-    if (process.env.SPARK_PROVIDER)
-      env.provider = process.env.SPARK_PROVIDER as SparkConfig["provider"];
-    if (process.env.SPARK_MODEL) env.model = process.env.SPARK_MODEL;
-    if (process.env.OPENAI_API_KEY) env.openai_api_key = process.env.OPENAI_API_KEY;
-    if (process.env.OPENROUTER_API_KEY) env.openrouter_api_key = process.env.OPENROUTER_API_KEY;
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY)
-      env.google_generative_ai_api_key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (
-      process.env.GOOGLE_VERTEX_PROJECT ||
-      process.env.GOOGLE_CLOUD_PROJECT ||
-      process.env.GCP_PROJECT
-    ) {
-      env.vertex_project =
-        process.env.GOOGLE_VERTEX_PROJECT ||
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCP_PROJECT;
-    }
-    if (process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION) {
-      env.vertex_location = process.env.GOOGLE_VERTEX_LOCATION || process.env.GOOGLE_CLOUD_REGION;
-    }
-
-    // Browser Configuration
-    if (process.env.SPARK_BROWSER)
-      env.browser = process.env.SPARK_BROWSER as SparkConfig["browser"];
-    if (process.env.SPARK_CHANNEL) env.channel = process.env.SPARK_CHANNEL;
-    if (process.env.SPARK_EXECUTABLE_PATH) env.executable_path = process.env.SPARK_EXECUTABLE_PATH;
-    if (process.env.SPARK_HEADLESS) env.headless = process.env.SPARK_HEADLESS === "true";
-    if (process.env.SPARK_BLOCK_ADS) env.block_ads = process.env.SPARK_BLOCK_ADS === "true";
-    if (process.env.SPARK_BLOCK_RESOURCES) env.block_resources = process.env.SPARK_BLOCK_RESOURCES;
-
-    // Proxy Configuration
-    if (process.env.SPARK_PROXY) env.proxy = process.env.SPARK_PROXY;
-    if (process.env.SPARK_PROXY_USERNAME) env.proxy_username = process.env.SPARK_PROXY_USERNAME;
-    if (process.env.SPARK_PROXY_PASSWORD) env.proxy_password = process.env.SPARK_PROXY_PASSWORD;
-
-    // Logging Configuration
-    if (process.env.SPARK_LOGGER) env.logger = process.env.SPARK_LOGGER as SparkConfig["logger"];
-    if (process.env.SPARK_METRICS_INCREMENTAL)
-      env.metrics_incremental = process.env.SPARK_METRICS_INCREMENTAL === "true";
-
-    // WebAgent Configuration
-    if (process.env.SPARK_DEBUG) env.debug = process.env.SPARK_DEBUG === "true";
-    if (process.env.SPARK_VISION) env.vision = process.env.SPARK_VISION === "true";
-    if (process.env.SPARK_MAX_ITERATIONS)
-      env.max_iterations = parseInt(process.env.SPARK_MAX_ITERATIONS, 10);
-    if (process.env.SPARK_MAX_VALIDATION_ATTEMPTS)
-      env.max_validation_attempts = parseInt(process.env.SPARK_MAX_VALIDATION_ATTEMPTS, 10);
-    if (process.env.SPARK_MAX_REPEATED_ACTIONS)
-      env.max_repeated_actions = parseInt(process.env.SPARK_MAX_REPEATED_ACTIONS, 10);
-    if (process.env.SPARK_REASONING_EFFORT)
-      env.reasoning_effort = process.env.SPARK_REASONING_EFFORT as SparkConfig["reasoning_effort"];
-    if (process.env.SPARK_STARTING_URL) env.starting_url = process.env.SPARK_STARTING_URL;
-    if (process.env.SPARK_DATA) env.data = process.env.SPARK_DATA;
-    if (process.env.SPARK_GUARDRAILS) env.guardrails = process.env.SPARK_GUARDRAILS;
-
-    // Playwright Configuration
-    if (process.env.SPARK_PW_ENDPOINT) env.pw_endpoint = process.env.SPARK_PW_ENDPOINT;
-    if (process.env.SPARK_PW_CDP_ENDPOINT) env.pw_cdp_endpoint = process.env.SPARK_PW_CDP_ENDPOINT;
-    if (process.env.SPARK_BYPASS_CSP) env.bypass_csp = process.env.SPARK_BYPASS_CSP === "true";
-
-    // Navigation Retry Configuration
-    if (process.env.SPARK_NAVIGATION_TIMEOUT_MS)
-      env.navigation_timeout_ms = parseInt(process.env.SPARK_NAVIGATION_TIMEOUT_MS, 10);
-    if (process.env.SPARK_NAVIGATION_MAX_ATTEMPTS)
-      env.navigation_max_attempts = parseInt(process.env.SPARK_NAVIGATION_MAX_ATTEMPTS, 10);
-    if (process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER)
-      env.navigation_timeout_multiplier = parseFloat(
-        process.env.SPARK_NAVIGATION_TIMEOUT_MULTIPLIER,
-      );
-
-    // Action Timeout Configuration
-    if (process.env.SPARK_ACTION_TIMEOUT_MS)
-      env.action_timeout_ms = parseInt(process.env.SPARK_ACTION_TIMEOUT_MS, 10);
-
+    const env = parseEnvConfig();
     const merged = this.getConfig();
-
     return { global, env, merged };
   }
 }
 
-// Export singleton instance
+/** Singleton config manager instance */
 export const config = ConfigManager.getInstance();

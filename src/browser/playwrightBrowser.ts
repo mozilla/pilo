@@ -21,11 +21,9 @@ import {
   NavigationTimeoutException,
   NavigationNetworkException,
 } from "../errors.js";
-import {
-  NavigationRetryConfig,
-  DEFAULT_NAVIGATION_RETRY_CONFIG,
-  calculateTimeout,
-} from "./navigationRetry.js";
+import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
+import { getConfigDefaults } from "../configDefaults.js";
+import { createNavigationRetryConfig } from "../utils/configMerge.js";
 
 // Type extension for Playwright's private AI snapshot function
 // See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
@@ -83,10 +81,6 @@ export class PlaywrightBrowser implements AriaBrowser {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
 
-  // Default timeout for element actions (clicks, fills, etc.)
-  // Navigation timeouts and network errors are handled by navigationRetry
-  private static readonly DEFAULT_ACTION_TIMEOUT_MS = 30000; // 30 seconds
-
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
 
@@ -98,17 +92,11 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.channel = this.options.channel ?? this.getDefaultChannel();
 
     // Initialize action timeout from options or use default
-    this.actionTimeoutMs = options.actionTimeoutMs ?? PlaywrightBrowser.DEFAULT_ACTION_TIMEOUT_MS;
+    this.actionTimeoutMs = options.actionTimeoutMs ?? getConfigDefaults().action_timeout_ms;
 
     // Initialize navigation retry config with defaults and overrides
-    // Filter out null/undefined values to prevent them from overwriting defaults
-    const retryOverrides = options.navigationRetry
-      ? Object.fromEntries(Object.entries(options.navigationRetry).filter(([, v]) => v != null))
-      : {};
-    this.navigationConfig = {
-      ...DEFAULT_NAVIGATION_RETRY_CONFIG,
-      ...retryOverrides,
-    };
+    // Uses createNavigationRetryConfig which safely handles undefined values
+    this.navigationConfig = createNavigationRetryConfig(options.navigationRetry);
   }
 
   get pwEndpoint(): string | undefined {

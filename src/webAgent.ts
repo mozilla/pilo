@@ -31,16 +31,12 @@ import { createWebActionTools } from "./tools/webActionTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-
-// === Configuration Constants ===
-const DEFAULT_MAX_ITERATIONS = 50;
-const DEFAULT_GENERATION_MAX_TOKENS = 3000;
-const DEFAULT_PLANNING_MAX_TOKENS = 1500;
-const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
-const DEFAULT_MAX_CONSECUTIVE_ERRORS = 5;
-const DEFAULT_MAX_TOTAL_ERRORS = 15;
-const DEFAULT_MAX_VALIDATION_ATTEMPTS = 3;
-const DEFAULT_MAX_REPEATED_ACTIONS = 2;
+import { getConfigDefaults } from "./configDefaults.js";
+import {
+  DEFAULT_GENERATION_MAX_TOKENS,
+  DEFAULT_PLANNING_MAX_TOKENS,
+  DEFAULT_VALIDATION_MAX_TOKENS,
+} from "./constants.js";
 
 // === Type Definitions ===
 
@@ -67,6 +63,8 @@ export interface WebAgentOptions {
   maxValidationAttempts?: number;
   /** Maximum times an action can be repeated before warning/aborting */
   maxRepeatedActions?: number;
+  /** Number of times to retry initial navigation with browser restart (0 = no retries, default: 1) */
+  initialNavigationRetries?: number;
 }
 
 export interface ExecuteOptions {
@@ -164,6 +162,7 @@ export class WebAgent {
   private readonly maxTotalErrors: number;
   private readonly maxValidationAttempts: number;
   private readonly maxRepeatedActions: number;
+  private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
 
   constructor(
@@ -171,14 +170,17 @@ export class WebAgent {
     options: WebAgentOptions,
   ) {
     // Initialize configuration
+    const defaults = getConfigDefaults();
     this.providerConfig = options.providerConfig;
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
-    this.maxIterations = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
-    this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? DEFAULT_MAX_CONSECUTIVE_ERRORS;
-    this.maxTotalErrors = options.maxTotalErrors ?? DEFAULT_MAX_TOTAL_ERRORS;
-    this.maxValidationAttempts = options.maxValidationAttempts ?? DEFAULT_MAX_VALIDATION_ATTEMPTS;
-    this.maxRepeatedActions = options.maxRepeatedActions ?? DEFAULT_MAX_REPEATED_ACTIONS;
+    this.maxIterations = options.maxIterations ?? defaults.max_iterations;
+    this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? defaults.max_consecutive_errors;
+    this.maxTotalErrors = options.maxTotalErrors ?? defaults.max_total_errors;
+    this.maxValidationAttempts = options.maxValidationAttempts ?? defaults.max_validation_attempts;
+    this.maxRepeatedActions = options.maxRepeatedActions ?? defaults.max_repeated_actions;
+    this.initialNavigationRetries =
+      options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
 
     // Initialize services
@@ -206,8 +208,8 @@ export class WebAgent {
       // 3. Planning phase
       await this.planTask(task, options.startingUrl);
 
-      // 4. Navigation phase
-      await this.navigateToStart(task);
+      // 4. Navigation phase (with retry on recoverable errors)
+      await this.navigateToStartWithRetry(task);
       this.initializeSystemPromptAndTask(task);
 
       // 5. Main execution loop
@@ -1229,6 +1231,48 @@ export class WebAgent {
     });
 
     await this.browser.start();
+  }
+
+  /**
+   * Navigate to the starting URL with retry on recoverable errors.
+   * On failure, restarts the browser and tries again.
+   */
+  private async navigateToStartWithRetry(task: string): Promise<void> {
+    let lastError: unknown;
+    const maxAttempts = this.initialNavigationRetries + 1; // retries + initial attempt
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Check abort signal before each attempt
+      if (this.abortSignal?.aborted) {
+        throw new Error("Task aborted by user");
+      }
+
+      try {
+        await this.navigateToStart(task);
+        return; // Success
+      } catch (error) {
+        lastError = error;
+
+        // Only retry on recoverable errors (e.g., timeout, network issues)
+        if (!(error instanceof RecoverableError)) {
+          throw error;
+        }
+
+        // Check if we have retries remaining
+        if (attempt < maxAttempts) {
+          console.warn(
+            `[WebAgent] Initial navigation failed (attempt ${attempt}/${maxAttempts}), restarting browser: ${this.extractErrorMessage(error)}`,
+          );
+
+          // Restart browser for a fresh connection
+          await this.browser.shutdown();
+          await this.browser.start();
+        }
+      }
+    }
+
+    // All retries exhausted
+    throw lastError;
   }
 
   private async navigateToStart(task: string): Promise<void> {

@@ -31,8 +31,9 @@ export function createAIProvider(overrides?: {
   reasoning_effort?: "none" | "low" | "medium" | "high";
 }): ProviderConfig {
   const currentConfig = config.getConfig();
-  const provider = overrides?.provider || currentConfig.provider || "openai";
-  const reasoningEffort = overrides?.reasoning_effort || currentConfig.reasoning_effort || "none";
+  // currentConfig is SparkConfigResolved, so provider and reasoning_effort are guaranteed
+  const provider = overrides?.provider ?? currentConfig.provider;
+  const reasoningEffort = overrides?.reasoning_effort ?? currentConfig.reasoning_effort;
 
   // Create temporary config with overrides
   const configWithOverrides = {
