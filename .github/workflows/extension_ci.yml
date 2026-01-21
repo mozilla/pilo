@@ -82,7 +82,14 @@ jobs:
 
       - name: Get Playwright version
         id: playwright-version
-        run: echo "version=$(jq -r '.devDependencies["@playwright/test"]' extension/package.json)" >> $GITHUB_OUTPUT
+        run: |
+          set -euo pipefail
+          if [ ! -f extension/package.json ]; then
+            echo "Error: extension/package.json not found" >&2
+            exit 1
+          fi
+          version=$(jq -er '.devDependencies["@playwright/test"]' extension/package.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -110,21 +117,9 @@ jobs:
           path: extension/playwright-report/
           retention-days: 30
 
-      - name: Check for test results
-        id: check-test-results
-        if: ${{ !cancelled() }}
-        run: |
-          if [ -d "extension/test-results" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✓ Test results directory exists (tests failed or retried)"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✓ No test results directory (all tests passed on first try)"
-          fi
-
       - name: Upload Playwright test results
         uses: actions/upload-artifact@v4
-        if: steps.check-test-results.outputs.exists == 'true'
+        if: ${{ !cancelled() && hashFiles('extension/test-results/**') != '' }}
         with:
           name: playwright-test-results
           path: extension/test-results/
