@@ -88,7 +88,11 @@ jobs:
             echo "Error: extension/package.json not found" >&2
             exit 1
           fi
-          version=$(jq -er '.devDependencies["@playwright/test"]' extension/package.json)
+          version=$(jq -re '.devDependencies["@playwright/test"] // empty' extension/package.json)
+          if [ -z "$version" ]; then
+            echo "Error: @playwright/test devDependency not found in extension/package.json" >&2
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
@@ -119,8 +123,9 @@ jobs:
 
       - name: Upload Playwright test results
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() && hashFiles('extension/test-results/**') != '' }}
+        if: ${{ !cancelled() }}
         with:
           name: playwright-test-results
           path: extension/test-results/
           retention-days: 30
+          if-no-files-found: ignore
