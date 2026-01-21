@@ -110,9 +110,21 @@ jobs:
           path: extension/playwright-report/
           retention-days: 30
 
+      - name: Check for test results
+        id: check-test-results
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -d "extension/test-results" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Test results directory exists (tests failed or retried)"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ No test results directory (all tests passed on first try)"
+          fi
+
       - name: Upload Playwright test results
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: steps.check-test-results.outputs.exists == 'true'
         with:
           name: playwright-test-results
           path: extension/test-results/
