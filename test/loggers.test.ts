@@ -20,6 +20,7 @@ import type {
   WaitingEventData,
   ProcessingEventData,
   ScreenshotCapturedEventData,
+  ScreenshotCapturedImageEventData,
 } from "../src/events.js";
 
 // Mock console methods
@@ -928,6 +929,79 @@ describe("JSONConsoleLogger", () => {
       eventTypes.forEach((eventType) => {
         expect(emitter.listenerCount(eventType)).toBe(0);
       });
+    });
+  });
+
+  describe("Screenshot image event exclusion", () => {
+    it("should exclude screenshot image events by default", () => {
+      const eventData: ScreenshotCapturedImageEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        image: "base64-encoded-image-data-would-be-here",
+        mediaType: "image/jpeg",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE,
+        data: eventData,
+      });
+
+      // Should not log anything
+      expect(mockConsole.log).not.toHaveBeenCalled();
+    });
+
+    it("should include screenshot image events when opted in", () => {
+      // Dispose the default logger
+      logger.dispose();
+
+      // Create a new logger with screenshot images enabled
+      const newLogger = new JSONConsoleLogger({ includeScreenshotImages: true });
+      newLogger.initialize(emitter);
+
+      const eventData: ScreenshotCapturedImageEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        image: "base64-encoded-image-data",
+        mediaType: "image/jpeg",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+
+      // Should be valid JSON
+      expect(() => JSON.parse(output)).not.toThrow();
+
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE);
+      expect(parsed.data.image).toBe("base64-encoded-image-data");
+      expect(parsed.data.mediaType).toBe("image/jpeg");
+
+      newLogger.dispose();
+    });
+
+    it("should handle regular screenshot events separately", () => {
+      const eventData: ScreenshotCapturedEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        size: 51200,
+        format: "jpeg",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED,
+        data: eventData,
+      });
+
+      // Regular screenshot events should still be logged
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      expect(parsed.event).toBe(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED);
     });
   });
 });

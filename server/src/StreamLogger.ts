@@ -2,11 +2,16 @@ import { GenericLogger, WebAgentEventType } from "spark";
 
 type EventSender = (event: string, data: any) => Promise<void>;
 
+interface StreamLoggerOptions {
+  sendEvent: EventSender;
+  includeScreenshotImages?: boolean; // default: false
+}
+
 /**
- * Events that should not be sent to the client
+ * Base events that should not be sent to the client
  * These may contain sensitive information or are too verbose
  */
-const EXCLUDED_EVENTS: readonly WebAgentEventType[] = [
+const BASE_EXCLUDED_EVENTS: readonly WebAgentEventType[] = [
   WebAgentEventType.TASK_SETUP, // Contains sensitive endpoint URLs
   WebAgentEventType.AI_GENERATION, // Too verbose
   WebAgentEventType.AI_GENERATION_ERROR, // Too verbose
@@ -17,14 +22,28 @@ const EXCLUDED_EVENTS: readonly WebAgentEventType[] = [
  * Uses the GenericLogger for automatic event forwarding
  */
 export class StreamLogger extends GenericLogger {
-  constructor(sendEvent: EventSender) {
+  constructor(options: EventSender | StreamLoggerOptions) {
+    // Support backward compatibility: if passed a function, use it as sendEvent
+    const config =
+      typeof options === "function"
+        ? { sendEvent: options, includeScreenshotImages: false }
+        : { includeScreenshotImages: false, ...options };
+
+    // Build excluded events list based on options
+    const excludedEvents = [
+      ...BASE_EXCLUDED_EVENTS,
+      ...(config.includeScreenshotImages
+        ? []
+        : [WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE]),
+    ];
+
     super(async (eventType: string, data: any) => {
       // Skip excluded events
-      if (EXCLUDED_EVENTS.includes(eventType as WebAgentEventType)) {
+      if (excludedEvents.includes(eventType as WebAgentEventType)) {
         return;
       }
 
-      await sendEvent(eventType, data);
+      await config.sendEvent(eventType, data);
     });
   }
 }

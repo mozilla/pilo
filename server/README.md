@@ -67,7 +67,11 @@ Execute a web automation task using natural language.
   // Proxy configuration overrides
   "proxy": "string (optional)",
   "proxyUsername": "string (optional)",
-  "proxyPassword": "string (optional)"
+  "proxyPassword": "string (optional)",
+
+  // Logging configuration
+  "logger": "console|json (optional)",
+  "includeScreenshotImages": "boolean (optional, default: false)"
 }
 ```
 
@@ -85,6 +89,10 @@ Execute a web automation task using natural language.
   "guardrails": "browse only, don't book anything"
 }
 ```
+
+**Note on Screenshot Events:**
+
+When `vision: true` is enabled, Spark captures screenshots for AI analysis. By default, screenshot events in the SSE stream only include metadata (size, format). Set `includeScreenshotImages: true` to receive the full base64-encoded image data in `browser:screenshot_captured_image` events. This is useful for clients that need to display or process screenshots, but note that it significantly increases bandwidth usage.
 
 ### Health Check
 

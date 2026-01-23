@@ -34,6 +34,7 @@ export enum WebAgentEventType {
   BROWSER_ACTION_COMPLETED = "browser:action_completed",
   BROWSER_NAVIGATED = "browser:navigated",
   BROWSER_SCREENSHOT_CAPTURED = "browser:screenshot_captured",
+  BROWSER_SCREENSHOT_CAPTURED_IMAGE = "browser:screenshot_captured_image",
 
   // System/Debug
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
@@ -219,6 +220,15 @@ export interface ScreenshotCapturedEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for screenshot image capture with full image data
+ * This event contains the complete screenshot and can be very large
+ */
+export interface ScreenshotCapturedImageEventData extends WebAgentEventData {
+  image: string; // base64-encoded image data
+  mediaType: "image/jpeg" | "image/png";
+}
+
+/**
  * Event data for task validation
  */
 export interface TaskValidationEventData extends WebAgentEventData {
@@ -269,6 +279,10 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.BROWSER_ACTION_COMPLETED; data: ActionResultEventData }
   | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
   | { type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED; data: ScreenshotCapturedEventData }
+  | {
+      type: WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE;
+      data: ScreenshotCapturedImageEventData;
+    }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };
 
