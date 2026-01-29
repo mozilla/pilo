@@ -322,6 +322,22 @@ pnpm run format
 
 Built with TypeScript, Playwright, and the Vercel AI SDK.
 
+## Evaluation System
+
+Spark includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
+
+```bash
+# Quick smoke test (1 task)
+git checkout -b evals/single/my-test
+git push origin evals/single/my-test
+
+# Validation run (30 tasks)
+git checkout -b evals/partial/my-experiment
+git push origin evals/partial/my-experiment
+```
+
+Results appear as commit status checks with links to detailed HTML reports. See [spark-evals-judge/docs/spark-evaluations.md](https://github.com/Mozilla-Ocho/spark-evals-judge/blob/main/docs/spark-evaluations.md) for complete documentation.
+
 ## Configuration Reference
 
 ### Complete CLI Options
