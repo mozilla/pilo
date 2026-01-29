@@ -539,11 +539,11 @@ export class PlaywrightBrowser implements AriaBrowser {
 
     if (count === 0) {
       // Extract all refs to provide helpful context
-      const allRefs = await this.page.locator("[aria-ref]").evaluateAll((els) =>
-        els
-          .map((el) => el.getAttribute("aria-ref"))
-          .filter((ref): ref is string => ref !== null),
-      );
+      const allRefs = await this.page
+        .locator("[aria-ref]")
+        .evaluateAll((els) =>
+          els.map((el) => el.getAttribute("aria-ref")).filter((ref): ref is string => ref !== null),
+        );
 
       if (allRefs.length > 0) {
         // Calculate ref range
