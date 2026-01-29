@@ -19,6 +19,7 @@ interface AriaSnapshotWindow {
     elements: Map<string, Element>;
   };
   renderAriaTree: (snapshot: any, options: { mode: string; forAI: boolean }) => string;
+  __lastSnapshotRefs?: Set<string>;
 }
 
 /**
@@ -202,6 +203,11 @@ export class ExtensionBrowser implements AriaBrowser {
             mode: "raw",
             forAI: true,
           });
+
+          // Extract and store refs from snapshot for future comparison
+          const refMatches = renderedText.match(/\[s1e\d+\]/g);
+          win.__lastSnapshotRefs = new Set(refMatches || []);
+          console.log(`[DEBUG] Stored ${win.__lastSnapshotRefs.size} refs from snapshot`);
 
           // DEBUG: Check again before returning
           const ariaRefCountBeforeReturn = document.querySelectorAll("[aria-ref]").length;
@@ -465,10 +471,25 @@ export class ExtensionBrowser implements AriaBrowser {
               allRefs.slice(0, 10),
             );
 
-            const errorMsg =
-              totalAriaRefs > 0
-                ? `Element with ref ${refParam} not found. This ref does not exist in the current page snapshot (valid refs range from s1e${minRef} to s1e${maxRef}). Please use only the refs visible in the snapshot provided to you.`
-                : `Element with ref ${refParam} not found. No refs are available on this page.`;
+            let errorMsg: string;
+
+            if (totalAriaRefs === 0) {
+              errorMsg = `Element with ref ${refParam} not found. No refs are available on this page.`;
+            } else {
+              // Check if this specific ref existed in the previous snapshot
+              const win = window as Window & AriaSnapshotWindow;
+              let contextMessage: string;
+
+              if (win.__lastSnapshotRefs?.has(`[${refParam}]`)) {
+                // This specific ref was valid before but is now missing
+                contextMessage = `This ref was present in the previous snapshot but is now missing - the page content appears to have changed.`;
+              } else {
+                // This ref was never valid - likely a hallucination
+                contextMessage = `This ref was not present in the previous snapshot. Please use only refs visible in the snapshot provided to you.`;
+              }
+
+              errorMsg = `Element with ref ${refParam} not found. Valid refs range from s1e${minRef} to s1e${maxRef}. ${contextMessage}`;
+            }
 
             return {
               success: false,

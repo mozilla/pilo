@@ -87,6 +87,9 @@ export class PlaywrightBrowser implements AriaBrowser {
   // Navigation retry configuration
   private readonly navigationConfig: NavigationRetryConfig;
 
+  // Track refs from last snapshot to distinguish hallucinations from page changes
+  private lastSnapshotRefs?: Set<string>;
+
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
     this.channel = this.options.channel ?? this.getDefaultChannel();
@@ -452,6 +455,11 @@ export class PlaywrightBrowser implements AriaBrowser {
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
     const snapshot = await (this.page as PageEx)._snapshotForAI();
+
+    // Extract and store refs from snapshot for future comparison
+    const refMatches = snapshot.full.match(/\[s1e\d+\]/g);
+    this.lastSnapshotRefs = new Set(refMatches || []);
+
     return snapshot.full;
   }
 
@@ -530,7 +538,43 @@ export class PlaywrightBrowser implements AriaBrowser {
     const count = await locator.count();
 
     if (count === 0) {
-      throw new InvalidRefException(ref);
+      // Extract all refs to provide helpful context
+      const allRefs = await this.page.locator("[aria-ref]").evaluateAll((els) =>
+        els
+          .map((el) => el.getAttribute("aria-ref"))
+          .filter((ref): ref is string => ref !== null),
+      );
+
+      if (allRefs.length > 0) {
+        // Calculate ref range
+        const refNumbers = allRefs
+          .map((r) => parseInt(r.replace(/[^\d]/g, ""), 10))
+          .filter((n) => !isNaN(n));
+
+        const minRef = Math.min(...refNumbers);
+        const maxRef = Math.max(...refNumbers);
+
+        // Check if this specific ref existed in the previous snapshot
+        let contextMessage: string;
+        if (this.lastSnapshotRefs?.has(`[${ref}]`)) {
+          // This specific ref was valid before but is now missing
+          contextMessage = `This ref was present in the previous snapshot but is now missing - the page content appears to have changed.`;
+        } else {
+          // This ref was never valid - likely a hallucination
+          contextMessage = `This ref was not present in the previous snapshot. Please use only refs visible in the snapshot provided to you.`;
+        }
+
+        throw new InvalidRefException(
+          ref,
+          `Element with ref ${ref} not found. Valid refs range from s1e${minRef} to s1e${maxRef}. ${contextMessage}`,
+        );
+      }
+
+      // No refs available at all
+      throw new InvalidRefException(
+        ref,
+        `Element with ref ${ref} not found. No refs are available on this page.`,
+      );
     }
 
     if (count > 1) {
