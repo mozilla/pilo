@@ -460,7 +460,10 @@ export class ExtensionBrowser implements AriaBrowser {
               .filter((ref) => ref !== null) as string[];
 
             const refNumbers = allRefs
-              .map((ref) => parseInt(ref.replace(/[^\d]/g, ""), 10))
+              .map((ref) => {
+                const match = ref.match(/e(\d+)/);
+                return match ? parseInt(match[1], 10) : NaN;
+              })
               .filter((num) => !isNaN(num));
 
             const maxRef = refNumbers.length > 0 ? Math.max(...refNumbers) : 0;

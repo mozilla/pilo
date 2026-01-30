@@ -546,9 +546,12 @@ export class PlaywrightBrowser implements AriaBrowser {
         );
 
       if (allRefs.length > 0) {
-        // Calculate ref range
+        // Calculate ref range - extract number after 'e' in format s1e###
         const refNumbers = allRefs
-          .map((r) => parseInt(r.replace(/[^\d]/g, ""), 10))
+          .map((r) => {
+            const match = r.match(/e(\d+)/);
+            return match ? parseInt(match[1], 10) : NaN;
+          })
           .filter((n) => !isNaN(n));
 
         const minRef = Math.min(...refNumbers);
