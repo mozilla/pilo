@@ -457,7 +457,8 @@ export class PlaywrightBrowser implements AriaBrowser {
     const snapshot = await (this.page as PageEx)._snapshotForAI();
 
     // Extract and store refs from snapshot for future comparison
-    const refMatches = snapshot.full.match(/\[s1e\d+\]/g);
+    // Playwright format: [e123] (no prefix)
+    const refMatches = snapshot.full.match(/\[e\d+\]/g);
     this.lastSnapshotRefs = new Set(refMatches || []);
 
     return snapshot.full;
@@ -538,39 +539,47 @@ export class PlaywrightBrowser implements AriaBrowser {
     const count = await locator.count();
 
     if (count === 0) {
-      // Use refs from last snapshot (already extracted in getTreeWithRefs)
-      if (this.lastSnapshotRefs && this.lastSnapshotRefs.size > 0) {
-        // Calculate ref range from stored refs
-        const refNumbers = Array.from(this.lastSnapshotRefs)
-          .map((r) => {
-            const match = r.match(/e(\d+)/);
-            return match ? parseInt(match[1], 10) : NaN;
-          })
-          .filter((n) => !isNaN(n));
-
-        const minRef = Math.min(...refNumbers);
-        const maxRef = Math.max(...refNumbers);
-
-        // Check if this specific ref existed in the previous snapshot
-        let contextMessage: string;
-        if (this.lastSnapshotRefs.has(`[${ref}]`)) {
-          // This specific ref was valid before but is now missing
-          contextMessage = `This ref was present in the previous snapshot but is now missing - the page content appears to have changed.`;
-        } else {
-          // This ref was never valid - likely a hallucination
-          contextMessage = `This ref was not present in the previous snapshot. Please use only refs visible in the snapshot provided to you.`;
-        }
-
+      // Check if we have refs from previous snapshot
+      if (!this.lastSnapshotRefs) {
+        // No snapshot taken yet - shouldn't normally happen
         throw new InvalidRefException(
           ref,
-          `Element with ref ${ref} not found. Valid refs range from s1e${minRef} to s1e${maxRef}. ${contextMessage}`,
+          `Element with ref ${ref} not found. No snapshot has been captured yet.`,
         );
       }
 
-      // No snapshot taken yet or no refs available
+      if (this.lastSnapshotRefs.size === 0) {
+        // Snapshot was taken but had no refs - page has no interactive elements
+        throw new InvalidRefException(
+          ref,
+          `Element with ref ${ref} not found. The current page has no interactive elements with refs.`,
+        );
+      }
+
+      // We have refs from previous snapshot - provide context
+      const refNumbers = Array.from(this.lastSnapshotRefs)
+        .map((r) => {
+          const match = r.match(/e(\d+)/);
+          return match ? parseInt(match[1], 10) : NaN;
+        })
+        .filter((n) => !isNaN(n));
+
+      const minRef = Math.min(...refNumbers);
+      const maxRef = Math.max(...refNumbers);
+
+      // Check if this specific ref existed in the previous snapshot
+      let contextMessage: string;
+      if (this.lastSnapshotRefs.has(`[${ref}]`)) {
+        // This specific ref was valid before but is now missing
+        contextMessage = `This ref was present in the previous snapshot but is now missing - the page content appears to have changed.`;
+      } else {
+        // This ref was never valid - likely a hallucination
+        contextMessage = `This ref was not present in the previous snapshot. Please use only refs visible in the snapshot provided to you.`;
+      }
+
       throw new InvalidRefException(
         ref,
-        `Element with ref ${ref} not found. No previous snapshot available for comparison.`,
+        `Element with ref ${ref} not found. Valid refs range from e${minRef} to e${maxRef}. ${contextMessage}`,
       );
     }
 

@@ -594,14 +594,14 @@ describe("PlaywrightBrowser", () => {
           locator: vi.fn().mockReturnValue(mockLocator),
         };
         (browser as any).page = mockPage;
-        // Set lastSnapshotRefs to simulate refs from previous snapshot
-        (browser as any).lastSnapshotRefs = new Set(["[s1e1]", "[s1e2]", "[s1e5]", "[s1e10]"]);
+        // Set lastSnapshotRefs to simulate refs from previous snapshot (Playwright format: [e###])
+        (browser as any).lastSnapshotRefs = new Set(["[e1]", "[e2]", "[e5]", "[e10]"]);
 
         await expect((browser as any).validateElementRef("nonexistent")).rejects.toThrow(
           InvalidRefException,
         );
         await expect((browser as any).validateElementRef("nonexistent")).rejects.toThrow(
-          "Valid refs range from s1e1 to s1e10",
+          "Valid refs range from e1 to e10",
         );
       });
 
@@ -786,8 +786,8 @@ describe("PlaywrightBrowser", () => {
           locator: vi.fn().mockReturnValue(mockLocator),
         };
         (browser as any).page = mockPage;
-        // Set lastSnapshotRefs to simulate refs from previous snapshot
-        (browser as any).lastSnapshotRefs = new Set(["[s1e1]", "[s1e2]", "[s1e5]", "[s1e10]"]);
+        // Set lastSnapshotRefs to simulate refs from previous snapshot (Playwright format: [e###])
+        (browser as any).lastSnapshotRefs = new Set(["[e1]", "[e2]", "[e5]", "[e10]"]);
 
         const error = await browser.performAction("missing", PageAction.Click).catch((e) => e);
         expect(error).toBeInstanceOf(InvalidRefException);
