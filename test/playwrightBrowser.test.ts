@@ -587,21 +587,15 @@ describe("PlaywrightBrowser", () => {
     describe("validateElementRef", () => {
       it("should throw InvalidRefException when element doesn't exist", async () => {
         // Mock the page and locator
-        const mockLocatorForRef = {
+        const mockLocator = {
           count: vi.fn().mockResolvedValue(0),
         };
-        const mockLocatorForAll = {
-          evaluateAll: vi.fn().mockResolvedValue(["s1e1", "s1e2", "s1e5", "s1e10"]),
-        };
         const mockPage = {
-          locator: vi.fn((selector: string) => {
-            if (selector === "[aria-ref]") {
-              return mockLocatorForAll;
-            }
-            return mockLocatorForRef;
-          }),
+          locator: vi.fn().mockReturnValue(mockLocator),
         };
         (browser as any).page = mockPage;
+        // Set lastSnapshotRefs to simulate refs from previous snapshot
+        (browser as any).lastSnapshotRefs = new Set(["[s1e1]", "[s1e2]", "[s1e5]", "[s1e10]"]);
 
         await expect((browser as any).validateElementRef("nonexistent")).rejects.toThrow(
           InvalidRefException,
@@ -785,21 +779,15 @@ describe("PlaywrightBrowser", () => {
       });
 
       it("should re-throw InvalidRefException as-is", async () => {
-        const mockLocatorForRef = {
+        const mockLocator = {
           count: vi.fn().mockResolvedValue(0),
         };
-        const mockLocatorForAll = {
-          evaluateAll: vi.fn().mockResolvedValue(["s1e1", "s1e2", "s1e5", "s1e10"]),
-        };
         const mockPage = {
-          locator: vi.fn((selector: string) => {
-            if (selector === "[aria-ref]") {
-              return mockLocatorForAll;
-            }
-            return mockLocatorForRef;
-          }),
+          locator: vi.fn().mockReturnValue(mockLocator),
         };
         (browser as any).page = mockPage;
+        // Set lastSnapshotRefs to simulate refs from previous snapshot
+        (browser as any).lastSnapshotRefs = new Set(["[s1e1]", "[s1e2]", "[s1e5]", "[s1e10]"]);
 
         const error = await browser.performAction("missing", PageAction.Click).catch((e) => e);
         expect(error).toBeInstanceOf(InvalidRefException);

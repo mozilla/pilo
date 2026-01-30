@@ -538,16 +538,10 @@ export class PlaywrightBrowser implements AriaBrowser {
     const count = await locator.count();
 
     if (count === 0) {
-      // Extract all refs to provide helpful context
-      const allRefs = await this.page
-        .locator("[aria-ref]")
-        .evaluateAll((els) =>
-          els.map((el) => el.getAttribute("aria-ref")).filter((ref): ref is string => ref !== null),
-        );
-
-      if (allRefs.length > 0) {
-        // Calculate ref range - extract number after 'e' in format s1e###
-        const refNumbers = allRefs
+      // Use refs from last snapshot (already extracted in getTreeWithRefs)
+      if (this.lastSnapshotRefs && this.lastSnapshotRefs.size > 0) {
+        // Calculate ref range from stored refs
+        const refNumbers = Array.from(this.lastSnapshotRefs)
           .map((r) => {
             const match = r.match(/e(\d+)/);
             return match ? parseInt(match[1], 10) : NaN;
@@ -559,7 +553,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
         // Check if this specific ref existed in the previous snapshot
         let contextMessage: string;
-        if (this.lastSnapshotRefs?.has(`[${ref}]`)) {
+        if (this.lastSnapshotRefs.has(`[${ref}]`)) {
           // This specific ref was valid before but is now missing
           contextMessage = `This ref was present in the previous snapshot but is now missing - the page content appears to have changed.`;
         } else {
@@ -573,10 +567,10 @@ export class PlaywrightBrowser implements AriaBrowser {
         );
       }
 
-      // No refs available at all
+      // No snapshot taken yet or no refs available
       throw new InvalidRefException(
         ref,
-        `Element with ref ${ref} not found. No refs are available on this page.`,
+        `Element with ref ${ref} not found. No previous snapshot available for comparison.`,
       );
     }
 
