@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createPlanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
+import type { CoreMessage } from "ai";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -52,7 +53,8 @@ describe("Planning Tools", () => {
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -71,7 +73,8 @@ describe("Planning Tools", () => {
         url: "https://travel-site.com",
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -85,7 +88,8 @@ describe("Planning Tools", () => {
         // missing plan
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -100,7 +104,8 @@ describe("Planning Tools", () => {
         // missing url
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -112,7 +117,10 @@ describe("Planning Tools", () => {
         plan: "Test plan",
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).successCriteria).toBe("Test successCriteria");
@@ -128,7 +136,10 @@ describe("Planning Tools", () => {
         url: "https://example.com",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).successCriteria).toBe("Test successCriteria");
@@ -144,7 +155,10 @@ describe("Planning Tools", () => {
         plan: "",
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).successCriteria).toBe("");
@@ -169,7 +183,10 @@ describe("Planning Tools", () => {
         plan: longPlan,
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect((result as any).plan).toBe(longPlan);
     });
@@ -183,7 +200,10 @@ describe("Planning Tools", () => {
         url: "https://example.com/search?q=test&filter=true&page=1",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect((result as any).url).toBe("https://example.com/search?q=test&filter=true&page=1");
     });
@@ -197,7 +217,10 @@ describe("Planning Tools", () => {
         url: "https://example.com/fr",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect((result as any).successCriteria).toBe("Tâche en français");
       expect((result as any).plan).toContain("Étape");
@@ -214,7 +237,8 @@ describe("Planning Tools", () => {
         actionItems: ["Navigate to search", "Enter query", "Review results"],
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -229,7 +253,8 @@ describe("Planning Tools", () => {
         actionItems: ["Go to travel site", "Enter dates", "Search flights"],
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -243,7 +268,8 @@ describe("Planning Tools", () => {
         actionItems: "not an array", // should be array
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -257,7 +283,8 @@ describe("Planning Tools", () => {
         actionItems: [123, true, { item: "wrong" }], // should be string array
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as z.ZodTypeAny;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -270,7 +297,10 @@ describe("Planning Tools", () => {
         actionItems: ["Action 1", "Action 2", "Action 3"],
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
@@ -286,7 +316,10 @@ describe("Planning Tools", () => {
         actionItems: ["Action 1", "Action 2"],
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).actionItems).toEqual(["Action 1", "Action 2"]);
@@ -300,7 +333,10 @@ describe("Planning Tools", () => {
         plan: "Plan without action items",
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      });
 
       expect(result).toEqual(input);
       expect((result as any).actionItems).toBeUndefined();
