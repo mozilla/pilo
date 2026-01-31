@@ -1,17 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createPlanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
 import type { CoreMessage } from "ai";
-
-// Mock the ai module
-vi.mock("ai", () => ({
-  tool: vi.fn((config: any) => ({
-    ...config,
-    description: config.description,
-    inputSchema: config.inputSchema,
-    execute: config.execute,
-  })),
-}));
 
 describe("Planning Tools", () => {
   describe("createPlanningTools", () => {
@@ -53,7 +43,7 @@ describe("Planning Tools", () => {
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
@@ -73,7 +63,7 @@ describe("Planning Tools", () => {
         url: "https://travel-site.com",
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
@@ -88,7 +78,7 @@ describe("Planning Tools", () => {
         // missing plan
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
@@ -104,7 +94,7 @@ describe("Planning Tools", () => {
         // missing url
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
@@ -237,7 +227,7 @@ describe("Planning Tools", () => {
         actionItems: ["Navigate to search", "Enter query", "Review results"],
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
@@ -253,7 +243,7 @@ describe("Planning Tools", () => {
         actionItems: ["Go to travel site", "Enter dates", "Search flights"],
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
@@ -268,7 +258,7 @@ describe("Planning Tools", () => {
         actionItems: "not an array", // should be array
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
@@ -283,7 +273,7 @@ describe("Planning Tools", () => {
         actionItems: [123, true, { item: "wrong" }], // should be string array
       };
 
-      const zodSchema = schema as z.ZodTypeAny;
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
