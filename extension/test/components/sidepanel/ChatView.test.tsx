@@ -1349,5 +1349,21 @@ describe("ChatView", () => {
         "task-123",
       );
     });
+
+    it("should not add message when task:started has neither actionItems nor plan", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      render(<ChatView {...defaultProps} />);
+      mockAddMessage.mockClear(); // Clear any setup calls
+
+      // Act: task:started with no actionItems and no plan
+      const message = createRealtimeMessage("task:started", {});
+      getMockMessageListener()(message);
+
+      // Assert: addMessage should NOT be called
+      expect(mockAddMessage).not.toHaveBeenCalled();
+    });
   });
 });
