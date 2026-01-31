@@ -3,6 +3,16 @@ import { createPlanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
 import type { CoreMessage } from "ai";
 
+interface CreatePlanResult {
+  successCriteria: string;
+  plan: string;
+  actionItems?: string[];
+}
+
+interface CreatePlanWithUrlResult extends CreatePlanResult {
+  url: string;
+}
+
 describe("Planning Tools", () => {
   describe("createPlanningTools", () => {
     it("should create planning tools with correct structure", () => {
@@ -107,14 +117,14 @@ describe("Planning Tools", () => {
         plan: "Test plan",
       };
 
-      const result = await tools.create_plan.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("Test successCriteria");
-      expect((result as any).plan).toBe("Test plan");
+      expect(result.successCriteria).toBe("Test successCriteria");
+      expect(result.plan).toBe("Test plan");
     });
 
     it("should execute create_plan_with_url and return input", async () => {
@@ -126,15 +136,15 @@ describe("Planning Tools", () => {
         url: "https://example.com",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanWithUrlResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("Test successCriteria");
-      expect((result as any).plan).toBe("Test plan");
-      expect((result as any).url).toBe("https://example.com");
+      expect(result.successCriteria).toBe("Test successCriteria");
+      expect(result.plan).toBe("Test plan");
+      expect(result.url).toBe("https://example.com");
     });
 
     it("should handle empty strings in input", async () => {
@@ -145,14 +155,14 @@ describe("Planning Tools", () => {
         plan: "",
       };
 
-      const result = await tools.create_plan.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("");
-      expect((result as any).plan).toBe("");
+      expect(result.successCriteria).toBe("");
+      expect(result.plan).toBe("");
     });
 
     it("should handle long multi-line plans", async () => {
@@ -173,12 +183,12 @@ describe("Planning Tools", () => {
         plan: longPlan,
       };
 
-      const result = await tools.create_plan.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanResult;
 
-      expect((result as any).plan).toBe(longPlan);
+      expect(result.plan).toBe(longPlan);
     });
 
     it("should handle URLs with query parameters", async () => {
@@ -190,12 +200,12 @@ describe("Planning Tools", () => {
         url: "https://example.com/search?q=test&filter=true&page=1",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanWithUrlResult;
 
-      expect((result as any).url).toBe("https://example.com/search?q=test&filter=true&page=1");
+      expect(result.url).toBe("https://example.com/search?q=test&filter=true&page=1");
     });
 
     it("should handle international characters in input", async () => {
@@ -207,14 +217,14 @@ describe("Planning Tools", () => {
         url: "https://example.com/fr",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanWithUrlResult;
 
-      expect((result as any).successCriteria).toBe("Tâche en français");
-      expect((result as any).plan).toContain("Étape");
-      expect((result as any).plan).toContain("完成任务");
+      expect(result.successCriteria).toBe("Tâche en français");
+      expect(result.plan).toContain("Étape");
+      expect(result.plan).toContain("完成任务");
     });
 
     it("should accept actionItems array in create_plan", () => {
@@ -287,13 +297,13 @@ describe("Planning Tools", () => {
         actionItems: ["Action 1", "Action 2", "Action 3"],
       };
 
-      const result = await tools.create_plan.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
+      expect(result.actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
     });
 
     it("should return actionItems when provided to create_plan_with_url", async () => {
@@ -306,13 +316,13 @@ describe("Planning Tools", () => {
         actionItems: ["Action 1", "Action 2"],
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanWithUrlResult;
 
       expect(result).toEqual(input);
-      expect((result as any).actionItems).toEqual(["Action 1", "Action 2"]);
+      expect(result.actionItems).toEqual(["Action 1", "Action 2"]);
     });
 
     it("should work without actionItems (optional field)", async () => {
@@ -323,13 +333,13 @@ describe("Planning Tools", () => {
         plan: "Plan without action items",
       };
 
-      const result = await tools.create_plan.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as CoreMessage[],
-      });
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).actionItems).toBeUndefined();
+      expect(result.actionItems).toBeUndefined();
     });
   });
 });
