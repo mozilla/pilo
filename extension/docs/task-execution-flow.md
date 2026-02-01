@@ -388,8 +388,9 @@ sequenceDiagram
     - Determines starting URL (provided URL or current page)
     - Constructs planning prompt with task and URL
     - Calls LLM with planning tools (`submit_plan`)
-    - Extracts plan and success criteria from response
-    - **Emits `task:started` event** with plan (handled by EventStoreLogger)
+    - Extracts plan, success criteria, and action items from response
+    - **Emits `task:started` event** with plan and action items (handled by EventStoreLogger)
+    - Note: The full plan is used for agent execution; action items (short titles) are for UI display
 
 16. **Navigation phase** via `navigateToStart()`:
     - Navigates to starting URL if needed
@@ -408,6 +409,7 @@ sequenceDiagram
   data: {
     plan: "1. Navigate to weather site\n2. Search for London\n3. Extract data",
     taskId: "abc123",
+    actionItems: ["Navigate to weather site", "Search for London", "Extract weather data"],
     timestamp: 1234567890
   }
 }
@@ -496,8 +498,9 @@ sequenceDiagram
 │ ⚡ Spark                     │
 │                              │
 │ 📋 Plan:                     │
-│ Overall Strategy             │
-│ [Plan text from LLM]         │
+│ 1. Navigate to weather site  │ ← Action items displayed as
+│ 2. Search for London         │   numbered list (not full plan)
+│ 3. Extract weather data      │
 │                              │
 │ 💭 Actions:                  │
 │ [Reasoning message 1]        │
@@ -761,7 +764,7 @@ Events flow from WebAgent through EventStoreLogger to the sidebar. Each event ha
 
 | Event Type                 | Description                         | Key Data Fields                                | Typed in Extension |
 | -------------------------- | ----------------------------------- | ---------------------------------------------- | ------------------ |
-| `task:started`             | Planning complete, execution begins | `plan`, `taskId`                               | ✅ Explicit        |
+| `task:started`             | Planning complete, execution begins | `plan`, `taskId`, `actionItems`                | ✅ Explicit        |
 | `task:completed`           | Task finished successfully          | `finalAnswer`, `success`                       | ✅ Explicit        |
 | `task:aborted`             | Task cancelled or failed            | `reason`, `finalAnswer`                        | ✅ Explicit        |
 | `task:validation_error`    | Answer validation failed            | `errors[]`, `retryCount`                       | ✅ Explicit        |
