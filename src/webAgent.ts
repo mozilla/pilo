@@ -125,6 +125,21 @@ interface ExecutionState {
   validationAttempts: number;
 }
 
+interface PlanOutput {
+  plan: string;
+  successCriteria: string;
+  url?: string;
+  actionItems?: string[];
+}
+
+interface PlanningToolResult {
+  output: PlanOutput;
+}
+
+interface PlanningResponse {
+  toolResults: PlanningToolResult[];
+}
+
 type StreamTextResultGeneric = StreamTextResult<any, never>;
 // HACK: cobble together a type from StreamTextResult with promises resolved
 type ProcessedAIResponse = AwaitedProperties<
@@ -143,6 +158,7 @@ export class WebAgent {
   private url: string = "";
   private messages: ModelMessage[] = [];
   private successCriteria: string = "";
+  private actionItems?: string[];
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
@@ -1105,10 +1121,14 @@ export class WebAgent {
         throw new Error("No tool results returned from planning");
       }
 
-      const { plan, successCriteria, url } = this.extractPlanOutput(planningResponse);
+      // Cast to PlanningResponse - we've validated toolResults[0] exists above
+      const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(
+        planningResponse as unknown as PlanningResponse,
+      );
 
       this.plan = plan;
       this.successCriteria = successCriteria;
+      this.actionItems = actionItems;
 
       if (!startingUrl && url) {
         this.url = url;
@@ -1188,18 +1208,15 @@ export class WebAgent {
   /**
    * Extract plan output from planning response
    */
-  private extractPlanOutput(planningResponse: any): {
-    plan: string;
-    successCriteria: string;
-    url?: string;
-  } {
-    const firstToolResult = planningResponse.toolResults[0] as any;
+  private extractPlanOutput(planningResponse: PlanningResponse): PlanOutput {
+    const firstToolResult = planningResponse.toolResults[0];
     const planOutput = firstToolResult.output;
 
     return {
       plan: planOutput.plan || "",
       successCriteria: planOutput.successCriteria || "",
       url: planOutput.url,
+      actionItems: planOutput.actionItems,
     };
   }
 
@@ -1289,6 +1306,7 @@ export class WebAgent {
       plan: this.plan,
       url: this.url,
       title: this.currentPage.title,
+      actionItems: this.actionItems,
     });
   }
 

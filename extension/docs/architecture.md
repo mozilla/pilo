@@ -373,7 +373,7 @@ graph TD
 
 **Event Types**:
 
-- `task:started` - Task begins with execution plan
+- `task:started` - Task begins with execution plan and action items for display
 - `agent:reasoned` - Agent's internal reasoning steps
 - `agent:status` - Current status updates
 - `ai:generation:error` - AI API errors
@@ -1487,6 +1487,14 @@ pnpm format
 4. **Performance monitoring** - Track task execution time
 5. **Custom actions** - User-defined automation actions
 6. **Export/import** - Share conversations and settings
+
+### Action Items Evolution
+
+The `actionItems` feature is currently display-only (the full `plan` drives execution). Future improvements:
+
+1. **Validation** - Enforce that actionItems are always generated; if missing, retry the planning step to produce them
+2. **Source of truth** - Elevate actionItems from display metadata to a primary artifact that defines the task structure
+3. **Execution checklist** - Use actionItems as an actual checklist that guides execution and is checked off as steps complete, providing clearer progress tracking
 
 ### Scalability
 

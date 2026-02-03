@@ -1,16 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createPlanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
+import type { CoreMessage } from "ai";
 
-// Mock the ai module
-vi.mock("ai", () => ({
-  tool: vi.fn((config: any) => ({
-    ...config,
-    description: config.description,
-    inputSchema: config.inputSchema,
-    execute: config.execute,
-  })),
-}));
+interface CreatePlanResult {
+  successCriteria: string;
+  plan: string;
+  actionItems?: string[];
+}
+
+interface CreatePlanWithUrlResult extends CreatePlanResult {
+  url: string;
+}
 
 describe("Planning Tools", () => {
   describe("createPlanningTools", () => {
@@ -52,7 +53,8 @@ describe("Planning Tools", () => {
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -71,7 +73,8 @@ describe("Planning Tools", () => {
         url: "https://travel-site.com",
       };
 
-      const result = (schema as any).safeParse?.(validInput) ?? { success: true };
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
@@ -85,7 +88,8 @@ describe("Planning Tools", () => {
         // missing plan
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -100,7 +104,8 @@ describe("Planning Tools", () => {
         // missing url
       };
 
-      const result = (schema as any).safeParse?.(invalidInput) ?? { success: false };
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
@@ -112,11 +117,14 @@ describe("Planning Tools", () => {
         plan: "Test plan",
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = (await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("Test successCriteria");
-      expect((result as any).plan).toBe("Test plan");
+      expect(result.successCriteria).toBe("Test successCriteria");
+      expect(result.plan).toBe("Test plan");
     });
 
     it("should execute create_plan_with_url and return input", async () => {
@@ -128,12 +136,15 @@ describe("Planning Tools", () => {
         url: "https://example.com",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = (await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanWithUrlResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("Test successCriteria");
-      expect((result as any).plan).toBe("Test plan");
-      expect((result as any).url).toBe("https://example.com");
+      expect(result.successCriteria).toBe("Test successCriteria");
+      expect(result.plan).toBe("Test plan");
+      expect(result.url).toBe("https://example.com");
     });
 
     it("should handle empty strings in input", async () => {
@@ -144,11 +155,14 @@ describe("Planning Tools", () => {
         plan: "",
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = (await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanResult;
 
       expect(result).toEqual(input);
-      expect((result as any).successCriteria).toBe("");
-      expect((result as any).plan).toBe("");
+      expect(result.successCriteria).toBe("");
+      expect(result.plan).toBe("");
     });
 
     it("should handle long multi-line plans", async () => {
@@ -169,9 +183,12 @@ describe("Planning Tools", () => {
         plan: longPlan,
       };
 
-      const result = await tools.create_plan.execute!(input, {} as any);
+      const result = (await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanResult;
 
-      expect((result as any).plan).toBe(longPlan);
+      expect(result.plan).toBe(longPlan);
     });
 
     it("should handle URLs with query parameters", async () => {
@@ -183,9 +200,12 @@ describe("Planning Tools", () => {
         url: "https://example.com/search?q=test&filter=true&page=1",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = (await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanWithUrlResult;
 
-      expect((result as any).url).toBe("https://example.com/search?q=test&filter=true&page=1");
+      expect(result.url).toBe("https://example.com/search?q=test&filter=true&page=1");
     });
 
     it("should handle international characters in input", async () => {
@@ -197,11 +217,129 @@ describe("Planning Tools", () => {
         url: "https://example.com/fr",
       };
 
-      const result = await tools.create_plan_with_url.execute!(input, {} as any);
+      const result = (await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanWithUrlResult;
 
-      expect((result as any).successCriteria).toBe("Tâche en français");
-      expect((result as any).plan).toContain("Étape");
-      expect((result as any).plan).toContain("完成任务");
+      expect(result.successCriteria).toBe("Tâche en français");
+      expect(result.plan).toContain("Étape");
+      expect(result.plan).toContain("完成任务");
+    });
+
+    it("should accept actionItems array in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const validInput = {
+        successCriteria: "I need to search for information",
+        plan: "1. Navigate to search\n2. Enter query\n3. Review results",
+        actionItems: ["Navigate to search", "Enter query", "Review results"],
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(validInput);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept actionItems array in create_plan_with_url", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan_with_url.inputSchema;
+
+      const validInput = {
+        successCriteria: "I need to search for flights",
+        plan: "1. Go to travel site\n2. Enter dates\n3. Search flights",
+        url: "https://travel-site.com",
+        actionItems: ["Go to travel site", "Enter dates", "Search flights"],
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(validInput);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid actionItems (non-array) in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        actionItems: "not an array", // should be array
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid actionItems (non-string elements) in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        actionItems: [123, true, { item: "wrong" }], // should be string array
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
+      expect(result.success).toBe(false);
+    });
+
+    it("should return actionItems when provided to create_plan", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test successCriteria",
+        plan: "Test plan",
+        actionItems: ["Action 1", "Action 2", "Action 3"],
+      };
+
+      const result = (await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanResult;
+
+      expect(result).toEqual(input);
+      expect(result.actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
+    });
+
+    it("should return actionItems when provided to create_plan_with_url", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test successCriteria",
+        plan: "Test plan",
+        url: "https://example.com",
+        actionItems: ["Action 1", "Action 2"],
+      };
+
+      const result = (await tools.create_plan_with_url.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanWithUrlResult;
+
+      expect(result).toEqual(input);
+      expect(result.actionItems).toEqual(["Action 1", "Action 2"]);
+    });
+
+    it("should work without actionItems (optional field)", async () => {
+      const tools = createPlanningTools();
+
+      const input = {
+        successCriteria: "Test",
+        plan: "Plan without action items",
+      };
+
+      const result = (await tools.create_plan.execute!(input, {
+        toolCallId: "test",
+        messages: [] as CoreMessage[],
+      })) as CreatePlanResult;
+
+      expect(result).toEqual(input);
+      expect(result.actionItems).toBeUndefined();
     });
   });
 });

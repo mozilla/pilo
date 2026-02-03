@@ -345,8 +345,16 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           typedMessage.event.type === "task:started" &&
           isTaskStartedData(typedMessage.event.data)
         ) {
-          if (typedMessage.event.data.plan && taskId) {
-            addMessage("plan", typedMessage.event.data.plan, taskId);
+          if (taskId) {
+            // Display actionItems if present, otherwise fall back to full plan
+            if (typedMessage.event.data.actionItems?.length) {
+              const displayPlan = typedMessage.event.data.actionItems
+                .map((item, index) => `${index + 1}. ${item}`)
+                .join("\n");
+              addMessage("plan", displayPlan, taskId);
+            } else if (typedMessage.event.data.plan) {
+              addMessage("plan", typedMessage.event.data.plan, taskId);
+            }
           }
         }
 

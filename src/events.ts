@@ -75,6 +75,7 @@ export interface TaskStartEventData extends WebAgentEventData {
   successCriteria: string;
   plan: string;
   url: string;
+  actionItems?: string[];
 }
 
 /**

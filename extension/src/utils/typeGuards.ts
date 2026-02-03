@@ -73,7 +73,11 @@ export function hasRequiredBooleanProp(obj: unknown, prop: string): boolean {
  */
 export function isTaskStartedData(data: unknown): data is TaskStartedEventData {
   if (typeof data !== "object" || data === null) return false;
-  return hasOptionalStringProp(data, "plan") && hasOptionalStringProp(data, "taskId");
+  return (
+    hasOptionalStringProp(data, "plan") &&
+    hasOptionalStringProp(data, "taskId") &&
+    hasOptionalStringArrayProp(data, "actionItems")
+  );
 }
 
 /**

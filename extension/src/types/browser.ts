@@ -65,6 +65,7 @@ export interface CancelTaskResponse {
 export interface TaskStartedEventData {
   plan?: string;
   taskId?: string;
+  actionItems?: string[];
 }
 
 export interface AgentReasonedEventData {
