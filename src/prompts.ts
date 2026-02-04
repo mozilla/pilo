@@ -71,10 +71,20 @@ export const TOOL_STRINGS = {
       reason:
         "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
     },
+    webSearch: {
+      description:
+        "Search the web for information. Returns the search results page as markdown. Use when you need to find websites or information but don't know the URL.",
+      query: "The search query to execute",
+    },
   },
 
   /**
    * Planning tools - task planning and URL determination
+   *
+   * Three tools for different scenarios:
+   * - create_plan: When starting URL is already known (user provided --starting-url)
+   * - create_plan_with_url: When planner must pick a URL (webSearch disabled)
+   * - create_plan_with_search_or_url: When planner can choose search OR url (webSearch enabled)
    */
   planning: {
     /** Common parameter descriptions */
@@ -93,6 +103,12 @@ export const TOOL_STRINGS = {
       description:
         "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
       url: "Starting URL for the task",
+    },
+    create_plan_with_search_or_url: {
+      description:
+        "Create a step-by-step plan and choose how to start: either with a web search OR by navigating to a URL. Provide exactly one of url or searchQuery.",
+      url: "Starting URL (use if you know the specific site to visit)",
+      searchQuery: "Search query (use if you need to find information or don't know the URL)",
     },
   },
 
@@ -139,6 +155,7 @@ const toolExamples = `
 - back() - ${TOOL_STRINGS.webActions.back.description}
 - forward() - ${TOOL_STRINGS.webActions.forward.description}
 - extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}
+- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}
 - done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}
 - abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}
 `.trim();
@@ -151,16 +168,14 @@ CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool c
 `.trim();
 
 /**
- * Planning prompt - converts tasks into structured execution plans.
- * Generates: create_plan_with_url() or create_plan() tool calls.
- * Used by: planTask() in WebAgent during planning phase.
+ * Base planning prompt content - shared across all planning prompt variants.
+ * Contains the core planning instructions without tool-specific sections.
  */
-const planPromptTemplate = buildPromptTemplate(
-  `
+const planningBaseContent = `
 ${youArePrompt}
 Create a plan for this web navigation task.
 First, briefly identify what the user needs from this task.
-Then provide a{% if includeUrl %} step-by-step plan and starting URL{% else %} step-by-step plan{% endif %}.
+Then provide a step-by-step plan.
 Keep plans concise and high-level, focusing on goals not specific UI elements.
 
 Today's Date: {{ currentDate }}
@@ -172,7 +187,7 @@ PART 1: SUCCESS CRITERIA
 What does the user need? Describe what a great response would include - the key information and level of detail that would fully satisfy their request.
 
 PART 2: NAVIGATION PLAN
-{% if includeUrl %}Provide a strategic plan starting from the given URL.{% else %}Provide a strategic plan for accomplishing the task.{% endif %}
+Provide a strategic plan for accomplishing the task.
 
 Your plan should:
 
@@ -195,38 +210,115 @@ Your plan should:
 {% if guardrails %}- Ensure every step complies with the stated limitations{% endif %}
 - All dates must include the year
 - Booking dates must be in the future
+`.trim();
 
-{% if includeUrl %}
-Call create_plan_with_url() with:
-- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
-- plan: ${TOOL_STRINGS.planning.common.plan}
-- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-- url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
-{% else %}
+/**
+ * Planning prompt - used when user provides a starting URL.
+ * Generates: create_plan() tool call.
+ * Used by: planTask() when startingUrl is provided.
+ */
+const planPromptTemplate = buildPromptTemplate(
+  `
+${planningBaseContent}
+
 Call create_plan() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
 - actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-{% endif %}
 
 ${toolCallInstruction}
 `.trim(),
 );
 
-export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
+/**
+ * Planning prompt - used when no starting URL and webSearch is disabled.
+ * Planner must determine the best starting URL.
+ * Generates: create_plan_with_url() tool call.
+ * Used by: planTask() when no startingUrl and webSearch is disabled.
+ */
+const planWithUrlPromptTemplate = buildPromptTemplate(
+  `
+${planningBaseContent}
+
+Call create_plan_with_url() with:
+- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
+- plan: ${TOOL_STRINGS.planning.common.plan}
+- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
+- url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
+
+${toolCallInstruction}
+`.trim(),
+);
+
+/**
+ * Planning prompt - used when no starting URL and webSearch IS enabled.
+ * Planner explicitly chooses to start with a web search OR a URL.
+ * Generates: create_plan_with_search_or_url() tool call.
+ * Used by: planTask() when no startingUrl and webSearch is enabled.
+ */
+const planWithSearchOrUrlPromptTemplate = buildPromptTemplate(
+  `
+${planningBaseContent}
+
+**Starting Point:**
+Choose how to begin the task:
+- If you need to search for information or find a website, provide a searchQuery
+- If you know the specific site to visit, provide a url
+
+Call create_plan_with_search_or_url() with:
+- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
+- plan: ${TOOL_STRINGS.planning.common.plan}
+- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
+- url: ${TOOL_STRINGS.planning.create_plan_with_search_or_url.url} (if navigating to a known site)
+- searchQuery: ${TOOL_STRINGS.planning.create_plan_with_search_or_url.searchQuery} (if starting with a search)
+
+Provide exactly ONE of url or searchQuery, not both.
+
+${toolCallInstruction}
+`.trim(),
+);
+
+/**
+ * Builds the planning prompt when user provides a starting URL.
+ * Uses create_plan() - no URL determination needed.
+ *
+ * @param task - The task to plan
+ * @param startingUrl - The URL to start from
+ * @param guardrails - Optional constraints/guardrails
+ */
+export const buildPlanPrompt = (task: string, startingUrl: string, guardrails?: string | null) =>
   planPromptTemplate({
     task,
     currentDate: getCurrentFormattedDate(),
-    includeUrl: true,
+    startingUrl,
     guardrails,
   });
 
-export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?: string | null) =>
-  planPromptTemplate({
+/**
+ * Builds the planning prompt when no starting URL and webSearch is disabled.
+ * Uses create_plan_with_url() - planner must determine starting URL.
+ *
+ * @param task - The task to plan
+ * @param guardrails - Optional constraints/guardrails
+ */
+export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
+  planWithUrlPromptTemplate({
     task,
     currentDate: getCurrentFormattedDate(),
-    includeUrl: false,
-    startingUrl,
+    guardrails,
+  });
+
+/**
+ * Builds the planning prompt when no starting URL and webSearch IS enabled.
+ * Uses create_plan_with_search_or_url() - planner chooses search OR url.
+ *
+ * @param task - The task to plan
+ * @param guardrails - Optional constraints/guardrails
+ */
+export const buildPlanWithSearchOrUrlPrompt = (task: string, guardrails?: string | null) =>
+  planWithSearchOrUrlPromptTemplate({
+    task,
+    currentDate: getCurrentFormattedDate(),
     guardrails,
   });
 

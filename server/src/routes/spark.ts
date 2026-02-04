@@ -88,6 +88,9 @@ interface SparkTaskRequest {
 
   // Logging configuration
   logger?: "console" | "json";
+
+  // Search configuration overrides
+  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel";
 }
 
 // POST /spark/run - Execute a Spark task with real-time streaming
@@ -173,6 +176,7 @@ spark.post("/run", async (c) => {
           maxIterations: body.maxIterations ?? serverConfig.max_iterations,
           maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
           guardrails: body.guardrails,
+          searchProvider: body.searchProvider ?? serverConfig.search_provider,
         };
 
         // Create browser and agent instances

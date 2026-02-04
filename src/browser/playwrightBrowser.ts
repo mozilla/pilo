@@ -11,7 +11,7 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
-import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState, IsolatedTab } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
@@ -665,6 +665,52 @@ export class PlaywrightBrowser implements AriaBrowser {
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
         { originalError: error },
       );
+    }
+  }
+
+  /**
+   * Runs a function in an isolated tab, then closes it.
+   * Main page state is preserved. Useful for "side quest" operations like search.
+   */
+  async runInIsolatedTab<T>(fn: (tab: IsolatedTab) => Promise<T>): Promise<T> {
+    if (!this.context) throw new Error("Browser not started");
+
+    const tempPage = await this.context.newPage();
+    tempPage.setDefaultTimeout(this.actionTimeoutMs);
+
+    try {
+      const tab: IsolatedTab = {
+        goto: async (url: string) => {
+          await tempPage.goto(url, { waitUntil: "domcontentloaded" });
+        },
+        getMarkdown: async () => {
+          // Get simplified HTML (noise removed in browser context)
+          const html = await tempPage.evaluate(() => {
+            const body = document.body || document.documentElement;
+            if (!body) return "";
+            const clone = body.cloneNode(true) as Element;
+            clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+            return clone.innerHTML;
+          });
+
+          // Convert HTML to markdown using turndown
+          const turndown = new TurndownService({
+            headingStyle: "atx",
+            codeBlockStyle: "fenced",
+            emDelimiter: "*",
+            strongDelimiter: "**",
+          });
+
+          return turndown.turndown(html);
+        },
+        waitForLoadState: async (state: LoadState, options?: { timeout?: number }) => {
+          await tempPage.waitForLoadState(state, options);
+        },
+      };
+
+      return await fn(tab);
+    } finally {
+      await tempPage.close();
     }
   }
 

@@ -31,7 +31,7 @@ describe("prompts", () => {
       expect(prompt).toContain("Book a flight from NYC to Paris");
       expect(prompt).toContain("Jan 15, 2024");
       expect(prompt).toContain("create_plan_with_url()");
-      expect(prompt).toContain("step-by-step plan and starting URL");
+      expect(prompt).toContain("Starting URL for the task");
     });
 
     it("should contain required instructions", () => {

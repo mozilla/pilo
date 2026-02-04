@@ -35,6 +35,19 @@ export enum LoadState {
   Load = "load",
 }
 
+/**
+ * Limited interface for isolated tab operations.
+ * Used for "side quest" operations like search that shouldn't affect main page state.
+ */
+export interface IsolatedTab {
+  /** Navigates to the specified URL */
+  goto(url: string): Promise<void>;
+  /** Returns the page content as clean markdown */
+  getMarkdown(): Promise<string>;
+  /** Waits for a specific load state */
+  waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
+}
+
 export interface AriaBrowser {
   /** The name of the browser being used */
   browserName: string;
@@ -83,4 +96,12 @@ export interface AriaBrowser {
    * @param options Additional options like timeout
    */
   waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
+
+  /**
+   * Runs a function in an isolated tab, then closes it.
+   * Main page state is preserved. Useful for "side quest" operations like search.
+   * @param fn Function to execute in the isolated tab
+   * @returns The result of the function
+   */
+  runInIsolatedTab<T>(fn: (tab: IsolatedTab) => Promise<T>): Promise<T>;
 }
