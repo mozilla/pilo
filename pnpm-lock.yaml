@@ -42,8 +42,8 @@ importers:
         specifier: ^17.2.3
         version: 17.2.3
       eventemitter3:
-        specifier: ^5.0.1
-        version: 5.0.1
+        specifier: ^5.0.4
+        version: 5.0.4
       liquidjs:
         specifier: ^10.24.0
         version: 10.24.0
@@ -1590,8 +1590,8 @@ packages:
   estree-walker@3.0.3:
     resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
 
-  eventemitter3@5.0.1:
-    resolution: {integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==}
+  eventemitter3@5.0.4:
+    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
   eventsource-parser@3.0.6:
     resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
@@ -4356,7 +4356,7 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.8
 
-  eventemitter3@5.0.1: {}
+  eventemitter3@5.0.4: {}
 
   eventsource-parser@3.0.6: {}
 
@@ -4824,7 +4824,7 @@ snapshots:
     dependencies:
       cli-truncate: 4.0.0
       colorette: 2.0.20
-      eventemitter3: 5.0.1
+      eventemitter3: 5.0.4
       log-update: 6.1.0
       rfdc: 1.4.1
       wrap-ansi: 9.0.2
@@ -5377,7 +5377,7 @@ snapshots:
       commander: 14.0.2
       cross-fetch: 4.1.0
       dotenv: 17.2.3
-      eventemitter3: 5.0.1
+      eventemitter3: 5.0.4
       liquidjs: 10.24.0
       nanoid: 5.1.6
       ollama-ai-provider-v2: 1.5.5(zod@4.3.5)
