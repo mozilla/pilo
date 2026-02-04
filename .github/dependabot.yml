@@ -23,6 +23,7 @@ updates:
           - ai
           - "@ai-sdk/*"
           - "@openrouter/ai-sdk-provider"
+          - ollama-ai-provider-v2
       devdependencies:
         patterns:
           - "@types/*"
