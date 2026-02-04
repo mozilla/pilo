@@ -26,9 +26,6 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: ^1.5.4
         version: 1.5.4(ai@5.0.121(zod@4.3.5))(zod@4.3.5)
-      '@types/turndown':
-        specifier: ^5.0.6
-        version: 5.0.6
       ai:
         specifier: ^5.0.121
         version: 5.0.121(zod@4.3.5)
@@ -72,6 +69,9 @@ importers:
       '@types/node':
         specifier: ^25.0.9
         version: 25.0.9
+      '@types/turndown':
+        specifier: ^5.0.6
+        version: 5.0.6
       jsdom:
         specifier: ^27.4.0
         version: 27.4.0
@@ -5346,7 +5346,6 @@ snapshots:
       '@ai-sdk/openai-compatible': 1.0.30(zod@4.3.5)
       '@ghostery/adblocker-playwright': 2.13.4(playwright@1.57.0)
       '@openrouter/ai-sdk-provider': 1.5.4(ai@5.0.121(zod@4.3.5))(zod@4.3.5)
-      '@types/turndown': 5.0.6
       ai: 5.0.121(zod@4.3.5)
       chalk: 5.6.2
       commander: 14.0.2

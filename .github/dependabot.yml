@@ -11,3 +11,27 @@ updates:
       default-days: 14
     open-pull-requests-limit: 10
     versioning-strategy: increase
+    groups:
+      react:
+        patterns:
+          - "@types/react"
+          - "@types/react-dom"
+          - react
+          - react-dom
+      aisdk:
+        patterns:
+          - ai
+          - "@ai-sdk/*"
+          - "@openrouter/ai-sdk-provider"
+      devdependencies:
+        patterns:
+          - "@types/*"
+          - "@testing-library/*"
+          - jsdom
+          - nodemon
+          - prettier
+          - typescript
+          - tsx
+          - vitest
+          - wxt
+          - "@wxt-dev/*"
