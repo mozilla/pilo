@@ -11,7 +11,7 @@ import type { SearchProvider } from "../searchProvider.js";
 interface ParallelSearchResult {
   url: string;
   title?: string;
-  excerpt?: string;
+  excerpts?: string[];
 }
 
 interface ParallelApiResponse {
@@ -36,7 +36,7 @@ export class ParallelSearchProvider implements SearchProvider {
       body: JSON.stringify({
         objective: query,
         search_queries: [query],
-        excerpts: { max_chars_per_result: 10000 },
+        excerpts: { max_chars_per_result: 1500 },
       }),
     });
 
@@ -64,8 +64,8 @@ export class ParallelSearchProvider implements SearchProvider {
     data.results.forEach((result, index) => {
       const title = result.title || result.url;
       lines.push(`${index + 1}. [${title}](${result.url})`);
-      if (result.excerpt) {
-        lines.push(result.excerpt);
+      if (result.excerpts?.length) {
+        lines.push(result.excerpts.join("\n"));
       }
       lines.push("");
     });

@@ -6,6 +6,7 @@ import {
   createAIProvider,
   getAIProviderInfo,
   createNavigationRetryConfig,
+  SEARCH_PROVIDERS,
 } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
@@ -102,6 +103,19 @@ spark.post("/run", async (c) => {
       return c.json(createErrorResponse("Task is required", "MISSING_TASK"), 400);
     }
 
+    if (
+      body.searchProvider &&
+      !SEARCH_PROVIDERS.includes(body.searchProvider as (typeof SEARCH_PROVIDERS)[number])
+    ) {
+      return c.json(
+        createErrorResponse(
+          `Invalid search provider: ${body.searchProvider}. Must be one of: ${SEARCH_PROVIDERS.join(", ")}`,
+          "INVALID_SEARCH_PROVIDER",
+        ),
+        400,
+      );
+    }
+
     // Get server configuration
     const serverConfig = config.getConfig();
 
@@ -177,6 +191,7 @@ spark.post("/run", async (c) => {
           maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
           guardrails: body.guardrails,
           searchProvider: body.searchProvider ?? serverConfig.search_provider,
+          searchApiKey: serverConfig.parallel_api_key,
         };
 
         // Create browser and agent instances

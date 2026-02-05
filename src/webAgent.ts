@@ -204,7 +204,7 @@ export class WebAgent {
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
-    this.searchProvider = options.searchProvider ?? getConfigDefaults().search_provider;
+    this.searchProvider = options.searchProvider ?? defaults.search_provider;
     this.searchApiKey = options.searchApiKey;
 
     // Initialize services
@@ -502,7 +502,11 @@ export class WebAgent {
     });
 
     // Add error feedback to conversation for non-tool errors
-    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, Boolean(this.guardrails));
+    const errorFeedback = buildStepErrorFeedbackPrompt(
+      errorMessage,
+      Boolean(this.guardrails),
+      this.searchProvider !== "none",
+    );
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
@@ -1329,7 +1333,9 @@ export class WebAgent {
       throw new Error("No starting URL determined");
     }
 
-    await this.browser.goto(this.url);
+    if (this.url !== "about:blank") {
+      await this.browser.goto(this.url);
+    }
     await this.updatePageState();
 
     this.emit(WebAgentEventType.TASK_STARTED, {
@@ -1344,6 +1350,7 @@ export class WebAgent {
 
   private initializeSystemPromptAndTask(task: string): void {
     const hasGuardrails = Boolean(this.guardrails);
+    const hasWebSearch = this.searchProvider !== "none";
 
     const taskPromptContent = buildTaskAndPlanPrompt(
       task,
@@ -1356,7 +1363,7 @@ export class WebAgent {
     this.messages = [
       {
         role: "system",
-        content: buildActionLoopSystemPrompt(hasGuardrails),
+        content: buildActionLoopSystemPrompt(hasGuardrails, hasWebSearch),
       },
       {
         role: "user",

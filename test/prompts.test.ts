@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPlanPrompt,
   actionLoopSystemPrompt,
+  buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   buildStepErrorFeedbackPrompt,
@@ -232,6 +233,38 @@ describe("prompts", () => {
     it("should include goto restrictions", () => {
       expect(actionLoopSystemPrompt).toContain("previously seen");
       expect(actionLoopSystemPrompt).toContain("goto() only accepts URLs");
+    });
+
+    it("should not include webSearch when built without it", () => {
+      expect(actionLoopSystemPrompt).not.toContain("webSearch(");
+    });
+  });
+
+  describe("buildActionLoopSystemPrompt", () => {
+    it("should include webSearch when hasWebSearch is true", () => {
+      const prompt = buildActionLoopSystemPrompt(false, true);
+
+      expect(prompt).toContain("webSearch(");
+      expect(prompt).toContain("Search the web for information");
+    });
+
+    it("should not include webSearch when hasWebSearch is false", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false);
+
+      expect(prompt).not.toContain("webSearch(");
+    });
+
+    it("should include guardrails when hasGuardrails is true", () => {
+      const prompt = buildActionLoopSystemPrompt(true, false);
+
+      expect(prompt).toContain("GUARDRAIL COMPLIANCE");
+    });
+
+    it("should support both guardrails and webSearch", () => {
+      const prompt = buildActionLoopSystemPrompt(true, true);
+
+      expect(prompt).toContain("GUARDRAIL COMPLIANCE");
+      expect(prompt).toContain("webSearch(");
     });
   });
 
@@ -464,6 +497,26 @@ describe("prompts", () => {
 
       expect(prompt).toContain("Error Occurred");
       expect(prompt).toContain("You MUST use exactly one tool");
+    });
+
+    it("should include tool examples", () => {
+      const prompt = buildStepErrorFeedbackPrompt("Some error");
+
+      expect(prompt).toContain("Available Tools:");
+      expect(prompt).toContain("click(");
+      expect(prompt).toContain("done(");
+    });
+
+    it("should not include webSearch by default", () => {
+      const prompt = buildStepErrorFeedbackPrompt("Some error");
+
+      expect(prompt).not.toContain("webSearch(");
+    });
+
+    it("should include webSearch when hasWebSearch is true", () => {
+      const prompt = buildStepErrorFeedbackPrompt("Some error", false, true);
+
+      expect(prompt).toContain("webSearch(");
     });
   });
 

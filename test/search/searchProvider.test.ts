@@ -152,8 +152,12 @@ describe("Search Provider", () => {
         json: () =>
           Promise.resolve({
             results: [
-              { url: "https://example.com", title: "Example", excerpt: "This is an example" },
-              { url: "https://test.com", title: "Test", excerpt: "This is a test" },
+              {
+                url: "https://example.com",
+                title: "Example",
+                excerpts: ["This is an example"],
+              },
+              { url: "https://test.com", title: "Test", excerpts: ["This is a test"] },
             ],
           }),
       });
@@ -188,7 +192,7 @@ describe("Search Provider", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            results: [{ url: "https://example.com/page", excerpt: "Content" }],
+            results: [{ url: "https://example.com/page", excerpts: ["Content"] }],
           }),
       });
 

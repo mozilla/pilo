@@ -125,25 +125,37 @@ IMPORTANT:
 - Focus on the elements you need to interact with directly.
 `.trim();
 
-/** Available browser action tools with JSON syntax examples. */
-const toolExamples = `
-- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}
-- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}
-- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}
-- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}
-- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}
-- uncheck({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.uncheck.description}
-- focus({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.focus.description}
-- enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.enter.description}
-- wait({"seconds": 3}) - ${TOOL_STRINGS.webActions.wait.description}
-- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}
-- back() - ${TOOL_STRINGS.webActions.back.description}
-- forward() - ${TOOL_STRINGS.webActions.forward.description}
-- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}
-- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}
-- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}
-- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}
-`.trim();
+/** Build available browser action tools with JSON syntax examples. */
+function buildToolExamples(hasWebSearch: boolean): string {
+  const lines = [
+    `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
+    `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
+    `- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}`,
+    `- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}`,
+    `- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}`,
+    `- uncheck({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.uncheck.description}`,
+    `- focus({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.focus.description}`,
+    `- enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.enter.description}`,
+    `- wait({"seconds": 3}) - ${TOOL_STRINGS.webActions.wait.description}`,
+    `- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}`,
+    `- back() - ${TOOL_STRINGS.webActions.back.description}`,
+    `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
+    `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
+  ];
+
+  if (hasWebSearch) {
+    lines.push(
+      `- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}`,
+    );
+  }
+
+  lines.push(
+    `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
+    `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
+  );
+
+  return lines.join("\n");
+}
 
 /** Standard tool calling instruction. */
 const toolCallInstruction = `
@@ -298,14 +310,14 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails. */
-const buildActionLoopSystemPrompt = (hasGuardrails: boolean) =>
+/** Build action system prompt with optional guardrails and web search. */
+const buildActionLoopSystemPrompt = (hasGuardrails: boolean, hasWebSearch: boolean = false) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
-    toolExamples,
+    toolExamples: buildToolExamples(hasWebSearch),
   });
 
-export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false);
+export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false, false);
 export { buildActionLoopSystemPrompt };
 
 /**
@@ -411,15 +423,22 @@ const stepErrorFeedbackTemplate = buildPromptTemplate(
 CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 
+**Available Tools:**
+{{ toolExamples }}
+
 ${toolCallInstruction}
 `.trim(),
 );
 
-export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boolean = false) =>
+export const buildStepErrorFeedbackPrompt = (
+  error: string,
+  hasGuardrails: boolean = false,
+  hasWebSearch: boolean = false,
+) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
-    toolExamples,
+    toolExamples: buildToolExamples(hasWebSearch),
   });
 
 /**

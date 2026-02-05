@@ -12,7 +12,7 @@
 // ============================================================================
 
 /** Max tokens for generation */
-export const DEFAULT_GENERATION_MAX_TOKENS = 3000;
+export const DEFAULT_GENERATION_MAX_TOKENS = 5000;
 
 /** Max tokens for planning */
 export const DEFAULT_PLANNING_MAX_TOKENS = 1500;

@@ -697,11 +697,16 @@ describe("WebAgent", () => {
         }) as any,
       );
 
+      const gotoSpy = vi.spyOn(mockBrowser, "goto");
+
       await webAgent.execute("Search for something");
 
       // Should have navigated to about:blank
       const startedEvent = mockLogger.events.find((e) => e.type === WebAgentEventType.TASK_STARTED);
       expect(startedEvent?.data.url).toBe("about:blank");
+
+      // Should NOT have called goto (browser already starts at about:blank)
+      expect(gotoSpy).not.toHaveBeenCalled();
     });
 
     it("should prefer startingUrl over planner-provided URL", async () => {
