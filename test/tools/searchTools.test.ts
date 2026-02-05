@@ -120,7 +120,7 @@ describe("Search Tools", () => {
     it("should execute search with API-based provider (no browser)", async () => {
       const mockMarkdown = "# Search Results\n\n1. [Result](https://example.com)";
       const mockProvider = {
-        name: "parallel",
+        name: "parallel-api",
         requiresBrowser: false,
         search: vi.fn().mockResolvedValue(mockMarkdown),
       };
@@ -144,12 +144,12 @@ describe("Search Tools", () => {
       const toolsWithApiKey = createSearchTools({
         browser: mockBrowser,
         eventEmitter,
-        searchProvider: "parallel",
+        searchProvider: "parallel-api",
         searchApiKey: "test-api-key",
       });
 
       const mockProvider = {
-        name: "parallel",
+        name: "parallel-api",
         requiresBrowser: false,
         search: vi.fn().mockResolvedValue("# Results"),
       };
@@ -160,7 +160,7 @@ describe("Search Tools", () => {
         messages: [],
       } as any);
 
-      expect(mockCreateSearchProvider).toHaveBeenCalledWith("parallel", {
+      expect(mockCreateSearchProvider).toHaveBeenCalledWith("parallel-api", {
         apiKey: "test-api-key",
       });
     });

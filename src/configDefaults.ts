@@ -32,7 +32,7 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
 export const LOGGERS = ["console", "json"] as const;
 export type LoggerType = (typeof LOGGERS)[number];
 
-export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel"] as const;
+export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
 export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 
 export type ConfigFieldType = "string" | "number" | "boolean" | "enum";

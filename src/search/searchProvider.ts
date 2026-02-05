@@ -40,9 +40,9 @@ export async function createSearchProvider(
       const { BingSearchProvider } = await import("./providers/bingSearch.js");
       return new BingSearchProvider();
     }
-    case "parallel": {
+    case "parallel-api": {
       if (!options.apiKey) {
-        throw new Error("Parallel API key is required for parallel search provider");
+        throw new Error("Parallel API key is required for parallel-api search provider");
       }
       const { ParallelSearchProvider } = await import("./providers/parallelSearch.js");
       return new ParallelSearchProvider(options.apiKey);

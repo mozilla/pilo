@@ -40,18 +40,18 @@ describe("Search Provider", () => {
     });
 
     it("should create Parallel provider with API key", async () => {
-      const provider = await createSearchProvider("parallel", {
+      const provider = await createSearchProvider("parallel-api", {
         apiKey: "test-api-key",
       });
 
       expect(provider).toBeInstanceOf(ParallelSearchProvider);
-      expect(provider.name).toBe("parallel");
+      expect(provider.name).toBe("parallel-api");
       expect(provider.requiresBrowser).toBe(false);
     });
 
     it("should throw error for Parallel provider without API key", async () => {
-      await expect(createSearchProvider("parallel")).rejects.toThrow(
-        "Parallel API key is required for parallel search provider",
+      await expect(createSearchProvider("parallel-api")).rejects.toThrow(
+        "Parallel API key is required for parallel-api search provider",
       );
     });
 

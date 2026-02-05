@@ -20,7 +20,7 @@ interface ParallelApiResponse {
 }
 
 export class ParallelSearchProvider implements SearchProvider {
-  readonly name = "parallel";
+  readonly name = "parallel-api";
   readonly requiresBrowser = false;
 
   constructor(private apiKey: string) {}
