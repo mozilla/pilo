@@ -34,7 +34,7 @@ export type {
   Browser,
   ReasoningLevel,
   LoggerType,
-  SearchProvider,
+  SearchProviderName,
   ConfigFieldType,
   ConfigCategory,
   SparkConfig,

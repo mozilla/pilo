@@ -136,7 +136,9 @@ describe("Search Provider", () => {
       expect(mockTab.goto).toHaveBeenCalledWith("https://test.com/search?q=test%20query");
       expect(mockTab.waitForLoadState).toHaveBeenCalledWith(LoadState.Load);
       expect(mockTab.getMarkdown).toHaveBeenCalled();
-      expect(result).toBe(mockMarkdown);
+      expect(result).toBe(
+        `# Search Results for "test query" (via test)\n\n\`\`\`\n${mockMarkdown}\n\`\`\``,
+      );
     });
   });
 
@@ -159,9 +161,9 @@ describe("Search Provider", () => {
       const result = await provider.search("test query");
 
       expect(result).toContain('# Search Results for "test query"');
-      expect(result).toContain("## 1. [Example](https://example.com)");
+      expect(result).toContain("1. [Example](https://example.com)");
       expect(result).toContain("This is an example");
-      expect(result).toContain("## 2. [Test](https://test.com)");
+      expect(result).toContain("2. [Test](https://test.com)");
       expect(result).toContain("This is a test");
     });
 

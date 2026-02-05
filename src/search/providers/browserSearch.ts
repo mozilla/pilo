@@ -37,10 +37,12 @@ export abstract class BrowserSearchProvider implements SearchProvider {
 
     const url = this.getSearchUrl(query);
 
-    return browser.runInIsolatedTab(async (tab) => {
+    const markdown = await browser.runInIsolatedTab(async (tab) => {
       await tab.goto(url);
       await tab.waitForLoadState(LoadState.Load);
       return tab.getMarkdown();
     });
+
+    return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\n${markdown}\n\`\`\``;
   }
 }

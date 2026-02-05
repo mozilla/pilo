@@ -33,7 +33,7 @@ export const LOGGERS = ["console", "json"] as const;
 export type LoggerType = (typeof LOGGERS)[number];
 
 export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
-export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
+export type SearchProviderName = (typeof SEARCH_PROVIDERS)[number];
 
 export type ConfigFieldType = "string" | "number" | "boolean" | "enum";
 
@@ -112,7 +112,7 @@ export interface SparkConfig {
   action_timeout_ms?: number;
 
   // Search Configuration
-  search_provider?: SearchProvider;
+  search_provider?: SearchProviderName;
   parallel_api_key?: string;
 }
 
@@ -176,7 +176,7 @@ export interface SparkConfigResolved {
   action_timeout_ms: number;
 
   // Search Configuration
-  search_provider: SearchProvider;
+  search_provider: SearchProviderName;
   parallel_api_key?: string;
 }
 

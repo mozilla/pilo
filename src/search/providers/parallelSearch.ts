@@ -56,21 +56,20 @@ export class ParallelSearchProvider implements SearchProvider {
 
   private formatAsMarkdown(query: string, data: ParallelApiResponse): string {
     if (!data.results || data.results.length === 0) {
-      return `# Search Results for "${query}"\n\nNo results found.`;
+      return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\nNo results found.\n\`\`\``;
     }
 
-    const lines: string[] = [`# Search Results for "${query}"`, ""];
+    const lines: string[] = [];
 
     data.results.forEach((result, index) => {
       const title = result.title || result.url;
-      lines.push(`## ${index + 1}. [${title}](${result.url})`);
-      lines.push("");
+      lines.push(`${index + 1}. [${title}](${result.url})`);
       if (result.excerpt) {
         lines.push(result.excerpt);
-        lines.push("");
       }
+      lines.push("");
     });
 
-    return lines.join("\n");
+    return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\n${lines.join("\n").trim()}\n\`\`\``;
   }
 }

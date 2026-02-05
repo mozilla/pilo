@@ -31,7 +31,7 @@ import { createSearchTools } from "./tools/searchTools.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-import { getConfigDefaults, type SearchProvider } from "./configDefaults.js";
+import { getConfigDefaults, type SearchProviderName } from "./configDefaults.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
@@ -66,7 +66,7 @@ export interface WebAgentOptions {
   /** Number of times to retry initial navigation with browser restart (0 = no retries, default: 1) */
   initialNavigationRetries?: number;
   /** Search provider to use for web search (default: from config, typically "none") */
-  searchProvider?: SearchProvider;
+  searchProvider?: SearchProviderName;
   /** API key for search providers that require authentication (e.g., Parallel) */
   searchApiKey?: string;
 }
@@ -184,7 +184,7 @@ export class WebAgent {
   private readonly maxRepeatedActions: number;
   private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
-  private readonly searchProvider: SearchProvider;
+  private readonly searchProvider: SearchProviderName;
   private readonly searchApiKey: string | undefined;
 
   constructor(

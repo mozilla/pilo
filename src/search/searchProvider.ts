@@ -6,7 +6,7 @@
  */
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
-import type { SearchProvider as SearchProviderType } from "../configDefaults.js";
+import type { SearchProviderName } from "../configDefaults.js";
 
 export interface SearchProvider {
   readonly name: string;
@@ -24,7 +24,7 @@ export interface CreateSearchProviderOptions {
  * API keys should be passed via options (typically read from config by the caller).
  */
 export async function createSearchProvider(
-  providerName: Exclude<SearchProviderType, "none">,
+  providerName: Exclude<SearchProviderName, "none">,
   options: CreateSearchProviderOptions = {},
 ): Promise<SearchProvider> {
   switch (providerName) {

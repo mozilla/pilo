@@ -47,15 +47,28 @@ const createMockBrowser = (): AriaBrowser => ({
   runInIsolatedTab: vi.fn(),
 });
 
+// Default mock provider used by most tests
+const createDefaultMockProvider = () => ({
+  name: "duckduckgo",
+  requiresBrowser: true,
+  search: vi.fn().mockResolvedValue("# Search Results\n\n1. [Result](https://example.com)"),
+});
+
 describe("Search Tools", () => {
   let mockBrowser: AriaBrowser;
   let eventEmitter: WebAgentEventEmitter;
+  let defaultMockProvider: ReturnType<typeof createDefaultMockProvider>;
   let tools: ReturnType<typeof createSearchTools>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockBrowser = createMockBrowser();
     eventEmitter = new WebAgentEventEmitter();
+
+    // Provider mock must be set up BEFORE createSearchTools (provider is cached at creation time)
+    defaultMockProvider = createDefaultMockProvider();
+    mockCreateSearchProvider.mockResolvedValue(defaultMockProvider);
+
     tools = createSearchTools({
       browser: mockBrowser,
       eventEmitter,
@@ -93,12 +106,7 @@ describe("Search Tools", () => {
   describe("webSearch execution", () => {
     it("should execute search with browser-based provider", async () => {
       const mockMarkdown = "# Search Results\n\n1. [Result](https://example.com)";
-      const mockProvider = {
-        name: "duckduckgo",
-        requiresBrowser: true,
-        search: vi.fn().mockResolvedValue(mockMarkdown),
-      };
-      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+      defaultMockProvider.search.mockResolvedValue(mockMarkdown);
 
       const result = await tools.webSearch.execute!({ query: "test query" }, {
         toolCallId: "test",
@@ -108,7 +116,7 @@ describe("Search Tools", () => {
       expect(mockCreateSearchProvider).toHaveBeenCalledWith("duckduckgo", {
         apiKey: undefined,
       });
-      expect(mockProvider.search).toHaveBeenCalledWith("test query", mockBrowser);
+      expect(defaultMockProvider.search).toHaveBeenCalledWith("test query", mockBrowser);
       expect(result).toEqual({
         success: true,
         action: "webSearch",
@@ -126,7 +134,15 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      const result = await tools.webSearch.execute!({ query: "test query" }, {
+      // Must create tools AFTER setting up the mock (provider is cached at creation time)
+      const apiTools = createSearchTools({
+        browser: mockBrowser,
+        eventEmitter,
+        searchProvider: "parallel-api",
+        searchApiKey: undefined,
+      });
+
+      const result = await apiTools.webSearch.execute!({ query: "test query" }, {
         toolCallId: "test",
         messages: [],
       } as any);
@@ -141,13 +157,6 @@ describe("Search Tools", () => {
     });
 
     it("should pass API key to search provider", async () => {
-      const toolsWithApiKey = createSearchTools({
-        browser: mockBrowser,
-        eventEmitter,
-        searchProvider: "parallel-api",
-        searchApiKey: "test-api-key",
-      });
-
       const mockProvider = {
         name: "parallel-api",
         requiresBrowser: false,
@@ -155,24 +164,39 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      await toolsWithApiKey.webSearch.execute!({ query: "test" }, {
-        toolCallId: "test",
-        messages: [],
-      } as any);
+      // Must create tools AFTER setting up the mock (provider is cached at creation time)
+      createSearchTools({
+        browser: mockBrowser,
+        eventEmitter,
+        searchProvider: "parallel-api",
+        searchApiKey: "test-api-key",
+      });
 
       expect(mockCreateSearchProvider).toHaveBeenCalledWith("parallel-api", {
         apiKey: "test-api-key",
       });
     });
 
-    it("should emit events on successful search", async () => {
-      const mockProvider = {
-        name: "duckduckgo",
-        requiresBrowser: true,
-        search: vi.fn().mockResolvedValue("# Results"),
-      };
-      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+    it("should create provider once and reuse across multiple searches", async () => {
+      // The default tools from beforeEach already triggered createSearchProvider once
+      expect(mockCreateSearchProvider).toHaveBeenCalledTimes(1);
 
+      await tools.webSearch.execute!({ query: "first search" }, {
+        toolCallId: "test1",
+        messages: [],
+      } as any);
+
+      await tools.webSearch.execute!({ query: "second search" }, {
+        toolCallId: "test2",
+        messages: [],
+      } as any);
+
+      // Still only called once — at creation time, not per-execution
+      expect(mockCreateSearchProvider).toHaveBeenCalledTimes(1);
+      expect(defaultMockProvider.search).toHaveBeenCalledTimes(2);
+    });
+
+    it("should emit events on successful search", async () => {
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
       await tools.webSearch.execute!({ query: "test" }, {
@@ -191,12 +215,7 @@ describe("Search Tools", () => {
     });
 
     it("should handle search errors gracefully", async () => {
-      const mockProvider = {
-        name: "duckduckgo",
-        requiresBrowser: true,
-        search: vi.fn().mockRejectedValue(new Error("Search failed")),
-      };
-      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+      defaultMockProvider.search.mockRejectedValue(new Error("Search failed"));
 
       const result = await tools.webSearch.execute!({ query: "test" }, {
         toolCallId: "test",
@@ -213,12 +232,7 @@ describe("Search Tools", () => {
     });
 
     it("should emit failure event on error", async () => {
-      const mockProvider = {
-        name: "duckduckgo",
-        requiresBrowser: true,
-        search: vi.fn().mockRejectedValue(new Error("Network error")),
-      };
-      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+      defaultMockProvider.search.mockRejectedValue(new Error("Network error"));
 
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
@@ -236,12 +250,7 @@ describe("Search Tools", () => {
     });
 
     it("should handle non-Error exceptions", async () => {
-      const mockProvider = {
-        name: "duckduckgo",
-        requiresBrowser: true,
-        search: vi.fn().mockRejectedValue("string error"),
-      };
-      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+      defaultMockProvider.search.mockRejectedValue("string error");
 
       const result = await tools.webSearch.execute!({ query: "test" }, {
         toolCallId: "test",
