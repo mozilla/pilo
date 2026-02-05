@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createPlanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
-import type { CoreMessage } from "ai";
+import type { ModelMessage } from "ai";
 
 interface CreatePlanResult {
   successCriteria: string;
@@ -119,7 +119,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanResult;
 
       expect(result).toEqual(input);
@@ -138,7 +138,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanWithUrlResult;
 
       expect(result).toEqual(input);
@@ -157,7 +157,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanResult;
 
       expect(result).toEqual(input);
@@ -185,7 +185,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanResult;
 
       expect(result.plan).toBe(longPlan);
@@ -202,7 +202,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanWithUrlResult;
 
       expect(result.url).toBe("https://example.com/search?q=test&filter=true&page=1");
@@ -219,7 +219,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanWithUrlResult;
 
       expect(result.successCriteria).toBe("Tâche en français");
@@ -299,7 +299,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanResult;
 
       expect(result).toEqual(input);
@@ -318,7 +318,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan_with_url.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanWithUrlResult;
 
       expect(result).toEqual(input);
@@ -335,7 +335,7 @@ describe("Planning Tools", () => {
 
       const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
-        messages: [] as CoreMessage[],
+        messages: [] as ModelMessage[],
       })) as CreatePlanResult;
 
       expect(result).toEqual(input);

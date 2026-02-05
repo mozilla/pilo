@@ -796,6 +796,15 @@ describe("JSONConsoleLogger", () => {
           totalTokens: 150,
           inputTokens: 100,
           outputTokens: 50,
+          inputTokenDetails: {
+            noCacheTokens: 100,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          },
+          outputTokenDetails: {
+            textTokens: 50,
+            reasoningTokens: 0,
+          },
         },
         providerMetadata: {},
         temperature: 0.7,
