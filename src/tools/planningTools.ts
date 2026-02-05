@@ -87,7 +87,7 @@ export function createSearchOrUrlPlanningTools() {
         })
         .refine(
           (data) => Boolean(data.url) !== Boolean(data.searchQuery),
-          "Provide either url OR searchQuery, not both"
+          "Provide either url OR searchQuery, not both",
         ),
       execute: async ({ successCriteria, plan, actionItems, url, searchQuery }) => {
         return {

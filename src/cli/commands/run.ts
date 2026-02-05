@@ -175,6 +175,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxConsecutiveErrors: options.maxConsecutiveErrors ?? cfg.max_consecutive_errors,
       maxTotalErrors: options.maxTotalErrors ?? cfg.max_total_errors,
       searchProvider: options.searchProvider ?? cfg.search_provider,
+      searchApiKey: cfg.parallel_api_key,
       providerConfig,
       logger,
       eventEmitter,

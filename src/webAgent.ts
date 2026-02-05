@@ -34,7 +34,6 @@ import { createPlanningTools, createSearchOrUrlPlanningTools } from "./tools/pla
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
 import { getConfigDefaults, type SearchProvider } from "./configDefaults.js";
-import { config } from "./config.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
@@ -70,6 +69,8 @@ export interface WebAgentOptions {
   initialNavigationRetries?: number;
   /** Search provider to use for web search (default: from config, typically "none") */
   searchProvider?: SearchProvider;
+  /** API key for search providers that require authentication (e.g., Parallel) */
+  searchApiKey?: string;
 }
 
 export interface ExecuteOptions {
@@ -189,6 +190,7 @@ export class WebAgent {
   private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
   private readonly searchProvider: SearchProvider;
+  private readonly searchApiKey: string | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -207,7 +209,8 @@ export class WebAgent {
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
-    this.searchProvider = options.searchProvider ?? config.get("search_provider");
+    this.searchProvider = options.searchProvider ?? getConfigDefaults().search_provider;
+    this.searchApiKey = options.searchApiKey;
 
     // Initialize services
     this.compressor = new SnapshotCompressor();
@@ -300,6 +303,7 @@ export class WebAgent {
             browser: this.browser,
             eventEmitter: this.eventEmitter,
             searchProvider: this.searchProvider,
+            searchApiKey: this.searchApiKey,
           })
         : {};
 
@@ -1112,7 +1116,9 @@ export class WebAgent {
 
     // Select the appropriate prompt and tools based on scenario
     let planningPrompt: string;
-    let planningTools: ReturnType<typeof createPlanningTools | typeof createSearchOrUrlPlanningTools>;
+    let planningTools: ReturnType<
+      typeof createPlanningTools | typeof createSearchOrUrlPlanningTools
+    >;
 
     if (startingUrl) {
       // Scenario 1: User provided URL - just plan, no URL determination needed
@@ -1385,6 +1391,7 @@ export class WebAgent {
       // when webSearch is enabled (searchProvider !== "none")
       const provider = await createSearchProvider(
         this.searchProvider as Exclude<SearchProvider, "none">,
+        { apiKey: this.searchApiKey },
       );
 
       const browser = provider.requiresBrowser ? this.browser : undefined;

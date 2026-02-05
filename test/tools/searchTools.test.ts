@@ -60,6 +60,7 @@ describe("Search Tools", () => {
       browser: mockBrowser,
       eventEmitter,
       searchProvider: "duckduckgo",
+      searchApiKey: undefined,
     });
   });
 
@@ -99,7 +100,9 @@ describe("Search Tools", () => {
 
       const result = await tools.webSearch.execute!({ query: "test query" });
 
-      expect(mockCreateSearchProvider).toHaveBeenCalledWith("duckduckgo");
+      expect(mockCreateSearchProvider).toHaveBeenCalledWith("duckduckgo", {
+        apiKey: undefined,
+      });
       expect(mockProvider.search).toHaveBeenCalledWith("test query", mockBrowser);
       expect(result).toEqual({
         success: true,
@@ -126,6 +129,28 @@ describe("Search Tools", () => {
         action: "webSearch",
         query: "test query",
         markdown: mockMarkdown,
+      });
+    });
+
+    it("should pass API key to search provider", async () => {
+      const toolsWithApiKey = createSearchTools({
+        browser: mockBrowser,
+        eventEmitter,
+        searchProvider: "parallel",
+        searchApiKey: "test-api-key",
+      });
+
+      const mockProvider = {
+        name: "parallel",
+        requiresBrowser: false,
+        search: vi.fn().mockResolvedValue("# Results"),
+      };
+      mockCreateSearchProvider.mockResolvedValue(mockProvider);
+
+      await toolsWithApiKey.webSearch.execute!({ query: "test" });
+
+      expect(mockCreateSearchProvider).toHaveBeenCalledWith("parallel", {
+        apiKey: "test-api-key",
       });
     });
 

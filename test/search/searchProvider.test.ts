@@ -1,13 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock config before importing modules that use it
-vi.mock("../../src/config.js", () => ({
-  config: {
-    get: vi.fn(),
-  },
-}));
-
-import { config } from "../../src/config.js";
 import { createSearchProvider } from "../../src/search/searchProvider.js";
 import { DuckDuckGoSearchProvider } from "../../src/search/providers/duckduckgoSearch.js";
 import { GoogleSearchProvider } from "../../src/search/providers/googleSearch.js";
@@ -16,8 +8,6 @@ import { ParallelSearchProvider } from "../../src/search/providers/parallelSearc
 import { BrowserSearchProvider } from "../../src/search/providers/browserSearch.js";
 import type { AriaBrowser, IsolatedTab } from "../../src/browser/ariaBrowser.js";
 import { LoadState } from "../../src/browser/ariaBrowser.js";
-
-const mockConfig = vi.mocked(config);
 
 describe("Search Provider", () => {
   beforeEach(() => {
@@ -50,12 +40,9 @@ describe("Search Provider", () => {
     });
 
     it("should create Parallel provider with API key", async () => {
-      mockConfig.get.mockImplementation((key: string) => {
-        if (key === "parallel_api_key") return "test-api-key";
-        return undefined;
+      const provider = await createSearchProvider("parallel", {
+        apiKey: "test-api-key",
       });
-
-      const provider = await createSearchProvider("parallel");
 
       expect(provider).toBeInstanceOf(ParallelSearchProvider);
       expect(provider.name).toBe("parallel");
@@ -63,11 +50,6 @@ describe("Search Provider", () => {
     });
 
     it("should throw error for Parallel provider without API key", async () => {
-      mockConfig.get.mockImplementation((key: string) => {
-        if (key === "parallel_api_key") return undefined;
-        return undefined;
-      });
-
       await expect(createSearchProvider("parallel")).rejects.toThrow(
         "Parallel API key is required for parallel search provider",
       );
@@ -86,7 +68,7 @@ describe("Search Provider", () => {
       const provider = new DuckDuckGoSearchProvider();
 
       expect(provider.getSearchUrl("test query")).toBe(
-        "https://lite.duckduckgo.com/lite/?q=test%20query"
+        "https://lite.duckduckgo.com/lite/?q=test%20query",
       );
     });
 
@@ -94,7 +76,7 @@ describe("Search Provider", () => {
       const provider = new DuckDuckGoSearchProvider();
 
       expect(provider.getSearchUrl("test & query")).toBe(
-        "https://lite.duckduckgo.com/lite/?q=test%20%26%20query"
+        "https://lite.duckduckgo.com/lite/?q=test%20%26%20query",
       );
     });
   });
@@ -104,7 +86,7 @@ describe("Search Provider", () => {
       const provider = new GoogleSearchProvider();
 
       expect(provider.getSearchUrl("test query")).toBe(
-        "https://www.google.com/search?q=test%20query"
+        "https://www.google.com/search?q=test%20query",
       );
     });
   });
@@ -114,7 +96,7 @@ describe("Search Provider", () => {
       const provider = new BingSearchProvider();
 
       expect(provider.getSearchUrl("test query")).toBe(
-        "https://www.bing.com/search?q=test%20query"
+        "https://www.bing.com/search?q=test%20query",
       );
     });
   });
@@ -222,7 +204,9 @@ describe("Search Provider", () => {
         text: () => Promise.resolve("Unauthorized"),
       });
 
-      await expect(provider.search("test")).rejects.toThrow("Parallel API error (401): Unauthorized");
+      await expect(provider.search("test")).rejects.toThrow(
+        "Parallel API error (401): Unauthorized",
+      );
     });
 
     it("should throw error on API error response", async () => {
@@ -234,7 +218,7 @@ describe("Search Provider", () => {
       });
 
       await expect(provider.search("test")).rejects.toThrow(
-        "Parallel API error: Rate limit exceeded"
+        "Parallel API error: Rate limit exceeded",
       );
     });
 
@@ -257,7 +241,7 @@ describe("Search Provider", () => {
             "x-api-key": "test-api-key",
           }),
           body: expect.stringContaining("my search query"),
-        })
+        }),
       );
     });
   });

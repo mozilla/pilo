@@ -7,7 +7,6 @@
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
 import type { SearchProvider as SearchProviderType } from "../configDefaults.js";
-import { config } from "../config.js";
 
 export interface SearchProvider {
   readonly name: string;
@@ -15,14 +14,19 @@ export interface SearchProvider {
   search(query: string, browser?: AriaBrowser): Promise<string>;
 }
 
+export interface CreateSearchProviderOptions {
+  /** API key for providers that require authentication (e.g., Parallel) */
+  apiKey?: string;
+}
+
 /**
  * Creates a search provider based on the given provider name.
- * API keys are read from config (set via environment variables).
+ * API keys should be passed via options (typically read from config by the caller).
  */
 export async function createSearchProvider(
   providerName: Exclude<SearchProviderType, "none">,
+  options: CreateSearchProviderOptions = {},
 ): Promise<SearchProvider> {
-
   switch (providerName) {
     case "duckduckgo": {
       const { DuckDuckGoSearchProvider } = await import("./providers/duckduckgoSearch.js");
@@ -37,12 +41,11 @@ export async function createSearchProvider(
       return new BingSearchProvider();
     }
     case "parallel": {
-      const apiKey = config.get("parallel_api_key");
-      if (!apiKey) {
+      if (!options.apiKey) {
         throw new Error("Parallel API key is required for parallel search provider");
       }
       const { ParallelSearchProvider } = await import("./providers/parallelSearch.js");
-      return new ParallelSearchProvider(apiKey);
+      return new ParallelSearchProvider(options.apiKey);
     }
     default:
       throw new Error(`Unknown search provider: ${providerName}`);
