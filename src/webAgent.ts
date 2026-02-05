@@ -22,15 +22,13 @@ import {
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   buildPlanPrompt,
-  buildPlanAndUrlPrompt,
-  buildPlanWithSearchOrUrlPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
   buildValidationFeedbackPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
-import { createPlanningTools, createSearchOrUrlPlanningTools } from "./tools/planningTools.js";
+import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
 import { getConfigDefaults, type SearchProvider } from "./configDefaults.js";
@@ -135,7 +133,6 @@ interface PlanOutput {
   plan: string;
   successCriteria: string;
   url?: string;
-  searchQuery?: string;
   actionItems?: string[];
 }
 
@@ -163,8 +160,6 @@ export class WebAgent {
   // === Core State (stays here) ===
   private plan: string = "";
   private url: string = "";
-  private initialSearchQuery: string | null = null;
-  private initialSearchResults: string | null = null;
   private messages: ModelMessage[] = [];
   private successCriteria: string = "";
   private actionItems?: string[];
@@ -240,9 +235,6 @@ export class WebAgent {
       // 4. Navigation phase (with retry on recoverable errors)
       await this.navigateToStartWithRetry(task);
 
-      // 4b. Execute initial search if planner chose to start with webSearch
-      await this.executeInitialSearchIfNeeded();
-
       this.initializeSystemPromptAndTask(task);
 
       // 5. Main execution loop
@@ -310,7 +302,10 @@ export class WebAgent {
     // Merge all tools
     const allTools = { ...webActionTools, ...searchTools };
 
-    let needsPageSnapshot = true;
+    // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
+    // The empty page has no useful elements and the snapshot prompt causes the model
+    // to hallucinate refs.
+    let needsPageSnapshot = this.url !== "about:blank";
     let consecutiveErrors = 0;
     let totalErrors = 0;
 
@@ -578,8 +573,16 @@ export class WebAgent {
     // First, truncate old snapshots to keep context size manageable
     this.truncateOldSnapshots();
 
+    const currentUrl = await this.browser.getUrl();
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
+
+    if (this.debug) {
+      console.warn(`[WebAgent:debug] addPageSnapshot URL: ${currentUrl}`);
+      console.warn(
+        `[WebAgent:debug] addPageSnapshot tree preview (first 500 chars):\n${currentPageSnapshot.slice(0, 500)}`,
+      );
+    }
 
     // Debug compression stats if enabled
     if (this.debug) {
@@ -1105,34 +1108,14 @@ export class WebAgent {
 
   /**
    * Plan the task using proper tool calling.
-   *
-   * Three scenarios:
-   * 1. User provides startingUrl → use create_plan (no URL determination needed)
-   * 2. No startingUrl, webSearch disabled → use create_plan_with_url (planner picks URL)
-   * 3. No startingUrl, webSearch enabled → use create_plan_with_search_or_url (planner chooses)
+   * Uses a single create_plan tool with optional url field.
+   * When startingUrl is provided, the prompt shows it and the planner omits url.
+   * When no startingUrl, the prompt instructs the planner to determine a url.
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
     const webSearchEnabled = this.searchProvider !== "none";
-
-    // Select the appropriate prompt and tools based on scenario
-    let planningPrompt: string;
-    let planningTools: ReturnType<
-      typeof createPlanningTools | typeof createSearchOrUrlPlanningTools
-    >;
-
-    if (startingUrl) {
-      // Scenario 1: User provided URL - just plan, no URL determination needed
-      planningPrompt = buildPlanPrompt(task, startingUrl, this.guardrails);
-      planningTools = createPlanningTools();
-    } else if (webSearchEnabled) {
-      // Scenario 3: webSearch enabled - planner chooses search OR url
-      planningPrompt = buildPlanWithSearchOrUrlPrompt(task, this.guardrails);
-      planningTools = createSearchOrUrlPlanningTools();
-    } else {
-      // Scenario 2: No webSearch - planner must pick a URL
-      planningPrompt = buildPlanAndUrlPrompt(task, this.guardrails);
-      planningTools = createPlanningTools();
-    }
+    const planningPrompt = buildPlanPrompt(task, startingUrl, this.guardrails, webSearchEnabled);
+    const planningTools = createPlanningTools();
 
     // Emit processing event before planning - planning doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1174,7 +1157,7 @@ export class WebAgent {
       }
 
       // Cast to PlanningResponse - we've validated toolResults[0] exists above
-      const { plan, successCriteria, url, searchQuery, actionItems } = this.extractPlanOutput(
+      const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(
         planningResponse as unknown as PlanningResponse,
       );
 
@@ -1182,25 +1165,14 @@ export class WebAgent {
       this.successCriteria = successCriteria;
       this.actionItems = actionItems;
 
-      // Determine starting point based on planning result
-      if (startingUrl) {
-        // User provided URL takes priority
-        this.url = startingUrl;
-      } else if (searchQuery) {
-        // Planner chose to start with a search
-        this.initialSearchQuery = searchQuery;
-        this.url = "about:blank"; // Will execute search before action loop
-      } else if (url) {
-        // Planner chose to start with a URL
-        this.url = url;
-      }
+      // Determine starting point: user-provided URL > planner URL > blank
+      this.url = startingUrl || url || "about:blank";
 
       this.emit(WebAgentEventType.AGENT_STATUS, {
         message: "Task plan created",
         plan: this.plan,
         successCriteria: this.successCriteria,
         url: this.url,
-        ...(this.initialSearchQuery && { searchQuery: this.initialSearchQuery }),
       });
     } catch (error) {
       const errorMsg = this.extractErrorMessage(error);
@@ -1276,7 +1248,6 @@ export class WebAgent {
       plan: planOutput.plan || "",
       successCriteria: planOutput.successCriteria || "",
       url: planOutput.url,
-      searchQuery: planOutput.searchQuery,
       actionItems: planOutput.actionItems,
     };
   }
@@ -1371,59 +1342,16 @@ export class WebAgent {
     });
   }
 
-  /**
-   * Execute the initial web search if the planner chose to start with webSearch.
-   * Results are stored and included in the agent's initial context.
-   */
-  private async executeInitialSearchIfNeeded(): Promise<void> {
-    if (!this.initialSearchQuery) {
-      return;
-    }
-
-    this.emit(WebAgentEventType.AGENT_STATUS, {
-      message: `Executing initial web search: "${this.initialSearchQuery}"`,
-      iterationId: this.currentIterationId || "initial-search",
-    });
-
-    try {
-      const { createSearchProvider } = await import("./search/searchProvider.js");
-      // searchProvider is guaranteed to not be "none" here since initialSearchQuery is only set
-      // when webSearch is enabled (searchProvider !== "none")
-      const provider = await createSearchProvider(
-        this.searchProvider as Exclude<SearchProvider, "none">,
-        { apiKey: this.searchApiKey },
-      );
-
-      const browser = provider.requiresBrowser ? this.browser : undefined;
-      this.initialSearchResults = await provider.search(this.initialSearchQuery, browser);
-
-      this.emit(WebAgentEventType.AGENT_STATUS, {
-        message: "Web search completed",
-        iterationId: this.currentIterationId || "initial-search",
-      });
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[WebAgent] Initial search failed: ${errorMsg}`);
-      this.initialSearchResults = `Search failed: ${errorMsg}`;
-    }
-  }
-
   private initializeSystemPromptAndTask(task: string): void {
     const hasGuardrails = Boolean(this.guardrails);
 
-    // Build the task prompt, including initial search results if present
-    let taskPromptContent = buildTaskAndPlanPrompt(
+    const taskPromptContent = buildTaskAndPlanPrompt(
       task,
       this.successCriteria,
       this.plan,
       this.data,
       this.guardrails,
     );
-
-    // Append initial search results to the context if we started with a search
-    if (this.initialSearchResults) {
-      taskPromptContent += `\n\n**Initial Web Search Results for "${this.initialSearchQuery}":**\n${this.initialSearchResults}`;
-    }
 
     this.messages = [
       {
@@ -1486,6 +1414,7 @@ export class WebAgent {
     this.url = "";
     this.messages = [];
     this.successCriteria = "";
+    this.actionItems = undefined;
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;

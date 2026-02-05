@@ -79,12 +79,7 @@ export const TOOL_STRINGS = {
   },
 
   /**
-   * Planning tools - task planning and URL determination
-   *
-   * Three tools for different scenarios:
-   * - create_plan: When starting URL is already known (user provided --starting-url)
-   * - create_plan_with_url: When planner must pick a URL (webSearch disabled)
-   * - create_plan_with_search_or_url: When planner can choose search OR url (webSearch enabled)
+   * Planning tools - task planning and optional URL determination
    */
   planning: {
     /** Common parameter descriptions */
@@ -98,17 +93,7 @@ export const TOOL_STRINGS = {
     create_plan: {
       description:
         "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
-    },
-    create_plan_with_url: {
-      description:
-        "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
-      url: "Starting URL for the task",
-    },
-    create_plan_with_search_or_url: {
-      description:
-        "Create a step-by-step plan and choose how to start: either with a web search OR by navigating to a URL. Provide exactly one of url or searchQuery.",
-      url: "Starting URL (use if you know the specific site to visit)",
-      searchQuery: "Search query (use if you need to find information or don't know the URL)",
+      url: "The best starting URL for the task",
     },
   },
 
@@ -213,9 +198,10 @@ Your plan should:
 `.trim();
 
 /**
- * Planning prompt - used when user provides a starting URL.
- * Generates: create_plan() tool call.
- * Used by: planTask() when startingUrl is provided.
+ * Planning prompt — single template for all scenarios.
+ * - startingUrl provided: URL shown in prompt, no url param needed.
+ * - No startingUrl, no webSearch: planner must provide a url.
+ * - No startingUrl, webSearch enabled: planner doesn't need a url (agent uses webSearch).
  */
 const planPromptTemplate = buildPromptTemplate(
   `
@@ -225,101 +211,33 @@ Call create_plan() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
 - actionItems: ${TOOL_STRINGS.planning.common.actionItems}
+{% if not startingUrl and not webSearchEnabled %}- url: ${TOOL_STRINGS.planning.create_plan.url}{% endif %}
+{% if not startingUrl and webSearchEnabled %}- url (optional): ${TOOL_STRINGS.planning.create_plan.url}. You do not need to provide a starting URL — the agent has web search available and will find the right sites during execution.{% endif %}
 
 ${toolCallInstruction}
 `.trim(),
 );
 
 /**
- * Planning prompt - used when no starting URL and webSearch is disabled.
- * Planner must determine the best starting URL.
- * Generates: create_plan_with_url() tool call.
- * Used by: planTask() when no startingUrl and webSearch is disabled.
- */
-const planWithUrlPromptTemplate = buildPromptTemplate(
-  `
-${planningBaseContent}
-
-Call create_plan_with_url() with:
-- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
-- plan: ${TOOL_STRINGS.planning.common.plan}
-- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-- url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
-
-${toolCallInstruction}
-`.trim(),
-);
-
-/**
- * Planning prompt - used when no starting URL and webSearch IS enabled.
- * Planner explicitly chooses to start with a web search OR a URL.
- * Generates: create_plan_with_search_or_url() tool call.
- * Used by: planTask() when no startingUrl and webSearch is enabled.
- */
-const planWithSearchOrUrlPromptTemplate = buildPromptTemplate(
-  `
-${planningBaseContent}
-
-**Starting Point:**
-Choose how to begin the task:
-- If you need to search for information or find a website, provide a searchQuery
-- If you know the specific site to visit, provide a url
-
-Call create_plan_with_search_or_url() with:
-- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
-- plan: ${TOOL_STRINGS.planning.common.plan}
-- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-- url: ${TOOL_STRINGS.planning.create_plan_with_search_or_url.url} (if navigating to a known site)
-- searchQuery: ${TOOL_STRINGS.planning.create_plan_with_search_or_url.searchQuery} (if starting with a search)
-
-Provide exactly ONE of url or searchQuery, not both.
-
-${toolCallInstruction}
-`.trim(),
-);
-
-/**
- * Builds the planning prompt when user provides a starting URL.
- * Uses create_plan() - no URL determination needed.
+ * Builds the planning prompt.
  *
  * @param task - The task to plan
- * @param startingUrl - The URL to start from
+ * @param startingUrl - Optional URL to start from
  * @param guardrails - Optional constraints/guardrails
+ * @param webSearchEnabled - Whether the agent has web search available
  */
-export const buildPlanPrompt = (task: string, startingUrl: string, guardrails?: string | null) =>
+export const buildPlanPrompt = (
+  task: string,
+  startingUrl?: string,
+  guardrails?: string | null,
+  webSearchEnabled?: boolean,
+) =>
   planPromptTemplate({
     task,
     currentDate: getCurrentFormattedDate(),
     startingUrl,
     guardrails,
-  });
-
-/**
- * Builds the planning prompt when no starting URL and webSearch is disabled.
- * Uses create_plan_with_url() - planner must determine starting URL.
- *
- * @param task - The task to plan
- * @param guardrails - Optional constraints/guardrails
- */
-export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
-  planWithUrlPromptTemplate({
-    task,
-    currentDate: getCurrentFormattedDate(),
-    guardrails,
-  });
-
-/**
- * Builds the planning prompt when no starting URL and webSearch IS enabled.
- * Uses create_plan_with_search_or_url() - planner chooses search OR url.
- *
- * @param task - The task to plan
- * @param guardrails - Optional constraints/guardrails
- */
-export const buildPlanWithSearchOrUrlPrompt = (task: string, guardrails?: string | null) =>
-  planWithSearchOrUrlPromptTemplate({
-    task,
-    currentDate: getCurrentFormattedDate(),
-    guardrails,
+    webSearchEnabled,
   });
 
 /**

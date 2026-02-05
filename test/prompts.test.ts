@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  buildPlanAndUrlPrompt,
   buildPlanPrompt,
   actionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
@@ -22,54 +21,105 @@ describe("prompts", () => {
     vi.useRealTimers();
   });
 
-  describe("buildPlanAndUrlPrompt", () => {
-    it("should generate prompt for plan with URL", () => {
+  describe("buildPlanPrompt without startingUrl", () => {
+    it("should generate prompt with required url when no startingUrl and no webSearch", () => {
       const task = "Book a flight from NYC to Paris";
-      const prompt = buildPlanAndUrlPrompt(task);
+      const prompt = buildPlanPrompt(task);
 
       expect(prompt).toContain("Create a plan for this web navigation task");
       expect(prompt).toContain("Book a flight from NYC to Paris");
       expect(prompt).toContain("Jan 15, 2024");
-      expect(prompt).toContain("create_plan_with_url()");
-      expect(prompt).toContain("Starting URL for the task");
+      expect(prompt).toContain("create_plan()");
+      // url should be required (not optional)
+      expect(prompt).toContain("- url:");
+      expect(prompt).not.toContain("url (optional)");
+      expect(prompt).not.toContain("web search available");
     });
 
     it("should contain required instructions", () => {
       const task = "Test task";
-      const prompt = buildPlanAndUrlPrompt(task);
+      const prompt = buildPlanPrompt(task);
 
-      // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
-      // Verify tool call instruction is included
       expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
     });
 
     it("should include current date in prompt", () => {
       const task = "Find weather forecast";
-      const prompt = buildPlanAndUrlPrompt(task);
+      const prompt = buildPlanPrompt(task);
 
       expect(prompt).toContain("Today's Date: Jan 15, 2024");
     });
 
-    it("should include JSON schema for plan with URL", () => {
+    it("should not contain Starting URL when none provided", () => {
       const task = "Search for hotels";
-      const prompt = buildPlanAndUrlPrompt(task);
+      const prompt = buildPlanPrompt(task);
 
-      expect(prompt).toContain("successCriteria");
-      expect(prompt).toContain("plan");
-      expect(prompt).toContain("url");
+      expect(prompt).not.toContain("Starting URL:");
     });
 
     it("should handle special characters in task", () => {
       const task = 'Find "best restaurants" in NYC & book a table';
-      const prompt = buildPlanAndUrlPrompt(task);
+      const prompt = buildPlanPrompt(task);
 
       expect(prompt).toContain('Find "best restaurants" in NYC & book a table');
     });
+
+    it("should require url when webSearchEnabled is explicitly false", () => {
+      const prompt = buildPlanPrompt("Find hotels", undefined, null, false);
+
+      expect(prompt).toContain("- url:");
+      expect(prompt).not.toContain("url (optional)");
+      expect(prompt).not.toContain("web search available");
+    });
+
+    it("should include guardrails without startingUrl", () => {
+      const prompt = buildPlanPrompt("Find hotels", undefined, "Stay on approved sites");
+
+      expect(prompt).toContain("Stay on approved sites");
+      expect(prompt).toContain("- url:");
+    });
   });
 
-  describe("buildPlanPrompt", () => {
-    it("should generate prompt for plan with URL", () => {
+  describe("buildPlanPrompt with webSearch enabled", () => {
+    it("should show url as optional with web search hint", () => {
+      const prompt = buildPlanPrompt("Find hotels", undefined, null, true);
+
+      expect(prompt).toContain("url (optional)");
+      expect(prompt).toContain("web search available");
+      // Should NOT have the required url line
+      expect(prompt).not.toMatch(/\n- url: The best starting URL/);
+    });
+
+    it("should not show any url instruction when startingUrl is provided", () => {
+      const prompt = buildPlanPrompt("Find hotels", "https://hotels.com", null, true);
+
+      expect(prompt).not.toContain("url (optional)");
+      expect(prompt).not.toContain("web search available");
+      expect(prompt).not.toMatch(/\n- url: The best starting URL/);
+      expect(prompt).toContain("Starting URL:");
+    });
+
+    it("should include guardrails with webSearch enabled", () => {
+      const prompt = buildPlanPrompt("Find hotels", undefined, "Stay on approved sites", true);
+
+      expect(prompt).toContain("Stay on approved sites");
+      expect(prompt).toContain("url (optional)");
+      expect(prompt).toContain("web search available");
+    });
+
+    it("should still contain base planning instructions", () => {
+      const prompt = buildPlanPrompt("Test task", undefined, null, true);
+
+      expect(prompt).toContain("create_plan()");
+      expect(prompt).toContain("successCriteria");
+      expect(prompt).toContain("plan");
+      expect(prompt).toContain("actionItems");
+    });
+  });
+
+  describe("buildPlanPrompt with startingUrl", () => {
+    it("should generate prompt for plan with URL and no url param instruction", () => {
       const task = "Fill out contact form";
       const startingUrl = "https://example.com/contact";
       const prompt = buildPlanPrompt(task, startingUrl);
@@ -79,6 +129,10 @@ describe("prompts", () => {
       expect(prompt).toContain("Jan 15, 2024");
       expect(prompt).toContain("step-by-step plan");
       expect(prompt).toContain("Starting URL:");
+      // Should NOT instruct planner to provide a url
+      expect(prompt).not.toContain("url (optional)");
+      expect(prompt).not.toContain("web search available");
+      expect(prompt).not.toMatch(/\n- url: The best starting URL/);
     });
 
     it("should contain required instructions", () => {
@@ -496,12 +550,12 @@ describe("prompts", () => {
     it("should format dates consistently across functions", () => {
       const task = "test task";
 
-      const planPrompt = buildPlanPrompt(task, "https://example.com");
-      const planAndUrlPrompt = buildPlanAndUrlPrompt(task);
+      const planPromptWithUrl = buildPlanPrompt(task, "https://example.com");
+      const planPromptWithoutUrl = buildPlanPrompt(task);
       const taskAndPlanPrompt = buildTaskAndPlanPrompt(task, "explanation", "plan");
 
-      expect(planPrompt).toContain("Jan 15, 2024");
-      expect(planAndUrlPrompt).toContain("Jan 15, 2024");
+      expect(planPromptWithUrl).toContain("Jan 15, 2024");
+      expect(planPromptWithoutUrl).toContain("Jan 15, 2024");
       expect(taskAndPlanPrompt).toContain("Jan 15, 2024");
     });
 
@@ -526,7 +580,7 @@ describe("prompts", () => {
     it("should use consistent prompt style across functions", () => {
       const prompts = [
         buildPlanPrompt("test", "https://example.com"),
-        buildPlanAndUrlPrompt("test"),
+        buildPlanPrompt("test"),
         actionLoopSystemPrompt,
         buildTaskAndPlanPrompt("test", "successCriteria", "plan"),
         buildPageSnapshotPrompt("title", "url", "snapshot"),
@@ -544,7 +598,7 @@ describe("prompts", () => {
     it("should maintain tool call format consistency", () => {
       const toolCallPrompts = [
         buildPlanPrompt("test", "https://example.com"),
-        buildPlanAndUrlPrompt("test"),
+        buildPlanPrompt("test"),
         actionLoopSystemPrompt,
         buildStepErrorFeedbackPrompt("errors"),
       ];
