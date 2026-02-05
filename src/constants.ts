@@ -11,7 +11,7 @@
 // AI Generation Token Limits
 // ============================================================================
 
-/** Max tokens for generation */
+/** Max tokens for generation (raised from 3000 to prevent truncation of legitimate answers) */
 export const DEFAULT_GENERATION_MAX_TOKENS = 5000;
 
 /** Max tokens for planning */

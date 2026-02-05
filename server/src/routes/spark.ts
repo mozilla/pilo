@@ -119,6 +119,17 @@ spark.post("/run", async (c) => {
     // Get server configuration
     const serverConfig = config.getConfig();
 
+    const effectiveSearchProvider = body.searchProvider ?? serverConfig.search_provider;
+    if (effectiveSearchProvider === "parallel-api" && !serverConfig.parallel_api_key) {
+      return c.json(
+        createErrorResponse(
+          "parallel-api search provider requires PARALLEL_API_KEY to be configured on the server",
+          "MISSING_SEARCH_API_KEY",
+        ),
+        400,
+      );
+    }
+
     // Validate that we have some AI provider configured
 
     try {

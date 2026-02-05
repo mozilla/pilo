@@ -300,7 +300,7 @@ Provide your final answer:
 - Write naturally and informatively
 - Include all requested information
 - Format results as VALID Markdown
-- NEVER return raw JSON - ALwAYS format structured data as VALID Markdown
+- NEVER return raw JSON - ALWAYS format structured data as VALID Markdown
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.

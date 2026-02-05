@@ -207,6 +207,10 @@ export class WebAgent {
     this.searchProvider = options.searchProvider ?? defaults.search_provider;
     this.searchApiKey = options.searchApiKey;
 
+    if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
+      throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
+    }
+
     // Initialize services
     this.compressor = new SnapshotCompressor();
     this.eventEmitter = options.eventEmitter ?? new WebAgentEventEmitter();
