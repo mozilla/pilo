@@ -69,21 +69,22 @@ describe("prompts", () => {
   });
 
   describe("buildPlanPrompt", () => {
-    it("should generate prompt for plan without URL", () => {
+    it("should generate prompt for plan with URL", () => {
       const task = "Fill out contact form";
-      const prompt = buildPlanPrompt(task);
+      const startingUrl = "https://example.com/contact";
+      const prompt = buildPlanPrompt(task, startingUrl);
 
       expect(prompt).toContain("Create a plan for this web navigation task");
       expect(prompt).toContain("Fill out contact form");
       expect(prompt).toContain("Jan 15, 2024");
-      expect(prompt).not.toContain('"url"');
       expect(prompt).toContain("step-by-step plan");
-      expect(prompt).not.toContain("starting URL");
+      expect(prompt).toContain("Starting URL:");
     });
 
     it("should contain required instructions", () => {
       const task = "Test task";
-      const prompt = buildPlanPrompt(task);
+      const startingUrl = "https://example.com";
+      const prompt = buildPlanPrompt(task, startingUrl);
 
       // Verify youArePrompt content is included
       expect(prompt).toContain("You are an expert at completing tasks using a web browser");
@@ -101,17 +102,19 @@ describe("prompts", () => {
       expect(prompt).toContain("Begin from the provided URL");
     });
 
-    it("should not include starting URL when not provided", () => {
+    it("should include guardrails when provided", () => {
       const task = "Submit feedback form";
-      const prompt = buildPlanPrompt(task);
+      const startingUrl = "https://example.com/feedback";
+      const guardrails = "Do not submit personal information";
+      const prompt = buildPlanPrompt(task, startingUrl, guardrails);
 
-      expect(prompt).not.toContain("Starting URL:");
-      expect(prompt).not.toContain("Begin from the provided URL");
+      expect(prompt).toContain("Do not submit personal information");
     });
 
-    it("should include JSON schema for plan without URL", () => {
+    it("should include JSON schema for plan", () => {
       const task = "Update profile information";
-      const prompt = buildPlanPrompt(task);
+      const startingUrl = "https://example.com/profile";
+      const prompt = buildPlanPrompt(task, startingUrl);
 
       expect(prompt).toContain("successCriteria");
       expect(prompt).toContain("plan");
@@ -493,7 +496,7 @@ describe("prompts", () => {
     it("should format dates consistently across functions", () => {
       const task = "test task";
 
-      const planPrompt = buildPlanPrompt(task);
+      const planPrompt = buildPlanPrompt(task, "https://example.com");
       const planAndUrlPrompt = buildPlanAndUrlPrompt(task);
       const taskAndPlanPrompt = buildTaskAndPlanPrompt(task, "explanation", "plan");
 
@@ -506,7 +509,7 @@ describe("prompts", () => {
       const christmasDate = new Date("2024-12-25T10:00:00Z");
       vi.setSystemTime(christmasDate);
 
-      const prompt = buildPlanPrompt("test task");
+      const prompt = buildPlanPrompt("test task", "https://example.com");
       expect(prompt).toContain("Dec 25, 2024");
     });
 
@@ -514,7 +517,7 @@ describe("prompts", () => {
       const leapYearDate = new Date("2024-02-29T10:00:00Z");
       vi.setSystemTime(leapYearDate);
 
-      const prompt = buildPlanPrompt("test task");
+      const prompt = buildPlanPrompt("test task", "https://example.com");
       expect(prompt).toContain("Feb 29, 2024");
     });
   });
@@ -522,7 +525,7 @@ describe("prompts", () => {
   describe("Template consistency", () => {
     it("should use consistent prompt style across functions", () => {
       const prompts = [
-        buildPlanPrompt("test"),
+        buildPlanPrompt("test", "https://example.com"),
         buildPlanAndUrlPrompt("test"),
         actionLoopSystemPrompt,
         buildTaskAndPlanPrompt("test", "successCriteria", "plan"),
@@ -540,7 +543,7 @@ describe("prompts", () => {
 
     it("should maintain tool call format consistency", () => {
       const toolCallPrompts = [
-        buildPlanPrompt("test"),
+        buildPlanPrompt("test", "https://example.com"),
         buildPlanAndUrlPrompt("test"),
         actionLoopSystemPrompt,
         buildStepErrorFeedbackPrompt("errors"),

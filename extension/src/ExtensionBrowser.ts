@@ -632,4 +632,16 @@ export class ExtensionBrowser implements AriaBrowser {
     }
     return tabs[0];
   }
+
+  async runInIsolatedTab<T>(
+    _fn: (tab: {
+      goto: (url: string) => Promise<void>;
+      getMarkdown: () => Promise<string>;
+      waitForLoadState: (state: LoadState) => Promise<void>;
+    }) => Promise<T>,
+  ): Promise<T> {
+    // Search functionality is not supported in the browser extension
+    // The extension uses searchProvider: "none" by default
+    throw new Error("runInIsolatedTab is not supported in the browser extension");
+  }
 }

@@ -9,7 +9,7 @@ vi.mock("ai", () => ({
     const typedConfig = config as {
       description: string;
       inputSchema: unknown;
-      execute: (args: unknown) => Promise<unknown>;
+      execute: (args: unknown, options?: unknown) => Promise<unknown>;
     };
     return {
       ...typedConfig,
@@ -75,7 +75,9 @@ describe("Search Tools", () => {
     });
 
     it("should have correct input schema", () => {
-      const schema = tools.webSearch.inputSchema;
+      const schema = tools.webSearch.inputSchema as {
+        safeParse: (input: unknown) => { success: boolean };
+      };
       expect(schema).toBeDefined();
 
       // Valid input
@@ -98,7 +100,10 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      const result = await tools.webSearch.execute!({ query: "test query" });
+      const result = await tools.webSearch.execute!({ query: "test query" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(mockCreateSearchProvider).toHaveBeenCalledWith("duckduckgo", {
         apiKey: undefined,
@@ -121,7 +126,10 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      const result = await tools.webSearch.execute!({ query: "test query" });
+      const result = await tools.webSearch.execute!({ query: "test query" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(mockProvider.search).toHaveBeenCalledWith("test query", undefined);
       expect(result).toEqual({
@@ -147,7 +155,10 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      await toolsWithApiKey.webSearch.execute!({ query: "test" });
+      await toolsWithApiKey.webSearch.execute!({ query: "test" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(mockCreateSearchProvider).toHaveBeenCalledWith("parallel", {
         apiKey: "test-api-key",
@@ -164,7 +175,10 @@ describe("Search Tools", () => {
 
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
-      await tools.webSearch.execute!({ query: "test" });
+      await tools.webSearch.execute!({ query: "test" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
         action: "webSearch",
@@ -184,7 +198,10 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      const result = await tools.webSearch.execute!({ query: "test" });
+      const result = await tools.webSearch.execute!({ query: "test" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(result).toEqual({
         success: false,
@@ -205,7 +222,10 @@ describe("Search Tools", () => {
 
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
-      await tools.webSearch.execute!({ query: "test" });
+      await tools.webSearch.execute!({ query: "test" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
         success: false,
@@ -223,7 +243,10 @@ describe("Search Tools", () => {
       };
       mockCreateSearchProvider.mockResolvedValue(mockProvider);
 
-      const result = await tools.webSearch.execute!({ query: "test" });
+      const result = await tools.webSearch.execute!({ query: "test" }, {
+        toolCallId: "test",
+        messages: [],
+      } as any);
 
       expect(result).toEqual({
         success: false,
