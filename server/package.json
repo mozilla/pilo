@@ -26,8 +26,8 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.0.9",
-    "prettier": "^3.8.0",
+    "@types/node": "^25.0.10",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
@@ -36,7 +36,7 @@
     "@hono/node-server": "^1.19.9",
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.3",
-    "hono": "^4.11.4",
+    "hono": "^4.11.7",
     "spark": "file:.."
   },
   "packageManager": "pnpm@9.0.0"
