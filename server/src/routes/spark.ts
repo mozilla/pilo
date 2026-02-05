@@ -90,7 +90,7 @@ interface SparkTaskRequest {
   logger?: "console" | "json";
 
   // Search configuration overrides
-  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel";
+  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
 }
 
 // POST /spark/run - Execute a Spark task with real-time streaming
