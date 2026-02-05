@@ -183,8 +183,8 @@ class MockBrowser implements AriaBrowser {
 
   async waitForLoadState(): Promise<void> {}
 
-  async runInIsolatedTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
-    // Mock implementation that creates a simple isolated tab
+  async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
+    // Mock implementation that creates a simple temporary tab
     const mockTab = {
       goto: async () => {},
       waitForLoadState: async () => {},

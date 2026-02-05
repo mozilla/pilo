@@ -6,7 +6,7 @@ import { GoogleSearchProvider } from "../../src/search/providers/googleSearch.js
 import { BingSearchProvider } from "../../src/search/providers/bingSearch.js";
 import { ParallelSearchProvider } from "../../src/search/providers/parallelSearch.js";
 import { BrowserSearchProvider } from "../../src/search/providers/browserSearch.js";
-import type { AriaBrowser, IsolatedTab } from "../../src/browser/ariaBrowser.js";
+import type { AriaBrowser, TemporaryTab } from "../../src/browser/ariaBrowser.js";
 import { LoadState } from "../../src/browser/ariaBrowser.js";
 
 describe("Search Provider", () => {
@@ -116,23 +116,23 @@ describe("Search Provider", () => {
       await expect(provider.search("test")).rejects.toThrow("test search requires a browser");
     });
 
-    it("should execute search in isolated tab", async () => {
+    it("should execute search in temporary tab", async () => {
       const provider = new TestBrowserProvider();
 
       const mockMarkdown = "# Search Results";
-      const mockTab: IsolatedTab = {
+      const mockTab: TemporaryTab = {
         goto: vi.fn(),
         getMarkdown: vi.fn().mockResolvedValue(mockMarkdown),
         waitForLoadState: vi.fn(),
       };
 
       const mockBrowser = {
-        runInIsolatedTab: vi.fn(async (fn) => fn(mockTab)),
+        runInTemporaryTab: vi.fn(async (fn) => fn(mockTab)),
       } as unknown as AriaBrowser;
 
       const result = await provider.search("test query", mockBrowser);
 
-      expect(mockBrowser.runInIsolatedTab).toHaveBeenCalled();
+      expect(mockBrowser.runInTemporaryTab).toHaveBeenCalled();
       expect(mockTab.goto).toHaveBeenCalledWith("https://test.com/search?q=test%20query");
       expect(mockTab.waitForLoadState).toHaveBeenCalledWith(LoadState.Load);
       expect(mockTab.getMarkdown).toHaveBeenCalled();

@@ -13,7 +13,7 @@ import type { SearchProvider } from "../searchProvider.js";
  * Abstract base class for browser-based search providers.
  * Subclasses just provide the search URL - no parsing needed.
  *
- * Search is performed in an isolated tab so the agent's current page
+ * Search is performed in an temporary tab so the agent's current page
  * context is preserved.
  */
 export abstract class BrowserSearchProvider implements SearchProvider {
@@ -27,7 +27,7 @@ export abstract class BrowserSearchProvider implements SearchProvider {
   abstract getSearchUrl(query: string): string;
 
   /**
-   * Search for the given query using the browser in an isolated tab.
+   * Search for the given query using the browser in an temporary tab.
    * Returns the page markdown for the LLM to parse.
    */
   async search(query: string, browser?: AriaBrowser): Promise<string> {
@@ -37,7 +37,7 @@ export abstract class BrowserSearchProvider implements SearchProvider {
 
     const url = this.getSearchUrl(query);
 
-    const markdown = await browser.runInIsolatedTab(async (tab) => {
+    const markdown = await browser.runInTemporaryTab(async (tab) => {
       await tab.goto(url);
       await tab.waitForLoadState(LoadState.Load);
       return tab.getMarkdown();

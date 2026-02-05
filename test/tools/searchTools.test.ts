@@ -44,7 +44,7 @@ const createMockBrowser = (): AriaBrowser => ({
   getScreenshot: vi.fn().mockResolvedValue(Buffer.from("mock")),
   performAction: vi.fn(),
   waitForLoadState: vi.fn(),
-  runInIsolatedTab: vi.fn(),
+  runInTemporaryTab: vi.fn(),
 });
 
 // Default mock provider used by most tests

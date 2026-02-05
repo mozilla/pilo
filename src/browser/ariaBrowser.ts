@@ -36,10 +36,10 @@ export enum LoadState {
 }
 
 /**
- * Limited interface for isolated tab operations.
+ * Limited interface for temporary tab operations.
  * Used for "side quest" operations like search that shouldn't affect main page state.
  */
-export interface IsolatedTab {
+export interface TemporaryTab {
   /** Navigates to the specified URL */
   goto(url: string): Promise<void>;
   /** Returns the page content as clean markdown */
@@ -98,10 +98,10 @@ export interface AriaBrowser {
   waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
 
   /**
-   * Runs a function in an isolated tab, then closes it.
+   * Runs a function in an temporary tab, then closes it.
    * Main page state is preserved. Useful for "side quest" operations like search.
-   * @param fn Function to execute in the isolated tab
+   * @param fn Function to execute in the temporary tab
    * @returns The result of the function
    */
-  runInIsolatedTab<T>(fn: (tab: IsolatedTab) => Promise<T>): Promise<T>;
+  runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T>;
 }

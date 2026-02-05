@@ -11,7 +11,7 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
-import { AriaBrowser, PageAction, LoadState, IsolatedTab } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
@@ -248,7 +248,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Set consistent default timeout for all operations
     this.page.setDefaultTimeout(this.actionTimeoutMs);
 
-    // Initialize ad blocker once (reused for isolated tabs)
+    // Initialize ad blocker once (reused for temporary tabs)
     if (this.options.blockAds) {
       this.blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
     }
@@ -258,7 +258,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   /**
    * Apply ad blocking and resource blocking to a page.
-   * Used for both the main page and isolated tabs.
+   * Used for both the main page and temporary tabs.
    */
   private async setupPageBlocking(page: Page): Promise<void> {
     if (this.blocker) {
@@ -680,10 +680,10 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Runs a function in an isolated tab, then closes it.
+   * Runs a function in an temporary tab, then closes it.
    * Main page state is preserved. Useful for "side quest" operations like search.
    */
-  async runInIsolatedTab<T>(fn: (tab: IsolatedTab) => Promise<T>): Promise<T> {
+  async runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T> {
     if (!this.context) throw new Error("Browser not started");
 
     const tempPage = await this.context.newPage();
@@ -691,7 +691,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     await this.setupPageBlocking(tempPage);
 
     try {
-      const tab: IsolatedTab = {
+      const tab: TemporaryTab = {
         goto: async (url: string) => {
           await tempPage.goto(url, { waitUntil: "domcontentloaded" });
         },
