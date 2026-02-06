@@ -38,6 +38,7 @@ function generateWebExtJSON(): WebExtConfig {
 
 // See https://wxt.dev/api/config.html
 let config = {
+  outDir: "dist",
   modules: ["@wxt-dev/module-react", "@wxt-dev/webextension-polyfill"],
   hooks: {
     // WXT dev mode strips content_scripts from manifest even with registration: "manifest".
