@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pre-commit hook to scan for secrets using gitleaks
+# This hook is optional - see CLAUDE.md for installation instructions
+
+set -e
+
+echo "🔍 Scanning for secrets with gitleaks..."
+
+# Check if gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo "❌ gitleaks is not installed. Install it with:"
+    echo "   brew install gitleaks  (macOS)"
+    echo "   or visit: https://github.com/gitleaks/gitleaks"
+    exit 1
+fi
+
+# Run gitleaks on staged changes
+if gitleaks protect --staged -v; then
+    echo "✅ No secrets detected"
+    exit 0
+else
+    echo ""
+    echo "❌ Gitleaks found potential secrets!"
+    echo ""
+    echo "Options:"
+    echo "  1. Remove the secret from your staged changes"
+    echo "  2. If it's a false positive, add the fingerprint to .gitleaksignore"
+    echo "  3. Use 'git commit --no-verify' to bypass this check (not recommended)"
+    echo ""
+    exit 1
+fi

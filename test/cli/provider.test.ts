@@ -673,7 +673,7 @@ describe("Provider", () => {
       mockConfig.getConfig.mockReturnValue({
         ...defaults,
         provider: "openrouter",
-        openrouter_api_key: "sk-or-global123",
+        openrouter_api_key: "fake-global-key-123",
       });
 
       const info = getAIProviderInfo();
