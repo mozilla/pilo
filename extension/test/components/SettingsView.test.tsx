@@ -189,10 +189,10 @@ describe("SettingsView - Provider Dropdown", () => {
     it("should render all required fields including provider", () => {
       render(<SettingsView onBack={mockOnBack} />);
 
-      expect(screen.getByText("API Key")).toBeInTheDocument();
       expect(screen.getByText("Provider")).toBeInTheDocument();
-      expect(screen.getByText("API Endpoint")).toBeInTheDocument();
       expect(screen.getByText("Model")).toBeInTheDocument();
+      expect(screen.getByText(/API Endpoint/)).toBeInTheDocument();
+      expect(screen.getByText(/API Key/)).toBeInTheDocument();
     });
   });
 });

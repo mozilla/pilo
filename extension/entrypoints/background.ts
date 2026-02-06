@@ -21,7 +21,7 @@ interface StorageSettings {
   apiKey?: string;
   apiEndpoint?: string;
   model?: string;
-  provider?: "openai" | "openrouter";
+  provider?: "openai" | "openrouter" | "google" | "ollama";
 }
 
 export default defineBackground(() => {
@@ -119,7 +119,8 @@ export default defineBackground(() => {
               apiEndpoint: settings.apiEndpoint,
             });
 
-            if (!settings.apiKey) {
+            // API key is optional for Ollama
+            if (!settings.apiKey && settings.provider !== "ollama") {
               response = {
                 success: false,
                 message: "API key not configured. Please set up your credentials first.",
@@ -174,7 +175,7 @@ export default defineBackground(() => {
 
               // Use AgentManager to run the task with AbortSignal
               const result = await AgentManager.runTask(executeMessage.task, {
-                apiKey: settings.apiKey,
+                apiKey: settings.apiKey || "",
                 apiEndpoint: settings.apiEndpoint,
                 model: settings.model || "gpt-4.1-mini",
                 provider: settings.provider,
