@@ -103,13 +103,13 @@ describe("AgentManager", () => {
   });
 
   describe("OpenRouter Default Model", () => {
-    it("should use openai/gpt-4.1-mini as default for OpenRouter", async () => {
+    it("should use google/gemini-2.5-flash as default for OpenRouter", async () => {
       await AgentManager.runTask("test task", {
         apiKey: "test-openrouter-key",
         provider: "openrouter",
       });
 
-      expect(mockOpenRouter).toHaveBeenCalledWith("openai/gpt-4.1-mini");
+      expect(mockOpenRouter).toHaveBeenCalledWith("google/gemini-2.5-flash");
     });
 
     it("should use gpt-4.1-mini as default for OpenAI", async () => {

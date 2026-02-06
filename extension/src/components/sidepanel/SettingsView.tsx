@@ -12,6 +12,21 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
 
   const focusRing = "focus:ring-2 focus:ring-blue-500 focus:border-transparent";
 
+  const handleProviderChange = (newProvider: "openai" | "openrouter") => {
+    const updates: Partial<typeof settings> = { provider: newProvider };
+
+    // If switching to OpenAI and endpoint is empty, prefill with default
+    if (newProvider === "openai" && !settings.apiEndpoint) {
+      updates.apiEndpoint = "https://api.openai.com/v1";
+    }
+    // If switching to OpenRouter, clear the endpoint (not used)
+    else if (newProvider === "openrouter") {
+      updates.apiEndpoint = "";
+    }
+
+    updateSettings(updates);
+  };
+
   const handleSave = async () => {
     await saveSettings();
     // Auto-close settings after successful save
@@ -43,9 +58,7 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
               <label className={`block text-sm font-medium ${t.text.secondary}`}>Provider</label>
               <select
                 value={settings.provider}
-                onChange={(e) =>
-                  updateSettings({ provider: e.target.value as "openai" | "openrouter" })
-                }
+                onChange={(e) => handleProviderChange(e.target.value as "openai" | "openrouter")}
                 className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} focus:outline-none ${focusRing}`}
               >
                 <option value="openai">OpenAI</option>
@@ -59,7 +72,7 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
                 type="text"
                 value={settings.model}
                 onChange={(e) => updateSettings({ model: e.target.value })}
-                placeholder="gpt-4.1-mini"
+                placeholder="google/gemini-2.5-flash"
                 className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
               />
             </div>
@@ -72,7 +85,7 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
                 type="text"
                 value={settings.apiEndpoint}
                 onChange={(e) => updateSettings({ apiEndpoint: e.target.value })}
-                placeholder="https://api.openai.com/v1"
+                placeholder="Optional for OpenAI only"
                 className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
               />
             </div>
