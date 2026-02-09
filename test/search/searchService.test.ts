@@ -87,7 +87,9 @@ describe("SearchService", () => {
       const result = await service.search("test query");
 
       expect(mockProvider.search).toHaveBeenCalledWith("test query", mockBrowser);
-      expect(result).toBe("# Results");
+      expect(result).toBe(
+        '# Results\n\n**IMPORTANT:** These are only search result summaries. When you find relevant results, use `goto({"url": "..."})` to visit the actual page and get complete information.',
+      );
     });
 
     it("should not pass browser when provider does not require it", async () => {
@@ -104,7 +106,9 @@ describe("SearchService", () => {
       const result = await service.search("test query");
 
       expect(mockProvider.search).toHaveBeenCalledWith("test query", undefined);
-      expect(result).toBe("# API Results");
+      expect(result).toBe(
+        '# API Results\n\n**IMPORTANT:** These are only search result summaries. When you find relevant results, use `goto({"url": "..."})` to visit the actual page and get complete information.',
+      );
     });
 
     it("should propagate search errors", async () => {

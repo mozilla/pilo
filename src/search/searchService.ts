@@ -31,6 +31,8 @@ export class SearchService {
 
   async search(query: string): Promise<string> {
     const browser = this.provider.requiresBrowser ? this.browser : undefined;
-    return this.provider.search(query, browser);
+    const results = await this.provider.search(query, browser);
+    // Append reminder to visit actual pages instead of relying on summaries
+    return `${results}\n\n**IMPORTANT:** These are only search result summaries. When you find relevant results, use \`goto({"url": "..."})\` to visit the actual page and get complete information.`;
   }
 }
