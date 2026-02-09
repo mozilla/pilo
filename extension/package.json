@@ -58,7 +58,7 @@
     "happy-dom": "^20.3.4",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.17",
+    "vitest": "^4.0.18",
     "wxt": "0.20.13"
   },
   "packageManager": "pnpm@9.0.0"
