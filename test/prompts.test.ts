@@ -7,6 +7,7 @@ import {
   buildPageSnapshotPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
+  buildExtractionPrompt,
 } from "../src/prompts.js";
 
 // Mock Date for consistent test results
@@ -627,6 +628,30 @@ describe("prompts", () => {
       const prompt = buildPlanPrompt("test task", "https://example.com");
       expect(prompt).toContain("Feb 29, 2024");
     });
+
+    it("should include date in buildActionLoopSystemPrompt", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false);
+      expect(prompt).toContain("Today's Date: Jan 15, 2024");
+    });
+
+    it("should include date in buildPageSnapshotPrompt", () => {
+      const prompt = buildPageSnapshotPrompt(
+        "Test Title",
+        "https://example.com",
+        "snapshot content",
+      );
+      expect(prompt).toContain("Today's Date: Jan 15, 2024");
+    });
+
+    it("should include date in buildTaskValidationPrompt", () => {
+      const prompt = buildTaskValidationPrompt("task", "success criteria", "answer", "history");
+      expect(prompt).toContain("Today's Date: Jan 15, 2024");
+    });
+
+    it("should include date in buildExtractionPrompt", () => {
+      const prompt = buildExtractionPrompt("extract prices", "# Page content\nPrice: $99");
+      expect(prompt).toContain("Today's Date: Jan 15, 2024");
+    });
   });
 
   describe("Template consistency", () => {
@@ -639,6 +664,7 @@ describe("prompts", () => {
         buildPageSnapshotPrompt("title", "url", "snapshot"),
         buildStepErrorFeedbackPrompt("errors"),
         buildTaskValidationPrompt("task", "success criteria", "answer", "conversation history"),
+        buildExtractionPrompt("extract data", "page content"),
       ];
 
       // All prompts should be non-empty strings

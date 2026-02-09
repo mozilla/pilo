@@ -261,6 +261,8 @@ const actionLoopSystemPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
 
+Today's Date: {{ currentDate }}
+
 Analyze the current page state and determine your next action based on previous outcomes.
 
 **Available Tools:**
@@ -315,6 +317,7 @@ const buildActionLoopSystemPrompt = (hasGuardrails: boolean, hasWebSearch: boole
   actionLoopSystemPromptTemplate({
     hasGuardrails,
     toolExamples: buildToolExamples(hasWebSearch),
+    currentDate: getCurrentFormattedDate(),
   });
 
 export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false, false);
@@ -371,6 +374,7 @@ const pageSnapshotTemplate = buildPromptTemplate(
   `
 Title: {{ title }}
 URL: {{ url }}
+Today's Date: {{ currentDate }}
 
 \`\`\`
 {{ snapshot }}
@@ -408,6 +412,7 @@ export const buildPageSnapshotPrompt = (
     url,
     snapshot,
     hasScreenshot,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /**
@@ -452,6 +457,7 @@ const taskValidationTemplate = buildPromptTemplate(
 Evaluate if the task result gives the user what they requested.
 Be concise in your response.
 
+Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Result: {{ finalAnswer }}
@@ -490,6 +496,7 @@ export const buildTaskValidationPrompt = (
     successCriteria,
     finalAnswer,
     conversationHistory,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /**
@@ -529,6 +536,7 @@ const extractionPromptTemplate = buildPromptTemplate(
 Extract this data from the page content:
 {{ extractionDescription }}
 
+Today's Date: {{ currentDate }}
 Page Content (Markdown):
 {{ markdown }}
 
@@ -544,6 +552,7 @@ export const buildExtractionPrompt = (extractionDescription: string, markdown: s
   extractionPromptTemplate({
     extractionDescription,
     markdown,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /** Get current date in "MMM D, YYYY" format. */
