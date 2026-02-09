@@ -1,3 +1,4 @@
+import { wrapExternalContentWithWarning, ExternalContentLabel } from "./utils/promptSecurity.js";
 import { buildPromptTemplate } from "./utils/template.js";
 
 /**
@@ -329,10 +330,10 @@ export { buildActionLoopSystemPrompt };
  */
 const taskAndPlanTemplate = buildPromptTemplate(
   `
+Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Plan: {{ plan }}
-Today's Date: {{ currentDate }}
 {% if data %}
 Input Data:
 \`\`\`json
@@ -372,13 +373,9 @@ export const buildTaskAndPlanPrompt = (
  */
 const pageSnapshotTemplate = buildPromptTemplate(
   `
-Title: {{ title }}
-URL: {{ url }}
-Today's Date: {{ currentDate }}
+{{ wrappedPageSnapshot }}
 
-\`\`\`
-{{ snapshot }}
-\`\`\`
+Today's Date: {{ currentDate }}
 
 The above accessibility tree shows page elements in a hierarchical text format. Each line represents an element with:
 - Element type (button, link, textbox, generic, etc.)
@@ -406,14 +403,17 @@ export const buildPageSnapshotPrompt = (
   url: string,
   snapshot: string,
   hasScreenshot: boolean = false,
-) =>
-  pageSnapshotTemplate({
-    title,
-    url,
-    snapshot,
+) => {
+  const pageContent = `Title: ${title}\nURL: ${url}\n\n${snapshot}`;
+  return pageSnapshotTemplate({
+    wrappedPageSnapshot: wrapExternalContentWithWarning(
+      pageContent,
+      ExternalContentLabel.PageSnapshot,
+    ),
     hasScreenshot,
     currentDate: getCurrentFormattedDate(),
   });
+};
 
 /**
  * Error feedback prompt - informs AI when actions fail.
@@ -533,12 +533,12 @@ export const buildValidationFeedbackPrompt = (
  */
 const extractionPromptTemplate = buildPromptTemplate(
   `
-Extract this data from the page content:
-{{ extractionDescription }}
+{{ wrappedMarkdown }}
 
 Today's Date: {{ currentDate }}
-Page Content (Markdown):
-{{ markdown }}
+
+Extract this data from the page content above:
+{{ extractionDescription }}
 
 Instructions:
 - Include all relevant details that match the extraction request
@@ -551,7 +551,7 @@ Return only the extracted data – no other text or commentary.
 export const buildExtractionPrompt = (extractionDescription: string, markdown: string): string =>
   extractionPromptTemplate({
     extractionDescription,
-    markdown,
+    wrappedMarkdown: wrapExternalContentWithWarning(markdown, ExternalContentLabel.PageMarkdown),
     currentDate: getCurrentFormattedDate(),
   });
 
