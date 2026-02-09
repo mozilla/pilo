@@ -11,7 +11,7 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
-import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
@@ -80,6 +80,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private blocker: PlaywrightBlocker | null = null;
 
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
@@ -247,27 +248,35 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Set consistent default timeout for all operations
     this.page.setDefaultTimeout(this.actionTimeoutMs);
 
-    // Enable ad blocking if requested
+    // Initialize ad blocker once (reused for temporary tabs)
     if (this.options.blockAds) {
-      const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
-      blocker.enableBlockingInPage(this.page);
+      this.blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
     }
 
-    // Set up resource blocking based on options
+    await this.setupPageBlocking(this.page);
+  }
+
+  /**
+   * Apply ad blocking and resource blocking to a page.
+   * Used for both the main page and temporary tabs.
+   */
+  private async setupPageBlocking(page: Page): Promise<void> {
+    if (this.blocker) {
+      this.blocker.enableBlockingInPage(page);
+    }
+
     if (this.options.blockResources && this.options.blockResources.length > 0) {
-      await this.page.route("**/*", async (route) => {
+      await page.route("**/*", async (route) => {
         try {
           const request = route.request();
           const resourceType = request.resourceType();
 
-          // Block if the resource type is in the block list
           if (this.options.blockResources!.includes(resourceType as any)) {
             await route.abort();
           } else {
             await route.continue();
           }
         } catch (error) {
-          // If route handling fails, continue to avoid blocking navigation
           try {
             await route.continue();
           } catch (continueError) {
@@ -289,6 +298,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       this.browser = null;
       this.context = null;
       this.page = null;
+      this.blocker = null;
     }
   }
 
@@ -456,46 +466,47 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Gets simplified HTML with noise elements removed in browser context
-   * Reduces payload size by removing elements we don't need
+   * Gets simplified HTML with noise elements removed in browser context.
+   * Reduces payload size by removing elements we don't need.
    */
   async getSimpleHtml(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-
-    return await this.page.evaluate(() => {
-      const body = document.body || document.documentElement;
-      if (!body) return "";
-
-      const clone = body.cloneNode(true) as Element;
-
-      // Remove noise elements in browser context to reduce wire transfer
-      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
-
-      return clone.innerHTML;
-    });
+    return PlaywrightBrowser.getSimpleHtmlFromPage(this.page);
   }
 
   async getMarkdown(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
+    return PlaywrightBrowser.pageToMarkdown(this.page);
+  }
 
-    try {
-      // Get simplified HTML (noise removed in browser context)
-      const html = await this.getSimpleHtml();
+  /**
+   * Strip noise elements and return innerHTML. Single source of truth
+   * for HTML simplification — used by getSimpleHtml() and pageToMarkdown().
+   */
+  private static async getSimpleHtmlFromPage(page: Page): Promise<string> {
+    return page.evaluate(() => {
+      const body = document.body || document.documentElement;
+      if (!body) return "";
+      const clone = body.cloneNode(true) as Element;
+      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+      return clone.innerHTML;
+    });
+  }
 
-      // Convert HTML to markdown using turndown
-      const turndown = new TurndownService({
-        headingStyle: "atx",
-        codeBlockStyle: "fenced",
-        emDelimiter: "*",
-        strongDelimiter: "**",
-      });
+  /**
+   * Convert a page's HTML to markdown, stripping noise elements first.
+   */
+  private static async pageToMarkdown(page: Page): Promise<string> {
+    const html = await PlaywrightBrowser.getSimpleHtmlFromPage(page);
 
-      return turndown.turndown(html);
-    } catch (error) {
-      throw new Error(
-        `Failed to get markdown: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    const turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      emDelimiter: "*",
+      strongDelimiter: "**",
+    });
+
+    return turndown.turndown(html);
   }
 
   async getScreenshot(): Promise<Buffer> {
@@ -665,6 +676,38 @@ export class PlaywrightBrowser implements AriaBrowser {
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
         { originalError: error },
       );
+    }
+  }
+
+  /**
+   * Runs a function in an temporary tab, then closes it.
+   * Main page state is preserved. Useful for "side quest" operations like search.
+   */
+  async runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T> {
+    if (!this.context) throw new Error("Browser not started");
+
+    const tempPage = await this.context.newPage();
+    tempPage.setDefaultTimeout(this.actionTimeoutMs);
+    await this.setupPageBlocking(tempPage);
+
+    try {
+      const tab: TemporaryTab = {
+        goto: async (url: string) => {
+          await tempPage.goto(url, { waitUntil: "domcontentloaded" });
+        },
+        getMarkdown: async () => PlaywrightBrowser.pageToMarkdown(tempPage),
+        waitForLoadState: async (state: LoadState, options?: { timeout?: number }) => {
+          await tempPage.waitForLoadState(state, options);
+        },
+      };
+
+      return await fn(tab);
+    } finally {
+      try {
+        await tempPage.close();
+      } catch {
+        // Ignore close errors to avoid masking the original error from fn()
+      }
     }
   }
 

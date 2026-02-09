@@ -6,6 +6,7 @@ import {
   createAIProvider,
   getAIProviderInfo,
   createNavigationRetryConfig,
+  SEARCH_PROVIDERS,
 } from "spark";
 import type { TaskExecutionResult } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
@@ -88,6 +89,9 @@ interface SparkTaskRequest {
 
   // Logging configuration
   logger?: "console" | "json";
+
+  // Search configuration overrides
+  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
 }
 
 // POST /spark/run - Execute a Spark task with real-time streaming
@@ -99,8 +103,32 @@ spark.post("/run", async (c) => {
       return c.json(createErrorResponse("Task is required", "MISSING_TASK"), 400);
     }
 
+    if (
+      body.searchProvider &&
+      !SEARCH_PROVIDERS.includes(body.searchProvider as (typeof SEARCH_PROVIDERS)[number])
+    ) {
+      return c.json(
+        createErrorResponse(
+          `Invalid search provider: ${body.searchProvider}. Must be one of: ${SEARCH_PROVIDERS.join(", ")}`,
+          "INVALID_SEARCH_PROVIDER",
+        ),
+        400,
+      );
+    }
+
     // Get server configuration
     const serverConfig = config.getConfig();
+
+    const effectiveSearchProvider = body.searchProvider ?? serverConfig.search_provider;
+    if (effectiveSearchProvider === "parallel-api" && !serverConfig.parallel_api_key) {
+      return c.json(
+        createErrorResponse(
+          "parallel-api search provider requires PARALLEL_API_KEY to be configured on the server",
+          "MISSING_SEARCH_API_KEY",
+        ),
+        400,
+      );
+    }
 
     // Validate that we have some AI provider configured
 
@@ -173,6 +201,8 @@ spark.post("/run", async (c) => {
           maxIterations: body.maxIterations ?? serverConfig.max_iterations,
           maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
           guardrails: body.guardrails,
+          searchProvider: body.searchProvider ?? serverConfig.search_provider,
+          searchApiKey: serverConfig.parallel_api_key,
         };
 
         // Create browser and agent instances

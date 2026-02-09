@@ -21,17 +21,18 @@ import {
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildPlanAndUrlPrompt,
   buildPlanPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
   buildValidationFeedbackPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
+import { createSearchTools } from "./tools/searchTools.js";
+import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-import { getConfigDefaults } from "./configDefaults.js";
+import { getConfigDefaults, type SearchProviderName } from "./configDefaults.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
@@ -65,6 +66,10 @@ export interface WebAgentOptions {
   maxRepeatedActions?: number;
   /** Number of times to retry initial navigation with browser restart (0 = no retries, default: 1) */
   initialNavigationRetries?: number;
+  /** Search provider to use for web search (default: from config, typically "none") */
+  searchProvider?: SearchProviderName;
+  /** API key for search providers that require authentication (e.g., Parallel) */
+  searchApiKey?: string;
 }
 
 export interface ExecuteOptions {
@@ -168,6 +173,7 @@ export class WebAgent {
   private compressor: SnapshotCompressor;
   private eventEmitter: WebAgentEventEmitter;
   private logger: Logger;
+  private searchService: SearchService | null = null;
 
   // === Configuration ===
   private readonly providerConfig: ProviderConfig;
@@ -180,6 +186,8 @@ export class WebAgent {
   private readonly maxRepeatedActions: number;
   private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
+  private readonly searchProvider: SearchProviderName;
+  private readonly searchApiKey: string | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -198,6 +206,12 @@ export class WebAgent {
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
+    this.searchProvider = options.searchProvider ?? defaults.search_provider;
+    this.searchApiKey = options.searchApiKey;
+
+    if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
+      throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
+    }
 
     // Initialize services
     this.compressor = new SnapshotCompressor();
@@ -218,20 +232,28 @@ export class WebAgent {
     // 2. Initialize browser and internal state
     await this.initializeBrowserAndState(task, options);
 
+    // 3. Eagerly create search service so provider errors surface before the main loop
+    if (this.searchProvider !== "none") {
+      this.searchService = await SearchService.create(this.searchProvider, this.browser, {
+        apiKey: this.searchApiKey,
+      });
+    }
+
     const executionState = this.initializeExecutionState();
 
     try {
-      // 3. Planning phase
+      // 4. Planning phase
       await this.planTask(task, options.startingUrl);
 
-      // 4. Navigation phase (with retry on recoverable errors)
+      // 5. Navigation phase (with retry on recoverable errors)
       await this.navigateToStartWithRetry(task);
+
       this.initializeSystemPromptAndTask(task);
 
-      // 5. Main execution loop
+      // 6. Main execution loop
       const loopOutcome = await this.runMainLoop(task, executionState);
 
-      // 6. Return results
+      // 7. Return results
       return this.buildResult(loopOutcome, executionState);
     } catch (error) {
       // Check if aborted
@@ -279,7 +301,18 @@ export class WebAgent {
       abortSignal: this.abortSignal,
     });
 
-    let needsPageSnapshot = true;
+    // Only include search tools if a search service was created
+    const searchTools = this.searchService
+      ? createSearchTools({ searchService: this.searchService, eventEmitter: this.eventEmitter })
+      : {};
+
+    // Merge all tools
+    const allTools = { ...webActionTools, ...searchTools };
+
+    // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
+    // The empty page has no useful elements and the snapshot prompt causes the model
+    // to hallucinate refs.
+    let needsPageSnapshot = this.url !== "about:blank";
     let consecutiveErrors = 0;
     let totalErrors = 0;
 
@@ -320,7 +353,7 @@ export class WebAgent {
 
       // Single try-catch for ALL iteration logic
       try {
-        const result = await this.generateAndProcessAction(task, webActionTools, executionState);
+        const result = await this.generateAndProcessAction(task, allTools, executionState);
 
         // Reset error counter on success
         consecutiveErrors = 0;
@@ -476,7 +509,11 @@ export class WebAgent {
     });
 
     // Add error feedback to conversation for non-tool errors
-    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, Boolean(this.guardrails));
+    const errorFeedback = buildStepErrorFeedbackPrompt(
+      errorMessage,
+      Boolean(this.guardrails),
+      this.searchProvider !== "none",
+    );
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
@@ -547,8 +584,16 @@ export class WebAgent {
     // First, truncate old snapshots to keep context size manageable
     this.truncateOldSnapshots();
 
+    const currentUrl = await this.browser.getUrl();
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
+
+    if (this.debug) {
+      console.warn(`[WebAgent:debug] addPageSnapshot URL: ${currentUrl}`);
+      console.warn(
+        `[WebAgent:debug] addPageSnapshot tree preview (first 500 chars):\n${currentPageSnapshot.slice(0, 500)}`,
+      );
+    }
 
     // Debug compression stats if enabled
     if (this.debug) {
@@ -764,8 +809,8 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract)
-    const pageChanged = actionOutput.action !== "extract";
+    // Determine if page changed (most actions change the page, except extract and webSearch)
+    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {
@@ -1073,12 +1118,15 @@ export class WebAgent {
   }
 
   /**
-   * Plan the task using proper tool calling
+   * Plan the task using proper tool calling.
+   * Uses a single create_plan tool with optional url field.
+   * When startingUrl is provided, the prompt shows it and the planner omits url.
+   * When no startingUrl, the prompt instructs the planner to determine a url.
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
-    const planningPrompt = startingUrl
-      ? buildPlanPrompt(task, startingUrl, this.guardrails)
-      : buildPlanAndUrlPrompt(task, this.guardrails);
+    const webSearchEnabled = this.searchProvider !== "none";
+    const planningPrompt = buildPlanPrompt(task, startingUrl, this.guardrails, webSearchEnabled);
+    const planningTools = createPlanningTools();
 
     // Emit processing event before planning - planning doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1094,8 +1142,6 @@ export class WebAgent {
     });
 
     try {
-      const planningTools = createPlanningTools();
-
       const planningResponse = await generateTextWithRetry(
         {
           ...this.providerConfig,
@@ -1130,11 +1176,8 @@ export class WebAgent {
       this.successCriteria = successCriteria;
       this.actionItems = actionItems;
 
-      if (!startingUrl && url) {
-        this.url = url;
-      } else if (startingUrl) {
-        this.url = startingUrl;
-      }
+      // Determine starting point: user-provided URL > planner URL > blank
+      this.url = startingUrl || url || "about:blank";
 
       this.emit(WebAgentEventType.AGENT_STATUS, {
         message: "Task plan created",
@@ -1297,7 +1340,9 @@ export class WebAgent {
       throw new Error("No starting URL determined");
     }
 
-    await this.browser.goto(this.url);
+    if (this.url !== "about:blank") {
+      await this.browser.goto(this.url);
+    }
     await this.updatePageState();
 
     this.emit(WebAgentEventType.TASK_STARTED, {
@@ -1312,21 +1357,24 @@ export class WebAgent {
 
   private initializeSystemPromptAndTask(task: string): void {
     const hasGuardrails = Boolean(this.guardrails);
+    const hasWebSearch = this.searchProvider !== "none";
+
+    const taskPromptContent = buildTaskAndPlanPrompt(
+      task,
+      this.successCriteria,
+      this.plan,
+      this.data,
+      this.guardrails,
+    );
 
     this.messages = [
       {
         role: "system",
-        content: buildActionLoopSystemPrompt(hasGuardrails),
+        content: buildActionLoopSystemPrompt(hasGuardrails, hasWebSearch),
       },
       {
         role: "user",
-        content: buildTaskAndPlanPrompt(
-          task,
-          this.successCriteria,
-          this.plan,
-          this.data,
-          this.guardrails,
-        ),
+        content: taskPromptContent,
       },
     ];
   }
@@ -1380,10 +1428,12 @@ export class WebAgent {
     this.url = "";
     this.messages = [];
     this.successCriteria = "";
+    this.actionItems = undefined;
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;
     this.abortSignal = undefined;
+    this.searchService = null;
   }
 
   private initializeExecutionState(): ExecutionState {

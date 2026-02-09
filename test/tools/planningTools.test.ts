@@ -6,11 +6,8 @@ import type { ModelMessage } from "ai";
 interface CreatePlanResult {
   successCriteria: string;
   plan: string;
+  url?: string;
   actionItems?: string[];
-}
-
-interface CreatePlanWithUrlResult extends CreatePlanResult {
-  url: string;
 }
 
 describe("Planning Tools", () => {
@@ -20,7 +17,6 @@ describe("Planning Tools", () => {
 
       expect(tools).toBeDefined();
       expect(tools.create_plan).toBeDefined();
-      expect(tools.create_plan_with_url).toBeDefined();
     });
 
     it("should have correct description for create_plan", () => {
@@ -28,14 +24,6 @@ describe("Planning Tools", () => {
 
       expect(tools.create_plan.description).toBe(
         "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
-      );
-    });
-
-    it("should have correct description for create_plan_with_url", () => {
-      const tools = createPlanningTools();
-
-      expect(tools.create_plan_with_url.description).toBe(
-        "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
       );
     });
 
@@ -47,7 +35,7 @@ describe("Planning Tools", () => {
       expect(schema).toBeDefined();
       expect(schema instanceof z.ZodObject).toBe(true);
 
-      // Test valid input
+      // Test valid input without url
       const validInput = {
         successCriteria: "I need to search for information",
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
@@ -58,15 +46,10 @@ describe("Planning Tools", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should have correct input schema for create_plan_with_url", () => {
+    it("should accept create_plan with optional url", () => {
       const tools = createPlanningTools();
-      const schema = tools.create_plan_with_url.inputSchema;
+      const schema = tools.create_plan.inputSchema;
 
-      // Validate the schema structure
-      expect(schema).toBeDefined();
-      expect(schema instanceof z.ZodObject).toBe(true);
-
-      // Test valid input
       const validInput = {
         successCriteria: "I need to search for flights",
         plan: "1. Go to travel site\n2. Enter dates\n3. Search flights",
@@ -76,6 +59,50 @@ describe("Planning Tools", () => {
       const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
       const result = zodSchema.safeParse(validInput);
       expect(result.success).toBe(true);
+    });
+
+    it("should accept create_plan without url", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const validInput = {
+        successCriteria: "I need to search for information",
+        plan: "1. Navigate to search\n2. Enter query\n3. Review results",
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(validInput);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid url in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        url: "not-a-url",
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject empty string url in create_plan", () => {
+      const tools = createPlanningTools();
+      const schema = tools.create_plan.inputSchema;
+
+      const invalidInput = {
+        successCriteria: "Test",
+        plan: "1. Do something",
+        url: "",
+      };
+
+      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
+      const result = zodSchema.safeParse(invalidInput);
+      expect(result.success).toBe(false);
     });
 
     it("should reject invalid input for create_plan", () => {
@@ -93,23 +120,7 @@ describe("Planning Tools", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should reject invalid input for create_plan_with_url", () => {
-      const tools = createPlanningTools();
-      const schema = tools.create_plan_with_url.inputSchema;
-
-      // Missing required fields
-      const invalidInput = {
-        successCriteria: "Test",
-        plan: "1. Do something",
-        // missing url
-      };
-
-      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
-      const result = zodSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-    });
-
-    it("should execute create_plan and return input", async () => {
+    it("should execute create_plan and return input without url", async () => {
       const tools = createPlanningTools();
 
       const input = {
@@ -125,9 +136,10 @@ describe("Planning Tools", () => {
       expect(result).toEqual(input);
       expect(result.successCriteria).toBe("Test successCriteria");
       expect(result.plan).toBe("Test plan");
+      expect(result.url).toBeUndefined();
     });
 
-    it("should execute create_plan_with_url and return input", async () => {
+    it("should execute create_plan and return input with url", async () => {
       const tools = createPlanningTools();
 
       const input = {
@@ -136,12 +148,11 @@ describe("Planning Tools", () => {
         url: "https://example.com",
       };
 
-      const result = (await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as ModelMessage[],
-      })) as CreatePlanWithUrlResult;
+      })) as CreatePlanResult;
 
-      expect(result).toEqual(input);
       expect(result.successCriteria).toBe("Test successCriteria");
       expect(result.plan).toBe("Test plan");
       expect(result.url).toBe("https://example.com");
@@ -200,10 +211,10 @@ describe("Planning Tools", () => {
         url: "https://example.com/search?q=test&filter=true&page=1",
       };
 
-      const result = (await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as ModelMessage[],
-      })) as CreatePlanWithUrlResult;
+      })) as CreatePlanResult;
 
       expect(result.url).toBe("https://example.com/search?q=test&filter=true&page=1");
     });
@@ -217,10 +228,10 @@ describe("Planning Tools", () => {
         url: "https://example.com/fr",
       };
 
-      const result = (await tools.create_plan_with_url.execute!(input, {
+      const result = (await tools.create_plan.execute!(input, {
         toolCallId: "test",
         messages: [] as ModelMessage[],
-      })) as CreatePlanWithUrlResult;
+      })) as CreatePlanResult;
 
       expect(result.successCriteria).toBe("Tâche en français");
       expect(result.plan).toContain("Étape");
@@ -235,22 +246,6 @@ describe("Planning Tools", () => {
         successCriteria: "I need to search for information",
         plan: "1. Navigate to search\n2. Enter query\n3. Review results",
         actionItems: ["Navigate to search", "Enter query", "Review results"],
-      };
-
-      const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
-      const result = zodSchema.safeParse(validInput);
-      expect(result.success).toBe(true);
-    });
-
-    it("should accept actionItems array in create_plan_with_url", () => {
-      const tools = createPlanningTools();
-      const schema = tools.create_plan_with_url.inputSchema;
-
-      const validInput = {
-        successCriteria: "I need to search for flights",
-        plan: "1. Go to travel site\n2. Enter dates\n3. Search flights",
-        url: "https://travel-site.com",
-        actionItems: ["Go to travel site", "Enter dates", "Search flights"],
       };
 
       const zodSchema = schema as unknown as z.ZodObject<z.ZodRawShape>;
@@ -304,25 +299,6 @@ describe("Planning Tools", () => {
 
       expect(result).toEqual(input);
       expect(result.actionItems).toEqual(["Action 1", "Action 2", "Action 3"]);
-    });
-
-    it("should return actionItems when provided to create_plan_with_url", async () => {
-      const tools = createPlanningTools();
-
-      const input = {
-        successCriteria: "Test successCriteria",
-        plan: "Test plan",
-        url: "https://example.com",
-        actionItems: ["Action 1", "Action 2"],
-      };
-
-      const result = (await tools.create_plan_with_url.execute!(input, {
-        toolCallId: "test",
-        messages: [] as ModelMessage[],
-      })) as CreatePlanWithUrlResult;
-
-      expect(result).toEqual(input);
-      expect(result.actionItems).toEqual(["Action 1", "Action 2"]);
     });
 
     it("should work without actionItems (optional field)", async () => {

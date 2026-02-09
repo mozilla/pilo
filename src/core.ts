@@ -43,7 +43,8 @@ export type { NavigationRetryConfig } from "./browser/navigationRetry.js";
 export { calculateTimeout, DEFAULT_NAVIGATION_RETRY_CONFIG } from "./browser/navigationRetry.js";
 
 // Config system - single source of truth (browser-compatible)
-export { getConfigDefaults } from "./configDefaults.js";
+export { getConfigDefaults, SEARCH_PROVIDERS } from "./configDefaults.js";
+export type { SearchProviderName } from "./configDefaults.js";
 
 // Internal constants (not configurable via env/CLI)
 export {

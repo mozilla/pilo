@@ -71,10 +71,15 @@ export const TOOL_STRINGS = {
       reason:
         "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
     },
+    webSearch: {
+      description:
+        "Search the web for information. Returns the search results page as markdown. Use when you need to find websites or information but don't know the URL.",
+      query: "The search query to execute",
+    },
   },
 
   /**
-   * Planning tools - task planning and URL determination
+   * Planning tools - task planning and optional URL determination
    */
   planning: {
     /** Common parameter descriptions */
@@ -88,11 +93,7 @@ export const TOOL_STRINGS = {
     create_plan: {
       description:
         "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
-    },
-    create_plan_with_url: {
-      description:
-        "Create a step-by-step plan, MUST be formatted as VALID Markdown and determine the best starting URL",
-      url: "Starting URL for the task",
+      url: "The best starting URL for the task",
     },
   },
 
@@ -124,24 +125,37 @@ IMPORTANT:
 - Focus on the elements you need to interact with directly.
 `.trim();
 
-/** Available browser action tools with JSON syntax examples. */
-const toolExamples = `
-- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}
-- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}
-- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}
-- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}
-- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}
-- uncheck({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.uncheck.description}
-- focus({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.focus.description}
-- enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.enter.description}
-- wait({"seconds": 3}) - ${TOOL_STRINGS.webActions.wait.description}
-- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}
-- back() - ${TOOL_STRINGS.webActions.back.description}
-- forward() - ${TOOL_STRINGS.webActions.forward.description}
-- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}
-- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}
-- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}
-`.trim();
+/** Build available browser action tools with JSON syntax examples. */
+function buildToolExamples(hasWebSearch: boolean): string {
+  const lines = [
+    `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
+    `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
+    `- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}`,
+    `- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}`,
+    `- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}`,
+    `- uncheck({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.uncheck.description}`,
+    `- focus({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.focus.description}`,
+    `- enter({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.enter.description}`,
+    `- wait({"seconds": 3}) - ${TOOL_STRINGS.webActions.wait.description}`,
+    `- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}`,
+    `- back() - ${TOOL_STRINGS.webActions.back.description}`,
+    `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
+    `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
+  ];
+
+  if (hasWebSearch) {
+    lines.push(
+      `- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}`,
+    );
+  }
+
+  lines.push(
+    `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
+    `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
+  );
+
+  return lines.join("\n");
+}
 
 /** Standard tool calling instruction. */
 const toolCallInstruction = `
@@ -151,16 +165,14 @@ CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool c
 `.trim();
 
 /**
- * Planning prompt - converts tasks into structured execution plans.
- * Generates: create_plan_with_url() or create_plan() tool calls.
- * Used by: planTask() in WebAgent during planning phase.
+ * Base planning prompt content - shared across all planning prompt variants.
+ * Contains the core planning instructions without tool-specific sections.
  */
-const planPromptTemplate = buildPromptTemplate(
-  `
+const planningBaseContent = `
 ${youArePrompt}
 Create a plan for this web navigation task.
 First, briefly identify what the user needs from this task.
-Then provide a{% if includeUrl %} step-by-step plan and starting URL{% else %} step-by-step plan{% endif %}.
+Then provide a step-by-step plan.
 Keep plans concise and high-level, focusing on goals not specific UI elements.
 
 Today's Date: {{ currentDate }}
@@ -172,7 +184,7 @@ PART 1: SUCCESS CRITERIA
 What does the user need? Describe what a great response would include - the key information and level of detail that would fully satisfy their request.
 
 PART 2: NAVIGATION PLAN
-{% if includeUrl %}Provide a strategic plan starting from the given URL.{% else %}Provide a strategic plan for accomplishing the task.{% endif %}
+Provide a strategic plan for accomplishing the task.
 
 Your plan should:
 
@@ -195,39 +207,49 @@ Your plan should:
 {% if guardrails %}- Ensure every step complies with the stated limitations{% endif %}
 - All dates must include the year
 - Booking dates must be in the future
+`.trim();
 
-{% if includeUrl %}
-Call create_plan_with_url() with:
-- successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
-- plan: ${TOOL_STRINGS.planning.common.plan}
-- actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-- url: ${TOOL_STRINGS.planning.create_plan_with_url.url}
-{% else %}
+/**
+ * Planning prompt — single template for all scenarios.
+ * - startingUrl provided: URL shown in prompt, no url param needed.
+ * - No startingUrl, no webSearch: planner must provide a url.
+ * - No startingUrl, webSearch enabled: planner doesn't need a url (agent uses webSearch).
+ */
+const planPromptTemplate = buildPromptTemplate(
+  `
+${planningBaseContent}
+
 Call create_plan() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
 - actionItems: ${TOOL_STRINGS.planning.common.actionItems}
-{% endif %}
+{% if not startingUrl and not webSearchEnabled %}- url: ${TOOL_STRINGS.planning.create_plan.url}{% endif %}
+{% if not startingUrl and webSearchEnabled %}- url (optional): ${TOOL_STRINGS.planning.create_plan.url}. You do not need to provide a starting URL — the agent has web search available and will find the right sites during execution.{% endif %}
 
 ${toolCallInstruction}
 `.trim(),
 );
 
-export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) =>
+/**
+ * Builds the planning prompt.
+ *
+ * @param task - The task to plan
+ * @param startingUrl - Optional URL to start from
+ * @param guardrails - Optional constraints/guardrails
+ * @param webSearchEnabled - Whether the agent has web search available
+ */
+export const buildPlanPrompt = (
+  task: string,
+  startingUrl?: string,
+  guardrails?: string | null,
+  webSearchEnabled?: boolean,
+) =>
   planPromptTemplate({
     task,
     currentDate: getCurrentFormattedDate(),
-    includeUrl: true,
-    guardrails,
-  });
-
-export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?: string | null) =>
-  planPromptTemplate({
-    task,
-    currentDate: getCurrentFormattedDate(),
-    includeUrl: false,
     startingUrl,
     guardrails,
+    webSearchEnabled,
   });
 
 /**
@@ -238,6 +260,8 @@ export const buildPlanPrompt = (task: string, startingUrl?: string, guardrails?:
 const actionLoopSystemPromptTemplate = buildPromptTemplate(
   `
 ${youArePrompt}
+
+Today's Date: {{ currentDate }}
 
 Analyze the current page state and determine your next action based on previous outcomes.
 
@@ -278,7 +302,7 @@ Provide your final answer:
 - Write naturally and informatively
 - Include all requested information
 - Format results as VALID Markdown
-- NEVER return raw JSON - ALwAYS format structured data as VALID Markdown
+- NEVER return raw JSON - ALWAYS format structured data as VALID Markdown
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
@@ -288,14 +312,15 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails. */
-const buildActionLoopSystemPrompt = (hasGuardrails: boolean) =>
+/** Build action system prompt with optional guardrails and web search. */
+const buildActionLoopSystemPrompt = (hasGuardrails: boolean, hasWebSearch: boolean = false) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
-    toolExamples,
+    toolExamples: buildToolExamples(hasWebSearch),
+    currentDate: getCurrentFormattedDate(),
   });
 
-export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false);
+export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false, false);
 export { buildActionLoopSystemPrompt };
 
 /**
@@ -349,6 +374,7 @@ const pageSnapshotTemplate = buildPromptTemplate(
   `
 Title: {{ title }}
 URL: {{ url }}
+Today's Date: {{ currentDate }}
 
 \`\`\`
 {{ snapshot }}
@@ -386,6 +412,7 @@ export const buildPageSnapshotPrompt = (
     url,
     snapshot,
     hasScreenshot,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /**
@@ -401,15 +428,22 @@ const stepErrorFeedbackTemplate = buildPromptTemplate(
 CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 
+**Available Tools:**
+{{ toolExamples }}
+
 ${toolCallInstruction}
 `.trim(),
 );
 
-export const buildStepErrorFeedbackPrompt = (error: string, hasGuardrails: boolean = false) =>
+export const buildStepErrorFeedbackPrompt = (
+  error: string,
+  hasGuardrails: boolean = false,
+  hasWebSearch: boolean = false,
+) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
-    toolExamples,
+    toolExamples: buildToolExamples(hasWebSearch),
   });
 
 /**
@@ -423,6 +457,7 @@ const taskValidationTemplate = buildPromptTemplate(
 Evaluate if the task result gives the user what they requested.
 Be concise in your response.
 
+Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Result: {{ finalAnswer }}
@@ -461,6 +496,7 @@ export const buildTaskValidationPrompt = (
     successCriteria,
     finalAnswer,
     conversationHistory,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /**
@@ -500,6 +536,7 @@ const extractionPromptTemplate = buildPromptTemplate(
 Extract this data from the page content:
 {{ extractionDescription }}
 
+Today's Date: {{ currentDate }}
 Page Content (Markdown):
 {{ markdown }}
 
@@ -515,6 +552,7 @@ export const buildExtractionPrompt = (extractionDescription: string, markdown: s
   extractionPromptTemplate({
     extractionDescription,
     markdown,
+    currentDate: getCurrentFormattedDate(),
   });
 
 /** Get current date in "MMM D, YYYY" format. */
