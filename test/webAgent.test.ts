@@ -3049,20 +3049,18 @@ describe("WebAgent", () => {
       if (secondActionCall && secondActionCall[0].messages) {
         const messages = secondActionCall[0].messages;
 
-        // Find user messages with snapshots (they start with Title:)
+        // Find user messages with snapshots (they contain EXTERNAL-CONTENT page-snapshot)
         const snapshotMessages = messages.filter(
           (msg: any) =>
             msg.role === "user" &&
             typeof msg.content === "string" &&
-            msg.content.startsWith("Title:"),
+            msg.content.includes('<EXTERNAL-CONTENT label="page-snapshot">'),
         );
 
         // If there are multiple snapshot messages, the earlier ones should be clipped
         if (snapshotMessages.length > 1) {
           const firstSnapshot = snapshotMessages[0].content;
-          expect(firstSnapshot).toContain("[clipped for brevity]");
-          // Should not contain the triple backticks anymore
-          expect(firstSnapshot).not.toContain("```");
+          expect(firstSnapshot).toContain("> [clipped for brevity]");
         }
       }
 

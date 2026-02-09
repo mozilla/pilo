@@ -7,6 +7,11 @@
 
 import type { AriaBrowser } from "../../browser/ariaBrowser.js";
 import type { SearchProvider } from "../searchProvider.js";
+import {
+  wrapExternalContentWithWarning,
+  ExternalContentLabel,
+  SEARCH_RESULTS_REMINDER,
+} from "../../utils/promptSecurity.js";
 
 interface ParallelSearchResult {
   url: string;
@@ -55,21 +60,32 @@ export class ParallelSearchProvider implements SearchProvider {
   }
 
   private formatAsMarkdown(query: string, data: ParallelApiResponse): string {
+    const header = `# Search Results for "${query}" (via ${this.name})`;
+
+    let wrapped: string;
     if (!data.results || data.results.length === 0) {
-      return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\nNo results found.\n\`\`\``;
+      wrapped = wrapExternalContentWithWarning(
+        `${header}\n\nNo results found.`,
+        ExternalContentLabel.SearchResults,
+      );
+    } else {
+      const lines: string[] = [];
+
+      data.results.forEach((result, index) => {
+        const title = result.title || result.url;
+        lines.push(`${index + 1}. [${title}](${result.url})`);
+        if (result.excerpts?.length) {
+          lines.push(result.excerpts.join("\n"));
+        }
+        lines.push("");
+      });
+
+      wrapped = wrapExternalContentWithWarning(
+        `${header}\n\n${lines.join("\n").trim()}`,
+        ExternalContentLabel.SearchResults,
+      );
     }
 
-    const lines: string[] = [];
-
-    data.results.forEach((result, index) => {
-      const title = result.title || result.url;
-      lines.push(`${index + 1}. [${title}](${result.url})`);
-      if (result.excerpts?.length) {
-        lines.push(result.excerpts.join("\n"));
-      }
-      lines.push("");
-    });
-
-    return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\n${lines.join("\n").trim()}\n\`\`\``;
+    return `${wrapped}\n\n${SEARCH_RESULTS_REMINDER}`;
   }
 }

@@ -518,55 +518,33 @@ export class WebAgent {
   }
 
   /**
-   * Truncate old snapshots in messages to keep context size down
-   * Replaces everything after the first ``` with "[clipped for brevity]"
+   * Truncate old external content in messages to keep context size down.
+   * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
+   * while preserving the tag structure and warning.
    */
-  private truncateOldSnapshots(): void {
+  private truncateOldExternalContent(): void {
+    const clipExternalContent = (text: string): string =>
+      text.replace(
+        /(<EXTERNAL-CONTENT[\s\S]*?>)\n[\s\S]*?\n(<\/EXTERNAL-CONTENT>)/g,
+        "$1\n> [clipped for brevity]\n$2",
+      );
+
     this.messages = this.messages.map((msg) => {
       if (msg.role === "user") {
         // Handle text-only messages
-        // Check if this is a snapshot message (starts with Title: and URL: followed by ```)
-        if (
-          typeof msg.content === "string" &&
-          msg.content.startsWith("Title:") &&
-          msg.content.includes("URL:") &&
-          msg.content.includes("```")
-        ) {
-          // Find the first ``` and replace everything after it
-          const firstBackticksIndex = msg.content.indexOf("```");
-          if (firstBackticksIndex !== -1) {
-            return {
-              ...msg,
-              content: msg.content.substring(0, firstBackticksIndex) + "[clipped for brevity]",
-            };
-          }
+        if (typeof msg.content === "string" && msg.content.includes("<EXTERNAL-CONTENT")) {
+          return { ...msg, content: clipExternalContent(msg.content) };
         }
         // Handle multimodal messages (text + image)
         if (Array.isArray(msg.content)) {
           return {
             ...msg,
             content: msg.content.map((item: any) => {
-              if (
-                item.type === "text" &&
-                item.text.startsWith("Title:") &&
-                item.text.includes("URL:") &&
-                item.text.includes("```")
-              ) {
-                // Find the first ``` and replace everything after it
-                const firstBackticksIndex = item.text.indexOf("```");
-                if (firstBackticksIndex !== -1) {
-                  return {
-                    ...item,
-                    text: item.text.substring(0, firstBackticksIndex) + "[clipped for brevity]",
-                  };
-                }
+              if (item.type === "text" && item.text.includes("<EXTERNAL-CONTENT")) {
+                return { ...item, text: clipExternalContent(item.text) };
               }
               if (item.type === "image") {
-                // Remove the image data to save memory
-                return {
-                  type: "text",
-                  text: "[screenshot clipped for brevity]",
-                };
+                return { type: "text", text: "[screenshot clipped for brevity]" };
               }
               return item;
             }),
@@ -582,7 +560,7 @@ export class WebAgent {
    */
   private async addPageSnapshot(): Promise<void> {
     // First, truncate old snapshots to keep context size manageable
-    this.truncateOldSnapshots();
+    this.truncateOldExternalContent();
 
     const currentUrl = await this.browser.getUrl();
     const currentPageSnapshot = await this.browser.getTreeWithRefs();

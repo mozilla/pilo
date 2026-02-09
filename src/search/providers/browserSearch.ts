@@ -8,6 +8,11 @@
 import type { AriaBrowser } from "../../browser/ariaBrowser.js";
 import { LoadState } from "../../browser/ariaBrowser.js";
 import type { SearchProvider } from "../searchProvider.js";
+import {
+  wrapExternalContentWithWarning,
+  ExternalContentLabel,
+  SEARCH_RESULTS_REMINDER,
+} from "../../utils/promptSecurity.js";
 
 /**
  * Abstract base class for browser-based search providers.
@@ -43,6 +48,11 @@ export abstract class BrowserSearchProvider implements SearchProvider {
       return tab.getMarkdown();
     });
 
-    return `# Search Results for "${query}" (via ${this.name})\n\n\`\`\`\n${markdown}\n\`\`\``;
+    const wrapped = wrapExternalContentWithWarning(
+      `# Search Results for "${query}" (via ${this.name})\n\n${markdown}`,
+      ExternalContentLabel.SearchResults,
+    );
+
+    return `${wrapped}\n\n${SEARCH_RESULTS_REMINDER}`;
   }
 }
