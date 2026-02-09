@@ -22,7 +22,7 @@ importers:
         version: 2.0.19(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.13.4
-        version: 2.13.4(playwright@1.57.0)
+        version: 2.13.4(playwright@1.58.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.0.2
         version: 2.0.2(ai@6.0.50(zod@4.3.6))(zod@4.3.6)
@@ -54,8 +54,8 @@ importers:
         specifier: ^3.0.2
         version: 3.0.2(ai@6.0.50(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.57.0
-        version: 1.57.0
+        specifier: 1.58.0
+        version: 1.58.0
       turndown:
         specifier: ^7.2.2
         version: 7.2.2
@@ -2635,18 +2635,8 @@ packages:
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
 
-  playwright-core@1.57.0:
-    resolution: {integrity: sha512-agTcKlMw/mjBWOnD6kFZttAAGHgi/Nw0CZ2o6JqWSbMlI219lAFLZZCyqByTsvVAJq5XA5H8cA6PrvBRpBWEuQ==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.58.0:
     resolution: {integrity: sha512-aaoB1RWrdNi3//rOeKuMiS65UCcgOVljU46At6eFcOFPFHWtd2weHRRow6z/n+Lec0Lvu0k9ZPKJSjPugikirw==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.57.0:
-    resolution: {integrity: sha512-ilYQj1s8sr2ppEJ2YVadYBN0Mb3mdo9J0wQ+UuDhzYqURwSoW4n1Xs5vs7ORwgDGmyEh33tRMeS8KhdkMoLXQw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -3850,11 +3840,11 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.13.4': {}
 
-  '@ghostery/adblocker-playwright@2.13.4(playwright@1.57.0)':
+  '@ghostery/adblocker-playwright@2.13.4(playwright@1.58.0)':
     dependencies:
       '@ghostery/adblocker': 2.13.4
       '@ghostery/adblocker-content': 2.13.4
-      playwright: 1.57.0
+      playwright: 1.58.0
       tldts-experimental: 7.0.19
 
   '@ghostery/adblocker@2.13.4':
@@ -5659,15 +5649,7 @@ snapshots:
       exsolve: 1.0.8
       pathe: 2.0.3
 
-  playwright-core@1.57.0: {}
-
   playwright-core@1.58.0: {}
-
-  playwright@1.57.0:
-    dependencies:
-      playwright-core: 1.57.0
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.58.0:
     dependencies:
@@ -5924,7 +5906,7 @@ snapshots:
       '@ai-sdk/google-vertex': 4.0.48(zod@4.3.6)
       '@ai-sdk/openai': 3.0.26(zod@4.3.6)
       '@ai-sdk/openai-compatible': 2.0.28(zod@4.3.6)
-      '@ghostery/adblocker-playwright': 2.13.4(playwright@1.57.0)
+      '@ghostery/adblocker-playwright': 2.13.4(playwright@1.58.0)
       '@openrouter/ai-sdk-provider': 2.1.1(ai@6.0.78(zod@4.3.6))(zod@4.3.6)
       ai: 6.0.78(zod@4.3.6)
       chalk: 5.6.2
@@ -5935,7 +5917,7 @@ snapshots:
       liquidjs: 10.24.0
       nanoid: 5.1.6
       ollama-ai-provider-v2: 3.0.4(ai@6.0.78(zod@4.3.6))(zod@4.3.6)
-      playwright: 1.57.0
+      playwright: 1.58.0
       turndown: 7.2.2
       zod: 4.3.6
     transitivePeerDependencies:
