@@ -703,7 +703,11 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       return await fn(tab);
     } finally {
-      await tempPage.close();
+      try {
+        await tempPage.close();
+      } catch {
+        // Ignore close errors to avoid masking the original error from fn()
+      }
     }
   }
 

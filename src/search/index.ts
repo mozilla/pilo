@@ -5,3 +5,4 @@
  */
 
 export { createSearchProvider, type SearchProvider } from "./searchProvider.js";
+export { SearchService } from "./searchService.js";

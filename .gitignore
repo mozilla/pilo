@@ -7,3 +7,4 @@ dist
 CLAUDE.md
 scripts/docker-build.sh
 debug
+coverage

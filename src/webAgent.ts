@@ -28,6 +28,7 @@ import {
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
+import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
@@ -172,6 +173,7 @@ export class WebAgent {
   private compressor: SnapshotCompressor;
   private eventEmitter: WebAgentEventEmitter;
   private logger: Logger;
+  private searchService: SearchService | null = null;
 
   // === Configuration ===
   private readonly providerConfig: ProviderConfig;
@@ -230,21 +232,28 @@ export class WebAgent {
     // 2. Initialize browser and internal state
     await this.initializeBrowserAndState(task, options);
 
+    // 3. Eagerly create search service so provider errors surface before the main loop
+    if (this.searchProvider !== "none") {
+      this.searchService = await SearchService.create(this.searchProvider, this.browser, {
+        apiKey: this.searchApiKey,
+      });
+    }
+
     const executionState = this.initializeExecutionState();
 
     try {
-      // 3. Planning phase
+      // 4. Planning phase
       await this.planTask(task, options.startingUrl);
 
-      // 4. Navigation phase (with retry on recoverable errors)
+      // 5. Navigation phase (with retry on recoverable errors)
       await this.navigateToStartWithRetry(task);
 
       this.initializeSystemPromptAndTask(task);
 
-      // 5. Main execution loop
+      // 6. Main execution loop
       const loopOutcome = await this.runMainLoop(task, executionState);
 
-      // 6. Return results
+      // 7. Return results
       return this.buildResult(loopOutcome, executionState);
     } catch (error) {
       // Check if aborted
@@ -292,16 +301,10 @@ export class WebAgent {
       abortSignal: this.abortSignal,
     });
 
-    // Only include search tools if a search provider is configured
-    const searchTools =
-      this.searchProvider !== "none"
-        ? createSearchTools({
-            browser: this.browser,
-            eventEmitter: this.eventEmitter,
-            searchProvider: this.searchProvider,
-            searchApiKey: this.searchApiKey,
-          })
-        : {};
+    // Only include search tools if a search service was created
+    const searchTools = this.searchService
+      ? createSearchTools({ searchService: this.searchService, eventEmitter: this.eventEmitter })
+      : {};
 
     // Merge all tools
     const allTools = { ...webActionTools, ...searchTools };
@@ -1430,6 +1433,7 @@ export class WebAgent {
     this.currentIterationId = "";
     this.data = null;
     this.abortSignal = undefined;
+    this.searchService = null;
   }
 
   private initializeExecutionState(): ExecutionState {

@@ -20,6 +20,15 @@ vi.mock("../src/utils/retry.js", () => ({
   generateTextWithRetry: vi.fn(),
 }));
 
+// Mock SearchService so it doesn't actually create providers
+vi.mock("../src/search/searchService.js", () => ({
+  SearchService: {
+    create: vi.fn().mockResolvedValue({
+      search: vi.fn().mockResolvedValue("# Mock Results"),
+    }),
+  },
+}));
+
 const mockStreamText = vi.mocked(streamText);
 const mockGenerateTextWithRetry = vi.mocked(generateTextWithRetry);
 

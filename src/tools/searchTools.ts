@@ -7,26 +7,16 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import type { AriaBrowser } from "../browser/ariaBrowser.js";
-import type { SearchProviderName } from "../configDefaults.js";
+import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
-import { createSearchProvider } from "../search/searchProvider.js";
 import { TOOL_STRINGS } from "../prompts.js";
 
 interface SearchToolContext {
-  browser: AriaBrowser;
+  searchService: SearchService;
   eventEmitter: WebAgentEventEmitter;
-  searchProvider: Exclude<SearchProviderName, "none">;
-  /** API key for search providers that require authentication */
-  searchApiKey?: string;
 }
 
 export function createSearchTools(context: SearchToolContext) {
-  // Create provider once at tool-creation time instead of per-invocation
-  const providerPromise = createSearchProvider(context.searchProvider, {
-    apiKey: context.searchApiKey,
-  });
-
   return {
     webSearch: tool({
       description: TOOL_STRINGS.webActions.webSearch.description,
@@ -40,10 +30,7 @@ export function createSearchTools(context: SearchToolContext) {
         });
 
         try {
-          const provider = await providerPromise;
-
-          const browser = provider.requiresBrowser ? context.browser : undefined;
-          const markdown = await provider.search(query, browser);
+          const markdown = await context.searchService.search(query);
 
           context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
             success: true,
