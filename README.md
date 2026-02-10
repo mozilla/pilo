@@ -2,6 +2,18 @@
 
 AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Spark will navigate websites, fill forms, and gather information automatically.
 
+## Requirements
+
+- **[Node.js 22+](https://nodejs.org/)** - JavaScript runtime
+- **[pnpm](https://pnpm.io/installation)** - Package manager (npm and yarn also work but pnpm is recommended)
+- **AI Provider (one of):**
+  - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
+  - [OpenRouter API key](https://openrouter.ai/keys) (cloud)
+  - [Ollama](https://ollama.ai) running locally (local)
+  - [LM Studio](https://lmstudio.ai) server (local)
+  - Google Cloud project with Vertex AI enabled
+- **Browsers:** Automatically installed by Playwright (Firefox, Chrome, Safari, Edge)
+
 ## Quick Start
 
 ### Installation
@@ -53,7 +65,33 @@ pnpm spark run "search hotels in Tokyo" --guardrails "browse only, don't book an
 
 ## Installation
 
-See [Quick Start](#quick-start) above for installation instructions.
+### CLI Installation
+
+See [Quick Start](#quick-start) above for CLI installation instructions.
+
+### Browser Extension
+
+Spark also provides a browser extension for interactive automation. To install the unpacked extension for development or testing:
+
+**Firefox:**
+
+1. Build the extension: `cd extension && pnpm build:firefox`
+2. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`
+3. Click "Load Temporary Add-on"
+4. Navigate to `extension/dist/firefox-mv2/` and select `manifest.json`
+
+**Chrome / Brave / Edge:**
+
+1. Build the extension: `cd extension && pnpm build:chrome`
+2. Open your browser and navigate to:
+   - Chrome: `chrome://extensions`
+   - Brave: `brave://extensions`
+   - Edge: `edge://extensions`
+3. Enable "Developer mode" (toggle in top-right corner)
+4. Click "Load unpacked"
+5. Select the `extension/dist/chrome-mv3/` directory
+
+For detailed extension development instructions, see [extension/README.md](extension/README.md).
 
 ## Usage
 
@@ -244,17 +282,6 @@ pnpm spark config --reset
 
 See [Configuration Priority](#configuration-priority) for how settings are resolved.
 
-## Requirements
-
-- **Node.js 20+**
-- **AI Provider (one of):**
-  - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
-  - [OpenRouter API key](https://openrouter.ai/keys) (cloud)
-  - [Ollama](https://ollama.ai) running locally (local)
-  - [LM Studio](https://lmstudio.ai) server (local)
-  - Google Cloud project with Vertex AI enabled
-- **Browsers:** Automatically installed by Playwright (Firefox, Chrome, Safari, Edge)
-
 ## API Reference
 
 ### WebAgent
@@ -308,19 +335,74 @@ new PlaywrightBrowser({
 
 ## Development
 
+Built with TypeScript, Playwright, and the Vercel AI SDK.
+
+### Running the CLI in Development
+
 ```bash
-# Run tests
-pnpm test
-pnpm run test:watch
-
-# Build
-pnpm run build
-
-# Format code
-pnpm run format
+# Run without building
+pnpm spark run "your task here"
 ```
 
-Built with TypeScript, Playwright, and the Vercel AI SDK.
+### Testing
+
+```bash
+pnpm test              # Run all tests
+pnpm test:watch        # Watch mode
+```
+
+### Code Quality
+
+```bash
+pnpm check             # Format, typecheck, and test
+pnpm format            # Format code with Prettier
+pnpm typecheck         # TypeScript type checking
+```
+
+### Working on Subprojects
+
+The repository includes multiple packages:
+
+**Browser Extension** (`extension/`):
+
+```bash
+cd extension
+pnpm dev:firefox         # Dev mode with persistent profile
+pnpm dev:chrome:tmp-profile
+pnpm build:firefox       # Production build
+pnpm build:chrome
+```
+
+**Server** (`server/`):
+
+```bash
+cd server
+cp .env.example .env     # Configure AI provider
+pnpm dev                 # Start dev server
+```
+
+See individual README files in each directory for details.
+
+### Project Structure
+
+```
+spark/
+├── src/              # Core library code
+├── test/             # Test files
+├── extension/        # Browser extension
+├── server/           # HTTP API server
+├── dist/             # Built output
+└── docs/             # Additional documentation
+```
+
+### Contributing
+
+Contributions welcome! When submitting pull requests:
+
+- Keep changes focused and atomic
+- Include tests for new features
+- Run `pnpm check` before submitting
+- Follow existing code style and patterns
 
 ## Evaluation System
 
@@ -454,10 +536,33 @@ pnpm spark config --set vision=true
 pnpm spark run "test task"  # Uses configured defaults
 ```
 
+## Sharp Edges & Limitations
+
+⚠️ **Use at Your Own Risk** - Spark is experimental software that automates real browser interactions. Always use appropriate guardrails and test thoroughly before relying on it for important tasks.
+
+**Known Limitations:**
+
+- **Model Variability**: Results depend on the AI model's capabilities and can vary between runs. Different models (GPT-4, Claude, local models) may produce different results for the same task.
+
+- **Task Complexity**: Success rates decrease with task complexity. Simple information retrieval works better than multi-step form filling or complex navigation flows.
+
+- **Website Changes**: Spark adapts to websites dynamically, but major layout changes, CAPTCHAs, or anti-bot measures can cause failures.
+
+- **Flaky Behavior**: Web automation is inherently flaky. Network issues, slow page loads, dynamic content, and race conditions can cause intermittent failures.
+
+- **No Guarantee of Success**: Spark uses best-effort automation. Always verify results and have fallback plans for critical workflows.
+
+- **Rate Limits & Costs**: Cloud AI providers charge per API call and have rate limits. Complex tasks can generate many API calls and screenshots, increasing costs.
+
+**Best Practices:**
+
+- Start with simple tasks and gradually increase complexity
+- Use `--guardrails` to constrain automation behavior
+- Test in `--headless false` mode first to observe behavior
+- Monitor API usage and costs with cloud providers
+- Don't use for tasks that require 100% reliability
+- Review and verify automation results before taking action
+
 ## License
 
 MIT
-
-## Contributing
-
-Contributions welcome! Please submit a Pull Request.
