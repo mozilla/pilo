@@ -84,7 +84,7 @@ export class AgentManager {
    * Get the default model for a provider
    */
   private static getDefaultModel(provider: "openai" | "openrouter"): string {
-    return provider === "openrouter" ? "openai/gpt-4.1-mini" : "gpt-4.1-mini";
+    return provider === "openrouter" ? "google/gemini-2.5-flash" : "gpt-4.1-mini";
   }
 
   /**

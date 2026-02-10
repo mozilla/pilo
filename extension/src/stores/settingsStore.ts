@@ -23,9 +23,9 @@ export interface SettingsStore {
 
 const defaultSettings: Settings = {
   apiKey: "",
-  apiEndpoint: "https://api.openai.com/v1",
-  model: "gpt-4.1-mini",
-  provider: "openai",
+  apiEndpoint: "",
+  model: "google/gemini-2.5-flash",
+  provider: "openrouter",
 };
 
 // Create browser storage adapter for settings
