@@ -184,6 +184,39 @@ const LoadingSpinner = ({ theme: t }: { theme: Theme }): ReactElement => (
   </svg>
 );
 
+// Task completion separator component
+const TaskCompletionSeparator = ({ theme: t }: { theme: Theme }): ReactElement => (
+  <div className="my-8 flex items-center">
+    <div className={`flex-1 border-t-2 ${t.border.secondary}`}></div>
+  </div>
+);
+
+// Input disabled overlay component
+interface InputDisabledOverlayProps {
+  onNewRequest: () => void;
+  theme: Theme;
+}
+
+const InputDisabledOverlay = ({
+  onNewRequest,
+  theme: t,
+}: InputDisabledOverlayProps): ReactElement => (
+  <div className="absolute inset-0 bg-white/90 dark:bg-stone-925/90 flex items-center justify-center backdrop-blur-sm z-10">
+    <div className="text-center px-4">
+      <p className={`${t.text.primary} dark:text-white text-sm mb-3`}>
+        Continued conversation context not yet supported.
+      </p>
+      <button
+        onClick={onNewRequest}
+        className="px-4 py-2 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] transition-colors font-medium"
+        data-testid="new-request-button"
+      >
+        New Request
+      </button>
+    </div>
+  </div>
+);
+
 // Task bubble component
 interface TaskBubbleProps {
   taskId: string;
@@ -288,6 +321,7 @@ const TaskBubble = ({
 export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps): ReactElement {
   const [task, setTask] = useState("");
   const [stableTabId, setStableTabId] = useState<number | undefined>(currentTab?.id);
+  const [lastCompletedTaskId, setLastCompletedTaskId] = useState<string | null>(null);
   const { addEvent, clearEvents } = useEvents();
   const { settings } = useSettings();
   const { theme: t } = useSystemTheme();
@@ -443,6 +477,11 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     };
   }, [addEvent, addMessage, stableTabId]);
 
+  const handleNewRequest = () => {
+    setLastCompletedTaskId(null);
+    setTask("");
+  };
+
   const handleExecute = async () => {
     if (!task.trim()) return;
     if (!settings.apiKey) {
@@ -526,6 +565,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     } finally {
       setExecutionState(false);
       endTask();
+      setLastCompletedTaskId(taskId);
     }
   };
 
@@ -572,6 +612,14 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
   };
 
   /**
+   * Checks if a task has been completed by looking for a result message
+   */
+  const isTaskCompleted = (taskId: string): boolean => {
+    const taskMessages = messages.filter((msg) => msg.taskId === taskId);
+    return taskMessages.some((msg) => msg.type === "result");
+  };
+
+  /**
    * Renders all messages in the order they exist in the enclosing scope's
    * messages array.
    *
@@ -612,6 +660,11 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             theme={t}
           />,
         );
+
+        // Add separator after completed task (but not if it's currently executing)
+        if (isTaskCompleted(message.taskId) && currentTaskId !== message.taskId) {
+          elements.push(<TaskCompletionSeparator key={`separator-${message.taskId}`} theme={t} />);
+        }
       }
     });
 
@@ -654,7 +707,12 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       </div>
 
       {/* Input Area */}
-      <div className={`border-t ${t.border.primary} p-4`}>
+      <div className={`border-t ${t.border.primary} p-4 relative`}>
+        {/* Overlay when task is completed */}
+        {lastCompletedTaskId && !isExecuting && (
+          <InputDisabledOverlay onNewRequest={handleNewRequest} theme={t} />
+        )}
+
         <div className="flex items-center gap-2">
           <textarea
             value={task}
@@ -662,7 +720,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             onKeyDown={handleKeyDown}
             placeholder="What would you like me to do?"
             rows={2}
-            disabled={isExecuting}
+            disabled={isExecuting || lastCompletedTaskId !== null}
             className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
             data-testid="task-input"
           />
