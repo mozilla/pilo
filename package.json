@@ -19,6 +19,10 @@
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
+    },
+    "./ariaTree": {
+      "types": "./dist/browser/ariaTree/index.d.ts",
+      "import": "./dist/browser/ariaTree/index.js"
     }
   },
   "files": [
@@ -28,7 +32,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc",
+    "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
+    "build": "pnpm run bundle:aria && tsc",
     "typecheck": "tsc --project tsconfig.check.json",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
@@ -56,6 +61,7 @@
     "@types/node": "^25.0.10",
     "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.0.18",
+    "esbuild": "^0.27.3",
     "jsdom": "^27.4.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",

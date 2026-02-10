@@ -12,13 +12,7 @@ interface ActionResult {
 }
 
 interface AriaSnapshotWindow {
-  generateAriaTree: (
-    element: Element,
-    options: { forAI: boolean; refPrefix: string },
-  ) => {
-    elements: Map<string, Element>;
-  };
-  renderAriaTree: (snapshot: any, options: { mode: string; forAI: boolean }) => string;
+  generateAndRenderAriaTree: (root: Element, counter?: { value: number }) => string;
 }
 
 /**
@@ -126,45 +120,22 @@ export class ExtensionBrowser implements AriaBrowser {
         target: { tabId: tab.id! },
         func: () => {
           const win = window as Window & AriaSnapshotWindow;
-          // Check if content script functions are available
-          if (
-            typeof win.generateAriaTree !== "function" ||
-            typeof win.renderAriaTree !== "function"
-          ) {
+          if (typeof win.generateAndRenderAriaTree !== "function") {
             throw new Error(
               "Content script functions not available. Page may not be fully loaded.",
             );
           }
 
-          // Use the globally available functions from content script
-          const snapshot = win.generateAriaTree(document.body, {
-            forAI: true,
-            refPrefix: "s1",
-          });
-
-          // Add aria-ref attributes to DOM elements for fast lookup
-          // This extends the vendored code without modifying it
-          for (const [ref, element] of snapshot.elements.entries()) {
-            element.setAttribute("aria-ref", ref);
-          }
-
-          const renderedText = win.renderAriaTree(snapshot, {
-            mode: "raw",
-            forAI: true,
-          });
-
-          // Return just the rendered text - elements can be looked up via aria-ref attributes
-          return {
-            renderedText,
-          };
+          // generateAndRenderAriaTree handles everything:
+          // - tree generation, ref assignment (E1, E2, ...), setAttribute('aria-ref', ref), YAML rendering
+          return win.generateAndRenderAriaTree(document.body);
         },
       });
 
-      // Script succeeded, return the rendered text
-      const snapshotData = result as { renderedText: string };
+      const yaml = result as string;
       this.logger.debug("ARIA tree generated and aria-ref attributes set", { tabId: tab.id });
       this.logger.info("getTreeWithRefs() completed successfully", { tabId: tab.id });
-      return snapshotData.renderedText;
+      return yaml;
     } catch (error) {
       this.logger.error("getTreeWithRefs execution error", { tabId: tab.id }, error);
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to analyze page content.`;
@@ -590,9 +561,7 @@ export class ExtensionBrowser implements AriaBrowser {
           target: { tabId: tab.id! },
           func: () => {
             const win = window as Window & AriaSnapshotWindow;
-            return (
-              typeof win.generateAriaTree === "function" && typeof win.renderAriaTree === "function"
-            );
+            return typeof win.generateAndRenderAriaTree === "function";
           },
         });
 

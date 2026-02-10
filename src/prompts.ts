@@ -12,8 +12,8 @@ export const TOOL_STRINGS = {
   webActions: {
     /** Common parameter descriptions used across multiple tools */
     common: {
-      elementRefExample: "e###",
-      elementRef: "Element reference from page snapshot (e.g., e###)",
+      elementRefExample: "E###",
+      elementRef: "Element reference from page snapshot (e.g., E###)",
       textValue: "Text to enter into the field",
     },
     /** Individual tool descriptions */
@@ -270,7 +270,7 @@ Analyze the current page state and determine your next action based on previous 
 {{ toolExamples }}
 
 **Core Rules:**
-1. Use element refs from page snapshot. They are found in square brackets: [${TOOL_STRINGS.webActions.common.elementRefExample}].
+1. Use element refs from page snapshot. They are found in square brackets: [ref=${TOOL_STRINGS.webActions.common.elementRefExample}].
 2. Execute EXACTLY ONE tool per turn
 3. Complete planned steps before using done()
 4. done() provides your final answer to the user
@@ -380,9 +380,9 @@ Today's Date: {{ currentDate }}
 The above accessibility tree shows page elements in a hierarchical text format. Each line represents an element with:
 - Element type (button, link, textbox, generic, etc.)
 - Text content in quotes or description
-- Reference ID in brackets like [e###] - use these exact IDs when interacting with elements
+- Reference ID in brackets like [ref=E###] - use these exact IDs when interacting with elements
 - Properties like [cursor=pointer] or [disabled]
-Example: button "Submit Form" [e455] [cursor=pointer]
+Example: button "Submit Form" [ref=E455] [cursor=pointer]
 
 This shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
 
