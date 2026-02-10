@@ -11,6 +11,10 @@ import type { SearchProviderName } from "../configDefaults.js";
 export interface SearchProvider {
   readonly name: string;
   readonly requiresBrowser: boolean;
+  /**
+   * Return wrapped search results. Do NOT append SEARCH_RESULTS_REMINDER —
+   * SearchService handles that so it appears exactly once.
+   */
   search(query: string, browser?: AriaBrowser): Promise<string>;
 }
 

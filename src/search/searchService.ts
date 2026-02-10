@@ -8,6 +8,7 @@
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
 import type { SearchProviderName } from "../configDefaults.js";
+import { SEARCH_RESULTS_REMINDER } from "../utils/promptSecurity.js";
 import {
   createSearchProvider,
   type SearchProvider,
@@ -31,6 +32,7 @@ export class SearchService {
 
   async search(query: string): Promise<string> {
     const browser = this.provider.requiresBrowser ? this.browser : undefined;
-    return this.provider.search(query, browser);
+    const results = await this.provider.search(query, browser);
+    return `${results}\n\n${SEARCH_RESULTS_REMINDER}`;
   }
 }

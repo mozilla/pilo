@@ -11,7 +11,6 @@ import type { SearchProvider } from "../searchProvider.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
-  SEARCH_RESULTS_REMINDER,
 } from "../../utils/promptSecurity.js";
 
 /**
@@ -53,6 +52,6 @@ export abstract class BrowserSearchProvider implements SearchProvider {
       ExternalContentLabel.SearchResults,
     );
 
-    return `${wrapped}\n\n${SEARCH_RESULTS_REMINDER}`;
+    return wrapped;
   }
 }

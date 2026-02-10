@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SearchService } from "../../src/search/searchService.js";
+import { SEARCH_RESULTS_REMINDER } from "../../src/utils/promptSecurity.js";
 import type { AriaBrowser } from "../../src/browser/ariaBrowser.js";
 
 // Mock the search provider module
@@ -87,7 +88,7 @@ describe("SearchService", () => {
       const result = await service.search("test query");
 
       expect(mockProvider.search).toHaveBeenCalledWith("test query", mockBrowser);
-      expect(result).toBe("# Results");
+      expect(result).toBe(`# Results\n\n${SEARCH_RESULTS_REMINDER}`);
     });
 
     it("should not pass browser when provider does not require it", async () => {
@@ -104,7 +105,7 @@ describe("SearchService", () => {
       const result = await service.search("test query");
 
       expect(mockProvider.search).toHaveBeenCalledWith("test query", undefined);
-      expect(result).toBe("# API Results");
+      expect(result).toBe(`# API Results\n\n${SEARCH_RESULTS_REMINDER}`);
     });
 
     it("should propagate search errors", async () => {
