@@ -127,13 +127,13 @@ export class ExtensionBrowser implements AriaBrowser {
           }
 
           // generateAndRenderAriaTree handles everything:
-          // - tree generation, ref assignment (E1, E2, ...), setAttribute('aria-ref', ref), YAML rendering
+          // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-spark-ref', ref), YAML rendering
           return win.generateAndRenderAriaTree(document.body);
         },
       });
 
       const yaml = result as string;
-      this.logger.debug("ARIA tree generated and aria-ref attributes set", { tabId: tab.id });
+      this.logger.debug("ARIA tree generated and data-spark-ref attributes set", { tabId: tab.id });
       this.logger.info("getTreeWithRefs() completed successfully", { tabId: tab.id });
       return yaml;
     } catch (error) {
@@ -208,15 +208,49 @@ export class ExtensionBrowser implements AriaBrowser {
     }
   }
 
-  async getScreenshot(): Promise<Buffer> {
+  async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     const tab = await this.getActiveTab();
-    const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
-      format: "png",
-    });
 
-    // Convert data URL to Buffer
-    const base64Data = dataUrl.split(",")[1];
-    return Buffer.from(base64Data, "base64");
+    // Apply SoM overlay before screenshot if requested.
+    // Failures are non-fatal — a plain screenshot is still useful.
+    if (options?.withMarks) {
+      try {
+        await this.ensureContentScript();
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id! },
+          func: () => {
+            const win = window as any;
+            win.applySetOfMarks?.();
+          },
+        });
+      } catch {
+        // Can fail if content script isn't loaded or tab navigated
+      }
+    }
+
+    try {
+      const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
+        format: "png",
+      });
+
+      // Convert data URL to Buffer
+      const base64Data = dataUrl.split(",")[1];
+      return Buffer.from(base64Data, "base64");
+    } finally {
+      if (options?.withMarks) {
+        try {
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id! },
+            func: () => {
+              const win = window as any;
+              win.removeSetOfMarks?.();
+            },
+          });
+        } catch {
+          // Tab may have navigated between screenshot and cleanup
+        }
+      }
+    }
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
@@ -319,8 +353,8 @@ export class ExtensionBrowser implements AriaBrowser {
         func: (paramsJson: string) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
-          // Look up the element using the aria-ref attribute that's now set by ariaSnapshot
-          const element = document.querySelector(`[aria-ref="${refParam}"]`);
+          // Look up the element using the data-spark-ref attribute that's now set by ariaSnapshot
+          const element = document.querySelector(`[data-spark-ref="${refParam}"]`);
 
           if (!element) {
             return {
@@ -534,10 +568,10 @@ export class ExtensionBrowser implements AriaBrowser {
     await new Promise((resolve) => setTimeout(resolve, this.PAGE_SETTLE_TIME_MS));
   }
 
-  // Clear aria-ref attributes from previous page
+  // Clear data-spark-ref attributes from previous page
   private clearAriaRefs(): void {
     // No need to clear anything - new page will have new DOM
-    // aria-ref attributes will be set fresh on next getText() call
+    // data-spark-ref attributes will be set fresh on next getText() call
   }
 
   // Handle page transition: wait for page to be ready

@@ -15,7 +15,7 @@
  *
  * ---
  * Adapted for Spark: stripped to AI-mode only, unified sequential refs (E1, E2, ...),
- * sets aria-ref attribute during tree generation, walks same-origin iframes inline.
+ * sets data-spark-ref attribute during tree generation, walks same-origin iframes inline.
  */
 
 import { normalizeWhiteSpace } from "./stringUtils.js";
@@ -28,7 +28,7 @@ import type { AriaNode, RefCounter } from "./types.js";
  * Generate an ARIA tree from a root element and render it as YAML.
  *
  * Uses a global sequential counter (E1, E2, ...) for refs across the entire page.
- * Sets `aria-ref` attributes on DOM elements during generation for fast lookup.
+ * Sets `data-spark-ref` attributes on DOM elements during generation for fast lookup.
  *
  * @param root - The root element to start from (typically document.body)
  * @param counter - Mutable counter for sequential ref numbering across frames.
@@ -38,16 +38,19 @@ import type { AriaNode, RefCounter } from "./types.js";
 export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): string {
   const refCounter = counter || { value: 0 };
 
-  // Clean up any existing aria-ref attributes from a previous snapshot
-  root.querySelectorAll("[aria-ref]").forEach((el) => el.removeAttribute("aria-ref"));
+  // Clean up any existing data-spark-ref attributes from a previous snapshot
+  root.querySelectorAll("[data-spark-ref]").forEach((el) => {
+    el.removeAttribute("data-spark-ref");
+    el.removeAttribute("data-spark-role");
+  });
 
-  const ariaTree = generateAriaTree(root, refCounter);
-  return renderAriaTree(ariaTree);
+  const ariaTree = generateAriaTree(root);
+  return renderAriaTree(ariaTree, refCounter);
 }
 
 const MAX_IFRAME_DEPTH = 5;
 
-function generateAriaTree(rootElement: Element, counter: RefCounter, iframeDepth = 0): AriaNode {
+function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
   const visited = new Set<Node>();
 
   const root: AriaNode = {
@@ -93,11 +96,11 @@ function generateAriaTree(rootElement: Element, counter: RefCounter, iframeDepth
       try {
         const iframeDoc = iframe.contentDocument;
         if (iframeDoc && iframeDoc.body) {
-          // Same-origin iframe: walk into it with the same counter
+          // Same-origin iframe: walk into it inline
           iframeDoc.body
-            .querySelectorAll("[aria-ref]")
-            .forEach((el) => el.removeAttribute("aria-ref"));
-          const iframeTree = generateAriaTree(iframeDoc.body, counter, iframeDepth + 1);
+            .querySelectorAll("[data-spark-ref]")
+            .forEach((el) => el.removeAttribute("data-spark-ref"));
+          const iframeTree = generateAriaTree(iframeDoc.body, iframeDepth + 1);
           // Merge iframe children into current node
           for (const child of iframeTree.children) {
             ariaNode.children.push(child);
@@ -120,7 +123,7 @@ function generateAriaTree(rootElement: Element, counter: RefCounter, iframeDepth
       return;
     }
 
-    const childAriaNode = toAriaNode(element, counter);
+    const childAriaNode = toAriaNode(element);
     if (childAriaNode) {
       ariaNode.children.push(childAriaNode);
     }
@@ -174,21 +177,16 @@ function generateAriaTree(rootElement: Element, counter: RefCounter, iframeDepth
   return root;
 }
 
-function toAriaNode(element: Element, counter: RefCounter): AriaNode | null {
+function toAriaNode(element: Element): AriaNode | null {
   const role = roleUtils.getAriaRole(element) ?? "generic";
   if (role === "presentation" || role === "none") return null;
 
   const name = normalizeWhiteSpace(roleUtils.getElementAccessibleName(element, false) || "");
   const pointerEvents = roleUtils.receivesPointerEvents(element);
 
-  const ref = "E" + ++counter.value;
-  // Set aria-ref attribute on the element for fast CSS selector lookup
-  element.setAttribute("aria-ref", ref);
-
   const result: AriaNode = {
     role,
     name,
-    ref,
     children: [],
     props: {},
     element,
@@ -290,6 +288,137 @@ function normalizeStringChildren(rootA11yNode: AriaNode) {
   visit(rootA11yNode);
 }
 
+// === Set-of-Marks (SoM) overlay ===
+
+const SOM_CONTAINER_ID = "__spark-som-container";
+
+const SOM_COLORS = [
+  "#e6194b", // red
+  "#3cb44b", // green
+  "#4363d8", // blue
+  "#f58231", // orange
+  "#911eb4", // purple
+  "#42d4f4", // cyan
+];
+
+// Interactive HTML tags and ARIA roles that are meaningful click/input targets.
+// Structural containers (generic, list, navigation, main, etc.) are excluded
+// to reduce visual noise — they have refs in the YAML but aren't useful to click.
+const SOM_INTERACTIVE_TAGS = new Set(["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY"]);
+const SOM_INTERACTIVE_ROLES = new Set([
+  "button",
+  "link",
+  "textbox",
+  "combobox",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "spinbutton",
+  "searchbox",
+  "option",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "tab",
+  "treeitem",
+  "gridcell",
+  "columnheader",
+  "rowheader",
+]);
+
+export function isInteractiveElement(el: Element): boolean {
+  if (SOM_INTERACTIVE_TAGS.has(el.tagName)) return true;
+
+  // Check contenteditable (rich text editors)
+  const ce = el.getAttribute("contenteditable");
+  if (ce === "true" || ce === "") return true;
+
+  // Use computed role (set during renderAriaTree) for accurate role detection,
+  // falling back to the raw role attribute which may contain space-separated fallback values
+  const computedRole = el.getAttribute("data-spark-role");
+  if (computedRole && SOM_INTERACTIVE_ROLES.has(computedRole)) return true;
+  const rawRole = el.getAttribute("role");
+  if (rawRole) {
+    const roles = rawRole.split(/\s+/);
+    if (roles.some((r) => SOM_INTERACTIVE_ROLES.has(r))) return true;
+  }
+
+  // Elements made focusable via tabindex with no semantic role are likely JS-driven widgets
+  const tabindex = el.getAttribute("tabindex");
+  if (tabindex !== null) {
+    const tabValue = parseInt(tabindex, 10);
+    if (!isNaN(tabValue) && tabValue >= 0 && (!computedRole || computedRole === "generic")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Overlay labeled badges on interactive elements that have `data-spark-ref` attributes.
+ * Each badge shows the ref ID (e.g., "E1") positioned at the element's top-left corner
+ * with a colored outline. Only interactive elements get marks — structural containers
+ * are skipped to reduce visual noise.
+ *
+ * Call removeSetOfMarks() to clean up (also called automatically at the start).
+ */
+export function applySetOfMarks(): void {
+  removeSetOfMarks();
+  if (!document.body) return;
+
+  const container = document.createElement("div");
+  container.id = SOM_CONTAINER_ID;
+  container.style.cssText =
+    "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483647;";
+
+  const elements = document.querySelectorAll("[data-spark-ref]");
+  let colorIndex = 0;
+
+  elements.forEach((el) => {
+    const ref = el.getAttribute("data-spark-ref");
+    if (!ref) return;
+
+    // Skip non-interactive structural containers
+    if (!isInteractiveElement(el)) return;
+
+    const rect = el.getBoundingClientRect();
+    // Skip invisible elements (0x0 bounding rect)
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const color = SOM_COLORS[colorIndex % SOM_COLORS.length];
+
+    const absTop = rect.top + window.scrollY;
+    const absLeft = rect.left + window.scrollX;
+
+    // Highlight outline
+    const outline = document.createElement("div");
+    outline.style.cssText = `position:absolute;top:${absTop}px;left:${absLeft}px;width:${rect.width}px;height:${rect.height}px;border:2px solid ${color};box-sizing:border-box;border-radius:2px;`;
+    container.appendChild(outline);
+
+    // Badge label
+    const badge = document.createElement("div");
+    badge.textContent = ref;
+    badge.style.cssText = `position:absolute;top:${absTop}px;left:${absLeft}px;background:${color};color:#fff;font:bold 11px monospace;padding:1px 3px;border-radius:2px;line-height:1.2;white-space:nowrap;`;
+    container.appendChild(badge);
+
+    colorIndex++;
+  });
+
+  document.body.appendChild(container);
+}
+
+/**
+ * Remove the SoM overlay container. Safe to call when no marks exist.
+ */
+export function removeSetOfMarks(): void {
+  const existing = document.getElementById(SOM_CONTAINER_ID);
+  if (existing) existing.remove();
+}
+
+// === Rendering helpers ===
+
 function nodeReceivesPointerEvents(ariaNode: AriaNode): boolean {
   return ariaNode.box.visible && ariaNode.receivesPointerEvents;
 }
@@ -298,7 +427,7 @@ function hasPointerCursor(ariaNode: AriaNode): boolean {
   return ariaNode.box.style?.cursor === "pointer";
 }
 
-function renderAriaTree(root: AriaNode): string {
+function renderAriaTree(root: AriaNode, counter: RefCounter): string {
   const lines: string[] = [];
 
   const visit = (ariaNode: AriaNode | string, _parentAriaNode: AriaNode | null, indent: string) => {
@@ -324,11 +453,16 @@ function renderAriaTree(root: AriaNode): string {
     if (ariaNode.pressed === true) key += ` [pressed]`;
     if (ariaNode.selected === true) key += ` [selected]`;
 
-    // Emit ref and cursor info for interactable elements
+    // Assign ref only for visible, interactable elements.
+    // SECURITY: Refs are counter-generated ("E1", "E2", ...) — never from external input,
+    // since they're used in CSS attribute selectors for element lookup.
     if (nodeReceivesPointerEvents(ariaNode)) {
-      const ref = ariaNode.ref;
+      const ref = "E" + ++counter.value;
       const cursor = hasPointerCursor(ariaNode) ? " [cursor=pointer]" : "";
-      if (ref) key += ` [ref=${ref}]${cursor}`;
+      key += ` [ref=${ref}]${cursor}`;
+      ariaNode.element?.setAttribute("data-spark-ref", ref);
+      // Store computed role for accurate SoM filtering (avoids re-computing or parsing raw role attribute)
+      ariaNode.element?.setAttribute("data-spark-role", ariaNode.role);
     }
 
     const escapedKey = indent + "- " + yamlEscapeKeyIfNeeded(key);

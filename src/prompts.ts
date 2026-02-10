@@ -384,14 +384,14 @@ The above accessibility tree shows page elements in a hierarchical text format. 
 - Properties like [cursor=pointer] or [disabled]
 Example: button "Submit Form" [ref=E455] [cursor=pointer]
 
-This shows the complete current page content.{% if hasScreenshot %} A screenshot is included for visual context.{% endif %}
+This shows the complete current page content.{% if hasScreenshot %} A labeled screenshot is included. The screenshot marks interactive elements (links, buttons, inputs) with colored badges showing their ref IDs (E1, E2, etc.). The tree above includes refs on all visible elements for structural context — only the interactive ones are labeled in the screenshot.{% endif %}
 
 **Your task:**
 - Analyze the current state and select your next action
 - Target the most relevant elements for your objective
 - If an action fails, adapt immediately—don't repeat failed attempts
 - Find alternative approaches when planned steps aren't viable
-{% if hasScreenshot %}- Use the screenshot to understand layout and identify elements missed in the text{% endif %}
+{% if hasScreenshot %}- Use the labeled screenshot to visually locate interactive elements and match them to [ref=E###] IDs in the tree{% endif %}
 - Follow all guardrails
 
 ${toolCallInstruction}

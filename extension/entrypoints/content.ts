@@ -1,6 +1,6 @@
 // Import ariaTree functionality from shared module
 import browser from "webextension-polyfill";
-import { generateAndRenderAriaTree } from "spark/ariaTree";
+import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "spark/ariaTree";
 import type {
   ExtensionMessage,
   GetPageInfoResponse,
@@ -11,6 +11,8 @@ import type {
 declare global {
   interface Window {
     generateAndRenderAriaTree: typeof generateAndRenderAriaTree;
+    applySetOfMarks: typeof applySetOfMarks;
+    removeSetOfMarks: typeof removeSetOfMarks;
   }
 }
 
@@ -20,8 +22,10 @@ export default defineContentScript({
   registration: "manifest",
   main() {
     console.log("[Spark] Content script loaded at document_start");
-    // Make ARIA tree function available globally for executeScript
+    // Make ARIA tree functions available globally for executeScript
     window.generateAndRenderAriaTree = generateAndRenderAriaTree;
+    window.applySetOfMarks = applySetOfMarks;
+    window.removeSetOfMarks = removeSetOfMarks;
 
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {

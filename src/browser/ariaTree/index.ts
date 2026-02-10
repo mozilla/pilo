@@ -9,5 +9,5 @@
  * - Extension: via content script imports
  */
 
-export { generateAndRenderAriaTree } from "./ariaSnapshot.js";
+export { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "./ariaSnapshot.js";
 export type { AriaNode, AriaRole, AriaProps, Box, RefCounter } from "./types.js";
