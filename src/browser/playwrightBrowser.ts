@@ -647,6 +647,8 @@ export class PlaywrightBrowser implements AriaBrowser {
       if (requiresElement) {
         // Validate and get the locator
         locator = await this.validateElementRef(ref);
+        // Scroll element into view so developers can follow along in headed mode
+        await locator.scrollIntoViewIfNeeded({ timeout: this.actionTimeoutMs });
       }
 
       switch (action) {
