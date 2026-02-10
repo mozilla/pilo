@@ -511,11 +511,11 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     category: "playwright",
   },
   bypass_csp: {
-    default: true,
+    default: false,
     type: "boolean",
     cli: "--bypass-csp",
     env: ["SPARK_BYPASS_CSP"],
-    description: "Bypass Content Security Policy",
+    description: "Bypass Content Security Policy (not needed for normal operation)",
     category: "playwright",
   },
 
