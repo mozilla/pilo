@@ -363,6 +363,9 @@ export class ExtensionBrowser implements AriaBrowser {
             };
           }
 
+          // Scroll element into view so the user can follow along
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+
           try {
             switch (actionParam) {
               // Element interactions
