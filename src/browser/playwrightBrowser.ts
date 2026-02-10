@@ -24,12 +24,7 @@ import {
 import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../configDefaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
-
-// Type extension for Playwright's private AI snapshot function
-// See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
-type PageEx = Page & {
-  _snapshotForAI: () => Promise<{ full: string; incremental?: string }>;
-};
+import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -461,8 +456,65 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    const snapshot = await (this.page as PageEx)._snapshotForAI();
-    return snapshot.full;
+
+    // Inject the ariaTree bundle and generate snapshot in the main frame
+    const mainResult = await this.page.evaluate(
+      ({ script }) => {
+        // Idempotent injection guard
+        const win = window as any;
+        if (!win.__sparkAriaTree) {
+          const fn = new Function(script);
+          fn();
+          win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+        }
+        const counter = { value: 0 };
+        const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(document.body, counter);
+        return { yaml, counterValue: counter.value };
+      },
+      { script: ARIA_TREE_SCRIPT },
+    );
+
+    // Handle cross-origin iframes via Playwright's frame API
+    const frames = this.page.frames();
+    const childYamls: string[] = [];
+    let counter = mainResult.counterValue;
+
+    for (const frame of frames) {
+      // Skip the main frame
+      if (frame === this.page.mainFrame()) continue;
+
+      try {
+        const frameResult = await frame.evaluate(
+          ({ script, counterStart }) => {
+            const win = window as any;
+            if (!win.__sparkAriaTree) {
+              const fn = new Function(script);
+              fn();
+              win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+            }
+            const counter = { value: counterStart };
+            const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(
+              document.body,
+              counter,
+            );
+            return { yaml, counterValue: counter.value };
+          },
+          { script: ARIA_TREE_SCRIPT, counterStart: counter },
+        );
+        if (frameResult.yaml) {
+          childYamls.push(frameResult.yaml);
+          counter = frameResult.counterValue;
+        }
+      } catch {
+        // Cross-origin or detached frame, skip
+      }
+    }
+
+    // Combine main frame and cross-origin iframe YAMLs
+    if (childYamls.length) {
+      return mainResult.yaml + "\n" + childYamls.join("\n");
+    }
+    return mainResult.yaml;
   }
 
   /**
@@ -537,7 +589,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private async validateElementRef(ref: string): Promise<Locator> {
     if (!this.page) throw new Error("Browser not started");
 
-    const locator = this.page.locator(`aria-ref=${ref}`);
+    const locator = this.page.locator(`[aria-ref="${ref}"]`);
     const count = await locator.count();
 
     if (count === 0) {

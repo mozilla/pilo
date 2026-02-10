@@ -8,7 +8,8 @@
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "WebWorker"],
     "paths": {
-      "spark/core": ["../src/core.ts"]
+      "spark/core": ["../src/core.ts"],
+      "spark/ariaTree": ["../src/browser/ariaTree/index.ts"]
     }
   }
 }

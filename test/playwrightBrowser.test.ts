@@ -631,7 +631,7 @@ describe("PlaywrightBrowser", () => {
 
         const result = await (browser as any).validateElementRef("valid");
         expect(result).toBe(mockLocator);
-        expect(mockPage.locator).toHaveBeenCalledWith("aria-ref=valid");
+        expect(mockPage.locator).toHaveBeenCalledWith('[aria-ref="valid"]');
       });
     });
 
