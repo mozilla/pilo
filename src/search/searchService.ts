@@ -8,6 +8,7 @@
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
 import type { SearchProviderName } from "../configDefaults.js";
+import { SEARCH_RESULTS_REMINDER } from "../utils/promptSecurity.js";
 import {
   createSearchProvider,
   type SearchProvider,
@@ -32,7 +33,6 @@ export class SearchService {
   async search(query: string): Promise<string> {
     const browser = this.provider.requiresBrowser ? this.browser : undefined;
     const results = await this.provider.search(query, browser);
-    // Append reminder to visit actual pages instead of relying on summaries
-    return `${results}\n\n**IMPORTANT:** These are only search result summaries. When you find relevant results, use \`goto({"url": "..."})\` to visit the actual page and get complete information.`;
+    return `${results}\n\n${SEARCH_RESULTS_REMINDER}`;
   }
 }
