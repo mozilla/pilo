@@ -151,7 +151,6 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
 
     const contextOptions: BrowserContextOptions = {
-      bypassCSP: true, // Spark default
       ...this.options.contextOptions, // User-provided Playwright options
     };
 
@@ -561,14 +560,41 @@ export class PlaywrightBrowser implements AriaBrowser {
     return turndown.turndown(html);
   }
 
-  async getScreenshot(): Promise<Buffer> {
+  async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     if (!this.page) throw new Error("Browser not started");
-    return await this.page.screenshot({
-      fullPage: true,
-      type: "jpeg",
-      quality: 80,
-      scale: "css",
-    });
+
+    // Apply SoM overlay before screenshot if requested.
+    // Failures are non-fatal — a plain screenshot is still useful.
+    if (options?.withMarks) {
+      try {
+        await this.page.evaluate(() => {
+          const win = window as any;
+          win.__sparkAriaTree?.applySetOfMarks?.();
+        });
+      } catch {
+        // Can fail if page navigated or ariaTree bundle wasn't injected yet
+      }
+    }
+
+    try {
+      return await this.page.screenshot({
+        fullPage: true,
+        type: "jpeg",
+        quality: 80,
+        scale: "css",
+      });
+    } finally {
+      if (options?.withMarks) {
+        try {
+          await this.page.evaluate(() => {
+            const win = window as any;
+            win.__sparkAriaTree?.removeSetOfMarks?.();
+          });
+        } catch {
+          // Page may have navigated between screenshot and cleanup
+        }
+      }
+    }
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
@@ -589,7 +615,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private async validateElementRef(ref: string): Promise<Locator> {
     if (!this.page) throw new Error("Browser not started");
 
-    const locator = this.page.locator(`[aria-ref="${ref}"]`);
+    const locator = this.page.locator(`[data-spark-ref="${ref}"]`);
     const count = await locator.count();
 
     if (count === 0) {
@@ -597,7 +623,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
 
     if (count > 1) {
-      // This shouldn't happen with aria-ref, but let's be defensive
+      // This shouldn't happen with data-spark-ref, but let's be defensive
       throw new InvalidRefException(
         ref,
         `Multiple elements found with reference '${ref}'. This may indicate a page structure issue.`,

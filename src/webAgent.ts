@@ -596,7 +596,7 @@ export class WebAgent {
     // Handle vision mode with screenshots
     if (this.vision) {
       try {
-        const screenshot = await this.browser.getScreenshot();
+        const screenshot = await this.browser.getScreenshot({ withMarks: true });
 
         // Emit screenshot captured event
         this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
