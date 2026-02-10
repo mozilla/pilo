@@ -19,7 +19,7 @@ vi.mock("../../src/config.js", () => ({
     max_iterations: 50,
     max_validation_attempts: 3,
     max_repeated_actions: 2,
-    bypass_csp: true,
+    bypass_csp: false,
     navigation_timeout_ms: 30000,
     navigation_max_timeout_ms: 120000,
     navigation_max_attempts: 3,
