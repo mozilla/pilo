@@ -24,7 +24,15 @@ import {
 import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../configDefaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
-import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
+
+// Path to the bundled ariaTree script (output by pnpm run bundle:aria)
+const ARIA_TREE_BUNDLE_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "ariaTree/bundle.iife.js",
+);
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -187,6 +195,14 @@ export class PlaywrightBrowser implements AriaBrowser {
       throw new Error("Browser already started. Call shutdown() first.");
     }
 
+    // Validate bundle exists before starting browser
+    if (!existsSync(ARIA_TREE_BUNDLE_PATH)) {
+      throw new Error(
+        `ariaTree bundle not found at ${ARIA_TREE_BUNDLE_PATH}. ` +
+          `Run "pnpm run build" to generate it.`,
+      );
+    }
+
     // Map all options upfront for clear precedence
     const { launchOptions, contextOptions, connectOptions } = this.mapOptionsToPlaywright();
 
@@ -236,6 +252,9 @@ export class PlaywrightBrowser implements AriaBrowser {
 
     // Setup context
     this.context = await this.browser.newContext(contextOptions);
+
+    // Inject ariaTree script into all pages/frames automatically
+    await this.context.addInitScript({ path: ARIA_TREE_BUNDLE_PATH });
 
     this.page = await this.context.newPage();
 
@@ -456,22 +475,15 @@ export class PlaywrightBrowser implements AriaBrowser {
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
 
-    // Inject the ariaTree bundle and generate snapshot in the main frame
-    const mainResult = await this.page.evaluate(
-      ({ script }) => {
-        // Idempotent injection guard
-        const win = window as any;
-        if (!win.__sparkAriaTree) {
-          const fn = new Function(script);
-          fn();
-          win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
-        }
-        const counter = { value: 0 };
-        const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(document.body, counter);
-        return { yaml, counterValue: counter.value };
-      },
-      { script: ARIA_TREE_SCRIPT },
-    );
+    // Generate snapshot in the main frame (script already injected via addInitScript)
+    const mainResult = await this.page.evaluate(() => {
+      const counter = { value: 0 };
+      const yaml: string = (globalThis as any).__sparkAriaTree.generateAndRenderAriaTree(
+        document.body,
+        counter,
+      );
+      return { yaml, counterValue: counter.value };
+    });
 
     // Handle cross-origin iframes via Playwright's frame API
     const frames = this.page.frames();
@@ -483,23 +495,14 @@ export class PlaywrightBrowser implements AriaBrowser {
       if (frame === this.page.mainFrame()) continue;
 
       try {
-        const frameResult = await frame.evaluate(
-          ({ script, counterStart }) => {
-            const win = window as any;
-            if (!win.__sparkAriaTree) {
-              const fn = new Function(script);
-              fn();
-              win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
-            }
-            const counter = { value: counterStart };
-            const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(
-              document.body,
-              counter,
-            );
-            return { yaml, counterValue: counter.value };
-          },
-          { script: ARIA_TREE_SCRIPT, counterStart: counter },
-        );
+        const frameResult = await frame.evaluate((counterStart: number) => {
+          const counter = { value: counterStart };
+          const yaml: string = (globalThis as any).__sparkAriaTree.generateAndRenderAriaTree(
+            document.body,
+            counter,
+          );
+          return { yaml, counterValue: counter.value };
+        }, counter);
         if (frameResult.yaml) {
           childYamls.push(frameResult.yaml);
           counter = frameResult.counterValue;
