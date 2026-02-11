@@ -604,6 +604,12 @@ export class WebAgent {
           format: "jpeg" as const,
         });
 
+        // Emit full screenshot image event (opt-in for loggers)
+        this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE, {
+          image: screenshot.toString("base64"),
+          mediaType: "image/jpeg" as const,
+        });
+
         // Add multimodal message with text and image
         this.messages.push({
           role: "user",

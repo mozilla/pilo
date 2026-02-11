@@ -92,6 +92,9 @@ interface SparkTaskRequest {
 
   // Search configuration overrides
   searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
+
+  // Enable full screenshot events (default: false)
+  includeScreenshotImages?: boolean;
 }
 
 // POST /spark/run - Execute a Spark task with real-time streaming
@@ -208,12 +211,15 @@ spark.post("/run", async (c) => {
         // Create browser and agent instances
         const browser = new PlaywrightBrowser(browserConfig);
 
-        // Create StreamLogger that uses Hono's stream
-        const logger = new StreamLogger(async (event: string, data: any) => {
-          await stream.writeSSE({
-            event,
-            data: JSON.stringify(data),
-          });
+        // Create StreamLogger with screenshot image option from request body
+        const logger = new StreamLogger({
+          sendEvent: async (event: string, data: any) => {
+            await stream.writeSSE({
+              event,
+              data: JSON.stringify(data),
+            });
+          },
+          includeScreenshotImages: body.includeScreenshotImages ?? false,
         });
 
         // Create AI provider with potential overrides

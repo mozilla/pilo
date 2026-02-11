@@ -132,6 +132,7 @@ describe("WebAgentEventEmitter", () => {
         "browser:action_completed",
         "browser:navigated",
         "browser:screenshot_captured",
+        "browser:screenshot_captured_image",
         "system:debug_compression",
         "system:debug_message",
       ];
