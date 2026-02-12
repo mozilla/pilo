@@ -34,12 +34,21 @@ spark config --init
 
 This creates a `~/.sparkrc` configuration file with your AI provider settings.
 
-### 2. Install Browser Engines
+### 2. Browser Installation (Automatic)
 
-Spark uses Playwright for browser automation. On first run, you'll be prompted to install the necessary browser engines:
+Spark uses Playwright for browser automation. The first time you run an automation task, Spark will detect if browsers are installed and prompt you to install them automatically:
+
+```
+⚠️  Playwright browsers are not installed.
+These are required for web automation.
+
+This will download ~300MB of browser binaries.
+Would you like to install them now? [Y/n]:
+```
+
+You can also install browsers manually beforehand:
 
 ```bash
-# Or install manually
 npx playwright install
 ```
 
@@ -128,10 +137,23 @@ spark config --list  # View current configuration
 
 ### Browser Installation Issues
 
-If you encounter issues with browser installation:
+If the automatic browser installation fails or you want to reinstall browsers:
 
 ```bash
+# Reinstall all browsers
 npx playwright install --force
+
+# Install only specific browsers
+npx playwright install chromium
+npx playwright install firefox
+npx playwright install webkit
+```
+
+**Note**: In CI/CD environments or non-interactive shells, Spark will not prompt for installation. You must install browsers before running automation tasks:
+
+```bash
+# In CI pipelines, run this before using Spark
+npx playwright install
 ```
 
 ### API Key Issues
