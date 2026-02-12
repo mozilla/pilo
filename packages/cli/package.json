@@ -1,0 +1,67 @@
+{
+  "name": "@tabstack/spark-cli",
+  "version": "0.1.0",
+  "description": "AI-powered web automation CLI - control browsers using natural language",
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "bin": {
+    "spark": "./dist/index.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "web-scraping",
+    "playwright",
+    "browser-automation",
+    "cli",
+    "natural-language",
+    "web-automation"
+  ],
+  "author": "Mozilla-Ocho",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mozilla-Ocho/spark.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/Mozilla-Ocho/spark#readme",
+  "bugs": {
+    "url": "https://github.com/Mozilla-Ocho/spark/issues"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.52",
+    "@ai-sdk/google-vertex": "^3.0.97",
+    "@ai-sdk/openai": "^2.0.89",
+    "@ai-sdk/openai-compatible": "^1.0.30",
+    "@ghostery/adblocker-playwright": "^2.13.4",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
+    "ai": "^5.0.121",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "eventemitter3": "^5.0.1",
+    "liquidjs": "^10.24.0",
+    "nanoid": "^5.1.6",
+    "ollama-ai-provider-v2": "^1.5.5",
+    "playwright": "1.57.0",
+    "turndown": "^7.2.2",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  }
+}

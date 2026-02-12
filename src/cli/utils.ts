@@ -10,6 +10,12 @@ import { fileURLToPath } from "url";
  * Get package.json information
  */
 export function getPackageInfo(): { version: string; name: string; description: string } {
+  // Check if running from bundled CLI package
+  if ((globalThis as any).__SPARK_PACKAGE_INFO) {
+    return (globalThis as any).__SPARK_PACKAGE_INFO;
+  }
+
+  // Otherwise read from local package.json (development mode)
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const packageJson = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
 
