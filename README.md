@@ -2,6 +2,19 @@
 
 AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Spark will navigate websites, fill forms, and gather information automatically.
 
+## About Tabstack
+
+Spark is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastructure for AI agents. Tabstack provides the web execution layer that enables AI agents to automate workflows and turn web content into clean, structured data.
+
+**Learn more:**
+
+- [Tabstack Website](https://tabstack.ai)
+- [Introduction to Tabstack](https://tabstack.ai/blog/intro-browsing-infrastructure-ai-agents)
+
+**Community:**
+
+- Join `#tabstack` on the [Mozilla AI Discord](https://discord.gg/mozillaai)
+
 ## Requirements
 
 - **[Node.js 22+](https://nodejs.org/)** - JavaScript runtime
@@ -592,4 +605,8 @@ pnpm spark run "test task"  # Uses configured defaults
 
 ## License
 
-MIT
+[Apache 2.0](LICENSE) - Copyright 2026 Mozilla Corporation
+
+## Contributing
+
+Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
