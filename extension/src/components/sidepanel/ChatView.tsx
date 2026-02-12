@@ -484,7 +484,8 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
 
   const handleExecute = async () => {
     if (!task.trim()) return;
-    if (!settings.apiKey) {
+    // API key is optional for Ollama
+    if (!settings.apiKey && settings.provider !== "ollama") {
       addMessage("system", "Please configure your API key in settings first");
       onOpenSettings();
       return;
@@ -530,7 +531,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       // once we add status events in, we should drop the number back down.
       const messagePromise = browser.runtime.sendMessage(message);
       const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 300000), // 5 mins
+        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 600000), // 10 mins
       );
 
       let response: ExecuteTaskResponse;

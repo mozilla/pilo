@@ -113,7 +113,7 @@ describe("Storage Loading", () => {
     // Load settings
     await useSettingsStore.getState().loadSettings();
 
-    // Verify provider falls back to openrouter
+    // Verify provider falls back to openrouter (the default)
     expect(useSettingsStore.getState().settings.provider).toBe("openrouter");
   });
 
@@ -129,7 +129,7 @@ describe("Storage Loading", () => {
     // Load settings
     await useSettingsStore.getState().loadSettings();
 
-    // Verify provider falls back to openrouter
+    // Verify provider falls back to openrouter (the default)
     expect(useSettingsStore.getState().settings.provider).toBe("openrouter");
   });
 });
