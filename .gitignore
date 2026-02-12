@@ -4,7 +4,6 @@ dist
 .env.*
 .DS_Store
 *.txt
-CLAUDE.md
 scripts/docker-build.sh
 debug
 coverage

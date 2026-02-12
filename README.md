@@ -404,6 +404,33 @@ Contributions welcome! When submitting pull requests:
 - Run `pnpm check` before submitting
 - Follow existing code style and patterns
 
+### Optional: Pre-Commit Hook for Secret Scanning
+
+Spark includes an optional pre-commit hook that automatically scans for secrets before each commit using [gitleaks](https://github.com/gitleaks/gitleaks).
+
+**To enable (recommended for contributors):**
+
+```bash
+# Install gitleaks
+brew install gitleaks  # macOS
+# or download from: https://github.com/gitleaks/gitleaks
+
+# Enable the pre-commit hook (one-time setup)
+git config core.hooksPath .githooks
+```
+
+The hook will now run automatically before each commit. If a potential secret is detected, the commit will be blocked and you'll see instructions on how to proceed.
+
+**To disable:**
+
+```bash
+git config --unset core.hooksPath
+```
+
+**Note:** The hook can be bypassed with `git commit --no-verify` if needed, but this is not recommended unless you're certain the flagged content is a false positive that's already documented in `.gitleaksignore`.
+
+Built with TypeScript, Playwright, and the Vercel AI SDK.
+
 ## Evaluation System
 
 Spark includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
