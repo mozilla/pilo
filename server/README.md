@@ -6,14 +6,14 @@ Web server for Spark AI-powered web automation. Provides HTTP API endpoints to e
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Copy environment file and configure
 cp .env.example .env
 # Edit .env with your AI provider API key and desired configuration
 
 # Start development server
-pnpm run dev
+npm run dev
 ```
 
 ## Basic Usage
@@ -127,9 +127,9 @@ SPARK_HEADLESS=true
 ## Development Commands
 
 ```bash
-pnpm run dev          # Start dev server with hot reload
-pnpm run build        # Build TypeScript to dist/
-pnpm run start        # Start production server
-pnpm run typecheck    # Run TypeScript type checking
-pnpm test             # Run tests
+npm run dev          # Start dev server with hot reload
+npm run build        # Build TypeScript to dist/
+npm run start        # Start production server
+npm run typecheck    # Run TypeScript type checking
+npm test             # Run tests
 ```

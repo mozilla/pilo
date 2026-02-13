@@ -25,7 +25,7 @@ function findExtensionPath(): string {
     }
   }
 
-  throw new Error("Extension not found. Run 'pnpm build:chrome' first.");
+  throw new Error("Extension not found. Run 'npm run build:chrome' first.");
 }
 
 export const test = base.extend<ExtensionFixtures>({

@@ -6,26 +6,26 @@ Browser extension for Spark AI-powered web automation.
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Development (Firefox - persistent profile)
-pnpm dev:firefox
+npm run dev:firefox
 
 # Development (Firefox - fresh temporary profile)
-pnpm dev:firefox:tmp-profile
+npm run dev:firefox:tmp-profile
 
 # Development (Chrome - fresh temporary profile)
-pnpm dev:chrome:tmp-profile
+npm run dev:chrome:tmp-profile
 
 # Build for production
-pnpm build:firefox  # Firefox
-pnpm build:chrome   # Chrome
+npm run build:firefox  # Firefox
+npm run build:chrome   # Chrome
 
 # Create distribution packages
-pnpm zip:firefox    # Firefox
-pnpm zip:chrome     # Chrome
+npm run zip:firefox    # Firefox
+npm run zip:chrome     # Chrome
 
 # Testing
-pnpm test           # Run tests
-pnpm test:watch     # Watch mode
+npm test           # Run tests
+npm run test:watch     # Watch mode
 ```

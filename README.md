@@ -78,7 +78,7 @@ spark config --reset    # Clear all settings
 ### Programmatic Usage
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
@@ -260,7 +260,7 @@ See [Configuration Priority](#configuration-priority) for how settings are resol
 ### WebAgent
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
