@@ -5,7 +5,7 @@
  * Node.js only - uses process.env.
  */
 
-import { FIELDS, type SparkConfig } from "../configDefaults.js";
+import { FIELDS, type SparkConfig } from "./defaults.js";
 import { coerceValue } from "./helpers.js";
 
 /**

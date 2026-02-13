@@ -6,7 +6,7 @@
  */
 
 import { config as loadDotenv } from "dotenv";
-import { DEFAULTS, type SparkConfig, type SparkConfigResolved } from "../configDefaults.js";
+import { DEFAULTS, type SparkConfig, type SparkConfigResolved } from "./defaults.js";
 import { isDevelopmentMode } from "../buildMode.js";
 import { parseEnvConfig } from "./envParser.js";
 import {

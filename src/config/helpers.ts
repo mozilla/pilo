@@ -5,7 +5,7 @@
  */
 
 import { Command, Option } from "commander";
-import { FIELDS, type ConfigFieldType, type FieldDef } from "../configDefaults.js";
+import { FIELDS, type ConfigFieldType, type FieldDef } from "./defaults.js";
 
 /**
  * Coerce a string value to the appropriate type.

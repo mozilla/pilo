@@ -2,7 +2,7 @@
  * Configuration System - Node.js
  *
  * Full config functionality including file I/O, env parsing, and CLI generation.
- * Re-exports browser-compatible types and defaults from configDefaults.ts.
+ * Re-exports browser-compatible types and defaults from defaults.ts.
  */
 
 // Re-export everything from browser-compatible module
@@ -20,7 +20,7 @@ export {
   getCliFields,
   getEnvFields,
   getSchemaConfigKeys,
-} from "../configDefaults.js";
+} from "./defaults.js";
 
 export type {
   Provider,
@@ -34,7 +34,7 @@ export type {
   ConfigKey,
   FieldDef,
   ConfigField,
-} from "../configDefaults.js";
+} from "./defaults.js";
 
 // Export environment variable parsing
 export { parseEnvConfig } from "./envParser.js";
