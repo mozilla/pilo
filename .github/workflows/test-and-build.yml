@@ -1,0 +1,272 @@
+name: Test and Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  setup:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.filter.outputs.cli }}
+      extension: ${{ steps.filter.outputs.extension }}
+      server: ${{ steps.filter.outputs.server }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cli:
+              - 'packages/cli/**'
+              - 'src/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            extension:
+              - 'packages/extension/**'
+              - 'src/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            server:
+              - 'packages/server/**'
+              - 'src/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+
+  core:
+    name: Core (format, typecheck, test)
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Run type check
+        run: pnpm run typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+  cli:
+    name: CLI (typecheck, test, build)
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.cli == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run CLI type check
+        run: pnpm --filter @tabstack/spark run typecheck
+
+      - name: Run CLI tests
+        run: pnpm --filter @tabstack/spark test
+
+      - name: Build CLI
+        run: pnpm --filter @tabstack/spark run build
+
+  extension:
+    name: Extension (typecheck, test, build, e2e)
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.extension == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run extension type check
+        run: pnpm --filter spark-extension run typecheck
+
+      - name: Run extension tests
+        run: pnpm --filter spark-extension test
+
+      - name: Build extension for Chrome
+        run: pnpm --filter spark-extension run build:chrome
+
+      - name: Build extension for Firefox
+        run: pnpm --filter spark-extension run build:firefox
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          set -euo pipefail
+          if [ ! -f packages/extension/package.json ]; then
+            echo "Error: packages/extension/package.json not found" >&2
+            exit 1
+          fi
+          version=$(jq -re '.devDependencies["@playwright/test"] // empty' packages/extension/package.json)
+          if [ -z "$version" ]; then
+            echo "Error: @playwright/test devDependency not found in packages/extension/package.json" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter spark-extension exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter spark-extension exec playwright install-deps chromium
+
+      - name: Run extension e2e tests
+        run: pnpm --filter spark-extension run test:e2e:headless:chrome
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: packages/extension/playwright-report/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-test-results
+          path: packages/extension/test-results/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  server:
+    name: Server (typecheck, test, build)
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.server == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run server type check
+        run: pnpm --filter spark-server run typecheck
+
+      - name: Run server tests
+        run: pnpm --filter spark-server test
+
+      - name: Build server
+        run: pnpm --filter spark-server run build
