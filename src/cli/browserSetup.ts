@@ -5,7 +5,7 @@
  */
 
 import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import * as readline from "readline";
@@ -39,7 +39,6 @@ function areBrowsersInstalled(): boolean {
   // Additional check: try to see if there are any browser folders
   // Playwright typically has folders like chromium-1234, firefox-1234, etc.
   try {
-    const { readdirSync } = require("fs");
     const contents = readdirSync(browserPath);
     // If there's at least one browser folder, consider browsers installed
     return contents.some(

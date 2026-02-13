@@ -246,7 +246,7 @@ See [Configuration Priority](#configuration-priority) for how settings are resol
 
 ## Requirements
 
-- **Node.js 20+**
+- **Node.js 22+**
 - **AI Provider (one of):**
   - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
   - [OpenRouter API key](https://openrouter.ai/keys) (cloud)

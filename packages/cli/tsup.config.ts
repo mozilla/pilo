@@ -24,7 +24,6 @@ export default defineConfig({
     "@ghostery/adblocker-playwright",
     "turndown",
     "liquidjs",
-    "jsdom",
   ],
 
   // Generate source maps for better debugging

@@ -20,7 +20,7 @@ import { createExamplesCommand } from "../../../src/cli/commands/examples.js";
  */
 function getPackageInfo(): { version: string; name: string; description: string } {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
+  const packageJson = JSON.parse(readFileSync(join(__dirname, "./package.json"), "utf-8"));
 
   return {
     version: packageJson.version,
