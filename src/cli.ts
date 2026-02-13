@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { existsSync } from "fs";
+import chalk from "chalk";
 import { createRunCommand } from "./cli/commands/run.js";
 import { createConfigCommand } from "./cli/commands/config.js";
 import { createExamplesCommand } from "./cli/commands/examples.js";
 import { getPackageInfo } from "./cli/utils.js";
+import { config } from "./config.js";
 
 /**
  * Spark CLI - AI-powered web automation tool
@@ -28,6 +31,31 @@ program
     sortSubcommands: true,
     subcommandTerm: (cmd) => cmd.name() + " " + cmd.usage(),
   });
+
+// Add pre-action hook to ensure config file exists (except for 'config init')
+program.hook("preAction", () => {
+  // Check if the command being run is 'config init' by inspecting process.argv
+  const args = process.argv.slice(2); // Skip 'node' and script path
+  const isConfigInit = args[0] === "config" && args[1] === "init";
+
+  // Allow 'config init' to run without a config file
+  if (isConfigInit) {
+    return;
+  }
+
+  // Check if config file exists
+  const configPath = config.getConfigPath();
+  if (!existsSync(configPath)) {
+    console.error(chalk.red("❌ Error: Global configuration file not found"));
+    console.log(chalk.gray("Config file: " + configPath));
+    console.log("");
+    console.log(
+      chalk.white("Please initialize your configuration first by running: ") +
+        chalk.green("spark config init"),
+    );
+    process.exit(1);
+  }
+});
 
 // Register all commands
 program.addCommand(createRunCommand());
