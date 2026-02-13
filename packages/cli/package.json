@@ -1,0 +1,46 @@
+{
+  "name": "@tabstack/spark",
+  "version": "0.12.0",
+  "description": "AI-powered web automation CLI tool",
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "bin": {
+    "spark": "./dist/index.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "dev": "NODE_NO_WARNINGS=1 tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "web-scraping",
+    "playwright",
+    "browser-automation",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "tsup": "^8.3.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

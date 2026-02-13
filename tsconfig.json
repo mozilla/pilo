@@ -26,7 +26,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+
+    // Path aliases
+    "baseUrl": ".",
+    "paths": {
+      "@core": ["./src"],
+      "@core/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

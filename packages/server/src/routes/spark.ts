@@ -7,8 +7,8 @@ import {
   getAIProviderInfo,
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
-} from "spark";
-import type { TaskExecutionResult } from "spark";
+} from "@core";
+import type { TaskExecutionResult } from "@core";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 

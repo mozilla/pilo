@@ -57,10 +57,15 @@ let config = {
   },
   vite: () => ({
     plugins: [tailwindcss()] as any,
+    resolve: {
+      alias: {
+        "@core": resolve(__dirname, "../../src"),
+      },
+    },
     server: {
       fs: {
         // Allow serving files from parent node_modules (for @fontsource-variable/inter)
-        allow: [".."],
+        allow: ["../.."],
       },
     },
   }),

@@ -1,4 +1,4 @@
-import { GenericLogger, WebAgentEventType } from "spark";
+import { GenericLogger, WebAgentEventType } from "@core";
 
 type EventSender = (event: string, data: any) => Promise<void>;
 
