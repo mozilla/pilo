@@ -206,7 +206,6 @@ Example — task: "Find a restaurant on OpenTable in San Francisco for 2 people 
 
 Replace YYYY-MM-DD with the date, HH%3AMM with the time (URL-encoded colon), N with party size (default 2), and LOCATION with the place name (use + for spaces).
 
-{% endif %}
 Call create_plan_with_url() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}

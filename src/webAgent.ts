@@ -1194,15 +1194,7 @@ export class WebAgent {
         now.setDate(now.getDate() + 1);
         dateStr = now.toISOString().split("T")[0];
       } else {
-        const days = [
-          "sunday",
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-        ];
+        const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
         for (let i = 0; i < days.length; i++) {
           if (lower.includes(days[i])) {
             const current = now.getDay();
@@ -1260,7 +1252,8 @@ export class WebAgent {
       /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/,
     ];
     // Words that look like locations but aren't
-    const nonLocationWords = /^(Open\s*Table|Find|Book|Reserve|Search|Make|Get|Show|Looking|Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday|January|February|March|April|May|June|July|August|September|October|November|December)$/i;
+    const nonLocationWords =
+      /^(Open\s*Table|Find|Book|Reserve|Search|Make|Get|Show|Looking|Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday|January|February|March|April|May|June|July|August|September|October|November|December)$/i;
     for (const pattern of locationPatterns) {
       const match = task.match(pattern);
       if (match && match[1] && !nonLocationWords.test(match[1].trim())) {
