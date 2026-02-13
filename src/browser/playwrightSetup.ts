@@ -13,7 +13,8 @@ import { join } from "path";
 /**
  * Returns the path where Playwright stores browser binaries for this platform.
  *
- * - Linux/macOS: ~/.cache/ms-playwright
+ * - macOS: ~/Library/Caches/ms-playwright
+ * - Linux: ~/.cache/ms-playwright
  * - Windows: %USERPROFILE%\AppData\Local\ms-playwright
  *
  * @returns The platform-specific browser path, or null for unknown platforms
@@ -21,10 +22,12 @@ import { join } from "path";
 export function getPlaywrightBrowserPath(): string | null {
   const platform = process.platform;
 
-  if (platform === "win32") {
-    return join(homedir(), "AppData", "Local", "ms-playwright");
-  } else if (platform === "darwin" || platform === "linux") {
+  if (platform === "darwin") {
+    return join(homedir(), "Library", "Caches", "ms-playwright");
+  } else if (platform === "linux") {
     return join(homedir(), ".cache", "ms-playwright");
+  } else if (platform === "win32") {
+    return join(homedir(), "AppData", "Local", "ms-playwright");
   }
 
   return null;
