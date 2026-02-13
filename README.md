@@ -322,6 +322,41 @@ pnpm run format
 
 Built with TypeScript, Playwright, and the Vercel AI SDK.
 
+### Publishing the CLI Package
+
+The Spark CLI is published as a standalone npm package (`@tabstack/spark-cli`) from the `packages/cli/` directory. This allows users to install the CLI globally without cloning the repository.
+
+**Package Structure:**
+
+- `packages/cli/` contains its own `package.json` (separate from the root workspace)
+- The build process bundles the CLI and all required dependencies into `packages/cli/dist/`
+- Published files include only `dist/` and `README.md` (see `files` field in `package.json`)
+
+**Publishing Workflow:**
+
+1. **Update version** in `packages/cli/package.json`:
+
+   ```bash
+   cd packages/cli
+   npm version patch|minor|major
+   ```
+
+2. **Build the package**:
+
+   ```bash
+   pnpm build
+   ```
+
+   This runs `tsup` to bundle the CLI and dependencies.
+
+3. **Publish to npm**:
+   ```bash
+   npm publish --access public
+   ```
+   The `prepublishOnly` script automatically runs the build before publishing.
+
+**Note:** The CLI package uses Node.js 22+ as specified in the `engines` field.
+
 ## Configuration Reference
 
 ### Complete CLI Options
