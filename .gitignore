@@ -11,7 +11,6 @@ debug
 # Build artifacts
 src/buildMode.ts.backup
 
-# Lockfiles (project uses npm, others can use their preferred PM locally)
-pnpm-lock.yaml
+# Lockfiles (project uses pnpm, others ignored)
 yarn.lock
 bun.lockb
