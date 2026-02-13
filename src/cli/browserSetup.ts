@@ -1,54 +1,17 @@
 /**
- * Playwright browser setup utilities
+ * Playwright browser setup utilities (CLI-specific)
  *
- * Handles first-run detection and installation of Playwright browsers
+ * Handles CLI-specific browser installation flow with interactive prompts
+ * and colored console output. Core detection logic lives in src/browser/playwrightSetup.ts.
  */
 
-import { execSync } from "child_process";
-import { existsSync, readdirSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
 import * as readline from "readline";
 import chalk from "chalk";
-
-/**
- * Checks if Playwright browsers are installed
- *
- * Playwright stores browsers in:
- * - Linux/macOS: ~/.cache/ms-playwright
- * - Windows: %USERPROFILE%\AppData\Local\ms-playwright
- */
-function areBrowsersInstalled(): boolean {
-  const platform = process.platform;
-  let browserPath: string;
-
-  if (platform === "win32") {
-    browserPath = join(homedir(), "AppData", "Local", "ms-playwright");
-  } else if (platform === "darwin" || platform === "linux") {
-    browserPath = join(homedir(), ".cache", "ms-playwright");
-  } else {
-    // Unknown platform, assume not installed
-    return false;
-  }
-
-  // Check if the directory exists and has content
-  if (!existsSync(browserPath)) {
-    return false;
-  }
-
-  // Additional check: try to see if there are any browser folders
-  // Playwright typically has folders like chromium-1234, firefox-1234, etc.
-  try {
-    const contents = readdirSync(browserPath);
-    // If there's at least one browser folder, consider browsers installed
-    return contents.some(
-      (item: string) =>
-        item.startsWith("chromium-") || item.startsWith("firefox-") || item.startsWith("webkit-"),
-    );
-  } catch {
-    return false;
-  }
-}
+import {
+  areBrowsersInstalled,
+  isNonInteractive,
+  installBrowsers,
+} from "../browser/playwrightSetup.js";
 
 /**
  * Prompts the user for permission to install Playwright browsers
@@ -74,19 +37,15 @@ async function promptForInstallation(): Promise<boolean> {
 }
 
 /**
- * Installs Playwright browsers using npx playwright install
+ * Installs Playwright browsers with CLI-specific output formatting
  */
-function installBrowsers(): void {
+async function installBrowsersWithCLIOutput(): Promise<void> {
   console.log(chalk.cyan("\n📦 Installing Playwright browsers..."));
   console.log(chalk.gray("This may take a few minutes.\n"));
 
   try {
-    // Run playwright install with progress output
-    execSync("npx playwright install", {
-      stdio: "inherit", // Show progress to user
-      cwd: process.cwd(),
-    });
-
+    // Use core installBrowsers with default behavior (stdio: inherit)
+    await installBrowsers();
     console.log(chalk.green("\n✓ Browsers installed successfully.\n"));
   } catch (error) {
     console.error(chalk.red("\n❌ Failed to install Playwright browsers."));
@@ -94,13 +53,6 @@ function installBrowsers(): void {
     console.error(chalk.gray("  npx playwright install\n"));
     throw error;
   }
-}
-
-/**
- * Checks if running in a non-interactive environment (CI, piped input, etc.)
- */
-function isNonInteractive(): boolean {
-  return !process.stdin.isTTY || !process.stdout.isTTY || Boolean(process.env.CI);
 }
 
 /**
@@ -137,5 +89,5 @@ export async function ensureBrowsersInstalled(): Promise<void> {
   }
 
   // User agreed, install browsers
-  installBrowsers();
+  await installBrowsersWithCLIOutput();
 }

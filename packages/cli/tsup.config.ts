@@ -2,7 +2,7 @@ import { defineConfig } from "tsup";
 import { copyFileSync } from "fs";
 
 export default defineConfig({
-  // Entry point that re-exports from root
+  // Entry point: thin wrapper that imports from ../../src/cli/
   entry: ["src/index.ts"],
 
   // Output configuration
@@ -10,21 +10,11 @@ export default defineConfig({
   format: ["esm"],
   target: "node22",
 
-  // Bundle everything except large external dependencies
-  // Playwright, AI SDKs, and other large deps stay external
-  external: [
-    "playwright",
-    "@ai-sdk/google",
-    "@ai-sdk/google-vertex",
-    "@ai-sdk/openai",
-    "@ai-sdk/openai-compatible",
-    "@openrouter/ai-sdk-provider",
-    "ollama-ai-provider-v2",
-    "ai",
-    "@ghostery/adblocker-playwright",
-    "turndown",
-    "liquidjs",
-  ],
+  // Keep all node_modules external (will be installed alongside the CLI)
+  // This prevents bundling issues with ESM/CJS interop
+  esbuildOptions(options) {
+    options.packages = "external";
+  },
 
   // Generate source maps for better debugging
   sourcemap: true,
@@ -32,19 +22,21 @@ export default defineConfig({
   // Clean output directory before build
   clean: true,
 
-  // Preserve shebang for CLI entry point
-  shims: true,
+  // Add shebang for CLI entry point
+  banner: {
+    js: "#!/usr/bin/env node",
+  },
 
   // Don't split code, keep it as a single bundle
   splitting: false,
 
-  // Generate TypeScript declaration files
-  dts: false, // We don't need type definitions for a CLI tool
+  // No TypeScript declarations needed for CLI
+  dts: false,
 
-  // Minify for production
-  minify: false, // Keep readable for debugging
+  // Keep readable for debugging
+  minify: false,
 
-  // Don't bundle node built-ins
+  // Node platform
   platform: "node",
 
   // Copy package.json to dist after build
