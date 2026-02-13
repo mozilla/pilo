@@ -8,7 +8,8 @@
     "node": "^22.0.0"
   },
   "scripts": {
-    "build": "pnpm --filter @tabstack/spark build",
+    "build": "pnpm run build:extension && pnpm --filter @tabstack/spark build",
+    "build:extension": "pnpm --filter spark-extension run build:chrome && pnpm --filter spark-extension run build:firefox",
     "typecheck": "tsc --project tsconfig.check.json",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { createRunCommand } from "./commands/run.js";
 import { createConfigCommand } from "./commands/config.js";
 import { createExamplesCommand } from "./commands/examples.js";
+import { createExtensionCommand } from "./commands/extension.js";
 import { getPackageInfo } from "./utils.js";
 
 /**
@@ -31,6 +32,7 @@ program
 program.addCommand(createRunCommand());
 program.addCommand(createConfigCommand());
 program.addCommand(createExamplesCommand());
+program.addCommand(createExtensionCommand());
 
 // Parse command line arguments
 program.parse();

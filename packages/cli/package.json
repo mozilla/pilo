@@ -12,10 +12,12 @@
   "files": [
     "dist/**/*",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/bundle-extension.js"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/bundle-extension.js",
+    "build:cli-only": "tsup",
     "typecheck": "tsc --noEmit",
     "dev": "NODE_NO_WARNINGS=1 tsx src/index.ts",
     "test": "vitest run",
