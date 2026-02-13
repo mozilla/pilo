@@ -61,6 +61,11 @@ vi.mock("../../../src/cli/utils.js", () => ({
   parseResourcesList: vi.fn((resources) => resources.split(",")),
 }));
 
+// Mock browserSetup to avoid checking for installed browsers in tests
+vi.mock("../../../src/cli/browserSetup.js", () => ({
+  ensureBrowsersInstalled: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock fs module - include all functions used by manager.ts
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
