@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsup",
+    "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "dev": "tsx --watch src/index.ts",
     "start": "node dist/index.js",

@@ -18,6 +18,7 @@
   "scripts": {
     "build": "tsup && node scripts/bundle-extension.js",
     "build:cli-only": "tsup",
+    "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "dev": "NODE_NO_WARNINGS=1 tsx src/index.ts",
     "test": "vitest run",
