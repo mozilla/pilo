@@ -6,7 +6,7 @@ export default defineConfig(async () => ({
   plugins: (await WxtVitest()) as any,
   resolve: {
     alias: {
-      "spark/core": path.resolve(__dirname, "../src/core.ts"),
+      "@core": path.resolve(__dirname, "../../src"),
     },
   },
   test: {
