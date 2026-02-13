@@ -12,9 +12,9 @@
     "dev:chrome:tmp-profile": "wxt -b chrome",
     "dev:firefox": "node scripts/mkdirp.js .wxt/firefox-data && WEB_EXT_FIREFOX_PROFILE=.wxt/firefox-data WEB_EXT_KEEP_PROFILE_CHANGES=true wxt -b firefox",
     "dev:firefox:tmp-profile": "wxt -b firefox",
-    "prebuild:chrome": "cd .. && pnpm build",
+    "prebuild:chrome": "cd .. && npm run build",
     "build:chrome": "wxt build -b chrome",
-    "prebuild:firefox": "cd .. && pnpm build",
+    "prebuild:firefox": "cd .. && npm run build",
     "build:firefox": "wxt build -b firefox",
     "zip:chrome": "wxt zip -b chrome",
     "zip:firefox": "wxt zip -b firefox",
@@ -23,7 +23,7 @@
     "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm run format && pnpm run typecheck && pnpm run test",
+    "check": "npm run format && npm run typecheck && npm run test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -60,6 +60,5 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
     "wxt": "0.20.13"
-  },
-  "packageManager": "pnpm@9.0.0"
+  }
 }

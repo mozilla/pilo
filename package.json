@@ -43,7 +43,7 @@
     "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
     "release": "./scripts/release.sh",
-    "check": "pnpm run format && pnpm run typecheck && pnpm test"
+    "check": "npm run format && npm run typecheck && npm test"
   },
   "keywords": [
     "ai",
@@ -85,6 +85,5 @@
     "playwright": "1.57.0",
     "turndown": "^7.2.2",
     "zod": "^4.3.5"
-  },
-  "packageManager": "pnpm@9.0.0"
+  }
 }

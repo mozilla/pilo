@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
-    "check": "pnpm run format && pnpm run typecheck && pnpm test"
+    "check": "npm run format && npm run typecheck && npm test"
   },
   "keywords": [
     "ai",
@@ -38,6 +38,5 @@
     "dotenv": "^17.2.3",
     "hono": "^4.11.4",
     "spark": "file:.."
-  },
-  "packageManager": "pnpm@9.0.0"
+  }
 }
