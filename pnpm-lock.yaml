@@ -245,6 +245,12 @@ importers:
       '@hono/sentry':
         specifier: ^1.2.2
         version: 1.2.2(hono@4.11.4)
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      commander:
+        specifier: ^14.0.2
+        version: 14.0.2
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -258,6 +264,9 @@ importers:
       prettier:
         specifier: ^3.8.0
         version: 3.8.0
+      tsup:
+        specifier: ^8.3.7
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

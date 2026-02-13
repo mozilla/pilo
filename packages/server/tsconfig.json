@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src",
+    "baseUrl": ".",
     "outDir": "./dist",
     "lib": ["ES2022"],
     "paths": {
       "@core": ["../../src"],
       "@core/*": ["../../src/*"]
-    }
+    },
+    "skipLibCheck": true,
+    "noEmit": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

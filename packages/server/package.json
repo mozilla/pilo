@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "dev": "tsx --watch src/index.ts",
     "start": "node dist/index.js",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^25.0.10",
     "prettier": "^3.8.1",
+    "tsup": "^8.3.7",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
@@ -35,6 +36,8 @@
   "dependencies": {
     "@hono/node-server": "^1.19.9",
     "@hono/sentry": "^1.2.2",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
     "dotenv": "^17.2.3",
     "hono": "^4.11.7"
   },
