@@ -51,5 +51,8 @@ export type {
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
 
+// Build Mode Detection
+export { SPARK_BUILD_MODE, isProductionBuild, isDevelopmentMode } from "./buildMode.js";
+
 // Config merge utilities
 export { mergeWithDefaults, createNavigationRetryConfig } from "./utils/configMerge.js";

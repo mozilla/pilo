@@ -8,6 +8,7 @@ import { createConfigCommand } from "./cli/commands/config.js";
 import { createExamplesCommand } from "./cli/commands/examples.js";
 import { getPackageInfo } from "./cli/utils.js";
 import { config } from "./config.js";
+import { isDevelopmentMode } from "./buildMode.js";
 
 /**
  * Spark CLI - AI-powered web automation tool
@@ -32,7 +33,7 @@ program
     subcommandTerm: (cmd) => cmd.name() + " " + cmd.usage(),
   });
 
-// Add pre-action hook to ensure config file exists (except for 'config init')
+// Add pre-action hook to ensure config file exists (except for 'config init' or dev mode)
 program.hook("preAction", () => {
   // Check if the command being run is 'config init' by inspecting process.argv
   const args = process.argv.slice(2); // Skip 'node' and script path
@@ -43,7 +44,12 @@ program.hook("preAction", () => {
     return;
   }
 
-  // Check if config file exists
+  // In development mode, config file is optional (env vars can be used)
+  if (isDevelopmentMode()) {
+    return;
+  }
+
+  // In production mode, require config file to exist
   const configPath = config.getConfigPath();
   if (!existsSync(configPath)) {
     console.error(chalk.red("❌ Error: Global configuration file not found"));

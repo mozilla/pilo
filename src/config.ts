@@ -52,6 +52,9 @@ import {
   type FieldDef,
 } from "./configDefaults.js";
 
+// Import build mode detection
+import { isDevelopmentMode } from "./buildMode.js";
+
 // =============================================================================
 // Environment Variable Parsing (Node.js only - uses process.env)
 // =============================================================================
@@ -259,19 +262,47 @@ export class ConfigManager {
   }
 
   /**
-   * Get CLI-specific configuration (global config file only, no environment variables).
-   * This is used by the CLI to ensure consistent behavior independent of environment.
+   * Get CLI-specific configuration.
+   *
+   * In production mode (installed via npm):
+   *   - Merges defaults with global config file (no env vars)
+   *   - Ensures consistent behavior independent of environment
+   *
+   * In development mode (running from source):
+   *   - Merges defaults with global config (if exists) with env vars
+   *   - Allows developers to override settings with environment variables
+   *   - Config file is optional, not required
    */
   public getCliConfig(): SparkConfigResolved {
     const globalConfig = this.getGlobalConfig();
 
-    // Merge: defaults < global config (no env vars)
-    const merged = {
-      ...DEFAULTS,
-      ...globalConfig,
-    };
+    if (isDevelopmentMode()) {
+      // Dev mode: defaults < global config (optional) < env vars
+      // Load local .env file if it exists
+      try {
+        loadDotenv({ path: ".env", quiet: true });
+      } catch {
+        // Ignore if .env doesn't exist
+      }
 
-    return merged as SparkConfigResolved;
+      const envConfig = parseEnvConfig();
+
+      const merged = {
+        ...DEFAULTS,
+        ...globalConfig,
+        ...envConfig,
+      };
+
+      return merged as SparkConfigResolved;
+    } else {
+      // Production mode: defaults < global config (no env vars)
+      const merged = {
+        ...DEFAULTS,
+        ...globalConfig,
+      };
+
+      return merged as SparkConfigResolved;
+    }
   }
 
   /**

@@ -7,3 +7,6 @@ dist
 CLAUDE.md
 scripts/docker-build.sh
 debug
+
+# Build artifacts
+src/buildMode.ts.backup
