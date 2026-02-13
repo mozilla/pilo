@@ -19,8 +19,6 @@
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
-    "format": "prettier --write . --list-different",
-    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "check": "pnpm run format && pnpm run typecheck && pnpm run test",
     "test": "vitest run",

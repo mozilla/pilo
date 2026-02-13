@@ -13,8 +13,6 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write . --list-different",
-    "format:check": "prettier --check .",
     "check": "pnpm run format && pnpm run typecheck && pnpm test"
   },
   "keywords": [
