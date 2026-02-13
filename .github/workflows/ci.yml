@@ -40,6 +40,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check lockfiles in sync
+        run: |
+          npm install
+          if ! git diff --exit-code package-lock.json; then
+            echo "Error: package-lock.json is out of sync with package.json"
+            echo ""
+            echo "Please run 'npm install' locally and commit the updated package-lock.json"
+            echo ""
+            echo "This ensures npm and pnpm lockfiles stay synchronized."
+            exit 1
+          fi
+
       - name: Check formatting
         run: pnpm run format:check
 
