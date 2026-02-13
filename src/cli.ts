@@ -7,7 +7,7 @@ import { createRunCommand } from "./cli/commands/run.js";
 import { createConfigCommand } from "./cli/commands/config.js";
 import { createExamplesCommand } from "./cli/commands/examples.js";
 import { getPackageInfo } from "./cli/utils.js";
-import { config } from "./config.js";
+import { config } from "./config/index.js";
 import { isDevelopmentMode } from "./buildMode.js";
 
 /**

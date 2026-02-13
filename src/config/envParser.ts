@@ -1,0 +1,50 @@
+/**
+ * Environment Variable Parser
+ *
+ * Parses environment variables into a SparkConfig object.
+ * Node.js only - uses process.env.
+ */
+
+import { FIELDS, type SparkConfig } from "../configDefaults.js";
+import { coerceValue } from "./helpers.js";
+
+/**
+ * Parse environment variables into a partial SparkConfig object.
+ */
+export function parseEnvConfig(): Partial<SparkConfig> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, field] of Object.entries(FIELDS)) {
+    // Find first set env var
+    let envValue: string | undefined;
+    let envVarName: string | undefined;
+    for (const envVar of field.env) {
+      const val = process.env[envVar];
+      if (val !== undefined) {
+        envValue = val;
+        envVarName = envVar;
+        break;
+      }
+    }
+
+    if (envValue !== undefined && envVarName) {
+      // Validate enum values
+      if (field.type === "enum" && field.values) {
+        if (!field.values.includes(envValue)) {
+          console.warn(
+            `Config warning: ${envVarName}="${envValue}" is not valid. ` +
+              `Allowed values: ${field.values.join(", ")}. Using default.`,
+          );
+          continue;
+        }
+      }
+
+      const coerced = coerceValue(envValue, field.type, envVarName);
+      if (coerced !== undefined) {
+        result[key] = coerced;
+      }
+    }
+  }
+
+  return result as Partial<SparkConfig>;
+}

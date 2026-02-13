@@ -5,4 +5,4 @@ export {
   getConfigDefaults,
   type SparkConfig,
   type SparkConfigResolved,
-} from "../config.js";
+} from "../config/index.js";

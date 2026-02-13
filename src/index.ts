@@ -35,7 +35,7 @@ export {
   parseEnvConfig,
   addSchemaOptions,
   addConfigOptions,
-} from "./config.js";
+} from "./config/index.js";
 export type {
   SparkConfig,
   SparkConfigResolved,
@@ -47,7 +47,7 @@ export type {
   Browser,
   ReasoningLevel,
   LoggerType,
-} from "./config.js";
+} from "./config/index.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
 

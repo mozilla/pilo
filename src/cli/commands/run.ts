@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { WebAgent } from "../../webAgent.js";
 import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
-import { config, addConfigOptions } from "../../config.js";
+import { config, addConfigOptions } from "../../config/index.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
 import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";

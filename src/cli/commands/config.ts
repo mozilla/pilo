@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync, unlinkSync, mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
-import { config } from "../../config.js";
+import { config } from "../../config/index.js";
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";
 
 /**
