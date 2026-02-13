@@ -1069,6 +1069,14 @@ export class WebAgent {
    * Plan the task using proper tool calling
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
+    // Auto-detect OpenTable tasks and construct a parameterized search URL
+    if (!startingUrl) {
+      const openTableUrl = this.buildOpenTableUrl(task);
+      if (openTableUrl) {
+        startingUrl = openTableUrl;
+      }
+    }
+
     const planningPrompt = startingUrl
       ? buildPlanPrompt(task, startingUrl, this.guardrails)
       : buildPlanAndUrlPrompt(task, this.guardrails);
@@ -1151,6 +1159,129 @@ export class WebAgent {
    */
   private createActionSignature(action: string, ref?: string, value?: string | number): string {
     return `${action}:${ref || ""}:${value || ""}`;
+  }
+
+  /**
+   * Detect OpenTable restaurant tasks and build a parameterized search URL.
+   * Returns the URL if the task matches, or null otherwise.
+   */
+  private buildOpenTableUrl(task: string): string | null {
+    if (!/opentable/i.test(task)) return null;
+
+    const lower = task.toLowerCase();
+
+    // Extract date — try explicit dates first, then relative day names
+    let dateStr: string | null = null;
+    // Match formats like "2026-02-14", "Feb 14, 2026", "February 14 2026", "2/14/2026"
+    const explicitDate =
+      task.match(/(\d{4}-\d{2}-\d{2})/) ||
+      task.match(/(\d{1,2}\/\d{1,2}\/\d{4})/) ||
+      task.match(
+        /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{1,2},?\s+\d{4})/i,
+      );
+    if (explicitDate) {
+      const parsed = new Date(explicitDate[1]);
+      if (!isNaN(parsed.getTime())) {
+        dateStr = parsed.toISOString().split("T")[0];
+      }
+    }
+    if (!dateStr) {
+      // Relative days: today, tomorrow, day names
+      const now = new Date();
+      if (lower.includes("today")) {
+        dateStr = now.toISOString().split("T")[0];
+      } else if (lower.includes("tomorrow")) {
+        now.setDate(now.getDate() + 1);
+        dateStr = now.toISOString().split("T")[0];
+      } else {
+        const days = [
+          "sunday",
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+        ];
+        for (let i = 0; i < days.length; i++) {
+          if (lower.includes(days[i])) {
+            const current = now.getDay();
+            let diff = i - current;
+            if (diff <= 0) diff += 7;
+            now.setDate(now.getDate() + diff);
+            dateStr = now.toISOString().split("T")[0];
+            break;
+          }
+        }
+      }
+    }
+
+    // Extract time — e.g. "7pm", "7:30 PM", "19:00"
+    // Also handles relative offsets like "2 hours before/beforehand/earlier"
+    let hour = 19;
+    let minute = 0;
+    const timeMatch =
+      task.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i) ||
+      task.match(/(\d{1,2})\s*(am|pm)/i) ||
+      task.match(/(\d{2}):(\d{2})/);
+    if (timeMatch) {
+      hour = parseInt(timeMatch[1], 10);
+      minute = timeMatch[2] && !timeMatch[2].match(/am|pm/i) ? parseInt(timeMatch[2], 10) : 0;
+      const ampm = timeMatch[3] || timeMatch[2];
+      if (ampm && /pm/i.test(ampm) && hour < 12) hour += 12;
+      if (ampm && /am/i.test(ampm) && hour === 12) hour = 0;
+    }
+    // Apply relative offset: "2 hours before", "1 hour beforehand", "3 hours earlier"
+    const offsetMatch = lower.match(/(\d+)\s+hours?\s+(?:before(?:hand)?|earlier|prior)/);
+    if (offsetMatch) {
+      hour -= parseInt(offsetMatch[1], 10);
+      if (hour < 0) hour += 24;
+    }
+
+    // Extract party size — e.g. "for 4", "party of 6", "2 people", "table for 3"
+    let covers = 2;
+    const coversMatch = lower.match(
+      /(?:for|party\s+of|table\s+for|group\s+of)\s+(\d+)|(\d+)\s+(?:people|guests|diners|persons)/,
+    );
+    if (coversMatch) {
+      covers = parseInt(coversMatch[1] || coversMatch[2], 10);
+    }
+
+    // Extract location — try multiple patterns from most to least specific
+    let location: string | null = null;
+    const locationPatterns = [
+      // "in downtown San Francisco, CA" / "in San Francisco" / "near Portland, Oregon"
+      /\b(?:in|near|around|downtown)\s+([A-Z][A-Za-z]+(?:[\s,]+[A-Z][A-Za-z]*)*)/,
+      // "San Francisco restaurants" / "NYC restaurants"
+      /([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]*)*)\s+restaurants?\b/,
+      // "restaurants in san francisco" (lowercase)
+      /restaurants?\s+(?:in|near|around)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)*)/i,
+      // Fallback: any capitalized multi-word phrase not matching known non-location words
+      /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/,
+    ];
+    // Words that look like locations but aren't
+    const nonLocationWords = /^(Open\s*Table|Find|Book|Reserve|Search|Make|Get|Show|Looking|Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday|January|February|March|April|May|June|July|August|September|October|November|December)$/i;
+    for (const pattern of locationPatterns) {
+      const match = task.match(pattern);
+      if (match && match[1] && !nonLocationWords.test(match[1].trim())) {
+        location = match[1].trim();
+        break;
+      }
+    }
+
+    // OpenTable search URLs require a location to return results
+    if (!location) return null;
+
+    // Build the URL
+    const timeParam = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+    const params = new URLSearchParams();
+    params.set("dateTime", `${dateStr || new Date().toISOString().split("T")[0]}T${timeParam}`);
+    params.set("covers", String(covers));
+    if (location) {
+      params.set("term", location);
+    }
+
+    return `https://www.opentable.com/s?${params.toString()}`;
   }
 
   /**

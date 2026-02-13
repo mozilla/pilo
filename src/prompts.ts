@@ -195,6 +195,18 @@ Your plan should:
 - Booking dates must be in the future
 
 {% if includeUrl %}
+## 🚨 OPENTABLE: ALWAYS USE DIRECT SEARCH URL
+If the task involves OpenTable, you MUST use a parameterized search URL as the starting URL. NEVER use https://www.opentable.com as the URL.
+
+Construct the URL using this format:
+https://www.opentable.com/s?dateTime=YYYY-MM-DDTHH%3AMM%3A00&covers=N&term=LOCATION
+
+Example — task: "Find a restaurant on OpenTable in San Francisco for 2 people on Feb 14, 2026 at 7pm"
+→ url: "https://www.opentable.com/s?dateTime=2026-02-14T19%3A00%3A00&covers=2&term=San+Francisco"
+
+Replace YYYY-MM-DD with the date, HH%3AMM with the time (URL-encoded colon), N with party size (default 2), and LOCATION with the place name (use + for spaces).
+
+{% endif %}
 Call create_plan_with_url() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
 - plan: ${TOOL_STRINGS.planning.common.plan}
@@ -284,6 +296,15 @@ Provide your final answer:
 - Include all requested information
 - Format results as VALID Markdown
 - NEVER return raw JSON - ALwAYS format structured data as VALID Markdown
+
+## 🚨 OPENTABLE: NEVER NAVIGATE TO THE HOMEPAGE
+If the task involves OpenTable and you are on the wrong page or need to navigate, use goto() with a parameterized search URL. NEVER go to https://www.opentable.com.
+
+Use this format:
+goto({"url": "https://www.opentable.com/s?dateTime=YYYY-MM-DDTHH%3AMM%3A00&covers=N&term=LOCATION"})
+
+Example:
+goto({"url": "https://www.opentable.com/s?dateTime=2026-02-14T19%3A00%3A00&covers=2&term=San+Francisco"})
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
