@@ -43,4 +43,4 @@ export { parseEnvConfig } from "./envParser.js";
 export { addConfigOptions, addSchemaOptions } from "./helpers.js";
 
 // Export ConfigManager class and singleton instance
-export { ConfigManager, config } from "./ConfigManager.js";
+export { ConfigManager, config } from "./configManager.js";
