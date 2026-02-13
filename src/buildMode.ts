@@ -4,17 +4,12 @@
  * This module provides runtime detection of whether the CLI is running
  * in production mode (installed via npm) or development mode (running from source).
  *
- * The build mode is determined at build time and baked into the bundle.
- * During development, this file is not replaced, so it defaults to dev mode.
- * During production build, the build script generates a version with production mode set.
+ * The build mode is determined at build time using tsup's `define` option.
+ * During development (running with tsx), process.env.SPARK_BUILD_MODE is undefined.
+ * During production build, tsup replaces process.env.SPARK_BUILD_MODE with "production".
  */
 
-/**
- * This constant is set at build time:
- * - During 'npm run build' or 'npm publish': "production" (file gets replaced)
- * - During development (running with tsx): undefined (this file is used as-is)
- */
-export const SPARK_BUILD_MODE: string | undefined = undefined;
+export const SPARK_BUILD_MODE = process.env.SPARK_BUILD_MODE;
 
 /**
  * Check if the CLI is running in production mode (installed via npm).

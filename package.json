@@ -32,7 +32,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "./scripts/build.sh",
+    "build": "tsup",
     "typecheck": "tsc --project tsconfig.check.json",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
@@ -61,6 +61,7 @@
     "jsdom": "^27.4.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
