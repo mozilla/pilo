@@ -218,7 +218,9 @@ export class ConfigManager {
     if (platform === "win32") {
       this.configDir = join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "spark");
     } else {
-      this.configDir = join(homedir(), ".spark");
+      // XDG-compliant location for Unix-like systems
+      const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+      this.configDir = join(xdgConfigHome, "spark");
     }
     this.configPath = join(this.configDir, "config.json");
   }
@@ -251,6 +253,22 @@ export class ConfigManager {
       ...DEFAULTS,
       ...globalConfig,
       ...envConfig,
+    };
+
+    return merged as SparkConfigResolved;
+  }
+
+  /**
+   * Get CLI-specific configuration (global config file only, no environment variables).
+   * This is used by the CLI to ensure consistent behavior independent of environment.
+   */
+  public getCliConfig(): SparkConfigResolved {
+    const globalConfig = this.getGlobalConfig();
+
+    // Merge: defaults < global config (no env vars)
+    const merged = {
+      ...DEFAULTS,
+      ...globalConfig,
     };
 
     return merged as SparkConfigResolved;

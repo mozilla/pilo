@@ -28,12 +28,13 @@ vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
 // Mock the config module to avoid fs dependencies
 vi.mock("../../../src/config.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/config.js")>();
-  // Return DEFAULTS from getConfig so run command gets proper default values
+  // Return DEFAULTS from getConfig/getCliConfig so run command gets proper default values
   return {
     ...actual,
     config: {
       get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
       getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
+      getCliConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
     },
   };
 });
@@ -304,11 +305,11 @@ describe("CLI Run Command", () => {
     });
 
     it("should preserve boolean false from config when CLI option not specified", async () => {
-      // Mock config returning headless=false (as if from .env SPARK_HEADLESS=false)
+      // Mock config returning headless=false (as if from global config)
       // This ensures the ?? operator doesn't override explicit false values
-      mockConfig.getConfig.mockReturnValueOnce({
+      mockConfig.getCliConfig.mockReturnValueOnce({
         ...schemaDefaults,
-        headless: false, // Explicitly false from .env
+        headless: false, // Explicitly false from global config
         block_ads: false, // Another boolean that's false
       });
 

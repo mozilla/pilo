@@ -18,7 +18,7 @@ npm install
 npx playwright install
 
 # Setup AI provider
-spark config --init
+spark config init
 
 # Run your first task
 spark run "what's the weather in Tokyo?"
@@ -70,9 +70,11 @@ See [Configuration Reference](#configuration-reference) for all available option
 **Configuration:**
 
 ```bash
-spark config --init     # Setup wizard
-spark config --show     # View current settings
-spark config --reset    # Clear all settings
+spark config init       # Initialize configuration file
+spark config show       # View current settings
+spark config set <key>=<value>  # Set a configuration value
+spark config get <key>  # Get a configuration value
+spark config reset      # Clear all settings
 ```
 
 ### Programmatic Usage
@@ -203,35 +205,35 @@ spark run "secure browsing" --proxy socks5://127.0.0.1:1080
 Spark supports multiple AI providers and stores configuration globally:
 
 ```bash
-# Setup wizard (recommended for first use)
-spark config --init
+# Initialize configuration (recommended for first use)
+spark config init
 
 # Manual configuration
-spark config --set provider=openai
-spark config --set openai_api_key=sk-your-key
+spark config set provider=openai
+spark config set openai_api_key=sk-your-key
 
 # Or use OpenRouter
-spark config --set provider=openrouter
-spark config --set openrouter_api_key=sk-or-your-key
+spark config set provider=openrouter
+spark config set openrouter_api_key=sk-or-your-key
 
 # Or use local AI providers
-spark config --set provider=ollama
-spark config --set model=llama3.2
+spark config set provider=ollama
+spark config set model=llama3.2
 
-spark config --set provider=lmstudio
-spark config --set model=your-loaded-model
+spark config set provider=lmstudio
+spark config set model=your-loaded-model
 
 # Set defaults
-spark config --set browser=chrome
-spark config --set headless=true
-spark config --set vision=true
-spark config --set reasoning_effort=medium
+spark config set browser=chrome
+spark config set headless=true
+spark config set vision=true
+spark config set reasoning_effort=medium
 
 # View settings
-spark config --show
+spark config show
 
 # Reset everything
-spark config --reset
+spark config reset
 ```
 
 **Available AI Providers:**
@@ -447,12 +449,12 @@ All configuration options can be set via environment variables. Environment vari
 
 ### Configuration Priority
 
-Configuration values are resolved in the following order (highest to lowest priority):
+Settings can be specified in multiple ways (highest priority first):
 
-1. **Command-line options** - Directly passed to the command
-2. **Environment variables** - Set in your shell or `.env` file
-3. **Local `.env` file** - In your project directory
-4. **Global config file** - Set via `spark config --set`
+1. **CLI options** - Passed directly to `spark run`
+2. **Global config file** - Set via `spark config set`
+
+**Note**: The CLI uses only the global config file for consistency. Environment variables are ignored by the CLI but are still used by the server and extension.
 
 ### Examples
 
@@ -465,22 +467,15 @@ spark run "search for flights" \
   --vision \
   --reasoning-effort high
 
-# Using environment variables
-export SPARK_PROVIDER=openrouter
-export SPARK_MODEL=claude-3.5-sonnet
-export SPARK_BROWSER=firefox
-export SPARK_HEADLESS=true
-spark run "book a hotel"
-
-# Mixed usage (CLI options override environment variables)
-export SPARK_BROWSER=firefox
-spark run "search products" --browser chrome  # Will use chrome
-
 # Setting defaults via config
-spark config --set browser=chrome
-spark config --set headless=true
-spark config --set vision=true
+spark config set browser=chrome
+spark config set headless=true
+spark config set vision=true
 spark run "test task"  # Uses configured defaults
+
+# CLI options override config file
+spark config set browser=firefox
+spark run "search products" --browser chrome  # Will use chrome
 ```
 
 ## License

@@ -42,8 +42,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Ensure Playwright browsers are installed before proceeding
     await ensureBrowsersInstalled();
 
-    // Get merged config (defaults < global config < env vars)
-    const cfg = config.getConfig();
+    // Get CLI config (defaults < global config only, no env vars)
+    const cfg = config.getCliConfig();
 
     // Parse JSON data if provided
     let parsedData = null;
