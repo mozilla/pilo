@@ -2,4 +2,3 @@ packages:
   - "."
   - "extension"
   - "server"
-  - "packages/*"

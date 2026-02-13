@@ -1,5 +1,5 @@
 {
-  "name": "spark",
+  "name": "@tabstack/spark",
   "version": "0.12.0",
   "description": "AI-powered web automation library and CLI tool",
   "main": "dist/index.js",
@@ -19,6 +19,10 @@
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
     }
   },
   "files": [
