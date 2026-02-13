@@ -1,8 +1,8 @@
 services:
   spark-server:
     build:
-      context: ..
-      dockerfile: server/Dockerfile
+      context: ../..
+      dockerfile: packages/server/Dockerfile
       args:
         INSTALL_PLAYWRIGHT_BROWSERS: "true"
     ports:
@@ -14,6 +14,6 @@ services:
       - SPARK_REASONING_EFFORT=low
     volumes:
       # Mount server source code for hot reloading
-      - ./src:/app/server/src
+      - ./src:/app/packages/server/src
     command: ["pnpm", "run", "dev"]
     restart: unless-stopped

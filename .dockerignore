@@ -1,0 +1,52 @@
+# Node.js
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+packages/*/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation (copy selectively if needed)
+*.md
+
+# Test files
+test/
+**/*.test.*
+**/*.spec.*
+coverage/
+
+# Logs
+logs/
+*.log
+
+# Docker files
+**/Dockerfile
+**/.dockerignore
+**/docker-compose*.yml
+
+# Agent files
+.dotagent/
+
+# Scripts (if not needed in container)
+scripts/
