@@ -6,13 +6,22 @@ import { fileURLToPath } from "url";
  * CLI-specific utilities and helpers
  */
 
+// These are injected at build time by tsup
+declare const __SPARK_VERSION__: string | undefined;
+declare const __SPARK_NAME__: string | undefined;
+declare const __SPARK_DESCRIPTION__: string | undefined;
+
 /**
  * Get package.json information
  */
 export function getPackageInfo(): { version: string; name: string; description: string } {
-  // Check if running from bundled CLI package
-  if ((globalThis as any).__SPARK_PACKAGE_INFO) {
-    return (globalThis as any).__SPARK_PACKAGE_INFO;
+  // Check if running from bundled build (values injected by tsup)
+  if (typeof __SPARK_VERSION__ !== "undefined") {
+    return {
+      version: __SPARK_VERSION__!,
+      name: __SPARK_NAME__!,
+      description: __SPARK_DESCRIPTION__!,
+    };
   }
 
   // Otherwise read from local package.json (development mode)
