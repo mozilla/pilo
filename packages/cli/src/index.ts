@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { Command } from "commander";
 import { createRunCommand } from "./commands/run.js";
 import { createConfigCommand } from "./commands/config.js";
