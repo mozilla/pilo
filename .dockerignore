@@ -1,0 +1,69 @@
+# Dependencies
+**/node_modules/
+npm-debug.log*
+pnpm-debug.log*
+
+# Build outputs (will be built in Docker)
+**/dist/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (except README)
+*.md
+!README.md
+
+# Test files
+test/
+**/test/
+*.test.*
+*.spec.*
+
+# Coverage
+coverage/
+**/coverage/
+
+# Logs
+logs/
+*.log
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.github/
+
+# Agent and plan files
+.dotagent/
+
+# Extension build outputs (not needed for server)
+extension/dist/
+extension/node_modules/
+
+# CLI source (only package.json needed for workspace)
+packages/cli/src/
+packages/cli/dist/
+
+# Scripts
+scripts/

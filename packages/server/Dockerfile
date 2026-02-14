@@ -10,29 +10,36 @@ ARG INSTALL_PLAYWRIGHT_BROWSERS=false
 # Set working directory
 WORKDIR /app
 
-# Copy root package files and build main spark package
+# Copy workspace configuration
+COPY pnpm-workspace.yaml ./
+
+# Copy root package files for core spark library
 COPY package.json pnpm-lock.yaml ./
 COPY src ./src
 COPY scripts ./scripts
 COPY tsconfig.json ./
-RUN pnpm install
+
+# Copy CLI package files (needed for bin reference in root package.json)
+COPY packages/cli/package.json packages/cli/tsconfig.json ./packages/cli/
+
+# Copy server package files
+COPY packages/server/package.json packages/server/tsconfig.json packages/server/tsup.config.ts ./packages/server/
+COPY packages/server/src ./packages/server/src
+
+# Install all workspace dependencies (skip prepare scripts to avoid build errors)
+RUN pnpm install --ignore-scripts
 
 # Install Playwright system dependencies as root (requires apt)
 RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
     npx playwright install-deps firefox chromium; \
     fi
 
-RUN pnpm run build
+# Build core spark package first (required by server)
+# Build just the TypeScript in the root (core library)
+RUN pnpm tsc
 
-# Now work on the server
-WORKDIR /app/server
-COPY server/package.json server/pnpm-lock.yaml ./
-RUN pnpm install
-
-# Copy server source and build
-COPY server/src ./src
-COPY server/tsconfig.json ./
-RUN pnpm run build
+# Build server package
+RUN pnpm --filter @spark/server run build
 
 # Expose the port
 EXPOSE 3000
@@ -52,6 +59,9 @@ ARG INSTALL_PLAYWRIGHT_BROWSERS=false
 RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
     npx playwright install firefox chromium; \
     fi
+
+# Set working directory to server package
+WORKDIR /app/packages/server
 
 # Start the server
 CMD ["pnpm", "start"]
