@@ -1,6 +1,6 @@
 import { type ReactElement } from "react";
-import { useSettings } from "../../stores/settingsStore";
-import { useSystemTheme } from "../../useSystemTheme";
+import { useSettings } from "../../stores/settingsStore.js";
+import { useSystemTheme } from "../../useSystemTheme.js";
 
 interface SettingsViewProps {
   onBack: () => void;
