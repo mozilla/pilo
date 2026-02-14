@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createAIProvider, getAIProviderInfo } from "spark/provider.js";
+import { createAIProvider, getAIProviderInfo } from "../src/provider.js";
 
 // Mock the config module
-vi.mock("spark/config.js", () => ({
+vi.mock("../src/config.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
@@ -85,7 +85,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config, getConfigDefaults } from "spark/config.js";
+import { config, getConfigDefaults } from "../src/config.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

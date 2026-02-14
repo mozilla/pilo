@@ -59,7 +59,7 @@ let config = {
     plugins: [tailwindcss()] as any,
     resolve: {
       alias: {
-        "spark/core": resolve(__dirname, "../../src/core.ts"),
+        "spark/core": resolve(__dirname, "../core/src/core.ts"),
       },
     },
     build: {
