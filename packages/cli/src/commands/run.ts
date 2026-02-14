@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
+<<<<<<<< HEAD:packages/cli/src/commands/run.ts
 import { WebAgent } from "spark-core/webAgent.js";
 import { PlaywrightBrowser } from "spark-core/browser/playwrightBrowser.js";
 import { config, addConfigOptions } from "spark-core/config.js";
@@ -13,6 +14,21 @@ import * as path from "path";
 import { MetricsCollector } from "spark-core/loggers/metricsCollector.js";
 import { Logger } from "spark-core/loggers/types.js";
 import { SecretsRedactor } from "spark-core/loggers/secretsRedactor.js";
+========
+import { WebAgent } from "spark/webAgent.js";
+import { PlaywrightBrowser } from "spark/browser/playwrightBrowser.js";
+import { config, addConfigOptions } from "spark/config.js";
+import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
+import { createAIProvider } from "../provider.js";
+import { ChalkConsoleLogger } from "spark/loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "spark/loggers/json.js";
+import { WebAgentEventType, WebAgentEventEmitter } from "spark/events.js";
+import * as fs from "fs";
+import * as path from "path";
+import { MetricsCollector } from "spark/loggers/metricsCollector.js";
+import { Logger } from "spark/loggers/types.js";
+import { SecretsRedactor } from "spark/loggers/secretsRedactor.js";
+>>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/src/cli/commands/run.ts
 
 /**
  * Creates the 'run' command for executing web automation tasks.
