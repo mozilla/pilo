@@ -43,11 +43,5 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
-      - name: Run type check
-        run: pnpm run typecheck
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Build project
-        run: pnpm run build
+      - name: Run checks in all packages
+        run: pnpm -r run check
