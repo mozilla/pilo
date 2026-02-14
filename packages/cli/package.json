@@ -18,10 +18,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "format": "prettier --write . --list-different",
-    "format:check": "prettier --check .",
-    "check": "pnpm run format:check && pnpm run typecheck && pnpm run test"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "chalk": "^5.6.2",

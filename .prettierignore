@@ -6,13 +6,11 @@ yarn.lock
 # Build outputs
 dist/
 build/
+.output/
+.wxt/
 
 # Generated bundles
 src/browser/ariaTree/bundle.ts
 
 # Dependencies
 node_modules/
-
-# Subprojects
-extension/
-server/

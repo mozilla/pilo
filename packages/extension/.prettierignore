@@ -1,6 +1,0 @@
-# Build outputs
-.output/
-.wxt/
-
-# Dependencies
-node_modules/
