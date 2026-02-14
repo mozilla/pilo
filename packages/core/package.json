@@ -30,9 +30,12 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write . --list-different",
+    "format:check": "prettier --check .",
+    "check": "pnpm run format:check && pnpm run typecheck && pnpm run test"
   },
   "keywords": [
     "ai",
