@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
-import { reviver } from "../utils/storage";
+import { reviver } from "../utils/storage.js";
 
 export interface Settings {
   apiKey: string;

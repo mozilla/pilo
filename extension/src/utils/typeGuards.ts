@@ -11,7 +11,7 @@ import type {
   BrowserActionCompletedEventData,
   BrowserActionStartedEventData,
   RealtimeEvent,
-} from "../types/browser";
+} from "../types/browser.js";
 
 /**
  * Check if an object has an optional string property

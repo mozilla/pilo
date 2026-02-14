@@ -1,13 +1,13 @@
 import browser from "webextension-polyfill";
-import { AgentManager, EventStoreLogger } from "../src/AgentManager";
-import { useConversationStore } from "../src/stores/conversationStore";
+import { AgentManager, EventStoreLogger } from "../src/AgentManager.js";
+import { useConversationStore } from "../src/stores/conversationStore.js";
 import {
   showIndicator,
   hideIndicator,
   isIndicatorActive,
   setupNavigationListener,
   cleanupStaleRegistrations,
-} from "../src/background/indicatorControl";
+} from "../src/background/indicatorControl.js";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -15,7 +15,7 @@ import type {
   ExecuteTaskResponse,
   CancelTaskMessage,
   CancelTaskResponse,
-} from "../src/types/browser";
+} from "../src/types/browser.js";
 
 interface StorageSettings {
   apiKey?: string;

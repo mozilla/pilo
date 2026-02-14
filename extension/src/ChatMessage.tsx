@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 
 import clsx from "clsx";
 
-import type { Theme } from "./theme";
+import type { Theme } from "./theme.js";
 
-import type { ChatMessage } from "./hooks/useConversation";
+import type { ChatMessage } from "./hooks/useConversation.js";
 
 interface ChatMessageProps {
   type: ChatMessage["type"];

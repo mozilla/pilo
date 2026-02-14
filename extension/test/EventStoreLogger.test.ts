@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { EventStoreLogger } from "../src/EventStoreLogger";
+import { EventStoreLogger } from "../src/EventStoreLogger.js";
 import browser from "webextension-polyfill";
 
 // Mock the webextension-polyfill module

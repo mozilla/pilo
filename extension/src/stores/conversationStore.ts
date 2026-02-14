@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
-import type { ChatMessage } from "../useChat";
-import { reviver } from "../utils/storage";
+import type { ChatMessage } from "../useChat.js";
+import { reviver } from "../utils/storage.js";
 
 export interface Conversation {
   id: string;

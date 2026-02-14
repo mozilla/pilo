@@ -1,5 +1,5 @@
-import { ExtensionBrowser } from "./ExtensionBrowser";
-import { EventStoreLogger } from "./EventStoreLogger";
+import { ExtensionBrowser } from "./ExtensionBrowser.js";
+import { EventStoreLogger } from "./EventStoreLogger.js";
 
 // Import shared code - browser-safe imports only
 import { WebAgent, Logger } from "spark/core";

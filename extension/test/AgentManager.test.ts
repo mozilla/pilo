@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { AgentManager } from "../src/AgentManager";
+import { AgentManager } from "../src/AgentManager.js";
 
 vi.mock("@ai-sdk/openai");
 vi.mock("@openrouter/ai-sdk-provider");
 vi.mock("spark/core");
-vi.mock("../src/ExtensionBrowser");
+vi.mock("../src/ExtensionBrowser.js");
 
 import { createOpenAI, type OpenAIProvider } from "@ai-sdk/openai";
 import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-provider";
 import { WebAgent } from "spark/core";
-import { ExtensionBrowser } from "../src/ExtensionBrowser";
+import { ExtensionBrowser } from "../src/ExtensionBrowser.js";
 
 describe("AgentManager", () => {
   let mockOpenAI: OpenAIProvider;

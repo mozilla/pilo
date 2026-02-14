@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { EventStoreLogger } from "./EventStoreLogger";
+import { EventStoreLogger } from "./EventStoreLogger.js";
 
 type AgentEvent = { type: string; data: any; timestamp: number };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ExtensionBrowser } from "../src/ExtensionBrowser";
+import { ExtensionBrowser } from "../src/ExtensionBrowser.js";
 import browser from "webextension-polyfill";
 
 vi.mock("webextension-polyfill", () => ({

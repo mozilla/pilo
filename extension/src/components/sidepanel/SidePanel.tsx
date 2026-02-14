@@ -1,10 +1,10 @@
 import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import "./SidePanel.css";
-import ChatView from "./ChatView";
-import SettingsView from "./SettingsView";
-import { useSettings } from "../../stores/settingsStore";
-import { useConversationStore } from "../../stores/conversationStore";
+import ChatView from "./ChatView.js";
+import SettingsView from "./SettingsView.js";
+import { useSettings } from "../../stores/settingsStore.js";
+import { useConversationStore } from "../../stores/conversationStore.js";
 
 type View = "chat" | "settings";
 

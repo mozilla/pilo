@@ -1,8 +1,8 @@
 import browser from "webextension-polyfill";
 import { GenericLogger } from "spark/core";
-import { createLogger } from "./utils/logger";
-import { isValidRealtimeEvent } from "./utils/typeGuards";
-import type { RealtimeEventMessage } from "./types/browser";
+import { createLogger } from "./utils/logger.js";
+import { isValidRealtimeEvent } from "./utils/typeGuards.js";
+import type { RealtimeEventMessage } from "./types/browser.js";
 
 interface EventData {
   type: string;
