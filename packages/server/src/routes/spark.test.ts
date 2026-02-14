@@ -3,19 +3,19 @@ import { Hono } from "hono";
 import sparkRoutes from "./spark.js";
 
 // Mock the spark library
-vi.mock("spark", () => ({
-  WebAgent: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
+vi.mock("@core/index.js", () => ({
+  WebAgent: class MockWebAgent {
+    execute = vi.fn().mockResolvedValue({
       success: true,
       finalAnswer: "Task completed successfully",
       plan: "Test plan",
       taskExplanation: "Test explanation",
       iterations: 1,
       validationAttempts: 1,
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
-  PlaywrightBrowser: vi.fn().mockImplementation(() => ({})),
+    });
+    close = vi.fn().mockResolvedValue(undefined);
+  },
+  PlaywrightBrowser: class MockPlaywrightBrowser {},
   config: {
     getConfig: vi.fn(() => ({
       provider: "openai",
@@ -54,7 +54,10 @@ vi.mock("@ai-sdk/openai", () => ({
 
 // Mock the StreamLogger
 vi.mock("../StreamLogger.js", () => ({
-  StreamLogger: vi.fn().mockImplementation(() => ({})),
+  StreamLogger: class MockStreamLogger {
+    initialize = vi.fn();
+    dispose = vi.fn();
+  },
 }));
 
 describe("Spark Routes", () => {
@@ -73,7 +76,7 @@ describe("Spark Routes", () => {
       process.env.OPENAI_API_KEY = "test-key";
 
       // Reset the getAIProviderInfo mock to its default success state
-      const { getAIProviderInfo } = await import("spark");
+      const { getAIProviderInfo } = await import("@core/index.js");
       vi.mocked(getAIProviderInfo).mockReturnValue({
         provider: "openai",
         model: "gpt-4.1",
@@ -103,7 +106,7 @@ describe("Spark Routes", () => {
 
     it("should reject requests without OpenAI API key", async () => {
       // Mock getAIProviderInfo to throw an error for missing API key
-      const { getAIProviderInfo } = await import("spark");
+      const { getAIProviderInfo } = await import("@core/index.js");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error(
           "No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
