@@ -57,6 +57,22 @@ let config = {
   },
   vite: () => ({
     plugins: [tailwindcss()] as any,
+    resolve: {
+      alias: {
+        "spark/core": resolve(__dirname, "../../src/core.ts"),
+      },
+    },
+    build: {
+      commonjsOptions: {
+        include: [/node_modules/],
+      },
+      rollupOptions: {
+        external: ["wxt/browser", "@wxt-dev/webextension-polyfill/browser"],
+      },
+    },
+    optimizeDeps: {
+      exclude: ["@wxt-dev/webextension-polyfill"],
+    },
     server: {
       fs: {
         // Allow serving files from parent node_modules (for @fontsource-variable/inter)
