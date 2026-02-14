@@ -65,15 +65,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v4
-        with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
-
       - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build core package
@@ -105,11 +97,20 @@ jobs:
         with:
           version: 9
 
-      - name: Cache node_modules
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Cache core build
         uses: actions/cache@v4
@@ -142,11 +143,20 @@ jobs:
         with:
           version: 9
 
-      - name: Cache node_modules
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Cache core build
         uses: actions/cache@v4
@@ -181,11 +191,20 @@ jobs:
         with:
           version: 9
 
-      - name: Cache node_modules
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Cache core build
         uses: actions/cache@v4
@@ -220,11 +239,20 @@ jobs:
         with:
           version: 9
 
-      - name: Cache node_modules
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Cache core build
         uses: actions/cache@v4
