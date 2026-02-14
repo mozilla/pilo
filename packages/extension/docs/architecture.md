@@ -433,7 +433,7 @@ Coordinates task execution between the extension and the core Spark agent.
 **Key Responsibilities**:
 
 - Creates `ExtensionBrowser` instance for the target tab
-- Initializes `WebAgent` from spark/core with AI configuration
+- Initializes `WebAgent` from @core with AI configuration
 - Manages agent execution lifecycle
 - Handles cancellation via `AbortSignal`
 - Captures and broadcasts events via `EventStoreLogger`
@@ -466,7 +466,7 @@ async runTask(params: ExecuteTaskParams, signal?: AbortSignal) {
 
 **Location**: [src/ExtensionBrowser.ts](../src/ExtensionBrowser.ts)
 
-Adapts WebExtension APIs to implement the `AriaBrowser` interface from spark/core. This allows the same agent code to run in extension, CLI, and server contexts.
+Adapts WebExtension APIs to implement the `AriaBrowser` interface from @core. This allows the same agent code to run in extension, CLI, and server contexts.
 
 **Key Methods**:
 
@@ -520,7 +520,7 @@ Captures events during task execution and broadcasts them to the sidebar for rea
 
 **Key Features**:
 
-- Implements the `EventLogger` interface from spark/core
+- Implements the `EventLogger` interface from @core
 - Broadcasts events via `browser.runtime.sendMessage()`
 - All extension listeners receive events simultaneously
 - Non-blocking - doesn't slow down task execution
@@ -1026,7 +1026,7 @@ The extension uses `webextension-polyfill` for consistent API across browsers:
 - **Styling**: Tailwind CSS
 - **Markdown Rendering**: marked-react (with XSS protection)
 - **Web Extension API**: webextension-polyfill
-- **Agent Core**: spark/core (shared with CLI and server)
+- **Agent Core**: @core (shared with CLI and server)
 
 ## Relationship to Core Codebase
 
@@ -1093,7 +1093,7 @@ export class WebAgent {
 
 ```typescript
 // extension/src/AgentManager.ts
-import { WebAgent } from "spark/core";
+import { WebAgent } from "@core";
 import { ExtensionBrowser } from "./ExtensionBrowser";
 
 class AgentManager {
@@ -1135,13 +1135,13 @@ The extension declares a local file dependency on the root package:
 
 This allows importing from two entry points:
 
-1. **`spark/core`** - Browser-safe exports (used by extension)
+1. **`@core`** - Browser-safe exports (used by extension)
    - WebAgent, AriaBrowser interface, Events, Loggers
    - No Node.js dependencies
    - Safe for browser extension environment
 
 2. **`spark`** - Full exports including Node.js APIs (used by CLI/Server)
-   - Everything from `spark/core` plus:
+   - Everything from `@core` plus:
    - PlaywrightBrowser, config utilities, Node.js-specific loggers
 
 ### Shared Components
@@ -1151,21 +1151,21 @@ The following are imported from the root package and used directly:
 **From [../../src/events.ts](../../src/events.ts)**:
 
 ```typescript
-import { WebAgentEventEmitter } from "spark/core";
+import { WebAgentEventEmitter } from "@core";
 // Used for event emission during task execution
 ```
 
 **From [../../src/loggers/types.ts](../../src/loggers/types.ts)**:
 
 ```typescript
-import { Logger } from "spark/core";
+import { Logger } from "@core";
 // EventStoreLogger extends GenericLogger
 ```
 
 **From [../../src/schemas.ts](../../src/schemas.ts)**:
 
 ```typescript
-import { PageAction, LoadState } from "spark/core";
+import { PageAction, LoadState } from "@core";
 // Used by ExtensionBrowser for action types
 ```
 
