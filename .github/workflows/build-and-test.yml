@@ -65,6 +65,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install is fast (pnpm store is cached) but needed to create workspace symlinks
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -109,6 +110,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install is fast (pnpm store is cached) but needed to create workspace symlinks
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -155,6 +157,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install is fast (pnpm store is cached) but needed to create workspace symlinks
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -203,6 +206,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install is fast (pnpm store is cached) but needed to create workspace symlinks
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -251,6 +255,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install is fast (pnpm store is cached) but needed to create workspace symlinks
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
