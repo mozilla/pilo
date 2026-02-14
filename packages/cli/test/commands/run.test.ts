@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createRunCommand } from "../../src/commands/run.js";
-import { getConfigDefaults } from "spark/config.js";
+import { getConfigDefaults } from "spark-core/config.js";
 
 // Get defaults from schema (used for mocking config.getConfig)
 const schemaDefaults = getConfigDefaults();
@@ -27,7 +27,7 @@ vi.mock("spark/browser/playwrightBrowser.js", () => ({
 
 // Mock the config module to avoid fs dependencies
 vi.mock("spark/config.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("spark/config.js")>();
+  const actual = await importOriginal<typeof import("spark-core/config.js")>();
   // Return DEFAULTS from getConfig so run command gets proper default values
   return {
     ...actual,
@@ -88,13 +88,13 @@ vi.mock("spark/events.js", () => ({
   }),
 }));
 
-import { WebAgent } from "spark/webAgent.js";
-import { PlaywrightBrowser } from "spark/browser/playwrightBrowser.js";
-import { config } from "spark/config.js";
-import { createAIProvider } from "spark/provider.js";
-import { ChalkConsoleLogger } from "spark/loggers/chalkConsole.js";
-import { JSONConsoleLogger } from "spark/loggers/json.js";
-import { WebAgentEventEmitter } from "spark/events.js";
+import { WebAgent } from "spark-core/webAgent.js";
+import { PlaywrightBrowser } from "spark-core/browser/playwrightBrowser.js";
+import { config } from "spark-core/config.js";
+import { createAIProvider } from "spark-core/provider.js";
+import { ChalkConsoleLogger } from "spark-core/loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "spark-core/loggers/json.js";
+import { WebAgentEventEmitter } from "spark-core/events.js";
 import * as fs from "fs";
 
 const mockWebAgent = vi.mocked(WebAgent);

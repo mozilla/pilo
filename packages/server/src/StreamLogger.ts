@@ -1,5 +1,5 @@
-import { GenericLogger } from "spark/loggers/generic.js";
-import { WebAgentEventType } from "spark/events.js";
+import { GenericLogger } from "spark-core/loggers/generic.js";
+import { WebAgentEventType } from "spark-core/events.js";
 
 type EventSender = (event: string, data: any) => Promise<void>;
 

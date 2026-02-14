@@ -1,5 +1,5 @@
 import browser from "webextension-polyfill";
-import { GenericLogger } from "spark/core.js";
+import { GenericLogger } from "spark-core/core.js";
 import { createLogger } from "./utils/logger.js";
 import { isValidRealtimeEvent } from "./utils/typeGuards.js";
 import type { RealtimeEventMessage } from "./types/browser.js";

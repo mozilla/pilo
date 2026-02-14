@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "prebuild": "pnpm --filter spark build",
+    "prebuild": "pnpm --filter spark-core build",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
@@ -23,7 +23,7 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
-    "spark": "workspace:*"
+    "spark-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",

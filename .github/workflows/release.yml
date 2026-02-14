@@ -45,7 +45,7 @@ jobs:
         run: pnpm -r run test
 
       - name: Build project
-        run: pnpm --filter spark build
+        run: pnpm --filter spark-core build
 
       - name: Create package tarball
         run: npm pack
