@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync, unlinkSync } from "fs";
 import { config } from "spark/config.js";
-import { getAIProviderInfo } from "../provider.js";
+import { getAIProviderInfo } from "spark/provider.js";
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";
 
 /**

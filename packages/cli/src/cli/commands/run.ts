@@ -4,7 +4,7 @@ import { WebAgent } from "spark/webAgent.js";
 import { PlaywrightBrowser } from "spark/browser/playwrightBrowser.js";
 import { config, addConfigOptions } from "spark/config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
-import { createAIProvider } from "../provider.js";
+import { createAIProvider } from "spark/provider.js";
 import { ChalkConsoleLogger } from "spark/loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "spark/loggers/json.js";
 import { WebAgentEventType, WebAgentEventEmitter } from "spark/events.js";
