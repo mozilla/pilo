@@ -1,0 +1,77 @@
+{
+  "name": "spark",
+  "version": "0.12.0",
+  "description": "AI-powered web automation library",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./*": {
+      "types": "./dist/*",
+      "import": "./dist/*"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "web-scraping",
+    "playwright",
+    "browser-automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.13",
+    "@ai-sdk/google-vertex": "^4.0.28",
+    "@ai-sdk/openai": "^3.0.19",
+    "@ai-sdk/openai-compatible": "^2.0.19",
+    "@ghostery/adblocker-playwright": "^2.13.4",
+    "@openrouter/ai-sdk-provider": "^2.0.2",
+    "ai": "^6.0.50",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "eventemitter3": "^5.0.4",
+    "liquidjs": "^10.24.0",
+    "nanoid": "^5.1.6",
+    "ollama-ai-provider-v2": "^3.0.2",
+    "playwright": "1.58.0",
+    "turndown": "^7.2.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^25.0.10",
+    "@types/turndown": "^5.0.6",
+    "@vitest/coverage-v8": "^4.0.18",
+    "jsdom": "^27.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
