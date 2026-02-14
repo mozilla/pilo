@@ -1,4 +1,4 @@
-import { GenericLogger, WebAgentEventType } from "@core";
+import { GenericLogger, WebAgentEventType } from "@core/index.js";
 
 type EventSender = (event: string, data: any) => Promise<void>;
 

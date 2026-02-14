@@ -7,8 +7,8 @@ import {
   getAIProviderInfo,
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
-} from "@core";
-import type { TaskExecutionResult } from "@core";
+} from "@core/index.js";
+import type { TaskExecutionResult } from "@core/index.js";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 
