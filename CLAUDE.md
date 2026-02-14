@@ -5,7 +5,7 @@
 Spark is an AI-powered web automation library and CLI tool that lets you control browsers using natural language. The project is organized as a pnpm monorepo with the following packages:
 
 - **Core library** (`packages/core/`) - Main automation engine (spark-core)
-- **CLI** (`packages/cli/`) - Command-line interface (@spark/cli)
+- **CLI** (`packages/cli/`) - Command-line interface (@tabstack/spark)
 - **Extension** (`packages/extension/`) - Browser extension (spark-extension)
 - **Server** (`packages/server/`) - Server component (@spark/server)
 
@@ -33,7 +33,8 @@ pnpm check             # Run format + typecheck + test (full validation)
 ```bash
 pnpm spark <command>   # Run spark CLI locally (uses tsx)
 pnpm spark run "task"  # Run an automation task
-pnpm spark config      # Configure AI provider settings
+pnpm spark config init # Create config file
+pnpm spark config show # View current settings
 ```
 
 ### Installation & Setup
@@ -56,10 +57,11 @@ spark/
 │   │   ├── tsconfig.json
 │   │   ├── src/              # Core library source code
 │   │   │   ├── browser/      # Browser automation implementations
+│   │   │   ├── config/       # Configuration system (modular)
 │   │   │   ├── tools/        # AI agent tools
 │   │   │   └── utils/        # Utility functions
 │   │   └── test/             # Test files (mirrors src structure)
-│   ├── cli/                  # CLI tool (@spark/cli)
+│   ├── cli/                  # CLI tool (@tabstack/spark)
 │   │   ├── package.json
 │   │   └── src/
 │   ├── server/               # Server component (@spark/server)
@@ -126,7 +128,32 @@ Spark supports multiple AI providers:
 - Ollama
 - Vertex AI
 
-Configure with: `pnpm spark config --init`
+### Configuration System
+
+The configuration system has been refactored into a modular architecture in `packages/core/src/config/`:
+
+- **defaults.ts**: Type definitions, field definitions, and default values (browser-compatible)
+- **configManager.ts**: Singleton config manager with build-mode-aware resolution
+- **globalConfig.ts**: File I/O operations with XDG-compliant paths (`~/.config/spark/`)
+- **envParser.ts**: Environment variable parsing and normalization
+- **helpers.ts**: CLI option generation utilities
+- **index.ts**: Public exports
+
+### Config Commands
+
+Configuration is now managed via subcommands:
+
+```bash
+pnpm spark config init         # Create empty config file
+pnpm spark config show         # Display current config
+pnpm spark config set <key>=<value>  # Set a value
+pnpm spark config get <key>    # Get a value
+pnpm spark config reset        # Reset to defaults
+```
+
+**Config file location**: `~/.config/spark/config.json` (XDG-compliant on Linux/macOS)
+
+In production mode (when installed via npm), the CLI requires a config file to exist. Run `spark config init` to create one.
 
 ## Security - Secret Scanning
 
