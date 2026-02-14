@@ -18,52 +18,47 @@ Spark is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastruct
 ## Requirements
 
 - **[Node.js 22+](https://nodejs.org/)** - JavaScript runtime
-- **[pnpm](https://pnpm.io/installation)** - Package manager (npm and yarn also work but pnpm is recommended)
 - **AI Provider (one of):**
   - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
   - [OpenRouter API key](https://openrouter.ai/keys) (cloud)
   - [Ollama](https://ollama.ai) running locally (local)
   - [LM Studio](https://lmstudio.ai) server (local)
   - Google Cloud project with Vertex AI enabled
-- **Browsers:** Automatically installed by Playwright (Firefox, Chrome, Safari, Edge)
+- **Browsers:** Automatically installed when you first run Spark (Firefox, Chrome, Safari, Edge)
 
 ## Quick Start
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/Mozilla-Ocho/spark.git
-cd spark
+# Install globally
+npm install -g @tabstack/spark
 
-# Install dependencies
-pnpm install
+# Or use npx (no installation required)
+npx @tabstack/spark <command>
 
-# Install browsers for automation
-pnpm playwright install
-
-# Setup AI provider
-pnpm spark config --init
+# Initialize configuration
+spark config init
 
 # Run your first task
-pnpm spark run "what's the weather in Tokyo?"
+spark run "what's the weather in Tokyo?"
 ```
 
 ### Basic Usage
 
 ```bash
 # Simple web queries
-pnpm spark run "find the latest news on Reuters"
-pnpm spark run "what's the current price of AAPL stock?"
+spark run "find the latest news on Reuters"
+spark run "what's the current price of AAPL stock?"
 
 # With specific starting URL
-pnpm spark run "find flight deals to Paris" --url https://booking.com/
+spark run "find flight deals to Paris" --url https://booking.com/
 
 # With structured data
-pnpm spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
 
 # With safety constraints
-pnpm spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
+spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
 ```
 
 ## Features
@@ -80,7 +75,15 @@ pnpm spark run "search hotels in Tokyo" --guardrails "browse only, don't book an
 
 ### CLI Installation
 
-See [Quick Start](#quick-start) above for CLI installation instructions.
+```bash
+# Install globally
+npm install -g @tabstack/spark
+
+# Or use npx (no installation required)
+npx @tabstack/spark <command>
+```
+
+See [Quick Start](#quick-start) above for complete setup instructions.
 
 ### Browser Extension
 
@@ -113,7 +116,7 @@ For detailed extension development instructions, see [extension/README.md](exten
 **Basic syntax:**
 
 ```bash
-pnpm spark run "<task description>" [options]
+spark run "<task description>" [options]
 ```
 
 See [Configuration Reference](#configuration-reference) for all available options.
@@ -121,15 +124,17 @@ See [Configuration Reference](#configuration-reference) for all available option
 **Configuration:**
 
 ```bash
-pnpm spark config --init     # Setup wizard
-pnpm spark config --show     # View current settings
-pnpm spark config --reset    # Clear all settings
+spark config init       # Create config file
+spark config show       # View current settings
+spark config set <key>=<value>  # Set a value
+spark config get <key>  # Get a value
+spark config reset      # Clear all settings
 ```
 
 ### Programmatic Usage
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
@@ -156,23 +161,23 @@ try {
 ### Simple Tasks
 
 ```bash
-pnpm spark run "is it raining in London?"
-pnpm spark run "what's trending on Hacker News?"
-pnpm spark run "find the contact email for example.com"
+spark run "is it raining in London?"
+spark run "what's trending on Hacker News?"
+spark run "find the contact email for example.com"
 ```
 
 ### With URLs
 
 ```bash
-pnpm spark run "find flight deals" --url https://kayak.com
-pnpm spark run "check if items are in stock" --url https://store.com
+spark run "find flight deals" --url https://kayak.com
+spark run "check if items are in stock" --url https://store.com
 ```
 
 ### With Structured Data
 
 ```bash
 # Hotel search
-pnpm spark run "find hotels" --url https://booking.com --data '{
+spark run "find hotels" --url https://booking.com --data '{
   "location": "Paris",
   "checkIn": "2024-12-20",
   "checkOut": "2024-12-22",
@@ -180,7 +185,7 @@ pnpm spark run "find hotels" --url https://booking.com --data '{
 }'
 
 # Form filling
-pnpm spark run "submit contact form" --url https://company.com/contact --data '{
+spark run "submit contact form" --url https://company.com/contact --data '{
   "name": "John Doe",
   "email": "john@example.com",
   "message": "Hello world"
@@ -191,41 +196,41 @@ pnpm spark run "submit contact form" --url https://company.com/contact --data '{
 
 ```bash
 # Browse-only mode
-pnpm spark run "research product prices" --guardrails "only browse, don't buy anything"
+spark run "research product prices" --guardrails "only browse, don't buy anything"
 
 # Domain restrictions
-pnpm spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
+spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
 
 # Form restrictions
-pnpm spark run "check shipping costs" --guardrails "don't submit any payment forms"
+spark run "check shipping costs" --guardrails "don't submit any payment forms"
 ```
 
 ### Advanced Options
 
 ```bash
 # Run a vanilla Firefox with WebDriver BiDi as protocol
-pnpm spark run "test checkout flow" --channel moz-firefox
+spark run "test checkout flow" --channel moz-firefox
 
 # Use a specific browser executable
-pnpm spark run "test with custom Firefox" --executable-path /usr/bin/firefox
+spark run "test with custom Firefox" --executable-path /usr/bin/firefox
 
 # Chrome browser testing
-pnpm spark run "test checkout flow" --browser chrome --headless
+spark run "test checkout flow" --browser chrome --headless
 
 # Headless automation
-pnpm spark run "get daily stock prices" --headless --browser firefox
+spark run "get daily stock prices" --headless --browser firefox
 
 # Debug mode
-pnpm spark run "complex automation task" --debug
+spark run "complex automation task" --debug
 
 # Vision mode for complex visual layouts
-pnpm spark run "fill out complex form" --vision
+spark run "fill out complex form" --vision
 
 # Enhanced reasoning for complex tasks
-pnpm spark run "research and compare insurance plans" --reasoning-effort high
+spark run "research and compare insurance plans" --reasoning-effort high
 
 # Combined options
-pnpm spark run "test signup flow" \
+spark run "test signup flow" \
   --url https://app.com \
   --browser safari \
   --headless \
@@ -237,52 +242,55 @@ pnpm spark run "test signup flow" \
 
 ```bash
 # Using an HTTP proxy
-pnpm spark run "search for products" --proxy http://proxy.company.com:8080
+spark run "search for products" --proxy http://proxy.company.com:8080
 
 # Using authenticated proxy
-pnpm spark run "access internal site" \
+spark run "access internal site" \
   --proxy http://proxy.company.com:8080 \
   --proxy-username myuser \
   --proxy-password mypass
 
 # Using SOCKS5 proxy
-pnpm spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+spark run "secure browsing" --proxy socks5://127.0.0.1:1080
 ```
 
 ## Configuration
 
-Spark supports multiple AI providers and stores configuration globally:
+Spark supports multiple AI providers and stores configuration in `~/.config/spark/config.json`:
 
 ```bash
-# Setup wizard (recommended for first use)
-pnpm spark config --init
+# Create config file (recommended for first use)
+spark config init
 
 # Manual configuration
-pnpm spark config --set provider=openai
-pnpm spark config --set openai_api_key=sk-your-key
+spark config set provider=openai
+spark config set openai_api_key=sk-your-key
 
 # Or use OpenRouter
-pnpm spark config --set provider=openrouter
-pnpm spark config --set openrouter_api_key=sk-or-your-key
+spark config set provider=openrouter
+spark config set openrouter_api_key=sk-or-your-key
 
 # Or use local AI providers
-pnpm spark config --set provider=ollama
-pnpm spark config --set model=llama3.2
+spark config set provider=ollama
+spark config set model=llama3.2
 
-pnpm spark config --set provider=lmstudio
-pnpm spark config --set model=your-loaded-model
+spark config set provider=lmstudio
+spark config set model=your-loaded-model
 
 # Set defaults
-pnpm spark config --set browser=chrome
-pnpm spark config --set headless=true
-pnpm spark config --set vision=true
-pnpm spark config --set reasoning_effort=medium
+spark config set browser=chrome
+spark config set headless=true
+spark config set vision=true
+spark config set reasoning_effort=medium
 
 # View settings
-pnpm spark config --show
+spark config show
+
+# Get specific value
+spark config get provider
 
 # Reset everything
-pnpm spark config --reset
+spark config reset
 ```
 
 **Available AI Providers:**
@@ -300,7 +308,7 @@ See [Configuration Priority](#configuration-priority) for how settings are resol
 ### WebAgent
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
@@ -350,10 +358,20 @@ new PlaywrightBrowser({
 
 Built with TypeScript, Playwright, and the Vercel AI SDK.
 
-### Running the CLI in Development
+### Setup for Contributors
 
 ```bash
-# Run without building
+# Clone the repository
+git clone https://github.com/Mozilla-Ocho/spark.git
+cd spark
+
+# Install dependencies (requires pnpm for monorepo)
+pnpm install
+
+# Install Playwright browsers
+pnpm playwright install
+
+# Run CLI locally in development mode
 pnpm spark run "your task here"
 ```
 
@@ -544,14 +562,13 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 1. **Command-line options** - Directly passed to the command
 2. **Environment variables** - Set in your shell or `.env` file
-3. **Local `.env` file** - In your project directory
-4. **Global config file** - Set via `pnpm spark config --set`
+3. **Global config file** - Stored at `~/.config/spark/config.json`
 
 ### Examples
 
 ```bash
 # Using CLI options
-pnpm spark run "search for flights" \
+spark run "search for flights" \
   --url https://airline.com \
   --browser chrome \
   --headless \
@@ -563,17 +580,17 @@ export SPARK_PROVIDER=openrouter
 export SPARK_MODEL=claude-3.5-sonnet
 export SPARK_BROWSER=firefox
 export SPARK_HEADLESS=true
-pnpm spark run "book a hotel"
+spark run "book a hotel"
 
 # Mixed usage (CLI options override environment variables)
 export SPARK_BROWSER=firefox
-pnpm spark run "search products" --browser chrome  # Will use chrome
+spark run "search products" --browser chrome  # Will use chrome
 
 # Setting defaults via config
-pnpm spark config --set browser=chrome
-pnpm spark config --set headless=true
-pnpm spark config --set vision=true
-pnpm spark run "test task"  # Uses configured defaults
+spark config set browser=chrome
+spark config set headless=true
+spark config set vision=true
+spark run "test task"  # Uses configured defaults
 ```
 
 ## Sharp Edges & Limitations
