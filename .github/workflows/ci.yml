@@ -43,5 +43,8 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
+      - name: Build core package
+        run: pnpm --filter spark build
+
       - name: Run checks in all packages
         run: pnpm -r run check
