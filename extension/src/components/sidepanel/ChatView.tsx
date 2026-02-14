@@ -2,14 +2,14 @@ import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import Markdown from "marked-react";
 import clsx from "clsx";
-import { ChatMessage } from "../../ChatMessage";
-import { useChat } from "../../useChat";
-import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
-import { useEvents } from "../../stores/eventStore";
-import { useSettings } from "../../stores/settingsStore";
-import { useConversationStore } from "../../stores/conversationStore";
-import { useSystemTheme } from "../../useSystemTheme";
-import type { Theme } from "../../theme";
+import { ChatMessage } from "../../ChatMessage.js";
+import { useChat } from "../../useChat.js";
+import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation.js";
+import { useEvents } from "../../stores/eventStore.js";
+import { useSettings } from "../../stores/settingsStore.js";
+import { useConversationStore } from "../../stores/conversationStore.js";
+import { useSystemTheme } from "../../useSystemTheme.js";
+import type { Theme } from "../../theme.js";
 import type {
   ExecuteTaskMessage,
   ExecuteTaskResponse,
@@ -17,7 +17,7 @@ import type {
   CancelTaskResponse,
   RealtimeEventMessage,
   RealtimeEvent,
-} from "../../types/browser";
+} from "../../types/browser.js";
 import {
   isTaskStartedData,
   isAgentReasonedData,
@@ -27,10 +27,10 @@ import {
   isBrowserActionCompletedData,
   isBrowserActionStartedData,
   isAgentActionData,
-} from "../../utils/typeGuards";
-import type { BrowserActionStartedEventData } from "../../types/browser";
-import { SettingsGearIcon } from "../icons/SettingsGearIcon";
-import { SparkLogo } from "../icons/SparkLogo";
+} from "../../utils/typeGuards.js";
+import type { BrowserActionStartedEventData } from "../../types/browser.js";
+import { SettingsGearIcon } from "../icons/SettingsGearIcon.js";
+import { SparkLogo } from "../icons/SparkLogo.js";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {

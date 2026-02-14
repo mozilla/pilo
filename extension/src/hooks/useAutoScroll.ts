@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useConversationStore } from "../stores/conversationStore";
-import type { ChatMessage } from "./useConversation";
+import { useConversationStore } from "../stores/conversationStore.js";
+import type { ChatMessage } from "./useConversation.js";
 
 /**
  * Hook for managing auto-scroll behavior in chat interfaces

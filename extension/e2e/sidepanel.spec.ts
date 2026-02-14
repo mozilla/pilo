@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures/extension";
+import { test, expect } from "./fixtures/extension.js";
 
 test.describe("Sidepanel", () => {
   test("should display settings page when no API key is configured", async ({

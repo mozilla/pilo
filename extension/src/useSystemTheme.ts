@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { theme, type ThemeMode } from "./theme";
+import { theme, type ThemeMode } from "./theme.js";
 
 export function useSystemTheme() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {

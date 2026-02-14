@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useConversationStore, useTabConversation } from "../stores/conversationStore";
+import { useConversationStore, useTabConversation } from "../stores/conversationStore.js";
 
 export interface ChatMessage {
   id: string;
