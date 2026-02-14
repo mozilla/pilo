@@ -9,8 +9,8 @@ import {
   SEARCH_PROVIDERS,
 } from "spark";
 import type { TaskExecutionResult } from "spark";
+import { config } from "spark";
 import { StreamLogger } from "../StreamLogger.js";
-import { config } from "../config.js";
 
 interface ErrorResponse {
   success: false;
