@@ -1,18 +1,18 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { WebAgent } from "../../webAgent.js";
-import { PlaywrightBrowser } from "../../browser/playwrightBrowser.js";
-import { config, addConfigOptions } from "../../config.js";
+import { WebAgent } from "spark/webAgent.js";
+import { PlaywrightBrowser } from "spark/browser/playwrightBrowser.js";
+import { config, addConfigOptions } from "spark/config.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "../provider.js";
-import { ChalkConsoleLogger } from "../../loggers/chalkConsole.js";
-import { JSONConsoleLogger } from "../../loggers/json.js";
-import { WebAgentEventType, WebAgentEventEmitter } from "../../events.js";
+import { ChalkConsoleLogger } from "spark/loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "spark/loggers/json.js";
+import { WebAgentEventType, WebAgentEventEmitter } from "spark/events.js";
 import * as fs from "fs";
 import * as path from "path";
-import { MetricsCollector } from "../../loggers/metricsCollector.js";
-import { Logger } from "../../loggers/types.js";
-import { SecretsRedactor } from "../../loggers/secretsRedactor.js";
+import { MetricsCollector } from "spark/loggers/metricsCollector.js";
+import { Logger } from "spark/loggers/types.js";
+import { SecretsRedactor } from "spark/loggers/secretsRedactor.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks.
