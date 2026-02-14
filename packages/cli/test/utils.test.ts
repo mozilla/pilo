@@ -7,7 +7,7 @@ import {
   parseConfigKeyValue,
   parseConfigValue,
   getPackageInfo,
-} from "../../src/cli/utils.js";
+} from "../src/utils.js";
 
 describe("CLI Utils", () => {
   describe("validateBrowser", () => {

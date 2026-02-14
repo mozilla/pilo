@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-import { createRunCommand } from "../../../src/cli/commands/run.js";
-import { getConfigDefaults } from "../../../src/config.js";
+import { createRunCommand } from "../../src/commands/run.js";
+import { getConfigDefaults } from "../../src/config.js";
 
 // Get defaults from schema (used for mocking config.getConfig)
 const schemaDefaults = getConfigDefaults();
 
 // Mock all the dependencies
-vi.mock("../../../src/webAgent.js", () => ({
+vi.mock("@core/webAgent.js", () => ({
   WebAgent: vi.fn().mockImplementation(function () {
     return {
       execute: vi.fn().mockResolvedValue({
@@ -19,42 +19,43 @@ vi.mock("../../../src/webAgent.js", () => ({
   }),
 }));
 
-vi.mock("../../../src/browser/playwrightBrowser.js", () => ({
+vi.mock("@core/browser/playwrightBrowser.js", () => ({
   PlaywrightBrowser: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
 // Mock the config module to avoid fs dependencies
-vi.mock("../../../src/config.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/config.js")>();
-  // Return DEFAULTS from getConfig so run command gets proper default values
+vi.mock("@core/config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@core/config.js")>();
+  const defaults = actual.getConfigDefaults();
+  // Return defaults from getConfig so run command gets proper default values
   return {
     ...actual,
     config: {
-      get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
-      getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
+      get: vi.fn((key: string) => defaults[key as keyof typeof defaults]),
+      getConfig: vi.fn(() => ({ ...defaults })),
     },
   };
 });
 
-vi.mock("../../../src/provider.js", () => ({
+vi.mock("../../src/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
 }));
 
-vi.mock("../../../src/loggers/chalkConsole.js", () => ({
+vi.mock("@core/loggers/chalkConsole.js", () => ({
   ChalkConsoleLogger: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
-vi.mock("../../../src/loggers/json.js", () => ({
+vi.mock("@core/loggers/json.js", () => ({
   JSONConsoleLogger: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
-vi.mock("../../../src/cli/utils.js", () => ({
+vi.mock("../../src/utils.js", () => ({
   validateBrowser: vi.fn(() => true),
   getValidBrowsers: vi.fn(() => ["firefox", "chrome", "chromium"]),
   parseJsonData: vi.fn((data) => JSON.parse(data)),
@@ -76,7 +77,7 @@ vi.mock("fs", async (importOriginal) => {
 });
 
 // Mock WebAgentEventEmitter
-vi.mock("../../../src/events.js", () => ({
+vi.mock("@core/events.js", () => ({
   WebAgentEventType: {
     AI_GENERATION: "ai:generation",
   },
@@ -88,13 +89,13 @@ vi.mock("../../../src/events.js", () => ({
   }),
 }));
 
-import { WebAgent } from "../../../src/webAgent.js";
-import { PlaywrightBrowser } from "../../../src/browser/playwrightBrowser.js";
-import { config } from "../../../src/config.js";
-import { createAIProvider } from "../../../src/provider.js";
-import { ChalkConsoleLogger } from "../../../src/loggers/chalkConsole.js";
-import { JSONConsoleLogger } from "../../../src/loggers/json.js";
-import { WebAgentEventEmitter } from "../../../src/events.js";
+import { WebAgent } from "@core/webAgent.js";
+import { PlaywrightBrowser } from "@core/browser/playwrightBrowser.js";
+import { config } from "@core/config.js";
+import { createAIProvider } from "../../src/provider.js";
+import { ChalkConsoleLogger } from "@core/loggers/chalkConsole.js";
+import { JSONConsoleLogger } from "@core/loggers/json.js";
+import { WebAgentEventEmitter } from "@core/events.js";
 import * as fs from "fs";
 
 const mockWebAgent = vi.mocked(WebAgent);
@@ -521,7 +522,7 @@ describe("CLI Run Command", () => {
   describe("Error Handling", () => {
     it("should handle invalid JSON data", async () => {
       // Mock parseJsonData to throw an error
-      const { parseJsonData } = await import("../../../src/cli/utils.js");
+      const { parseJsonData } = await import("../../src/utils.js");
       vi.mocked(parseJsonData).mockImplementation(() => {
         throw new Error("Invalid JSON");
       });
@@ -543,7 +544,7 @@ describe("CLI Run Command", () => {
 
     it("should handle WebAgent execution errors", async () => {
       // Reset validateBrowser to return true so we get past browser validation
-      const { validateBrowser } = await import("../../../src/cli/utils.js");
+      const { validateBrowser } = await import("../../src/utils.js");
       vi.mocked(validateBrowser).mockReturnValue(true);
 
       const mockWebAgentInstance = {
