@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies and build core package
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter spark build
+          pnpm --filter spark-core build
 
       - name: Check server formatting
         run: pnpm --filter @spark/server run format:check
