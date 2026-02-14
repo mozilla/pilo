@@ -2,26 +2,32 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
 import sparkRoutes from "./spark.js";
 
-// Mock the spark library
-vi.mock("spark", () => ({
-  WebAgent: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      success: true,
-      finalAnswer: "Task completed successfully",
-      plan: "Test plan",
-      taskExplanation: "Test explanation",
-      iterations: 1,
-      validationAttempts: 1,
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
-  PlaywrightBrowser: vi.fn().mockImplementation(() => ({})),
-  config: {
-    getConfig: vi.fn(() => ({
-      provider: "openai",
-      openai_api_key: "sk-test123",
-    })),
-  },
+// Mock spark/webAgent.js
+vi.mock("spark/webAgent.js", () => ({
+  WebAgent: vi.fn().mockImplementation(function () {
+    return {
+      execute: vi.fn().mockResolvedValue({
+        success: true,
+        finalAnswer: "Task completed successfully",
+        plan: "Test plan",
+        taskExplanation: "Test explanation",
+        iterations: 1,
+        validationAttempts: 1,
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+  }),
+}));
+
+// Mock spark/browser/playwrightBrowser.js
+vi.mock("spark/browser/playwrightBrowser.js", () => ({
+  PlaywrightBrowser: vi.fn().mockImplementation(function () {
+    return {};
+  }),
+}));
+
+// Mock spark/provider.js
+vi.mock("spark/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
   getAIProviderInfo: vi.fn(() => ({
     provider: "openai",
@@ -29,7 +35,10 @@ vi.mock("spark", () => ({
     hasApiKey: true,
     keySource: "env",
   })),
-  // Config merge utilities
+}));
+
+// Mock spark/utils/configMerge.js
+vi.mock("spark/utils/configMerge.js", () => ({
   createNavigationRetryConfig: vi.fn((overrides) => ({
     baseTimeoutMs: overrides?.baseTimeoutMs ?? 30000,
     maxTimeoutMs: overrides?.maxTimeoutMs ?? 120000,
@@ -37,14 +46,21 @@ vi.mock("spark", () => ({
     timeoutMultiplier: overrides?.timeoutMultiplier ?? 2,
     ...(overrides?.onRetry && { onRetry: overrides.onRetry }),
   })),
-  // Default constants
-  DEFAULT_BROWSER: "firefox",
-  DEFAULT_HEADLESS: false,
-  DEFAULT_BLOCK_ADS: true,
-  DEFAULT_DEBUG: false,
-  DEFAULT_VISION: false,
-  DEFAULT_MAX_ITERATIONS: 50,
-  DEFAULT_MAX_VALIDATION_ATTEMPTS: 3,
+}));
+
+// Mock spark/configDefaults.js
+vi.mock("spark/configDefaults.js", () => ({
+  SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
+}));
+
+// Mock spark/config.js
+vi.mock("spark/config.js", () => ({
+  config: {
+    getConfig: vi.fn(() => ({
+      provider: "openai",
+      openai_api_key: "sk-test123",
+    })),
+  },
 }));
 
 // Mock the AI SDK
@@ -54,7 +70,9 @@ vi.mock("@ai-sdk/openai", () => ({
 
 // Mock the StreamLogger
 vi.mock("../StreamLogger.js", () => ({
-  StreamLogger: vi.fn().mockImplementation(() => ({})),
+  StreamLogger: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 describe("Spark Routes", () => {
@@ -73,7 +91,7 @@ describe("Spark Routes", () => {
       process.env.OPENAI_API_KEY = "test-key";
 
       // Reset the getAIProviderInfo mock to its default success state
-      const { getAIProviderInfo } = await import("spark");
+      const { getAIProviderInfo } = await import("spark/provider.js");
       vi.mocked(getAIProviderInfo).mockReturnValue({
         provider: "openai",
         model: "gpt-4.1",
@@ -103,7 +121,7 @@ describe("Spark Routes", () => {
 
     it("should reject requests without OpenAI API key", async () => {
       // Mock getAIProviderInfo to throw an error for missing API key
-      const { getAIProviderInfo } = await import("spark");
+      const { getAIProviderInfo } = await import("spark/provider.js");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error(
           "No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
