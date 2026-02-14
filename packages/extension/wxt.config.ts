@@ -6,16 +6,21 @@ import { resolve } from "node:path";
 // Custom Vite plugin to fix WXT auto-import module resolution for files outside package root
 function fixWxtImportsPlugin() {
   return {
-    name: 'fix-wxt-imports',
-    enforce: 'pre' as const, // Run before other plugins
+    name: "fix-wxt-imports",
+    enforce: "pre" as const, // Run before other plugins
     async resolveId(source: string, importer: string | undefined) {
       // If a file in ../../src is importing wxt/browser or @wxt-dev/webextension-polyfill/browser,
       // resolve it to webextension-polyfill instead
-      if (importer && importer.includes('../../src') && 
-          (source === 'wxt/browser' || source === '@wxt-dev/webextension-polyfill/browser')) {
+      if (
+        importer &&
+        importer.includes("../../src") &&
+        (source === "wxt/browser" || source === "@wxt-dev/webextension-polyfill/browser")
+      ) {
         // Return the module ID that should be used instead
-        console.log(`[fix-wxt-imports] Redirecting ${source} to webextension-polyfill for ${importer}`);
-        return 'webextension-polyfill';
+        console.log(
+          `[fix-wxt-imports] Redirecting ${source} to webextension-polyfill for ${importer}`,
+        );
+        return "webextension-polyfill";
       }
       return null; // Let other plugins handle it
     },
@@ -84,7 +89,7 @@ let config = {
         "@wxt-dev/webextension-polyfill/browser": "webextension-polyfill",
       },
       // Ensure node module resolution works for files in ../../src
-      conditions: ['import', 'module', 'browser', 'default'],
+      conditions: ["import", "module", "browser", "default"],
     },
     optimizeDeps: {
       // Don't pre-bundle core library files
@@ -92,7 +97,7 @@ let config = {
     },
     build: {
       rollupOptions: {
-        external: ['wxt/browser', '@wxt-dev/webextension-polyfill/browser'],
+        external: ["wxt/browser", "@wxt-dev/webextension-polyfill/browser"],
       },
     },
     server: {

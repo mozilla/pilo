@@ -43,4 +43,8 @@ export type { Logger } from "../../../src/loggers/types.js";
 export type { Action, TaskValidationResult } from "../../../src/schemas.js";
 
 // Errors
-export { RecoverableError, BrowserException, NavigationTimeoutException } from "../../../src/errors.js";
+export {
+  RecoverableError,
+  BrowserException,
+  NavigationTimeoutException,
+} from "../../../src/errors.js";

@@ -6,6 +6,8 @@ yarn.lock
 # Build outputs
 dist/
 build/
+.wxt/
+.output/
 
 # Dependencies
 node_modules/
