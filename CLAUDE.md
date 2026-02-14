@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-Spark is an AI-powered web automation library and CLI tool that lets you control browsers using natural language. The project consists of:
+Spark is an AI-powered web automation library and CLI tool that lets you control browsers using natural language. The project is organized as a pnpm monorepo with the following packages:
 
-- **Core library** (`src/`) - Main automation engine
-- **CLI** (`src/cli/`) - Command-line interface
-- **Extension** (`extension/`) - Browser extension
-- **Server** (`server/`) - Server component
+- **Core library** (`packages/core/`) - Main automation engine (spark-core)
+- **CLI** (`packages/cli/`) - Command-line interface (@spark/cli)
+- **Extension** (`packages/extension/`) - Browser extension (spark-extension)
+- **Server** (`packages/server/`) - Server component (@spark/server)
 
 ## Common Commands
 
@@ -46,16 +46,31 @@ pnpm install-cli       # Build and install CLI globally
 
 ## Project Structure
 
-- `src/` - Core library source code
-  - `browser/` - Browser automation implementations
-  - `cli/` - CLI commands and configuration
-  - `tools/` - AI agent tools
-  - `utils/` - Utility functions
-- `test/` - Test files (mirrors src structure)
-- `extension/` - Browser extension code
-- `server/` - Server component
-- `docs/` - Documentation
-- `scripts/` - Build and deployment scripts
+```
+spark/
+├── package.json              # Workspace root (format scripts only)
+├── pnpm-workspace.yaml
+├── packages/
+│   ├── core/                 # Main library (spark-core)
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── src/              # Core library source code
+│   │   │   ├── browser/      # Browser automation implementations
+│   │   │   ├── tools/        # AI agent tools
+│   │   │   └── utils/        # Utility functions
+│   │   └── test/             # Test files (mirrors src structure)
+│   ├── cli/                  # CLI tool (@spark/cli)
+│   │   ├── package.json
+│   │   └── src/
+│   ├── server/               # Server component (@spark/server)
+│   │   ├── package.json
+│   │   └── src/
+│   └── extension/            # Browser extension (spark-extension)
+│       ├── package.json
+│       └── src/
+├── docs/                     # Documentation
+└── scripts/                  # Build and deployment scripts
+```
 
 ## Development Workflow
 
@@ -65,6 +80,35 @@ pnpm install-cli       # Build and install CLI globally
    - Run `pnpm typecheck` to check types
    - Run `pnpm test` to verify tests pass
 3. **Full validation**: Run `pnpm check` (does all three)
+
+### Working in the Monorepo
+
+**From root:**
+
+- `pnpm format` - Format all code
+- `pnpm format:check` - Check formatting
+- `pnpm spark <command>` - Run CLI locally
+- `pnpm -r run test` - Run all tests
+- `pnpm -r run typecheck` - Typecheck all packages
+- `pnpm -F spark-core run test` - Run tests for specific package
+
+**From a package directory (e.g., `cd packages/core`):**
+
+- `pnpm test` - Run tests
+- `pnpm test:watch` - Run tests in watch mode
+- `pnpm typecheck` - Run type checking
+- `pnpm build` - Build the package
+
+### Package Dependencies
+
+- CLI, server, and extension depend on `spark-core` via workspace protocol
+- Use `"spark-core": "workspace:*"` in package.json
+
+### Import Style
+
+- All imports use `.js` extensions (NodeNext module resolution)
+- No barrel imports (no index.ts re-export files)
+- Import directly from specific files: `import { foo } from "spark-core/utils/foo.js"`
 
 ## Testing
 
