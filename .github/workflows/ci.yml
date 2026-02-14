@@ -36,10 +36,11 @@ jobs:
             extension:
               - 'packages/extension/**'
 
-  core:
+  ci:
     runs-on: ubuntu-latest
     needs: [detect-changes]
     steps:
+      # Setup (runs once)
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -55,32 +56,34 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
+      - name: Cache pnpm store
+        uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      # Format check (always)
       - name: Check formatting
         run: pnpm format:check
 
+      # Core (always build and typecheck, conditionally test)
       - name: Build core package
         run: pnpm --filter spark-core build
-
-      - name: Upload core build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-dist
-          path: packages/core/dist/
-          retention-days: 1
 
       - name: Typecheck core
         run: pnpm --filter spark-core run typecheck
@@ -89,166 +92,52 @@ jobs:
         if: needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-core run test
 
-  cli:
-    runs-on: ubuntu-latest
-    needs: [detect-changes, core]
-    if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download core build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: core-dist
-          path: packages/core/dist/
-
-      - name: Re-link workspace dependencies
-        run: pnpm install
-
+      # CLI (conditional on cli or core changes)
       - name: Typecheck CLI
+        if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-cli run typecheck
 
       - name: Test CLI
+        if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-cli run test
 
       - name: Build CLI
+        if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-cli run build
 
-  server:
-    runs-on: ubuntu-latest
-    needs: [detect-changes, core]
-    if: needs.detect-changes.outputs.server == 'true' || needs.detect-changes.outputs.core == 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download core build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: core-dist
-          path: packages/core/dist/
-
-      - name: Re-link workspace dependencies
-        run: pnpm install
-
+      # Server (conditional on server or core changes)
       - name: Typecheck server
+        if: needs.detect-changes.outputs.server == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter @spark/server run typecheck
 
       - name: Test server
+        if: needs.detect-changes.outputs.server == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter @spark/server run test
 
       - name: Build server
+        if: needs.detect-changes.outputs.server == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter @spark/server run build
 
-  extension:
-    runs-on: ubuntu-latest
-    needs: [detect-changes, core]
-    if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download core build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: core-dist
-          path: packages/core/dist/
-
-      - name: Re-link workspace dependencies
-        run: pnpm install
-
+      # Extension (conditional on extension or core changes)
       - name: Typecheck extension
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-extension run typecheck
 
       - name: Test extension
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-extension run test
 
       - name: Build extension for Firefox
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-extension run build:firefox
 
       - name: Build extension for Chrome
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-extension run build:chrome
 
+      # Extension E2E tests (conditional on extension or core changes)
       - name: Get Playwright version
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         id: playwright-version
         run: |
           set -euo pipefail
@@ -264,6 +153,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         uses: actions/cache@v4
         id: playwright-cache
         with:
@@ -271,19 +161,20 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: (needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true') && steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter spark-extension exec playwright install --with-deps chromium
 
       - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        if: (needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true') && steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm --filter spark-extension exec playwright install-deps chromium
 
       - name: Run extension e2e tests
+        if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true'
         run: pnpm --filter spark-extension run test:e2e:headless:chrome
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true') }}
         with:
           name: playwright-report
           path: packages/extension/playwright-report/
@@ -291,7 +182,7 @@ jobs:
 
       - name: Upload Playwright test results
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true') }}
         with:
           name: playwright-test-results
           path: packages/extension/test-results/
