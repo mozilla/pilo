@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
 import sparkRoutes from "./spark.js";
 
-// Mock spark/webAgent.js
-vi.mock("spark/webAgent.js", () => ({
+// Mock spark-core/webAgent.js
+vi.mock("spark-core/webAgent.js", () => ({
   WebAgent: vi.fn().mockImplementation(function () {
     return {
       execute: vi.fn().mockResolvedValue({
@@ -19,15 +19,15 @@ vi.mock("spark/webAgent.js", () => ({
   }),
 }));
 
-// Mock spark/browser/playwrightBrowser.js
-vi.mock("spark/browser/playwrightBrowser.js", () => ({
+// Mock spark-core/browser/playwrightBrowser.js
+vi.mock("spark-core/browser/playwrightBrowser.js", () => ({
   PlaywrightBrowser: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
-// Mock spark/provider.js
-vi.mock("spark/provider.js", () => ({
+// Mock spark-core/provider.js
+vi.mock("spark-core/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
   getAIProviderInfo: vi.fn(() => ({
     provider: "openai",
@@ -37,8 +37,8 @@ vi.mock("spark/provider.js", () => ({
   })),
 }));
 
-// Mock spark/utils/configMerge.js
-vi.mock("spark/utils/configMerge.js", () => ({
+// Mock spark-core/utils/configMerge.js
+vi.mock("spark-core/utils/configMerge.js", () => ({
   createNavigationRetryConfig: vi.fn((overrides) => ({
     baseTimeoutMs: overrides?.baseTimeoutMs ?? 30000,
     maxTimeoutMs: overrides?.maxTimeoutMs ?? 120000,
@@ -48,13 +48,13 @@ vi.mock("spark/utils/configMerge.js", () => ({
   })),
 }));
 
-// Mock spark/configDefaults.js
-vi.mock("spark/configDefaults.js", () => ({
+// Mock spark-core/configDefaults.js
+vi.mock("spark-core/configDefaults.js", () => ({
   SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
 }));
 
-// Mock spark/config.js
-vi.mock("spark/config.js", () => ({
+// Mock spark-core/config.js
+vi.mock("spark-core/config.js", () => ({
   config: {
     getConfig: vi.fn(() => ({
       provider: "openai",
