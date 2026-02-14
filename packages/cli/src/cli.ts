@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { createRunCommand } from "./cli/commands/run.js";
-import { createConfigCommand } from "./cli/commands/config.js";
-import { createExamplesCommand } from "./cli/commands/examples.js";
-import { getPackageInfo } from "./cli/utils.js";
+import { createRunCommand } from "./commands/run.js";
+import { createConfigCommand } from "./commands/config.js";
+import { createExamplesCommand } from "./commands/examples.js";
+import { getPackageInfo } from "./utils.js";
 
 /**
  * Spark CLI - AI-powered web automation tool
