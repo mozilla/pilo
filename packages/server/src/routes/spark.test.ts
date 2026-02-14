@@ -91,7 +91,7 @@ describe("Spark Routes", () => {
       process.env.OPENAI_API_KEY = "test-key";
 
       // Reset the getAIProviderInfo mock to its default success state
-      const { getAIProviderInfo } = await import("spark/provider.js");
+      const { getAIProviderInfo } = await import("spark-core/provider.js");
       vi.mocked(getAIProviderInfo).mockReturnValue({
         provider: "openai",
         model: "gpt-4.1",
@@ -121,7 +121,7 @@ describe("Spark Routes", () => {
 
     it("should reject requests without OpenAI API key", async () => {
       // Mock getAIProviderInfo to throw an error for missing API key
-      const { getAIProviderInfo } = await import("spark/provider.js");
+      const { getAIProviderInfo } = await import("spark-core/provider.js");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error(
           "No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",

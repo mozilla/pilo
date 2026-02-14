@@ -44,7 +44,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build core package
-        run: pnpm --filter spark build
+        run: pnpm --filter spark-core build
 
       - name: Typecheck all packages
         run: pnpm -r run typecheck

@@ -1,5 +1,5 @@
 {
-  "name": "spark",
+  "name": "spark-core",
   "version": "0.12.0",
   "description": "AI-powered web automation library",
   "type": "module",
