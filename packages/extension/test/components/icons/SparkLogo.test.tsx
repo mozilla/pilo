@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { SparkLogo } from "../../../src/components/icons/SparkLogo";
+import { SparkLogo } from "../../../src/components/icons/SparkLogo.js";
 
 describe("SparkLogo", () => {
   it("renders an SVG element", () => {

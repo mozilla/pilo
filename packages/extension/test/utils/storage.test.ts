@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reviver } from "../../src/utils/storage";
+import { reviver } from "../../src/utils/storage.js";
 
 describe("reviver", () => {
   it("should convert ISO date string to Date object when key is timestamp", () => {

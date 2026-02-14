@@ -8,7 +8,7 @@ import {
   resetIndicatorState,
   ensureIndicatorCSSRegistered,
   cleanupStaleRegistrations,
-} from "../../src/background/indicatorControl";
+} from "../../src/background/indicatorControl.js";
 import browser from "webextension-polyfill";
 
 // Type definitions for test mocks

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { INDICATOR_CSS } from "../../src/background/indicatorControl";
+import { INDICATOR_CSS } from "../../src/background/indicatorControl.js";
 
 describe("indicator CSS file for dynamic registration", () => {
   const cssPath = path.join(__dirname, "../../public/indicator.css");

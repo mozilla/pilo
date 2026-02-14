@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import SettingsView from "../../src/components/sidepanel/SettingsView";
+import SettingsView from "../../src/components/sidepanel/SettingsView.js";
 
 // Mock the hooks
 const mockUpdateSettings = vi.fn();

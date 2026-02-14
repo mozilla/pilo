@@ -3,12 +3,12 @@ import { AgentManager } from "../src/AgentManager.js";
 
 vi.mock("@ai-sdk/openai");
 vi.mock("@openrouter/ai-sdk-provider");
-vi.mock("spark/core");
+vi.mock("spark/core.js");
 vi.mock("../src/ExtensionBrowser.js");
 
 import { createOpenAI, type OpenAIProvider } from "@ai-sdk/openai";
 import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-provider";
-import { WebAgent } from "spark/core";
+import { WebAgent } from "spark/core.js";
 import { ExtensionBrowser } from "../src/ExtensionBrowser.js";
 
 describe("AgentManager", () => {

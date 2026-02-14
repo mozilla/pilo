@@ -2,7 +2,7 @@ import { ExtensionBrowser } from "./ExtensionBrowser.js";
 import { EventStoreLogger } from "./EventStoreLogger.js";
 
 // Import shared code - browser-safe imports only
-import { WebAgent, Logger } from "spark/core";
+import { WebAgent, Logger } from "spark/core.js";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

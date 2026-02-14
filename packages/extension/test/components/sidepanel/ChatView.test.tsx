@@ -3,10 +3,10 @@ import { render, screen } from "@testing-library/react";
 import ChatView, {
   shouldDisplayError,
   formatBrowserAction,
-} from "../../../src/components/sidepanel/ChatView";
-import { theme } from "../../../src/theme";
+} from "../../../src/components/sidepanel/ChatView.js";
+import { theme } from "../../../src/theme.js";
 import browser from "webextension-polyfill";
-import type { RealtimeEventMessage } from "../../../src/types/browser";
+import type { RealtimeEventMessage } from "../../../src/types/browser.js";
 
 type MessageListenerCallback = (message: RealtimeEventMessage) => void;
 
