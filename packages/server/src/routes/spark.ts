@@ -1,15 +1,12 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import {
-  WebAgent,
-  PlaywrightBrowser,
-  createAIProvider,
-  getAIProviderInfo,
-  createNavigationRetryConfig,
-  SEARCH_PROVIDERS,
-} from "spark";
-import type { TaskExecutionResult } from "spark";
-import { config } from "spark";
+import { WebAgent } from "spark/webAgent.js";
+import { PlaywrightBrowser } from "spark/browser/playwrightBrowser.js";
+import { createAIProvider, getAIProviderInfo } from "spark/provider.js";
+import { createNavigationRetryConfig } from "spark/utils/configMerge.js";
+import { SEARCH_PROVIDERS } from "spark/configDefaults.js";
+import type { TaskExecutionResult } from "spark/webAgent.js";
+import { config } from "spark/config.js";
 import { StreamLogger } from "../StreamLogger.js";
 
 interface ErrorResponse {
