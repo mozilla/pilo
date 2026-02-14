@@ -57,9 +57,8 @@ docker-compose*.yml
 # Agent and plan files
 .dotagent/
 
-# Extension build outputs (not needed for server)
-extension/dist/
-extension/node_modules/
+# Extension package (not needed for server)
+packages/extension/
 
 # CLI source (only package.json needed for workspace)
 packages/cli/src/
