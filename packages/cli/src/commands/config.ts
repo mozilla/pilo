@@ -1,8 +1,13 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync, unlinkSync } from "fs";
+<<<<<<<< HEAD:packages/cli/src/commands/config.ts
 import { config } from "spark-core/config.js";
 import { getAIProviderInfo } from "spark-core/provider.js";
+========
+import { config } from "spark/config.js";
+import { getAIProviderInfo } from "../provider.js";
+>>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/src/cli/commands/config.ts
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";
 
 /**
