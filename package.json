@@ -70,13 +70,13 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.13",
-    "@ai-sdk/google-vertex": "^4.0.28",
-    "@ai-sdk/openai": "^3.0.19",
-    "@ai-sdk/openai-compatible": "^2.0.19",
+    "@ai-sdk/google": "^3.0.20",
+    "@ai-sdk/google-vertex": "^4.0.41",
+    "@ai-sdk/openai": "^3.0.25",
+    "@ai-sdk/openai-compatible": "^2.0.26",
     "@ghostery/adblocker-playwright": "^2.13.4",
-    "@openrouter/ai-sdk-provider": "^2.0.2",
-    "ai": "^6.0.50",
+    "@openrouter/ai-sdk-provider": "^2.1.1",
+    "ai": "^6.0.69",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "cross-fetch": "^4.1.0",
@@ -84,7 +84,7 @@
     "eventemitter3": "^5.0.4",
     "liquidjs": "^10.24.0",
     "nanoid": "^5.1.6",
-    "ollama-ai-provider-v2": "^3.0.2",
+    "ollama-ai-provider-v2": "^3.0.3",
     "playwright": "1.58.1",
     "turndown": "^7.2.2",
     "zod": "^4.3.6"
