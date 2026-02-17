@@ -37,7 +37,7 @@
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.3",
     "hono": "^4.11.7",
-    "spark": "file:.."
+    "spark-core": "workspace:*"
   },
   "packageManager": "pnpm@9.0.0"
 }
