@@ -32,7 +32,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
+    "build": "pnpm run bundle:aria && tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --project tsconfig.check.json",
     "test": "vitest run",
@@ -72,6 +73,7 @@
     "@types/node": "^25.0.10",
     "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.0.18",
+    "esbuild": "^0.27.3",
     "jsdom": "^27.4.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
