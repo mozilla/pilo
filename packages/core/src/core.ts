@@ -84,6 +84,13 @@ export const DEFAULT_REASONING_EFFORT = _defaults.reasoning_effort;
 export const DEFAULT_LOGGER = _defaults.logger;
 export const DEFAULT_METRICS_INCREMENTAL = _defaults.metrics_incremental;
 
+// Aria tree utilities
+export {
+  generateAndRenderAriaTree,
+  applySetOfMarks,
+  removeSetOfMarks,
+} from "./browser/ariaTree/ariaSnapshot.js";
+
 // Note: createProvider not exported in core to avoid Node.js dependencies in browser
 // Use provider libraries directly in browser environments
 export * from "./schemas.js";
