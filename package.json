@@ -9,10 +9,8 @@
   },
   "scripts": {
     "clean": "pnpm -r run clean",
-    "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
-    "build": "pnpm run bundle:aria && pnpm -r run build",
+    "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
-    "prepare": "pnpm run bundle:aria",
     "spark": "pnpm --filter @tabstack/spark run spark",
     "test": "pnpm -r run test",
     "test:watch": "pnpm -r run test:watch",
