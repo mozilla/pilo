@@ -22,7 +22,7 @@ importers:
         version: 2.0.19(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.13.4
-        version: 2.13.4(playwright@1.58.0)
+        version: 2.13.4(playwright@1.58.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.0.2
         version: 2.0.2(ai@6.0.50(zod@4.3.6))(zod@4.3.6)
@@ -54,8 +54,8 @@ importers:
         specifier: ^3.0.2
         version: 3.0.2(ai@6.0.50(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.58.0
-        version: 1.58.0
+        specifier: 1.58.1
+        version: 1.58.1
       turndown:
         specifier: ^7.2.2
         version: 7.2.2
@@ -3853,11 +3853,11 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.13.4': {}
 
-  '@ghostery/adblocker-playwright@2.13.4(playwright@1.58.0)':
+  '@ghostery/adblocker-playwright@2.13.4(playwright@1.58.1)':
     dependencies:
       '@ghostery/adblocker': 2.13.4
       '@ghostery/adblocker-content': 2.13.4
-      playwright: 1.58.0
+      playwright: 1.58.1
       tldts-experimental: 7.0.19
 
   '@ghostery/adblocker@2.13.4':
@@ -5915,7 +5915,7 @@ snapshots:
       '@ai-sdk/google-vertex': 4.0.48(zod@4.3.6)
       '@ai-sdk/openai': 3.0.26(zod@4.3.6)
       '@ai-sdk/openai-compatible': 2.0.28(zod@4.3.6)
-      '@ghostery/adblocker-playwright': 2.13.4(playwright@1.58.0)
+      '@ghostery/adblocker-playwright': 2.13.4(playwright@1.58.1)
       '@openrouter/ai-sdk-provider': 2.1.1(ai@6.0.78(zod@4.3.6))(zod@4.3.6)
       ai: 6.0.78(zod@4.3.6)
       chalk: 5.6.2
@@ -5926,7 +5926,7 @@ snapshots:
       liquidjs: 10.24.0
       nanoid: 5.1.6
       ollama-ai-provider-v2: 3.0.4(ai@6.0.78(zod@4.3.6))(zod@4.3.6)
-      playwright: 1.58.0
+      playwright: 1.58.1
       turndown: 7.2.2
       zod: 4.3.6
     transitivePeerDependencies:
