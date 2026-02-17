@@ -10,20 +10,16 @@ ARG INSTALL_PLAYWRIGHT_BROWSERS=false
 # Set working directory
 WORKDIR /app
 
-# Copy workspace configuration
-COPY pnpm-workspace.yaml ./
+# Copy workspace configuration and root package files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
-# Copy root package files for core spark library
-COPY package.json pnpm-lock.yaml ./
-COPY src ./src
-COPY scripts ./scripts
-COPY tsconfig.json ./
-
-# Copy CLI package files (needed for bin reference in root package.json)
-COPY packages/cli/package.json packages/cli/tsconfig.json ./packages/cli/
+# Copy core package files (must be built first - server depends on it)
+COPY packages/core/package.json packages/core/tsconfig.json ./packages/core/
+COPY packages/core/src ./packages/core/src
+COPY packages/core/scripts ./packages/core/scripts
 
 # Copy server package files
-COPY packages/server/package.json packages/server/tsconfig.json packages/server/tsup.config.ts ./packages/server/
+COPY packages/server/package.json packages/server/tsconfig.json ./packages/server/
 COPY packages/server/src ./packages/server/src
 
 # Install all workspace dependencies (skip prepare scripts to avoid build errors)
@@ -34,12 +30,11 @@ RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
     npx playwright install-deps firefox chromium; \
     fi
 
-# Build core spark package first (required by server)
-# Build just the TypeScript in the root (core library)
-RUN pnpm tsc
+# Build core package first (required by server)
+RUN pnpm --filter spark-core run build
 
 # Build server package
-RUN pnpm --filter @spark/server run build
+RUN pnpm --filter spark-server run build
 
 # Expose the port
 EXPOSE 3000

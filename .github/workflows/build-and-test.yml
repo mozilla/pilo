@@ -171,13 +171,13 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck CLI
-        run: pnpm --filter spark-cli run typecheck
+        run: pnpm --filter @spark/cli run typecheck
 
       - name: Test CLI
-        run: pnpm --filter spark-cli run test
+        run: pnpm --filter @spark/cli run test
 
       - name: Build CLI
-        run: pnpm --filter spark-cli run build
+        run: pnpm --filter @spark/cli run build
 
   server:
     runs-on: ubuntu-latest
@@ -220,13 +220,13 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck server
-        run: pnpm --filter @spark/server run typecheck
+        run: pnpm --filter spark-server run typecheck
 
       - name: Test server
-        run: pnpm --filter @spark/server run test
+        run: pnpm --filter spark-server run test
 
       - name: Build server
-        run: pnpm --filter @spark/server run build
+        run: pnpm --filter spark-server run build
 
   extension:
     runs-on: ubuntu-latest
