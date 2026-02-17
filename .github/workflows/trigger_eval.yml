@@ -34,6 +34,8 @@ jobs:
           fi
 
       - name: Trigger repository_dispatch
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           echo "Sending repository_dispatch event to spark-evals-judge..."
           echo ""
@@ -47,7 +49,7 @@ jobs:
           echo ""
 
           # Escape commit message for JSON (replace newlines, quotes, backslashes)
-          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | jq -Rs .)
+          COMMIT_MSG=$(echo "$COMMIT_MESSAGE" | jq -Rs .)
 
           # Generate current timestamp
           TRIGGER_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
