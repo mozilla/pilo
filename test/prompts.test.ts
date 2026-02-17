@@ -3,6 +3,7 @@ import {
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
   actionLoopSystemPrompt,
+  buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   buildStepErrorFeedbackPrompt,
@@ -175,6 +176,35 @@ describe("prompts", () => {
     it("should include goto restrictions", () => {
       expect(actionLoopSystemPrompt).toContain("previously seen");
       expect(actionLoopSystemPrompt).toContain("goto() only accepts URLs");
+    });
+
+    it("should include reference resolution guidance for demonstrative pronouns", () => {
+      // Test that the prompt explains how to interpret "this/that/these/those + noun"
+      // as referring to content on the current page
+      expect(actionLoopSystemPrompt).toContain("Reference Resolution");
+      expect(actionLoopSystemPrompt).toContain("demonstrative");
+      expect(actionLoopSystemPrompt).toContain('like "this event" or "that restaurant"');
+    });
+
+    it("should include reference resolution guidance with guardrails enabled", () => {
+      const promptWithGuardrails = buildActionLoopSystemPrompt(true);
+      expect(promptWithGuardrails).toContain("Reference Resolution");
+      expect(promptWithGuardrails).toContain("demonstrative");
+      expect(promptWithGuardrails).toContain("current page");
+    });
+
+    it("should include reference resolution guidance without guardrails", () => {
+      const promptWithoutGuardrails = buildActionLoopSystemPrompt(false);
+      expect(promptWithoutGuardrails).toContain("Reference Resolution");
+      expect(promptWithoutGuardrails).toContain("demonstrative");
+      expect(promptWithoutGuardrails).toContain("current page");
+    });
+
+    it("should provide actionable guidance for reference resolution", () => {
+      // Verify the guidance tells the AI what to DO, not just what it means
+      expect(actionLoopSystemPrompt).toContain("Look for the referenced item");
+      expect(actionLoopSystemPrompt).toContain("interact with it");
+      expect(actionLoopSystemPrompt).toContain("page snapshot");
     });
   });
 

@@ -248,6 +248,9 @@ ${youArePrompt}
 
 Analyze the current page state and determine your next action based on previous outcomes.
 
+**Reference Resolution:**
+When users use demonstrative pronouns with nouns (like "this event" or "that restaurant"), they are referring to specific content visible on the current page. Look for the referenced item in the page snapshot and interact with it directly.
+
 **Available Tools:**
 {{ toolExamples }}
 
