@@ -321,9 +321,9 @@ importers:
       hono:
         specifier: ^4.11.7
         version: 4.11.9
-      spark:
-        specifier: file:..
-        version: packages@file:packages
+      spark-core:
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^25.2.0
@@ -2538,9 +2538,6 @@ packages:
   package-json@10.0.1:
     resolution: {integrity: sha512-ua1L4OgXSBdsu1FPb7F3tYH0F48a6kxvod4pLUlGY9COeJAJQNX/sNH2IiEmsxw7lqYiAwrdHMjz1FctOsyDQg==}
     engines: {node: '>=18'}
-
-  packages@file:packages:
-    resolution: {directory: packages, type: directory}
 
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
@@ -5516,8 +5513,6 @@ snapshots:
       registry-auth-token: 5.1.1
       registry-url: 6.0.1
       semver: 7.7.4
-
-  packages@file:packages: {}
 
   pako@1.0.11: {}
 

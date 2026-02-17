@@ -17,6 +17,10 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },
+    "./ariaTree": {
+      "types": "./dist/browser/ariaTree/index.d.ts",
+      "import": "./dist/browser/ariaTree/index.js"
+    },
     "./*": {
       "types": "./dist/*",
       "import": "./dist/*"

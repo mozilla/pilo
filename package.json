@@ -1,50 +1,26 @@
 {
-  "name": "spark",
+  "name": "spark-workspace",
+  "description": "Spark monorepo workspace",
+  "private": true,
   "version": "0.12.1",
-  "description": "AI-powered web automation library and CLI tool",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "type": "module",
   "engines": {
     "node": "^22.0.0"
   },
-  "bin": {
-    "spark": "./dist/cli.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js"
-    },
-    "./ariaTree": {
-      "types": "./dist/browser/ariaTree/index.d.ts",
-      "import": "./dist/browser/ariaTree/index.js"
-    }
-  },
-  "files": [
-    "dist/**/*",
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "pnpm -r run clean",
     "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
-    "build": "pnpm run bundle:aria && tsc",
-    "typecheck": "tsc --project tsconfig.check.json",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
-    "spark": "NODE_NO_WARNINGS=1 tsx src/cli.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "install-cli": "npm run build && chmod +x dist/cli.js && npm install -g .",
+    "build": "pnpm run bundle:aria && pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "prepare": "pnpm run bundle:aria",
+    "spark": "pnpm --filter @tabstack/spark run spark",
+    "test": "pnpm -r run test",
+    "test:watch": "pnpm -r run test:watch",
+    "install-cli": "pnpm --filter @tabstack/spark run build && pnpm install -g ./packages/cli",
     "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
     "release": "./scripts/release.sh",
-    "check": "pnpm run format && pnpm run typecheck && pnpm test"
+    "check": "pnpm run format && pnpm run typecheck && pnpm run test"
   },
   "keywords": [
     "ai",
