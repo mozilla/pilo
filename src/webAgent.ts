@@ -23,6 +23,7 @@ import {
   buildPageSnapshotPrompt,
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
+  buildPlanWithCurrentUrlPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
   buildValidationFeedbackPrompt,
@@ -206,7 +207,7 @@ export class WebAgent {
 
     try {
       // 3. Planning phase
-      await this.planTask(task, options.startingUrl);
+      await this.planTask(task, options.startingUrl, this.data?.currentUrl);
 
       // 4. Navigation phase (with retry on recoverable errors)
       await this.navigateToStartWithRetry(task);
@@ -1068,9 +1069,9 @@ export class WebAgent {
   /**
    * Plan the task using proper tool calling
    */
-  private async planTask(task: string, startingUrl?: string): Promise<void> {
+  private async planTask(task: string, startingUrl?: string, currentUrl?: string): Promise<void> {
     // Auto-detect OpenTable tasks and construct a parameterized search URL
-    if (!startingUrl) {
+    if (!startingUrl && !currentUrl) {
       const openTableUrl = this.buildOpenTableUrl(task);
       if (openTableUrl) {
         startingUrl = openTableUrl;
@@ -1079,7 +1080,9 @@ export class WebAgent {
 
     const planningPrompt = startingUrl
       ? buildPlanPrompt(task, startingUrl, this.guardrails)
-      : buildPlanAndUrlPrompt(task, this.guardrails);
+      : currentUrl
+        ? buildPlanWithCurrentUrlPrompt(task, currentUrl, this.guardrails)
+        : buildPlanAndUrlPrompt(task, this.guardrails);
 
     // Emit processing event before planning - planning doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1131,6 +1134,8 @@ export class WebAgent {
         this.url = url;
       } else if (startingUrl) {
         this.url = startingUrl;
+      } else if (currentUrl) {
+        this.url = currentUrl;
       }
 
       this.emit(WebAgentEventType.AGENT_STATUS, {

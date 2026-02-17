@@ -163,6 +163,8 @@ Keep plans concise and high-level, focusing on goals not specific UI elements.
 
 Today's Date: {{ currentDate }}
 Task: {{ task }}
+{% if currentUrl %}The user is currently on: {{ currentUrl }}
+If the task references "this page", "this restaurant", or similar, use this URL as the starting URL.{% endif %}
 {% if startingUrl %}Starting URL: {{ startingUrl }}{% endif %}
 {% if guardrails %}Guardrails: {{ guardrails }}{% endif %}
 
@@ -225,6 +227,19 @@ export const buildPlanAndUrlPrompt = (task: string, guardrails?: string | null) 
     task,
     currentDate: getCurrentFormattedDate(),
     includeUrl: true,
+    guardrails,
+  });
+
+export const buildPlanWithCurrentUrlPrompt = (
+  task: string,
+  currentUrl: string,
+  guardrails?: string | null,
+) =>
+  planPromptTemplate({
+    task,
+    currentDate: getCurrentFormattedDate(),
+    includeUrl: true,
+    currentUrl,
     guardrails,
   });
 

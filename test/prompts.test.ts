@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
+  buildPlanWithCurrentUrlPrompt,
   actionLoopSystemPrompt,
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
@@ -117,6 +118,45 @@ describe("prompts", () => {
       expect(prompt).toContain("successCriteria");
       expect(prompt).toContain("plan");
       expect(prompt).toContain("create_plan()");
+    });
+  });
+
+  describe("buildPlanWithCurrentUrlPrompt", () => {
+    it("should include the currentUrl in the prompt text", () => {
+      const task = "Make a reservation at this restaurant";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain(
+        "The user is currently on: https://www.opentable.com/r/some-restaurant",
+      );
+      expect(prompt).toContain("Make a reservation at this restaurant");
+    });
+
+    it("should use the includeUrl path with create_plan_with_url", () => {
+      const task = "Book a table here";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain("create_plan_with_url()");
+      expect(prompt).toContain("step-by-step plan and starting URL");
+    });
+
+    it("should not include Starting URL line", () => {
+      const task = "Check the menu";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).not.toContain("Starting URL:");
+    });
+
+    it("should include reference resolution hint", () => {
+      const task = "Reserve at this place";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain("this page");
+      expect(prompt).toContain("this restaurant");
     });
   });
 
