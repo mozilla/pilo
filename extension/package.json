@@ -44,7 +44,7 @@
     "tailwindcss": "^4.1.18",
     "webextension-polyfill": "^0.12.0",
     "yaml": "^2.8.2",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
