@@ -18,8 +18,8 @@
       "import": "./dist/core.js"
     },
     "./ariaTree": {
-      "types": "./dist/browser/ariaTree/index.d.ts",
-      "import": "./dist/browser/ariaTree/index.js"
+      "types": "./dist/browser/ariaTree/ariaSnapshot.d.ts",
+      "import": "./dist/browser/ariaTree/ariaSnapshot.js"
     },
     "./*": {
       "types": "./dist/*",
