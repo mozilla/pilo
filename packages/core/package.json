@@ -36,8 +36,8 @@
     "build": "pnpm run bundle:aria && tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --project tsconfig.check.json",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "pnpm run bundle:aria && vitest run",
+    "test:watch": "pnpm run bundle:aria && vitest"
   },
   "keywords": [
     "ai",
