@@ -1,6 +1,6 @@
 // Import ariaTree functionality from shared module
 import browser from "webextension-polyfill";
-import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "spark-core/ariaTree";
+import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "spark-core/core.js";
 import type {
   ExtensionMessage,
   GetPageInfoResponse,

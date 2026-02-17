@@ -17,10 +17,6 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },
-    "./ariaTree": {
-      "types": "./dist/browser/ariaTree/ariaSnapshot.d.ts",
-      "import": "./dist/browser/ariaTree/ariaSnapshot.js"
-    },
     "./*": {
       "types": "./dist/*",
       "import": "./dist/*"
