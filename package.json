@@ -79,7 +79,7 @@
     "liquidjs": "^10.24.0",
     "nanoid": "^5.1.6",
     "ollama-ai-provider-v2": "^3.0.2",
-    "playwright": "1.58.0",
+    "playwright": "1.58.1",
     "turndown": "^7.2.2",
     "zod": "^4.3.6"
   },
