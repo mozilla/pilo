@@ -1,0 +1,68 @@
+/**
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+export function yamlEscapeKeyIfNeeded(str: string): string {
+  if (!yamlStringNeedsQuotes(str)) return str;
+  return `'` + str.replace(/'/g, `''`) + `'`;
+}
+
+export function yamlEscapeValueIfNeeded(str: string): string {
+  if (!yamlStringNeedsQuotes(str)) return str;
+  return (
+    '"' +
+    str.replace(/[\\"\x00-\x1f\x7f-\x9f]/g, (c) => {
+      switch (c) {
+        case "\\":
+          return "\\\\";
+        case '"':
+          return '\\"';
+        case "\b":
+          return "\\b";
+        case "\f":
+          return "\\f";
+        case "\n":
+          return "\\n";
+        case "\r":
+          return "\\r";
+        case "\t":
+          return "\\t";
+        default:
+          const code = c.charCodeAt(0);
+          return "\\x" + code.toString(16).padStart(2, "0");
+      }
+    }) +
+    '"'
+  );
+}
+
+function yamlStringNeedsQuotes(str: string): boolean {
+  if (str.length === 0) return true;
+  if (/^\s|\s$/.test(str)) return true;
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(str)) return true;
+  if (/^-/.test(str)) return true;
+  if (/[\n:](\s|$)/.test(str)) return true;
+  if (/\s#/.test(str)) return true;
+  if (/[\n\r]/.test(str)) return true;
+  if (/^[&*\],?!>|@"'#%]/.test(str)) return true;
+  if (/[{}`]/.test(str)) return true;
+  if (/^\[/.test(str)) return true;
+  if (
+    !isNaN(Number(str)) ||
+    ["y", "n", "yes", "no", "true", "false", "on", "off", "null"].includes(str.toLowerCase())
+  )
+    return true;
+  return false;
+}
