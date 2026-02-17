@@ -3,7 +3,7 @@
  * that can be injected into browser pages via page.evaluate().
  *
  * Usage: tsx scripts/bundle-aria-tree.ts
- * Output: src/browser/ariaTree/bundle.ts
+ * Output: packages/core/src/browser/ariaTree/bundle.ts
  */
 
 import { build } from "esbuild";
@@ -17,7 +17,7 @@ const projectRoot = join(__dirname, "..");
 async function main() {
   // Bundle the ariaTree entry point into a single IIFE
   const result = await build({
-    entryPoints: [join(projectRoot, "src/browser/ariaTree/ariaSnapshot.ts")],
+    entryPoints: [join(projectRoot, "packages/core/src/browser/ariaTree/ariaSnapshot.ts")],
     bundle: true,
     format: "iife",
     globalName: "__sparkAriaTree",
@@ -40,7 +40,7 @@ async function main() {
 export const ARIA_TREE_SCRIPT = ${JSON.stringify(bundledCode)};
 `;
 
-  const outPath = join(projectRoot, "src/browser/ariaTree/bundle.ts");
+  const outPath = join(projectRoot, "packages/core/src/browser/ariaTree/bundle.ts");
   writeFileSync(outPath, output);
   console.log(`Wrote ${outPath} (${bundledCode.length} bytes)`);
 }
