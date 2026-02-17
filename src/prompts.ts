@@ -204,7 +204,7 @@ https://www.opentable.com/s?dateTime=YYYY-MM-DDTHH%3AMM%3A00&covers=N&term=LOCAT
 Example — task: "Find a restaurant on OpenTable in San Francisco for 2 people on Feb 14, 2026 at 7pm"
 → url: "https://www.opentable.com/s?dateTime=2026-02-14T19%3A00%3A00&covers=2&term=San+Francisco"
 
-Replace YYYY-MM-DD with the date, HH%3AMM with the time (URL-encoded colon), N with party size (default 2), and LOCATION with the place name (use + for spaces).
+Replace YYYY-MM-DD with the date, HH%3AMM with the time (URL-encoded colon), N with party size (default 2), and LOCATION with the place name (city & state only) formatted as (use + for spaces).
 
 Call create_plan_with_url() with:
 - successCriteria: ${TOOL_STRINGS.planning.common.successCriteria}
