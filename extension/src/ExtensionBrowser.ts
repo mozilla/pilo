@@ -12,13 +12,7 @@ interface ActionResult {
 }
 
 interface AriaSnapshotWindow {
-  generateAriaTree: (
-    element: Element,
-    options: { forAI: boolean; refPrefix: string },
-  ) => {
-    elements: Map<string, Element>;
-  };
-  renderAriaTree: (snapshot: any, options: { mode: string; forAI: boolean }) => string;
+  generateAndRenderAriaTree: (root: Element, counter?: { value: number }) => string;
 }
 
 /**
@@ -126,45 +120,22 @@ export class ExtensionBrowser implements AriaBrowser {
         target: { tabId: tab.id! },
         func: () => {
           const win = window as Window & AriaSnapshotWindow;
-          // Check if content script functions are available
-          if (
-            typeof win.generateAriaTree !== "function" ||
-            typeof win.renderAriaTree !== "function"
-          ) {
+          if (typeof win.generateAndRenderAriaTree !== "function") {
             throw new Error(
               "Content script functions not available. Page may not be fully loaded.",
             );
           }
 
-          // Use the globally available functions from content script
-          const snapshot = win.generateAriaTree(document.body, {
-            forAI: true,
-            refPrefix: "s1",
-          });
-
-          // Add aria-ref attributes to DOM elements for fast lookup
-          // This extends the vendored code without modifying it
-          for (const [ref, element] of snapshot.elements.entries()) {
-            element.setAttribute("aria-ref", ref);
-          }
-
-          const renderedText = win.renderAriaTree(snapshot, {
-            mode: "raw",
-            forAI: true,
-          });
-
-          // Return just the rendered text - elements can be looked up via aria-ref attributes
-          return {
-            renderedText,
-          };
+          // generateAndRenderAriaTree handles everything:
+          // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-spark-ref', ref), YAML rendering
+          return win.generateAndRenderAriaTree(document.body);
         },
       });
 
-      // Script succeeded, return the rendered text
-      const snapshotData = result as { renderedText: string };
-      this.logger.debug("ARIA tree generated and aria-ref attributes set", { tabId: tab.id });
+      const yaml = result as string;
+      this.logger.debug("ARIA tree generated and data-spark-ref attributes set", { tabId: tab.id });
       this.logger.info("getTreeWithRefs() completed successfully", { tabId: tab.id });
-      return snapshotData.renderedText;
+      return yaml;
     } catch (error) {
       this.logger.error("getTreeWithRefs execution error", { tabId: tab.id }, error);
       return `Page title: ${tab.title || "Unknown"}\nURL: ${tab.url || "Unknown"}\nFailed to analyze page content.`;
@@ -237,15 +208,49 @@ export class ExtensionBrowser implements AriaBrowser {
     }
   }
 
-  async getScreenshot(): Promise<Buffer> {
+  async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     const tab = await this.getActiveTab();
-    const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
-      format: "png",
-    });
 
-    // Convert data URL to Buffer
-    const base64Data = dataUrl.split(",")[1];
-    return Buffer.from(base64Data, "base64");
+    // Apply SoM overlay before screenshot if requested.
+    // Failures are non-fatal — a plain screenshot is still useful.
+    if (options?.withMarks) {
+      try {
+        await this.ensureContentScript();
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id! },
+          func: () => {
+            const win = window as any;
+            win.applySetOfMarks?.();
+          },
+        });
+      } catch {
+        // Can fail if content script isn't loaded or tab navigated
+      }
+    }
+
+    try {
+      const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
+        format: "png",
+      });
+
+      // Convert data URL to Buffer
+      const base64Data = dataUrl.split(",")[1];
+      return Buffer.from(base64Data, "base64");
+    } finally {
+      if (options?.withMarks) {
+        try {
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id! },
+            func: () => {
+              const win = window as any;
+              win.removeSetOfMarks?.();
+            },
+          });
+        } catch {
+          // Tab may have navigated between screenshot and cleanup
+        }
+      }
+    }
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
@@ -348,8 +353,8 @@ export class ExtensionBrowser implements AriaBrowser {
         func: (paramsJson: string) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
-          // Look up the element using the aria-ref attribute that's now set by ariaSnapshot
-          const element = document.querySelector(`[aria-ref="${refParam}"]`);
+          // Look up the element using the data-spark-ref attribute that's now set by ariaSnapshot
+          const element = document.querySelector(`[data-spark-ref="${refParam}"]`);
 
           if (!element) {
             return {
@@ -357,6 +362,9 @@ export class ExtensionBrowser implements AriaBrowser {
               error: `Element with ref ${refParam} not found in DOM`,
             };
           }
+
+          // Scroll element into view so the user can follow along
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
 
           try {
             switch (actionParam) {
@@ -563,10 +571,10 @@ export class ExtensionBrowser implements AriaBrowser {
     await new Promise((resolve) => setTimeout(resolve, this.PAGE_SETTLE_TIME_MS));
   }
 
-  // Clear aria-ref attributes from previous page
+  // Clear data-spark-ref attributes from previous page
   private clearAriaRefs(): void {
     // No need to clear anything - new page will have new DOM
-    // aria-ref attributes will be set fresh on next getText() call
+    // data-spark-ref attributes will be set fresh on next getText() call
   }
 
   // Handle page transition: wait for page to be ready
@@ -590,9 +598,7 @@ export class ExtensionBrowser implements AriaBrowser {
           target: { tabId: tab.id! },
           func: () => {
             const win = window as Window & AriaSnapshotWindow;
-            return (
-              typeof win.generateAriaTree === "function" && typeof win.renderAriaTree === "function"
-            );
+            return typeof win.generateAndRenderAriaTree === "function";
           },
         });
 

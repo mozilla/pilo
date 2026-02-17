@@ -14,30 +14,7 @@
  * limitations under the License.
  */
 
-type GlobalOptions = {
-  browserNameForWorkarounds?: string;
-  inputFileRoleTextbox?: boolean;
-};
-let globalOptions: GlobalOptions = {};
-export function setGlobalOptions(options: GlobalOptions) {
-  globalOptions = options;
-}
-export function getGlobalOptions(): GlobalOptions {
-  return globalOptions;
-}
-
-export function isInsideScope(scope: Node, element: Element | undefined): boolean {
-  while (element) {
-    if (scope.contains(element)) return true;
-    element = enclosingShadowHost(element);
-  }
-  return false;
-}
-
-export function enclosingElement(node: Node) {
-  if (node.nodeType === 1 /* Node.ELEMENT_NODE */) return node as Element;
-  return node.parentElement ?? undefined;
-}
+import type { Box } from "./types.js";
 
 export function parentElementOrShadowHost(element: Element): Element | undefined {
   if (element.parentElement) return element.parentElement;
@@ -93,16 +70,10 @@ export function isElementStyleVisibilityVisible(
 ): boolean {
   style = style ?? getElementComputedStyle(element);
   if (!style) return true;
-  // Element.checkVisibility checks for content-visibility and also looks at
-  // styles up the flat tree including user-agent ShadowRoots, such as the
-  // details element for example.
-  // All the browser implement it, but WebKit has a bug which prevents us from using it:
-  // https://bugs.webkit.org/show_bug.cgi?id=264733
   // @ts-ignore
-  if (Element.prototype.checkVisibility && globalOptions.browserNameForWorkarounds !== "webkit") {
+  if (Element.prototype.checkVisibility) {
     if (!element.checkVisibility()) return false;
   } else {
-    // Manual workaround for WebKit that does not have checkVisibility.
     const detailsOrSummary = element.closest("details,summary");
     if (
       detailsOrSummary !== element &&
@@ -115,18 +86,10 @@ export function isElementStyleVisibilityVisible(
   return true;
 }
 
-export type Box = {
-  visible: boolean;
-  rect?: DOMRect;
-  style?: CSSStyleDeclaration;
-};
-
 export function box(element: Element): Box {
-  // Note: this logic should be similar to waitForDisplayedAtStablePosition() to avoid surprises.
   const style = getElementComputedStyle(element);
   if (!style) return { visible: true };
   if (style.display === "contents") {
-    // display:contents is not rendered itself, but its child nodes are.
     for (let child = element.firstChild; child; child = child.nextSibling) {
       if (child.nodeType === 1 /* Node.ELEMENT_NODE */ && isElementVisible(child as Element))
         return { visible: true, style };
@@ -145,7 +108,6 @@ export function isElementVisible(element: Element): boolean {
 }
 
 export function isVisibleTextNode(node: Text) {
-  // https://stackoverflow.com/questions/1461059/is-there-an-equivalent-to-getboundingclientrect-for-text-nodes
   const range = node.ownerDocument.createRange();
   range.selectNode(node);
   const rect = range.getBoundingClientRect();
@@ -153,9 +115,6 @@ export function isVisibleTextNode(node: Text) {
 }
 
 export function elementSafeTagName(element: Element) {
-  // Named inputs, e.g. <input name=tagName>, will be exposed as fields on the parent <form>
-  // and override its properties.
   if (element instanceof HTMLFormElement) return "FORM";
-  // Elements from the svg namespace do not have uppercase tagName right away.
   return element.tagName.toUpperCase();
 }

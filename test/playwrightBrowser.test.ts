@@ -631,7 +631,7 @@ describe("PlaywrightBrowser", () => {
 
         const result = await (browser as any).validateElementRef("valid");
         expect(result).toBe(mockLocator);
-        expect(mockPage.locator).toHaveBeenCalledWith("aria-ref=valid");
+        expect(mockPage.locator).toHaveBeenCalledWith('[data-spark-ref="valid"]');
       });
     });
 
@@ -672,6 +672,7 @@ describe("PlaywrightBrowser", () => {
       it("should throw BrowserActionException for missing value in Fill action", async () => {
         const mockLocator = {
           count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
           fill: vi.fn(),
         };
         const mockPage = {
@@ -690,6 +691,7 @@ describe("PlaywrightBrowser", () => {
       it("should throw BrowserActionException for missing value in Select action", async () => {
         const mockLocator = {
           count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
           selectOption: vi.fn(),
         };
         const mockPage = {
@@ -708,6 +710,7 @@ describe("PlaywrightBrowser", () => {
       it("should throw BrowserActionException for missing value in FillAndEnter action", async () => {
         const mockLocator = {
           count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
           fill: vi.fn(),
           press: vi.fn(),
         };
@@ -759,6 +762,7 @@ describe("PlaywrightBrowser", () => {
       it("should wrap unexpected errors in BrowserActionException", async () => {
         const mockLocator = {
           count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
           click: vi.fn().mockRejectedValue(new Error("Network error")),
         };
         const mockPage = {

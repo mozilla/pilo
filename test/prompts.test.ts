@@ -227,7 +227,7 @@ describe("prompts", () => {
     });
 
     it("should include ref format examples", () => {
-      expect(actionLoopSystemPrompt).toContain("e###");
+      expect(actionLoopSystemPrompt).toContain("ref=E###");
       expect(actionLoopSystemPrompt).toContain("element refs from page snapshot");
     });
 

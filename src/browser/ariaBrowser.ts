@@ -80,7 +80,7 @@ export interface AriaBrowser {
   getMarkdown(): Promise<string>;
 
   /** Captures and returns a screenshot of the current page */
-  getScreenshot(): Promise<Buffer>;
+  getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer>;
 
   /**
    * Performs an action on an element in the accessibility tree.
