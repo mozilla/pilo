@@ -13,6 +13,7 @@ import * as path from "path";
 import { MetricsCollector } from "spark-core/loggers/metricsCollector.js";
 import { Logger } from "spark-core/loggers/types.js";
 import { SecretsRedactor } from "spark-core/loggers/secretsRedactor.js";
+import { ensureBrowsersInstalled } from "../browserSetup.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks.
@@ -38,6 +39,9 @@ export function createRunCommand(): Command {
  */
 async function executeRunCommand(task: string, options: any): Promise<void> {
   try {
+    // Check if browsers are installed before proceeding
+    await ensureBrowsersInstalled();
+
     // Get merged config (defaults < global config < env vars)
     const cfg = config.getConfig();
 

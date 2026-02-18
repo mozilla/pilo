@@ -88,6 +88,11 @@ vi.mock("spark-core/events.js", () => ({
   }),
 }));
 
+// Mock browserSetup - browsers should be considered installed in tests
+vi.mock("../../src/browserSetup.js", () => ({
+  ensureBrowsersInstalled: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { WebAgent } from "spark-core/webAgent.js";
 import { PlaywrightBrowser } from "spark-core/browser/playwrightBrowser.js";
 import { config } from "spark-core/config.js";

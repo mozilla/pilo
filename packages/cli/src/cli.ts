@@ -8,6 +8,7 @@ import { config } from "spark-core/config.js";
 import { createRunCommand } from "./commands/run.js";
 import { createConfigCommand } from "./commands/config.js";
 import { createExamplesCommand } from "./commands/examples.js";
+import { createExtensionCommand } from "./commands/extension.js";
 import { getPackageInfo } from "./utils.js";
 
 /**
@@ -35,9 +36,9 @@ program
 
 // Pre-action hook: require config file in production mode
 program.hook("preAction", (thisCommand) => {
-  // Skip config check for config command and version/help flags
+  // Skip config check for config and extension commands and version/help flags
   const commandName = thisCommand.name();
-  if (commandName === "config") {
+  if (commandName === "config" || commandName === "extension") {
     return;
   }
 
@@ -62,6 +63,7 @@ program.hook("preAction", (thisCommand) => {
 program.addCommand(createRunCommand());
 program.addCommand(createConfigCommand());
 program.addCommand(createExamplesCommand());
+program.addCommand(createExtensionCommand());
 
 // Parse command line arguments
 program.parse();
