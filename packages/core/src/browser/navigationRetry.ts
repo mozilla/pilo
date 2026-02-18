@@ -15,7 +15,7 @@ export interface NavigationRetryConfig {
   onRetry?: (attempt: number, error: Error, nextTimeoutMs: number) => void;
 }
 
-import { getConfigDefaults } from "../configDefaults.js";
+import { getConfigDefaults } from "../config/defaults.js";
 
 /** Default navigation retry configuration derived from schema defaults */
 export const DEFAULT_NAVIGATION_RETRY_CONFIG: NavigationRetryConfig = (() => {
