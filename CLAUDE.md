@@ -32,8 +32,10 @@ pnpm check             # Run format + typecheck + test (full validation)
 
 ```bash
 pnpm spark <command>   # Run spark CLI locally (uses tsx)
-pnpm spark run "task"  # Run an automation task
-pnpm spark config      # Configure AI provider settings
+pnpm spark run "task"  # Run an automation task (auto-installs browsers if needed)
+pnpm spark config init # Create config file
+pnpm spark config show # View current settings
+pnpm spark extension install [firefox|chrome]  # Install browser extension
 ```
 
 ### Installation & Setup
@@ -126,7 +128,31 @@ Spark supports multiple AI providers:
 - Ollama
 - Vertex AI
 
-Configure with: `pnpm spark config --init`
+### Configuration System
+
+The configuration system has been refactored into a modular architecture in `packages/core/src/config/`:
+
+- **defaults.ts**: Type definitions, field definitions, and default values (browser-compatible)
+- **configManager.ts**: Singleton config manager with build-mode-aware resolution
+- **globalConfig.ts**: File I/O operations with XDG-compliant paths (`~/.config/spark/`)
+- **envParser.ts**: Environment variable parsing and normalization
+- **helpers.ts**: CLI option generation utilities
+
+### Config Commands
+
+Configuration is now managed via subcommands:
+
+```bash
+pnpm spark config init         # Create empty config file
+pnpm spark config show         # Display current config
+pnpm spark config set <key>=<value>  # Set a value
+pnpm spark config get <key>    # Get a value
+pnpm spark config reset        # Reset to defaults
+```
+
+**Config file location**: `~/.config/spark/config.json` (XDG-compliant on Linux/macOS)
+
+In production mode (when installed via npm), the CLI requires a config file to exist. Run `spark config init` to create one.
 
 ## Security - Secret Scanning
 
