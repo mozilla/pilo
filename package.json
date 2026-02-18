@@ -18,7 +18,8 @@
     "format": "prettier --write . --list-different",
     "format:check": "prettier --check .",
     "release": "./scripts/release.sh",
-    "check": "pnpm run format && pnpm run typecheck && pnpm run test"
+    "check": "pnpm run format && pnpm run typecheck && pnpm run test",
+    "ci": "pnpm run format:check && pnpm run typecheck && pnpm run test"
   },
   "keywords": [
     "ai",
