@@ -13,6 +13,7 @@ import * as path from "path";
 import { MetricsCollector } from "spark-core/loggers/metricsCollector.js";
 import { Logger } from "spark-core/loggers/types.js";
 import { SecretsRedactor } from "spark-core/loggers/secretsRedactor.js";
+import { checkBrowserForRun } from "../browserSetup.js";
 
 /**
  * Creates the 'run' command for executing web automation tasks.
@@ -27,6 +28,9 @@ export function createRunCommand(): Command {
   // Add all CLI options from schema
   addConfigOptions(command);
 
+  // Add browser check flag
+  command.option("--skip-browser-check", "Skip checking if browser is installed", false);
+
   // Set action handler
   command.action(executeRunCommand);
 
@@ -40,6 +44,27 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
   try {
     // Get merged config (defaults < global config < env vars)
     const cfg = config.getConfig();
+
+    // Validate and check browser option
+    const browserOption = options.browser ?? cfg.browser;
+
+    // Validate browser option
+    if (!validateBrowser(browserOption)) {
+      console.error(chalk.red.bold("❌ Error: Invalid browser option"));
+      console.log(chalk.gray(`Browser: ${browserOption}`));
+      console.log(chalk.gray(`Valid browsers: ${getValidBrowsers().join(", ")}`));
+      process.exit(1);
+    }
+
+    // Check if required browser is installed (unless skipped)
+    const skipBrowserCheck = options.skipBrowserCheck ?? false;
+
+    const browserAvailable = await checkBrowserForRun(browserOption, skipBrowserCheck);
+
+    if (!browserAvailable) {
+      console.error(chalk.red.bold("\n❌ Browser not available. Cannot proceed."));
+      process.exit(1);
+    }
 
     // Parse JSON data if provided
     let parsedData = null;
@@ -62,17 +87,6 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
           "image" | "stylesheet" | "font" | "media" | "manifest"
         >)
       : [];
-
-    // Merge CLI options with config (CLI takes precedence)
-    const browserOption = options.browser ?? cfg.browser;
-
-    // Validate browser option
-    if (!validateBrowser(browserOption)) {
-      console.error(chalk.red.bold("❌ Error: Invalid browser option"));
-      console.log(chalk.gray(`Browser: ${browserOption}`));
-      console.log(chalk.gray(`Valid browsers: ${getValidBrowsers().join(", ")}`));
-      process.exit(1);
-    }
 
     // Create logger
     const loggerType = options.logger ?? cfg.logger;

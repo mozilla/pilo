@@ -1,65 +1,68 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { existsSync, unlinkSync } from "fs";
+import { existsSync, unlinkSync, writeFileSync, mkdirSync } from "fs";
 import { config } from "spark-core/config.js";
+import { getConfigPath } from "spark-core/config/globalConfig.js";
 import { getAIProviderInfo } from "spark-core/provider.js";
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";
+import { dirname } from "path";
 
 /**
  * Creates the 'config' command for managing Spark configuration
  */
 export function createConfigCommand(): Command {
-  return new Command("config")
-    .description("Manage Spark configuration")
-    .option("--show", "Show current configuration from all sources")
-    .option("--list", "List configuration sources and values")
-    .option("--get <key>", "Get a specific configuration value")
-    .option("--set <key-value>", "Set a global configuration value (format: key=value)")
-    .option("--unset <key>", "Remove a global configuration value")
-    .option("--init", "Initialize global configuration with guided setup")
-    .option("--reset", "Reset global configuration (removes all settings)")
-    .action(executeConfigCommand);
-}
+  const configCmd = new Command("config").description("Manage Spark configuration");
 
-/**
- * Execute the config command with the provided options
- */
-async function executeConfigCommand(options: any): Promise<void> {
-  const currentConfig = config.getConfig();
+  // spark config init
+  configCmd
+    .command("init")
+    .description("Initialize global configuration file")
+    .action(async () => {
+      await initializeGlobalConfiguration();
+    });
 
-  if (options.show) {
-    await showConfiguration(currentConfig);
-  }
+  // spark config show
+  configCmd
+    .command("show")
+    .description("Show current configuration from all sources")
+    .action(async () => {
+      await showConfiguration();
+    });
 
-  if (options.list) {
-    showConfigurationSources();
-  }
+  // spark config set <key> <value>
+  configCmd
+    .command("set")
+    .description("Set a global configuration value")
+    .argument("<key-value>", "Configuration key=value pair (e.g., browser=chrome)")
+    .action((keyValue: string) => {
+      setConfigurationValue(keyValue);
+    });
 
-  if (options.get) {
-    getConfigurationValue(options.get);
-  }
+  // spark config get <key>
+  configCmd
+    .command("get")
+    .description("Get a specific configuration value")
+    .argument("<key>", "Configuration key to retrieve")
+    .action((key: string) => {
+      getConfigurationValue(key);
+    });
 
-  if (options.set) {
-    setConfigurationValue(options.set);
-  }
+  // spark config reset
+  configCmd
+    .command("reset")
+    .description("Reset global configuration (removes config file)")
+    .action(() => {
+      resetGlobalConfiguration();
+    });
 
-  if (options.unset) {
-    unsetConfigurationValue(options.unset);
-  }
-
-  if (options.init) {
-    await initializeGlobalConfiguration();
-  }
-
-  if (options.reset) {
-    resetGlobalConfiguration();
-  }
+  return configCmd;
 }
 
 /**
  * Show the current configuration from all sources
  */
-async function showConfiguration(currentConfig: any): Promise<void> {
+async function showConfiguration(): Promise<void> {
+  const currentConfig = config.getConfig();
   const aiInfo = getAIProviderInfo();
 
   console.log(chalk.blue.bold("🔧 Current Configuration"));
@@ -84,26 +87,9 @@ async function showConfiguration(currentConfig: any): Promise<void> {
   );
   console.log("");
   const packageInfo = getPackageInfo();
-  console.log(`Config File: ${config.getConfigPath()}`);
+  console.log(`Config File: ${getConfigPath()}`);
   console.log(`Node Version: ${process.version}`);
   console.log(`Spark Version: ${packageInfo.version}`);
-}
-
-/**
- * Show configuration sources and their values for debugging
- */
-function showConfigurationSources(): void {
-  const sources = config.listSources();
-  console.log(chalk.blue.bold("🔧 Configuration Sources"));
-  console.log("");
-  console.log(chalk.white.bold("Global Config:"));
-  console.log(JSON.stringify(sources.global, null, 2));
-  console.log("");
-  console.log(chalk.white.bold("Environment Variables:"));
-  console.log(JSON.stringify(sources.env, null, 2));
-  console.log("");
-  console.log(chalk.white.bold("Merged (Final):"));
-  console.log(JSON.stringify(sources.merged, null, 2));
 }
 
 /**
@@ -131,20 +117,7 @@ function setConfigurationValue(keyValue: string): void {
     console.log(chalk.green(`✅ Set ${key} = ${value}`));
   } catch (error) {
     console.error(chalk.red("❌ Error:"), error instanceof Error ? error.message : String(error));
-    console.log(chalk.gray("Example: spark config --set browser=chrome"));
-    process.exit(1);
-  }
-}
-
-/**
- * Remove a global configuration value
- */
-function unsetConfigurationValue(key: string): void {
-  try {
-    config.unset(key as any);
-    console.log(chalk.green(`✅ Removed ${key}`));
-  } catch (error) {
-    console.error(chalk.red("❌ Error:"), error instanceof Error ? error.message : String(error));
+    console.log(chalk.gray("Example: spark config set browser=chrome"));
     process.exit(1);
   }
 }
@@ -153,44 +126,66 @@ function unsetConfigurationValue(key: string): void {
  * Initialize global configuration with guided setup
  */
 async function initializeGlobalConfiguration(): Promise<void> {
-  console.log(chalk.blue.bold("🔧 Initializing Spark Global Configuration"));
-  console.log("");
+  const configPath = getConfigPath();
 
-  const currentConfig = config.getConfig();
-
-  // Check if already configured
-  if (
-    currentConfig.provider &&
-    (currentConfig.openai_api_key || currentConfig.openrouter_api_key)
-  ) {
-    console.log(chalk.yellow("⚠️  Configuration already exists"));
-    console.log(chalk.gray("Current provider: " + (currentConfig.provider || "openai")));
-    console.log(chalk.gray("Use 'spark config --show' to see full configuration"));
-    console.log(chalk.gray("Use 'spark config --set key=value' to modify settings"));
+  // Check if config file already exists
+  if (existsSync(configPath)) {
+    console.log(chalk.yellow("⚠️  Configuration file already exists"));
+    console.log(chalk.gray("Config file: " + configPath));
+    console.log("");
+    console.log(
+      chalk.white("Use ") +
+        chalk.green("spark config show") +
+        chalk.white(" to view configuration"),
+    );
+    console.log(
+      chalk.white("Use ") +
+        chalk.green("spark config set <key>=<value>") +
+        chalk.white(" to modify settings"),
+    );
     return;
   }
 
-  // Guide user through setup
-  console.log(chalk.white.bold("To get started, you need to configure an AI provider:"));
-  console.log("");
-  console.log(chalk.cyan.bold("Option 1: OpenAI (Default)"));
-  console.log("1. Get an API key from " + chalk.underline("https://platform.openai.com/api-keys"));
-  console.log("2. Run: " + chalk.green("pnpm spark config --set openai_api_key=your-key"));
-  console.log("");
-  console.log(chalk.cyan.bold("Option 2: OpenRouter (Alternative)"));
-  console.log("1. Get an API key from " + chalk.underline("https://openrouter.ai/keys"));
-  console.log("2. Run: " + chalk.green("pnpm spark config --set provider=openrouter"));
-  console.log("3. Run: " + chalk.green("pnpm spark config --set openrouter_api_key=your-key"));
-  console.log("");
-  console.log(chalk.white.bold("Verification:"));
-  console.log("Run " + chalk.green("pnpm spark config --show") + " to verify your configuration");
-  console.log("");
-  console.log(chalk.white.bold("Configuration Priority:"));
-  console.log(chalk.gray("1. Environment variables (highest priority)"));
-  console.log(chalk.gray("2. Local .env file (development)"));
-  console.log(chalk.gray("3. Global config file (lowest priority)"));
-  console.log("");
-  console.log(chalk.gray("Global config saved to: " + config.getConfigPath()));
+  // Create empty config file
+  try {
+    const configDir = dirname(configPath);
+    if (!existsSync(configDir)) {
+      mkdirSync(configDir, { recursive: true });
+    }
+
+    writeFileSync(configPath, JSON.stringify({}, null, 2), "utf-8");
+    console.log(chalk.green("✅ Configuration file created successfully"));
+    console.log(chalk.gray("Config file: " + configPath));
+    console.log("");
+    console.log(chalk.blue.bold("🔧 Getting Started"));
+    console.log("");
+    console.log(chalk.white.bold("To configure an AI provider:"));
+    console.log("");
+    console.log(chalk.cyan.bold("Option 1: OpenAI (Default)"));
+    console.log(
+      "1. Get an API key from " + chalk.underline("https://platform.openai.com/api-keys"),
+    );
+    console.log("2. Run: " + chalk.green("spark config set openai_api_key=your-key"));
+    console.log("");
+    console.log(chalk.cyan.bold("Option 2: OpenRouter (Alternative)"));
+    console.log("1. Get an API key from " + chalk.underline("https://openrouter.ai/keys"));
+    console.log("2. Run: " + chalk.green("spark config set provider=openrouter"));
+    console.log("3. Run: " + chalk.green("spark config set openrouter_api_key=your-key"));
+    console.log("");
+    console.log(chalk.white.bold("Verification:"));
+    console.log("Run " + chalk.green("spark config show") + " to verify your configuration");
+    console.log("");
+    console.log(chalk.white.bold("Configuration Priority:"));
+    console.log(chalk.gray("1. Environment variables (highest priority)"));
+    console.log(chalk.gray("2. Local .env file (development)"));
+    console.log(chalk.gray("3. Global config file (lowest priority)"));
+  } catch (error) {
+    console.error(
+      chalk.red("❌ Error creating configuration file:"),
+      error instanceof Error ? error.message : String(error),
+    );
+    process.exit(1);
+  }
 }
 
 /**
@@ -198,14 +193,14 @@ async function initializeGlobalConfiguration(): Promise<void> {
  */
 function resetGlobalConfiguration(): void {
   try {
-    const configPath = config.getConfigPath();
+    const configPath = getConfigPath();
 
     if (existsSync(configPath)) {
       unlinkSync(configPath);
       console.log(chalk.green("✅ Global configuration reset successfully"));
       console.log(chalk.gray("Config file removed: " + configPath));
       console.log("");
-      console.log(chalk.white("To get started again, run: ") + chalk.green("spark config --init"));
+      console.log(chalk.white("To get started again, run: ") + chalk.green("spark config init"));
     } else {
       console.log(chalk.yellow("⚠️  No global configuration found to reset"));
       console.log(chalk.gray("Config file: " + configPath));

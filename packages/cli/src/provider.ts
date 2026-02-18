@@ -1,2 +1,2 @@
 // Re-export shared provider system
-export { createAIProvider, getAIProviderInfo } from "spark/provider.js";
+export { createAIProvider, getAIProviderInfo } from "spark-core/provider.js";
