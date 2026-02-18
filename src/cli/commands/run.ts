@@ -100,6 +100,10 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       proxyPassword: options.proxyPassword ?? cfg.proxy_password,
       pwEndpoint: options.pwEndpoint ?? cfg.pw_endpoint,
       pwCdpEndpoint: options.pwCdpEndpoint ?? cfg.pw_cdp_endpoint,
+      pwCdpEndpoints:
+        (options.pwCdpEndpoints as string[] | undefined) ??
+        cfg.pw_cdp_endpoints ??
+        (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
       actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
       navigationRetry: {
         baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,

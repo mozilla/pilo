@@ -65,7 +65,7 @@ function coerceValue(
   value: string,
   type: ConfigFieldType,
   envVar?: string,
-): string | number | boolean | undefined {
+): string | string[] | number | boolean | undefined {
   switch (type) {
     case "boolean": {
       const lower = value.toLowerCase();
@@ -90,6 +90,11 @@ function coerceValue(
       }
       return num;
     }
+    case "string[]":
+      return value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     case "string":
     case "enum":
       return value;
@@ -183,6 +188,16 @@ export function addConfigOptions(command: Command, exclude: string[] = []): Comm
     // For numbers, use argParser to return actual numbers
     if (field.type === "number") {
       option.argParser(parseFloat);
+    }
+
+    // For string arrays, use argParser to split comma-separated values
+    if (field.type === "string[]") {
+      option.argParser((val: string) =>
+        val
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
     }
 
     // Don't set Commander defaults - our config system handles defaults via

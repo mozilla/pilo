@@ -4,6 +4,7 @@ import type {
   ActionExecutionEventData,
   ActionResultEventData,
   AgentStepEventData,
+  CdpEndpointCycleEventData,
   CompressionDebugEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
@@ -81,6 +82,9 @@ export class ChalkConsoleLogger implements Logger {
 
     // AI events
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+
+    // CDP failover events
+    emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
   }
 
   dispose(): void {
@@ -128,6 +132,9 @@ export class ChalkConsoleLogger implements Logger {
       // AI events
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
 
+      // CDP failover events
+      this.emitter.offEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
+
       // Reset emitter reference
       this.emitter = null;
     }
@@ -141,6 +148,8 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.gray(`Browser: ${data.browserName}`));
     if (data.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${data.pwEndpoint}`));
     if (data.pwCdpEndpoint) console.log(chalk.gray(`CDP endpoint: ${data.pwCdpEndpoint}`));
+    else if (data.pwCdpEndpoints?.length)
+      console.log(chalk.gray(`CDP endpoint: ${data.pwCdpEndpoints[0]}`));
     if (data.proxy) console.log(chalk.gray(`Proxy: ${data.proxy}`));
     if (data.url) console.log(chalk.gray(`Starting URL: ${data.url}`));
     if (data.guardrails) console.log(chalk.gray(`Guardrails: ${data.guardrails}`));
@@ -292,6 +301,13 @@ export class ChalkConsoleLogger implements Logger {
 
   private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
     console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
+  };
+
+  private handleCdpEndpointCycle = (data: CdpEndpointCycleEventData): void => {
+    console.warn(
+      chalk.yellow(`⚠️ CDP endpoint attempt ${data.attempt} failed, trying next...`),
+      chalk.gray(`(${data.error})`),
+    );
   };
 
   private handleTaskMetrics = (data: TaskMetricsEventData): void => {

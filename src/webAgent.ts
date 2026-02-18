@@ -10,7 +10,7 @@
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
-import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
+import { CdpEndpointCycleEventData, WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
@@ -220,6 +220,18 @@ export class WebAgent {
 
     // Initialize logger with event emitter
     this.logger.initialize(this.eventEmitter);
+
+    // Wire up CDP endpoint cycle callback so browser failover events flow through the event system
+    const browserAny = this.browser as any;
+    if ("onCdpEndpointCycle" in browserAny) {
+      browserAny.onCdpEndpointCycle = (attempt: number, error: Error): void => {
+        const data: Omit<CdpEndpointCycleEventData, "timestamp" | "iterationId"> = {
+          attempt,
+          error: error.message,
+        };
+        this.emit(WebAgentEventType.CDP_ENDPOINT_CYCLE, data);
+      };
+    }
   }
 
   /**
@@ -1270,6 +1282,7 @@ export class WebAgent {
       data: this.data,
       pwEndpoint: (this.browser as any).pwEndpoint,
       pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
+      pwCdpEndpoints: (this.browser as any).pwCdpEndpoints,
       proxy: (this.browser as any).proxyServer,
       vision: this.vision,
     });

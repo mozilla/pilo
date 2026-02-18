@@ -39,6 +39,9 @@ export enum WebAgentEventType {
   // System/Debug
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
+
+  // CDP endpoint failover
+  CDP_ENDPOINT_CYCLE = "cdp:endpoint_cycle",
 }
 
 /**
@@ -60,12 +63,23 @@ export interface TaskSetupEventData extends WebAgentEventData {
   data?: any;
   pwEndpoint?: string;
   pwCdpEndpoint?: string;
+  pwCdpEndpoints?: string[];
   proxy?: string;
   vision?: boolean;
   provider?: string;
   model?: string;
   hasApiKey?: boolean;
   keySource?: "global" | "env" | "not_set";
+}
+
+/**
+ * Event data when a CDP endpoint fails and the next one is being tried
+ */
+export interface CdpEndpointCycleEventData extends WebAgentEventData {
+  /** 1-based index of the endpoint attempt that failed */
+  attempt: number;
+  /** Error message from the failed connection attempt */
+  error: string;
 }
 
 /**
@@ -284,7 +298,8 @@ export type WebAgentEvent =
       data: ScreenshotCapturedImageEventData;
     }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
-  | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData };
+  | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
+  | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData };
 
 /**
  * Event emitter for WebAgent events

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { PlaywrightBrowser } from "../src/browser/playwrightBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
 import { InvalidRefException, BrowserActionException } from "../src/errors.js";
@@ -793,6 +793,193 @@ describe("PlaywrightBrowser", () => {
         expect(error).toBeInstanceOf(InvalidRefException);
         expect(error.ref).toBe("missing");
       });
+    });
+  });
+
+  describe("CDP endpoint failover", () => {
+    // Mock the playwright chromium module for connection tests
+    vi.mock("playwright", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("playwright")>();
+      return {
+        ...actual,
+        chromium: {
+          ...actual.chromium,
+          connectOverCDP: vi.fn(),
+        },
+      };
+    });
+
+    let mockChromium: { connectOverCDP: ReturnType<typeof vi.fn> };
+
+    beforeEach(async () => {
+      const playwright = await import("playwright");
+      mockChromium = playwright.chromium as any;
+      vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    function makeMockBrowser() {
+      const mockPage = { setDefaultTimeout: vi.fn(), close: vi.fn() };
+      const mockContext = { newPage: vi.fn().mockResolvedValue(mockPage), close: vi.fn() };
+      const mockBrowser = { newContext: vi.fn().mockResolvedValue(mockContext), close: vi.fn() };
+      return { mockBrowser, mockContext, mockPage };
+    }
+
+    it("normalizes singular pwCdpEndpoint to internal array", () => {
+      const browser = new PlaywrightBrowser({ pwCdpEndpoint: "ws://host-a:9222" });
+      expect((browser as any).cdpEndpoints).toEqual(["ws://host-a:9222"]);
+      expect(browser.pwCdpEndpoints).toEqual(["ws://host-a:9222"]);
+    });
+
+    it("uses pwCdpEndpoints (plural) when provided, ignoring singular", () => {
+      const browser = new PlaywrightBrowser({
+        pwCdpEndpoint: "ws://host-a:9222",
+        pwCdpEndpoints: ["ws://host-b:9222", "ws://host-c:9222"],
+      });
+      expect((browser as any).cdpEndpoints).toEqual(["ws://host-b:9222", "ws://host-c:9222"]);
+    });
+
+    it("pwCdpEndpoint getter returns undefined before any connection", () => {
+      const browser = new PlaywrightBrowser({ pwCdpEndpoint: "ws://host-a:9222" });
+      expect(browser.pwCdpEndpoint).toBeUndefined();
+    });
+
+    it("pwCdpEndpoint getter returns active endpoint after successful start()", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP.mockResolvedValue(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+      });
+      await browser.start();
+
+      expect(browser.pwCdpEndpoint).toBe("ws://host-a:9222");
+    });
+
+    it("tries second endpoint when first fails with connection refused", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+      });
+      await browser.start();
+
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(2);
+      expect(browser.pwCdpEndpoint).toBe("ws://host-b:9222");
+    });
+
+    it("tries second endpoint when first times out", async () => {
+      const { errors } = await import("playwright");
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new errors.TimeoutError("Connection timed out"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+      });
+      await browser.start();
+
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(2);
+      expect(browser.pwCdpEndpoint).toBe("ws://host-b:9222");
+    });
+
+    it("throws hard error when all endpoints are exhausted", async () => {
+      mockChromium.connectOverCDP.mockRejectedValue(new Error("ECONNREFUSED"));
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222", "ws://host-c:9222"],
+      });
+
+      await expect(browser.start()).rejects.toThrow("All 3 CDP endpoint(s) failed");
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not cycle on auth/hard errors", async () => {
+      mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+      });
+
+      await expect(browser.start()).rejects.toThrow("HTTP 401 Unauthorized");
+      // Only tried the first endpoint — didn't cycle
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+    });
+
+    it("advances nextStartIndex after successful connection for mid-task restart", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP.mockResolvedValue(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222", "ws://host-c:9222"],
+      });
+
+      await browser.start();
+      expect(mockChromium.connectOverCDP).toHaveBeenLastCalledWith(
+        "ws://host-a:9222",
+        expect.any(Object),
+      );
+      expect((browser as any).nextStartIndex).toBe(1);
+
+      await browser.shutdown();
+      await browser.start();
+      expect(mockChromium.connectOverCDP).toHaveBeenLastCalledWith(
+        "ws://host-b:9222",
+        expect.any(Object),
+      );
+      expect((browser as any).nextStartIndex).toBe(2);
+    });
+
+    it("calls onCdpEndpointCycle callback when cycling", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      const cycleCallback = vi.fn();
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        onCdpEndpointCycle: cycleCallback,
+      });
+      await browser.start();
+
+      expect(cycleCallback).toHaveBeenCalledOnce();
+      expect(cycleCallback).toHaveBeenCalledWith(1, expect.any(Error));
+    });
+
+    it("does not call onCdpEndpointCycle on hard errors", async () => {
+      const cycleCallback = vi.fn();
+      mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        onCdpEndpointCycle: cycleCallback,
+      });
+
+      await expect(browser.start()).rejects.toThrow();
+      expect(cycleCallback).not.toHaveBeenCalled();
+    });
+
+    it("falls through to local launch when cdpEndpoints is empty", () => {
+      // No CDP configured — should not touch connectOverCDP at all
+      // (We just verify the internal state; actual launch isn't tested here)
+      const browser = new PlaywrightBrowser({ browser: "chromium" });
+      expect((browser as any).cdpEndpoints).toEqual([]);
     });
   });
 });
