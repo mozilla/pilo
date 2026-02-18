@@ -12,14 +12,14 @@ WORKDIR /app
 
 # Copy workspace configuration
 COPY pnpm-workspace.yaml ./
-
-# Copy root package files for core spark library
 COPY package.json pnpm-lock.yaml ./
-COPY src ./src
-COPY scripts ./scripts
-COPY tsconfig.json ./
 
-# Copy CLI package files (needed for bin reference in root package.json)
+# Copy core package (required by server)
+COPY packages/core/package.json packages/core/tsconfig.json packages/core/vitest.config.ts ./packages/core/
+COPY packages/core/src ./packages/core/src
+COPY packages/core/scripts ./packages/core/scripts
+
+# Copy CLI package files (needed as dependency)
 COPY packages/cli/package.json packages/cli/tsconfig.json ./packages/cli/
 
 # Copy server package files
@@ -35,11 +35,10 @@ RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
     fi
 
 # Build core spark package first (required by server)
-# Build just the TypeScript in the root (core library)
-RUN pnpm tsc
+RUN pnpm --filter spark-core run build
 
 # Build server package
-RUN pnpm --filter @spark/server run build
+RUN pnpm --filter spark-server run build
 
 # Expose the port
 EXPOSE 3000

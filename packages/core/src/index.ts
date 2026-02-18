@@ -35,7 +35,7 @@ export {
   parseEnvConfig,
   addSchemaOptions,
   addConfigOptions,
-} from "./config.js";
+} from "./config/index.js";
 export type {
   SparkConfig,
   SparkConfigResolved,
@@ -47,9 +47,12 @@ export type {
   Browser,
   ReasoningLevel,
   LoggerType,
-} from "./config.js";
+} from "./config/index.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
 
 // Config merge utilities
 export { mergeWithDefaults, createNavigationRetryConfig } from "./utils/configMerge.js";
+
+// Build mode detection
+export { isProductionMode, isDevelopmentMode, getBuildMode } from "./buildMode.js";

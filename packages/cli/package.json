@@ -1,5 +1,5 @@
 {
-  "name": "@spark/cli",
+  "name": "@tabstack/spark",
   "version": "0.12.0",
   "description": "Spark CLI - AI-powered web automation tool",
   "type": "module",

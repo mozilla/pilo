@@ -6,7 +6,7 @@
  */
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
-import type { SearchProviderName } from "../configDefaults.js";
+import type { SearchProviderName } from "../config/defaults.js";
 
 export interface SearchProvider {
   readonly name: string;

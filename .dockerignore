@@ -64,5 +64,8 @@ packages/extension/
 packages/cli/src/
 packages/cli/dist/
 
-# Scripts
-scripts/
+# Scripts (but keep packages/core/scripts for build)
+/scripts/
+packages/cli/scripts/
+packages/server/scripts/
+packages/extension/scripts/

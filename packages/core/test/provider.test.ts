@@ -85,7 +85,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config, getConfigDefaults } from "../src/config.js";
+import { config, getConfigDefaults } from "../src/config/index.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

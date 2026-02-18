@@ -5,7 +5,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOllama } from "ollama-ai-provider-v2";
-import { config } from "./config.js";
+import { config } from "./config/index.js";
 import { getEnv } from "./utils/env.js";
 
 export interface ProviderConfig {
