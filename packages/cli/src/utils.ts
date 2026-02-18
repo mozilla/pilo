@@ -11,13 +11,7 @@ import { fileURLToPath } from "url";
  */
 export function getPackageInfo(): { version: string; name: string; description: string } {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-<<<<<<<< HEAD:packages/cli/src/utils.ts
   const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
-========
-  const packageJson = JSON.parse(
-    readFileSync(join(__dirname, "../../../../package.json"), "utf-8"),
-  );
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/src/cli/utils.ts
 
   return {
     version: packageJson.version,

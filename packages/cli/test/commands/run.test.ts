@@ -1,22 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 import { createRunCommand } from "../../src/commands/run.js";
 import { getConfigDefaults } from "spark-core/config.js";
-========
-import { createRunCommand } from "../../../src/cli/commands/run.js";
-import { getConfigDefaults } from "../../../../../src/config.js";
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
 
 // Get defaults from schema (used for mocking config.getConfig)
 const schemaDefaults = getConfigDefaults();
 
 // Mock all the dependencies
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/webAgent.js", () => ({
-========
-vi.mock("../../../../../src/webAgent.js", () => ({
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   WebAgent: vi.fn().mockImplementation(function () {
     return {
       execute: vi.fn().mockResolvedValue({
@@ -28,24 +19,15 @@ vi.mock("../../../../../src/webAgent.js", () => ({
   }),
 }));
 
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/browser/playwrightBrowser.js", () => ({
-========
-vi.mock("../../../../../src/browser/playwrightBrowser.js", () => ({
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   PlaywrightBrowser: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
 // Mock the config module to avoid fs dependencies
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/config.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("spark-core/config.js")>();
-========
-vi.mock("../../../../../src/config.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../src/config.js")>();
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   // Return DEFAULTS from getConfig so run command gets proper default values
   return {
     ...actual,
@@ -56,29 +38,17 @@ vi.mock("../../../../../src/config.js", async (importOriginal) => {
   };
 });
 
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/provider.js", () => ({
   createAIProvider: vi.fn(() => ({})),
 }));
 
 vi.mock("spark-core/loggers/chalkConsole.js", () => ({
-========
-vi.mock("../../../../../src/provider.js", () => ({
-  createAIProvider: vi.fn(() => ({})),
-}));
-
-vi.mock("../../../../../src/loggers/chalkConsole.js", () => ({
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   ChalkConsoleLogger: vi.fn().mockImplementation(function () {
     return {};
   }),
 }));
 
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/loggers/json.js", () => ({
-========
-vi.mock("../../../../../src/loggers/json.js", () => ({
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   JSONConsoleLogger: vi.fn().mockImplementation(function () {
     return {};
   }),
@@ -106,11 +76,7 @@ vi.mock("fs", async (importOriginal) => {
 });
 
 // Mock WebAgentEventEmitter
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 vi.mock("spark-core/events.js", () => ({
-========
-vi.mock("../../../../../src/events.js", () => ({
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
   WebAgentEventType: {
     AI_GENERATION: "ai:generation",
   },
@@ -122,7 +88,6 @@ vi.mock("../../../../../src/events.js", () => ({
   }),
 }));
 
-<<<<<<<< HEAD:packages/cli/test/commands/run.test.ts
 import { WebAgent } from "spark-core/webAgent.js";
 import { PlaywrightBrowser } from "spark-core/browser/playwrightBrowser.js";
 import { config } from "spark-core/config.js";
@@ -130,15 +95,6 @@ import { createAIProvider } from "spark-core/provider.js";
 import { ChalkConsoleLogger } from "spark-core/loggers/chalkConsole.js";
 import { JSONConsoleLogger } from "spark-core/loggers/json.js";
 import { WebAgentEventEmitter } from "spark-core/events.js";
-========
-import { WebAgent } from "../../../../../src/webAgent.js";
-import { PlaywrightBrowser } from "../../../../../src/browser/playwrightBrowser.js";
-import { config } from "../../../../../src/config.js";
-import { createAIProvider } from "../../../../../src/provider.js";
-import { ChalkConsoleLogger } from "../../../../../src/loggers/chalkConsole.js";
-import { JSONConsoleLogger } from "../../../../../src/loggers/json.js";
-import { WebAgentEventEmitter } from "../../../../../src/events.js";
->>>>>>>> 2568219 (refactor: move CLI to packages/cli with workspace setup):packages/cli/test/cli/commands/run.test.ts
 import * as fs from "fs";
 
 const mockWebAgent = vi.mocked(WebAgent);
