@@ -12,14 +12,18 @@
     "node": "^22.0.0"
   },
   "scripts": {
-    "build": "tsup",
-    "prebuild": "pnpm --filter spark-core build",
+    "build": "tsup && pnpm run copy-extensions",
+    "prebuild": "pnpm --filter spark-core build && pnpm --filter spark-extension run build:all",
+    "copy-extensions": "mkdir -p dist/extensions && cp ../extension/dist/*.zip dist/extensions/",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.3",

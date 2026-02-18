@@ -1,8 +1,10 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { existsSync } from "fs";
+import { existsSync, copyFileSync, mkdirSync, readdirSync } from "fs";
 import { homedir, platform } from "os";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { isDevelopmentMode } from "spark-core/buildMode.js";
 
 /**
  * Creates the 'extension' command for managing the Spark browser extension
@@ -65,21 +67,52 @@ async function installFirefoxExtension(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(chalk.yellow("⚠️  Extension installation for Firefox coming soon"));
-  console.log("");
-  console.log(chalk.white("In the meantime, you can manually load the extension:"));
-  console.log("");
-  console.log(chalk.white("1. Open Firefox and navigate to:"));
-  console.log(`   ${chalk.cyan("about:debugging#/runtime/this-firefox")}`);
-  console.log("");
-  console.log(chalk.white("2. Click 'Load Temporary Add-on'"));
-  console.log("");
-  console.log(chalk.white("3. Navigate to and select:"));
-  console.log(
-    `   ${chalk.cyan("[spark-installation-path]/packages/extension/dist/manifest.json")}`,
-  );
-  console.log("");
-  console.log(chalk.gray("Profile directory found: " + profileDir));
+  // Get the bundled extension path
+  const extensionZip = getExtensionAssetPath("firefox");
+  if (!extensionZip) {
+    console.error(chalk.red("❌ Error: Firefox extension not found"));
+    console.log("");
+    console.log(chalk.white("The extension may not have been bundled correctly."));
+    if (isDevelopmentMode()) {
+      console.log("");
+      console.log(chalk.white("In development mode, build the extension first:"));
+      console.log(`  ${chalk.green("cd packages/extension && pnpm run build:all")}`);
+    }
+    process.exit(1);
+  }
+
+  // Firefox requires extensions to be in the extensions directory
+  // For unsigned extensions (development), we'll extract to a known location
+  const extensionsDir = join(profileDir, "extensions");
+  mkdirSync(extensionsDir, { recursive: true });
+
+  const targetPath = join(extensionsDir, "spark-extension.xpi");
+
+  try {
+    copyFileSync(extensionZip, targetPath);
+    console.log(chalk.green("✅ Extension copied successfully!"));
+    console.log("");
+    console.log(chalk.white("Extension location:"));
+    console.log(`   ${chalk.cyan(targetPath)}`);
+    console.log("");
+    console.log(
+      chalk.yellow("⚠️  Note: Firefox requires manual installation for unsigned extensions"),
+    );
+    console.log("");
+    console.log(chalk.white("To complete installation:"));
+    console.log("");
+    console.log(chalk.white("1. Open Firefox and navigate to:"));
+    console.log(`   ${chalk.cyan("about:debugging#/runtime/this-firefox")}`);
+    console.log("");
+    console.log(chalk.white("2. Click 'Load Temporary Add-on'"));
+    console.log("");
+    console.log(chalk.white("3. Navigate to and select the manifest.json from:"));
+    console.log(`   ${chalk.cyan(extensionZip.replace(".zip", ""))}`);
+  } catch (error) {
+    console.error(chalk.red("❌ Error copying extension:"));
+    console.error(chalk.red((error as Error).message));
+    process.exit(1);
+  }
 }
 
 /**
@@ -101,21 +134,86 @@ async function installChromeExtension(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(chalk.yellow("⚠️  Extension installation for Chrome coming soon"));
+  // Get the bundled extension path
+  const extensionZip = getExtensionAssetPath("chrome");
+  if (!extensionZip) {
+    console.error(chalk.red("❌ Error: Chrome extension not found"));
+    console.log("");
+    console.log(chalk.white("The extension may not have been bundled correctly."));
+    if (isDevelopmentMode()) {
+      console.log("");
+      console.log(chalk.white("In development mode, build the extension first:"));
+      console.log(`  ${chalk.green("cd packages/extension && pnpm run build:all")}`);
+    }
+    process.exit(1);
+  }
+
+  console.log(
+    chalk.yellow("⚠️  Chrome does not allow programmatic installation outside the Web Store"),
+  );
   console.log("");
-  console.log(chalk.white("In the meantime, you can manually load the extension:"));
+  console.log(chalk.white("Extension location:"));
+  console.log(`   ${chalk.cyan(extensionZip)}`);
   console.log("");
-  console.log(chalk.white("1. Open Chrome and navigate to:"));
+  console.log(chalk.white("To manually load the extension:"));
+  console.log("");
+  console.log(chalk.white("1. Unzip the extension:"));
+  console.log(`   ${chalk.green(`unzip ${extensionZip} -d ~/spark-chrome-extension`)}`);
+  console.log("");
+  console.log(chalk.white("2. Open Chrome and navigate to:"));
   console.log(`   ${chalk.cyan("chrome://extensions/")}`);
   console.log("");
-  console.log(chalk.white("2. Enable 'Developer mode' (toggle in top right)"));
+  console.log(chalk.white("3. Enable 'Developer mode' (toggle in top right)"));
   console.log("");
-  console.log(chalk.white("3. Click 'Load unpacked'"));
+  console.log(chalk.white("4. Click 'Load unpacked'"));
   console.log("");
-  console.log(chalk.white("4. Navigate to and select:"));
-  console.log(`   ${chalk.cyan("[spark-installation-path]/packages/extension/dist/")}`);
+  console.log(chalk.white("5. Select the unzipped directory:"));
+  console.log(`   ${chalk.cyan("~/spark-chrome-extension")}`);
   console.log("");
   console.log(chalk.gray("Profile directory found: " + profileDir));
+}
+
+/**
+ * Get the path to a bundled extension asset
+ * @param browser - The browser to get the extension for (firefox or chrome)
+ * @returns The path to the extension ZIP file, or null if not found
+ */
+function getExtensionAssetPath(browser: "firefox" | "chrome"): string | null {
+  // Determine the base directory based on build mode
+  let baseDir: string;
+
+  if (isDevelopmentMode()) {
+    // In development, extensions are in packages/extension/dist/
+    const currentFile = fileURLToPath(import.meta.url);
+    const cliDir = dirname(dirname(currentFile)); // Go up from dist/commands/ to cli/
+    baseDir = join(cliDir, "..", "extension", "dist");
+  } else {
+    // In production, extensions are bundled in dist/extensions/
+    const currentFile = fileURLToPath(import.meta.url);
+    const distDir = dirname(dirname(currentFile)); // Go up from dist/commands/ to dist/
+    baseDir = join(distDir, "extensions");
+  }
+
+  // Look for the extension ZIP file
+  // The filename pattern is: spark-extension-{version}-{browser}.zip
+  // We'll use a glob pattern to find any version
+  const pattern = browser === "firefox" ? "firefox" : "chrome";
+
+  try {
+    const files = existsSync(baseDir) ? readdirSync(baseDir) : [];
+    const extensionFile = files.find(
+      (f: string) => f.includes(pattern) && f.endsWith(".zip") && !f.includes("sources"),
+    );
+
+    if (extensionFile) {
+      return join(baseDir, extensionFile);
+    }
+  } catch (error) {
+    // Directory doesn't exist or can't be read
+    return null;
+  }
+
+  return null;
 }
 
 /**

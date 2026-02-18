@@ -10,6 +10,7 @@
   "scripts": {
     "build": "wxt build -b chrome",
     "prebuild": "pnpm --filter spark-core build",
+    "build:all": "pnpm run zip:firefox && pnpm run zip:chrome",
     "build:chrome": "wxt build -b chrome",
     "prebuild:chrome": "pnpm --filter spark-core build",
     "build:firefox": "wxt build -b firefox",
