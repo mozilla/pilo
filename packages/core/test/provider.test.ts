@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../src/provider.js";
 
 // Mock the config module
-vi.mock("../src/config.js", () => ({
+vi.mock("../src/config/index.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
