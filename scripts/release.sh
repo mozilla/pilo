@@ -133,7 +133,7 @@ git commit -m "Bump version to $NEW_VERSION"
 
 # Finish git flow release
 log_info "Finishing git flow release..."
-git flow release finish "$NEW_VERSION" -m "Release $NEW_VERSION"
+GIT_MERGE_AUTOEDIT=no GIT_EDITOR=true git flow release finish "$NEW_VERSION"
 
 # Push everything
 log_info "Pushing to remote..."
