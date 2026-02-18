@@ -41,7 +41,11 @@ export enum WebAgentEventType {
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
 
   // CDP endpoint failover
+  CDP_ENDPOINT_CONNECTED = "cdp:endpoint_connected",
   CDP_ENDPOINT_CYCLE = "cdp:endpoint_cycle",
+
+  // Browser reconnect after mid-task disconnect
+  BROWSER_RECONNECTED = "browser:reconnected",
 }
 
 /**
@@ -64,6 +68,8 @@ export interface TaskSetupEventData extends WebAgentEventData {
   pwEndpoint?: string;
   pwCdpEndpoint?: string;
   pwCdpEndpoints?: string[];
+  /** Total number of CDP endpoints configured (index, not URLs) */
+  pwCdpEndpointCount?: number;
   proxy?: string;
   vision?: boolean;
   provider?: string;
@@ -73,13 +79,37 @@ export interface TaskSetupEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data when a CDP endpoint is successfully connected to
+ */
+export interface CdpEndpointConnectedEventData extends WebAgentEventData {
+  /** 1-based index of the endpoint that connected */
+  endpointIndex: number;
+  /** Total number of configured CDP endpoints */
+  total: number;
+}
+
+/**
  * Event data when a CDP endpoint fails and the next one is being tried
  */
 export interface CdpEndpointCycleEventData extends WebAgentEventData {
   /** 1-based index of the endpoint attempt that failed */
   attempt: number;
+  /** Total number of configured CDP endpoints */
+  total: number;
   /** Error message from the failed connection attempt */
   error: string;
+}
+
+/**
+ * Event data when the browser reconnects after a mid-task disconnect
+ */
+export interface BrowserReconnectedEventData extends WebAgentEventData {
+  /** The original starting URL the agent is restarting execution from */
+  startingUrl: string;
+  /** 1-based index of the CDP endpoint now in use */
+  endpointIndex: number;
+  /** Total number of configured CDP endpoints */
+  total: number;
 }
 
 /**
@@ -299,7 +329,9 @@ export type WebAgentEvent =
     }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
-  | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData };
+  | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
+  | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
+  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData };
 
 /**
  * Event emitter for WebAgent events

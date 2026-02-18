@@ -18,6 +18,7 @@ import TurndownService from "turndown";
 import {
   InvalidRefException,
   BrowserActionException,
+  BrowserDisconnectedError,
   NavigationTimeoutException,
   NavigationNetworkException,
 } from "../errors.js";
@@ -53,6 +54,8 @@ export interface PlaywrightBrowserOptions {
   pwCdpEndpoints?: string[];
   /** Called when a CDP endpoint fails and the next one is being tried */
   onCdpEndpointCycle?: (attempt: number, error: Error) => void;
+  /** Called when a CDP endpoint is successfully connected to */
+  onCdpEndpointConnected?: (endpointIndex: number, total: number) => void;
   /** Playwright endpoint URL to connect to remote browser */
   pwEndpoint?: string;
   /** Navigation retry configuration */
@@ -74,7 +77,7 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
  */
 /** Timeout per CDP endpoint connection attempt in milliseconds */
-const CDP_CONNECTION_TIMEOUT_MS = 10_000;
+const CDP_CONNECTION_TIMEOUT_MS = 5_000;
 
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
@@ -96,6 +99,8 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   /** Called when a CDP endpoint fails and the next one is being tried. Can be set after construction. */
   public onCdpEndpointCycle: ((attempt: number, error: Error) => void) | undefined;
+  /** Called when a CDP endpoint is successfully connected to. Can be set after construction. */
+  public onCdpEndpointConnected: ((endpointIndex: number, total: number) => void) | undefined;
 
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
@@ -115,8 +120,9 @@ export class PlaywrightBrowser implements AriaBrowser {
         ? [options.pwCdpEndpoint]
         : [];
 
-    // Initialize callback from options (can also be set directly after construction)
+    // Initialize callbacks from options (can also be set directly after construction)
     this.onCdpEndpointCycle = options.onCdpEndpointCycle;
+    this.onCdpEndpointConnected = options.onCdpEndpointConnected;
   }
 
   get pwEndpoint(): string | undefined {
@@ -418,6 +424,7 @@ export class PlaywrightBrowser implements AriaBrowser {
           timeout: CDP_CONNECTION_TIMEOUT_MS,
         });
         this.nextStartIndex = i + 1;
+        this.onCdpEndpointConnected?.(i + 1, this.cdpEndpoints.length);
         return browser;
       } catch (err) {
         if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
@@ -426,9 +433,6 @@ export class PlaywrightBrowser implements AriaBrowser {
         const attemptNumber = i + 1;
         const remaining = this.cdpEndpoints.length - i - 1;
         if (remaining > 0) {
-          console.warn(
-            `[PlaywrightBrowser] CDP endpoint ${attemptNumber} failed (${err.message}), trying next...`,
-          );
           this.onCdpEndpointCycle?.(attemptNumber, err);
         }
       }
@@ -449,6 +453,18 @@ export class PlaywrightBrowser implements AriaBrowser {
       message.includes("ETIMEDOUT") ||
       message.includes("net::ERR_") ||
       message.includes("NS_ERROR_")
+    );
+  }
+
+  /**
+   * Returns true for errors that indicate the CDP browser session was closed
+   * while the agent was mid-task. Triggers browser restart rather than ordinary
+   * error handling.
+   */
+  private isBrowserDisconnectedError(error: Error): boolean {
+    return (
+      error.message.includes("Target page, context or browser has been closed") ||
+      error.constructor.name === "TargetClosedError"
     );
   }
 
@@ -536,8 +552,19 @@ export class PlaywrightBrowser implements AriaBrowser {
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
 
+    try {
+      return await this.getTreeWithRefsImpl();
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private async getTreeWithRefsImpl(): Promise<string> {
     // Inject the ariaTree bundle and generate snapshot in the main frame
-    const mainResult = await this.page.evaluate(
+    const mainResult = await this.page!.evaluate(
       ({ script }) => {
         // Idempotent injection guard
         const win = window as any;
@@ -554,13 +581,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     );
 
     // Handle cross-origin iframes via Playwright's frame API
-    const frames = this.page.frames();
+    const frames = this.page!.frames();
     const childYamls: string[] = [];
     let counter = mainResult.counterValue;
 
     for (const frame of frames) {
       // Skip the main frame
-      if (frame === this.page.mainFrame()) continue;
+      if (frame === this.page!.mainFrame()) continue;
 
       try {
         const frameResult = await frame.evaluate(
@@ -663,6 +690,11 @@ export class PlaywrightBrowser implements AriaBrowser {
         quality: 80,
         scale: "css",
       });
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      throw error;
     } finally {
       if (options?.withMarks) {
         try {
@@ -828,6 +860,11 @@ export class PlaywrightBrowser implements AriaBrowser {
       // Re-throw browser exceptions as-is
       if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
         throw error;
+      }
+
+      // Surface browser disconnects distinctly so WebAgent can trigger a restart
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
       }
 
       // Wrap other errors

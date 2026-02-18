@@ -46,18 +46,18 @@ a coherent browser state.
 
 ## Design Decisions
 
-| # | Decision |
-|---|---|
-| 1 | `BrowserDisconnectedError extends RecoverableError` — fits the error hierarchy but gets special handling in `runMainLoop` |
-| 2 | Detection lives in `PlaywrightBrowser` methods (not in `WebAgent`) — keeps Playwright internals encapsulated |
-| 3 | Reconnect logic lives in a new `WebAgent.handleBrowserDisconnect()` private method |
-| 4 | Disconnects do NOT increment `consecutiveErrors` or `totalErrors` |
-| 5 | `consecutiveErrors` is reset to 0 on successful reconnect |
-| 6 | After reconnect, navigate to `this.url` (original starting URL, not last page URL) and reset messages via `initializeSystemPromptAndTask()` |
-| 7 | Planning phase state (`this.plan`, `this.successCriteria`, `this.url`, `this.actionItems`) is preserved — only message history is reset |
-| 8 | Iteration counter is NOT reset — the agent continues against the same `maxIterations` budget |
-| 9 | If `browser.start()` throws (endpoints exhausted), it propagates as a hard error → task fails |
-| 10 | `navigateToStartWithRetry` already handles `RecoverableError` → no changes needed there |
+| #   | Decision                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `BrowserDisconnectedError extends RecoverableError` — fits the error hierarchy but gets special handling in `runMainLoop`                   |
+| 2   | Detection lives in `PlaywrightBrowser` methods (not in `WebAgent`) — keeps Playwright internals encapsulated                                |
+| 3   | Reconnect logic lives in a new `WebAgent.handleBrowserDisconnect()` private method                                                          |
+| 4   | Disconnects do NOT increment `consecutiveErrors` or `totalErrors`                                                                           |
+| 5   | `consecutiveErrors` is reset to 0 on successful reconnect                                                                                   |
+| 6   | After reconnect, navigate to `this.url` (original starting URL, not last page URL) and reset messages via `initializeSystemPromptAndTask()` |
+| 7   | Planning phase state (`this.plan`, `this.successCriteria`, `this.url`, `this.actionItems`) is preserved — only message history is reset     |
+| 8   | Iteration counter is NOT reset — the agent continues against the same `maxIterations` budget                                                |
+| 9   | If `browser.start()` throws (endpoints exhausted), it propagates as a hard error → task fails                                               |
+| 10  | `navigateToStartWithRetry` already handles `RecoverableError` → no changes needed there                                                     |
 
 ## Disconnect Detection in `PlaywrightBrowser`
 
@@ -184,12 +184,12 @@ and is converted to a task failure in `execute()`.
 
 ## Error Counting Behavior
 
-| Scenario | `consecutiveErrors` | `totalErrors` |
-|---|---|---|
-| Normal agent error (bad action, timeout, etc.) | +1 | +1 |
-| Browser disconnect, reconnect succeeds | reset to 0 | unchanged |
-| Browser disconnect, reconnect fails (endpoints exhausted) | task fails immediately | N/A |
-| Error after reconnect | +1 from 0 | +1 |
+| Scenario                                                  | `consecutiveErrors`    | `totalErrors` |
+| --------------------------------------------------------- | ---------------------- | ------------- |
+| Normal agent error (bad action, timeout, etc.)            | +1                     | +1            |
+| Browser disconnect, reconnect succeeds                    | reset to 0             | unchanged     |
+| Browser disconnect, reconnect fails (endpoints exhausted) | task fails immediately | N/A           |
+| Error after reconnect                                     | +1 from 0              | +1            |
 
 Disconnects are not agent errors — they're infrastructure failures. The agent gets a
 clean error slate on the new browser.
@@ -227,10 +227,10 @@ export class BrowserDisconnectedError extends RecoverableError {
 Add new event type and data interface:
 
 ```ts
-BROWSER_RECONNECTED = "browser:reconnected"
+BROWSER_RECONNECTED = "browser:reconnected";
 
 export interface BrowserReconnectedEventData extends WebAgentEventData {
-  startingUrl: string;  // The original starting URL the agent is restarting from
+  startingUrl: string; // The original starting URL the agent is restarting from
 }
 ```
 

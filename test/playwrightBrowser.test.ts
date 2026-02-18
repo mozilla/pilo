@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { PlaywrightBrowser } from "../src/browser/playwrightBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
-import { InvalidRefException, BrowserActionException } from "../src/errors.js";
+import {
+  InvalidRefException,
+  BrowserActionException,
+  BrowserDisconnectedError,
+} from "../src/errors.js";
 
 describe("PlaywrightBrowser", () => {
   describe("constructor and options", () => {
@@ -980,6 +984,100 @@ describe("PlaywrightBrowser", () => {
       // (We just verify the internal state; actual launch isn't tested here)
       const browser = new PlaywrightBrowser({ browser: "chromium" });
       expect((browser as any).cdpEndpoints).toEqual([]);
+    });
+  });
+
+  describe("browser disconnect detection", () => {
+    let browser: PlaywrightBrowser;
+
+    beforeEach(() => {
+      browser = new PlaywrightBrowser({ browser: "chromium" });
+      // Inject a mock page so the browser appears started
+      (browser as any).page = {
+        locator: vi.fn(),
+        screenshot: vi.fn(),
+        evaluate: vi.fn(),
+        frames: vi.fn().mockReturnValue([]),
+        mainFrame: vi.fn(),
+        waitForTimeout: vi.fn(),
+        url: vi.fn().mockReturnValue("https://example.com"),
+      };
+    });
+
+    it("throws BrowserDisconnectedError from performAction on target-closed message", async () => {
+      const targetClosedError = new Error("Target page, context or browser has been closed");
+      const mockLocator = {
+        count: vi.fn().mockResolvedValue(1),
+        scrollIntoViewIfNeeded: vi.fn().mockResolvedValue(undefined),
+        click: vi.fn().mockRejectedValue(targetClosedError),
+      };
+      (browser as any).page.locator.mockReturnValue(mockLocator);
+
+      await expect(browser.performAction("s1e1", PageAction.Click)).rejects.toThrow(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("throws BrowserDisconnectedError from performAction on TargetClosedError constructor name", async () => {
+      const err = new Error("some internal playwright message");
+      err.constructor = { name: "TargetClosedError" } as any;
+      Object.defineProperty(err, "constructor", { value: { name: "TargetClosedError" } });
+      const mockLocator = {
+        count: vi.fn().mockResolvedValue(1),
+        scrollIntoViewIfNeeded: vi.fn().mockResolvedValue(undefined),
+        click: vi.fn().mockRejectedValue(err),
+      };
+      (browser as any).page.locator.mockReturnValue(mockLocator);
+
+      await expect(browser.performAction("s1e1", PageAction.Click)).rejects.toThrow(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("wraps non-disconnect errors from performAction as BrowserActionException", async () => {
+      const genericError = new Error("Element not interactable");
+      const mockLocator = {
+        count: vi.fn().mockResolvedValue(1),
+        scrollIntoViewIfNeeded: vi.fn().mockResolvedValue(undefined),
+        click: vi.fn().mockRejectedValue(genericError),
+      };
+      (browser as any).page.locator.mockReturnValue(mockLocator);
+
+      await expect(browser.performAction("s1e1", PageAction.Click)).rejects.toThrow(
+        BrowserActionException,
+      );
+    });
+
+    it("throws BrowserDisconnectedError from getTreeWithRefs on target-closed message", async () => {
+      (browser as any).page.evaluate = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+
+      await expect(browser.getTreeWithRefs()).rejects.toThrow(BrowserDisconnectedError);
+    });
+
+    it("rethrows non-disconnect errors from getTreeWithRefs unchanged", async () => {
+      const evalError = new Error("Script evaluation failed");
+      (browser as any).page.evaluate = vi.fn().mockRejectedValue(evalError);
+
+      await expect(browser.getTreeWithRefs()).rejects.toThrow("Script evaluation failed");
+      await expect(browser.getTreeWithRefs()).rejects.not.toThrow(BrowserDisconnectedError);
+    });
+
+    it("throws BrowserDisconnectedError from getScreenshot on target-closed message", async () => {
+      (browser as any).page.screenshot = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+
+      await expect(browser.getScreenshot()).rejects.toThrow(BrowserDisconnectedError);
+    });
+
+    it("rethrows non-disconnect errors from getScreenshot unchanged", async () => {
+      const screenshotError = new Error("Screenshot capture failed");
+      (browser as any).page.screenshot = vi.fn().mockRejectedValue(screenshotError);
+
+      await expect(browser.getScreenshot()).rejects.toThrow("Screenshot capture failed");
+      await expect(browser.getScreenshot()).rejects.not.toThrow(BrowserDisconnectedError);
     });
   });
 });
