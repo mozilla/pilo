@@ -7,7 +7,7 @@ Spark is an AI-powered web automation library and CLI tool that lets you control
 - **Core library** (`packages/core/`) - Main automation engine (spark-core)
 - **CLI** (`packages/cli/`) - Command-line interface (@tabstack/spark)
 - **Extension** (`packages/extension/`) - Browser extension (spark-extension)
-- **Server** (`packages/server/`) - Server component (@spark/server)
+- **Server** (`packages/server/`) - Server component (spark-server)
 
 ## Common Commands
 
@@ -64,7 +64,7 @@ spark/
 │   ├── cli/                  # CLI tool (@tabstack/spark)
 │   │   ├── package.json
 │   │   └── src/
-│   ├── server/               # Server component (@spark/server)
+│   ├── server/               # Server component (spark-server)
 │   │   ├── package.json
 │   │   └── src/
 │   └── extension/            # Browser extension (spark-extension)
@@ -154,6 +154,41 @@ pnpm spark config reset        # Reset to defaults
 **Config file location**: `~/.config/spark/config.json` (XDG-compliant on Linux/macOS)
 
 In production mode (when installed via npm), the CLI requires a config file to exist. Run `spark config init` to create one.
+
+## Browser Auto-Installation
+
+Spark automatically checks if the required browser is installed before running automation tasks. If the browser is not found, it prompts you to install it.
+
+### How It Works
+
+When you run `spark run "task"`, the CLI:
+
+1. Checks if the browser specified in your config (default: `chromium`) is installed
+2. If not found, offers to install it automatically using Playwright
+3. Prompts for confirmation before installing
+
+### Skipping the Browser Check
+
+You can skip the browser installation check with the `--skip-browser-check` flag:
+
+```bash
+pnpm spark run "task" --skip-browser-check
+```
+
+This is useful in environments where:
+
+- The browser is installed in a non-standard location
+- You are connecting to a remote browser via `--pw-endpoint` or `--pw-cdp-endpoint`
+- You want to proceed even if the browser check fails
+
+### Manual Installation
+
+You can also manually install browsers using Playwright:
+
+```bash
+pnpm playwright install          # Install all browsers
+pnpm playwright install chromium # Install specific browser
+```
 
 ## Security - Secret Scanning
 
