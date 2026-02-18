@@ -157,37 +157,25 @@ In production mode (when installed via npm), the CLI requires a config file to e
 
 ## Browser Auto-Installation
 
-Spark automatically checks if the required browser is installed before running automation tasks. If the browser is not found, it prompts you to install it.
+Spark automatically checks if the required Playwright browser is installed before running automation tasks. If the browser is not found, it prompts you to install it.
 
 ### How It Works
 
-When you run `spark run "task"`, the CLI:
+When you run `spark run "task"` in an interactive environment, the CLI:
 
-1. Checks if the browser specified in your config (default: `chromium`) is installed
-2. If not found, offers to install it automatically using Playwright
+1. Checks if the Playwright browser specified in your config (default: `chromium`) is installed
+2. If not found, offers to install it automatically
 3. Prompts for confirmation before installing
 
-### Skipping the Browser Check
-
-You can skip the browser installation check with the `--skip-browser-check` flag:
-
-```bash
-pnpm spark run "task" --skip-browser-check
-```
-
-This is useful in environments where:
-
-- The browser is installed in a non-standard location
-- You are connecting to a remote browser via `--pw-endpoint` or `--pw-cdp-endpoint`
-- You want to proceed even if the browser check fails
+In non-interactive environments (CI, test, or no TTY), the browser check is automatically skipped.
 
 ### Manual Installation
 
-You can also manually install browsers using Playwright:
+You can also manually install Playwright browsers:
 
 ```bash
-pnpm playwright install          # Install all browsers
-pnpm playwright install chromium # Install specific browser
+pnpm playwright install          # Install all Playwright browsers
+pnpm playwright install chromium # Install specific Playwright browser
 ```
 
 ## Security - Secret Scanning

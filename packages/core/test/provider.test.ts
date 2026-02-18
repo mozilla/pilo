@@ -2,10 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAIProvider, getAIProviderInfo } from "../src/provider.js";
 
 // Mock the config module
-vi.mock("../src/config/index.js", () => ({
+vi.mock("../src/config/configManager.js", () => ({
   config: {
     getConfig: vi.fn(),
   },
+}));
+
+vi.mock("../src/config/defaults.js", () => ({
   getConfigDefaults: vi.fn(() => ({
     provider: "openai",
     browser: "firefox",
@@ -85,7 +88,8 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
   })),
 }));
 
-import { config, getConfigDefaults } from "../src/config/index.js";
+import { config } from "../src/config/configManager.js";
+import { getConfigDefaults } from "../src/config/defaults.js";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

@@ -66,15 +66,13 @@ function installBrowser(browserType?: BrowserType): void {
 /**
  * Check if required browser is installed and prompt for installation if needed
  * @param browserType Browser to check (defaults to chromium)
- * @param skipCheck If true, skip the check entirely
  * @returns true if browser is available, false if user declined installation
  */
 export async function ensureBrowserInstalled(
   browserType: BrowserType = "chromium",
-  skipCheck = false,
 ): Promise<boolean> {
-  // Skip check if requested
-  if (skipCheck) {
+  // In non-interactive environments (CI/test/no-TTY), skip the check
+  if (isNonInteractive()) {
     return true;
   }
 
@@ -87,20 +85,12 @@ export async function ensureBrowserInstalled(
   }
 
   // Browser not installed
-  console.log(chalk.yellow(`\n⚠️ ${browserType} browser is not installed.`));
-
-  // In non-interactive environments, show error and exit
-  if (isNonInteractive()) {
-    console.error(chalk.red("Running in non-interactive environment (CI/test/no-TTY)."));
-    console.error(chalk.gray(`Please install the browser manually:`));
-    console.error(chalk.gray(`  npx playwright install ${browserType}`));
-    return false;
-  }
+  console.log(chalk.yellow(`\n⚠️ Playwright browser '${browserType}' is not installed.`));
 
   // Interactive environment - prompt user
   console.log(chalk.gray("Playwright browsers are required to run Spark automation tasks."));
 
-  const shouldInstall = await promptYesNo(`\nWould you like to install ${browserType} now?`);
+  const shouldInstall = await promptYesNo(`\nWould you like to install the Playwright browser?`);
 
   if (!shouldInstall) {
     console.log(chalk.yellow("\nBrowser installation skipped."));
@@ -140,13 +130,9 @@ function mapBrowserType(sparkBrowser: string): BrowserType {
 /**
  * Check browser installation for a Spark browser option
  * @param sparkBrowser Browser option from CLI/config (e.g., "chrome", "firefox")
- * @param skipCheck If true, skip the check entirely
  * @returns true if browser is available, false otherwise
  */
-export async function checkBrowserForRun(
-  sparkBrowser: string,
-  skipCheck = false,
-): Promise<boolean> {
+export async function checkBrowserForRun(sparkBrowser: string): Promise<boolean> {
   const browserType = mapBrowserType(sparkBrowser);
-  return ensureBrowserInstalled(browserType, skipCheck);
+  return ensureBrowserInstalled(browserType);
 }

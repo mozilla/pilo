@@ -17,9 +17,8 @@ export type {
 export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 
 // Configuration and Provider System
+export { config, ConfigManager } from "./config/configManager.js";
 export {
-  config,
-  ConfigManager,
   CONFIG_SCHEMA,
   FIELDS,
   DEFAULTS,
@@ -32,10 +31,7 @@ export {
   getCliFields,
   getEnvFields,
   getSchemaConfigKeys,
-  parseEnvConfig,
-  addSchemaOptions,
-  addConfigOptions,
-} from "./config/index.js";
+} from "./config/defaults.js";
 export type {
   SparkConfig,
   SparkConfigResolved,
@@ -47,7 +43,9 @@ export type {
   Browser,
   ReasoningLevel,
   LoggerType,
-} from "./config/index.js";
+} from "./config/defaults.js";
+export { parseEnvConfig } from "./config/envParser.js";
+export { addSchemaOptions, addConfigOptions } from "./config/helpers.js";
 export { createAIProvider, getAIProviderInfo } from "./provider.js";
 export type { ProviderConfig } from "./provider.js";
 

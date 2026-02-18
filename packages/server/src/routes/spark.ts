@@ -6,7 +6,7 @@ import { createAIProvider, getAIProviderInfo } from "spark-core/provider.js";
 import { createNavigationRetryConfig } from "spark-core/utils/configMerge.js";
 import { SEARCH_PROVIDERS } from "spark-core/config/defaults.js";
 import type { TaskExecutionResult } from "spark-core/webAgent.js";
-import { config } from "spark-core/config.js";
+import { config } from "spark-core/config/configManager.js";
 import { StreamLogger } from "../StreamLogger.js";
 
 interface ErrorResponse {

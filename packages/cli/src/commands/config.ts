@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync, unlinkSync, writeFileSync, mkdirSync } from "fs";
-import { config } from "spark-core/config.js";
+import { config } from "spark-core/config/configManager.js";
 import { getConfigPath } from "spark-core/config/globalConfig.js";
 import { getAIProviderInfo } from "spark-core/provider.js";
 import { getPackageInfo, parseConfigKeyValue, parseConfigValue } from "../utils.js";

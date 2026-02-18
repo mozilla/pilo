@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";
-import type { SparkConfig } from "../src/config/index.js";
-import { getSchemaConfigKeys, addConfigOptions, DEFAULTS } from "../src/config/index.js";
+import type { SparkConfig } from "../src/config/defaults.js";
+import { getSchemaConfigKeys, DEFAULTS } from "../src/config/defaults.js";
+import { addConfigOptions } from "../src/config/helpers.js";
 
 describe("ConfigManager", () => {
   describe("get() method with default values", () => {

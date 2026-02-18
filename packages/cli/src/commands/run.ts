@@ -2,7 +2,8 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { WebAgent } from "spark-core/webAgent.js";
 import { PlaywrightBrowser } from "spark-core/browser/playwrightBrowser.js";
-import { config, addConfigOptions } from "spark-core/config.js";
+import { config } from "spark-core/config/configManager.js";
+import { addConfigOptions } from "spark-core/config/helpers.js";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import { createAIProvider } from "spark-core/provider.js";
 import { ChalkConsoleLogger } from "spark-core/loggers/chalkConsole.js";
@@ -27,9 +28,6 @@ export function createRunCommand(): Command {
 
   // Add all CLI options from schema
   addConfigOptions(command);
-
-  // Add browser check flag
-  command.option("--skip-browser-check", "Skip checking if browser is installed", false);
 
   // Set action handler
   command.action(executeRunCommand);
@@ -56,10 +54,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       process.exit(1);
     }
 
-    // Check if required browser is installed (unless skipped)
-    const skipBrowserCheck = options.skipBrowserCheck ?? false;
-
-    const browserAvailable = await checkBrowserForRun(browserOption, skipBrowserCheck);
+    // Check if required browser is installed
+    const browserAvailable = await checkBrowserForRun(browserOption);
 
     if (!browserAvailable) {
       console.error(chalk.red.bold("\n❌ Browser not available. Cannot proceed."));
