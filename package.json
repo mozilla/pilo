@@ -1,6 +1,6 @@
 {
   "name": "spark",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "AI-powered web automation library and CLI tool",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
