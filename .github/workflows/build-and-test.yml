@@ -171,13 +171,13 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck CLI
-        run: pnpm --filter @spark/cli run typecheck
+        run: pnpm --filter @tabstack/spark run typecheck
 
       - name: Test CLI
-        run: pnpm --filter @spark/cli run test
+        run: pnpm --filter @tabstack/spark run test
 
       - name: Build CLI
-        run: pnpm --filter @spark/cli run build
+        run: pnpm --filter @tabstack/spark run build
 
   server:
     runs-on: ubuntu-latest
