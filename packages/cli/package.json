@@ -17,6 +17,7 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
+    "spark": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
