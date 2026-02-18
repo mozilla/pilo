@@ -20,6 +20,11 @@ interface ErrorResponse {
   };
 }
 
+// Use error.name rather than error.message to avoid leaking sensitive data
+// (e.g. credentials embedded in proxy URLs that Playwright includes in error messages)
+const errorToString = (error: unknown): string =>
+  error instanceof Error ? error.name : "Unknown error";
+
 const createErrorResponse = (message: string, code: string): ErrorResponse => ({
   success: false,
   error: {
@@ -110,7 +115,7 @@ spark.post("/run", async (c) => {
     } catch (error) {
       return c.json(
         createErrorResponse(
-          `AI provider not configured: ${error instanceof Error ? error.message : String(error)}`,
+          `AI provider not configured: ${errorToString(error)}`,
           "MISSING_API_KEY",
         ),
         500,
@@ -233,7 +238,7 @@ spark.post("/run", async (c) => {
             event: "error",
             data: JSON.stringify(
               createErrorResponse(
-                error instanceof Error ? error.message : "Unknown error",
+                errorToString(error),
                 "TASK_EXECUTION_FAILED",
               ),
             ),
@@ -254,7 +259,7 @@ spark.post("/run", async (c) => {
     console.error("Spark task setup failed:", error);
     return c.json(
       createErrorResponse(
-        error instanceof Error ? error.message : "Unknown error",
+        errorToString(error),
         "TASK_SETUP_FAILED",
       ),
       500,

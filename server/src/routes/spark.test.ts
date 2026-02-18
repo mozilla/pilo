@@ -119,9 +119,7 @@ describe("Spark Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
-      expect(data.error.message).toBe(
-        "AI provider not configured: No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
-      );
+      expect(data.error.message).toBe("AI provider not configured: Error");
       expect(data.error.code).toBe("MISSING_API_KEY");
       expect(data.error.timestamp).toBeDefined();
     });
@@ -165,7 +163,7 @@ describe("Spark Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
-      expect(data.error.message).toContain("not valid JSON");
+      expect(data.error.message).toBe("SyntaxError");
       expect(data.error.code).toBe("TASK_SETUP_FAILED");
       expect(data.error.timestamp).toBeDefined();
     });
