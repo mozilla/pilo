@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPlanAndUrlPrompt,
   buildPlanPrompt,
+  buildPlanWithCurrentUrlPrompt,
   actionLoopSystemPrompt,
+  buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
   buildStepErrorFeedbackPrompt,
@@ -119,6 +121,45 @@ describe("prompts", () => {
     });
   });
 
+  describe("buildPlanWithCurrentUrlPrompt", () => {
+    it("should include the currentUrl in the prompt text", () => {
+      const task = "Make a reservation at this restaurant";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain(
+        "The user is currently on: https://www.opentable.com/r/some-restaurant",
+      );
+      expect(prompt).toContain("Make a reservation at this restaurant");
+    });
+
+    it("should use the includeUrl path with create_plan_with_url", () => {
+      const task = "Book a table here";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain("create_plan_with_url()");
+      expect(prompt).toContain("step-by-step plan and starting URL");
+    });
+
+    it("should not include Starting URL line", () => {
+      const task = "Check the menu";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).not.toContain("Starting URL:");
+    });
+
+    it("should include reference resolution hint", () => {
+      const task = "Reserve at this place";
+      const currentUrl = "https://www.opentable.com/r/some-restaurant";
+      const prompt = buildPlanWithCurrentUrlPrompt(task, currentUrl);
+
+      expect(prompt).toContain("this page");
+      expect(prompt).toContain("this restaurant");
+    });
+  });
+
   describe("actionLoopSystemPrompt", () => {
     it("should contain action loop instructions", () => {
       expect(actionLoopSystemPrompt).toContain("Analyze the current page state");
@@ -175,6 +216,35 @@ describe("prompts", () => {
     it("should include goto restrictions", () => {
       expect(actionLoopSystemPrompt).toContain("previously seen");
       expect(actionLoopSystemPrompt).toContain("goto() only accepts URLs");
+    });
+
+    it("should include reference resolution guidance for demonstrative pronouns", () => {
+      // Test that the prompt explains how to interpret "this/that/these/those + noun"
+      // as referring to content on the current page
+      expect(actionLoopSystemPrompt).toContain("Reference Resolution");
+      expect(actionLoopSystemPrompt).toContain("demonstrative");
+      expect(actionLoopSystemPrompt).toContain('like "this event" or "that restaurant"');
+    });
+
+    it("should include reference resolution guidance with guardrails enabled", () => {
+      const promptWithGuardrails = buildActionLoopSystemPrompt(true);
+      expect(promptWithGuardrails).toContain("Reference Resolution");
+      expect(promptWithGuardrails).toContain("demonstrative");
+      expect(promptWithGuardrails).toContain("current page");
+    });
+
+    it("should include reference resolution guidance without guardrails", () => {
+      const promptWithoutGuardrails = buildActionLoopSystemPrompt(false);
+      expect(promptWithoutGuardrails).toContain("Reference Resolution");
+      expect(promptWithoutGuardrails).toContain("demonstrative");
+      expect(promptWithoutGuardrails).toContain("current page");
+    });
+
+    it("should provide actionable guidance for reference resolution", () => {
+      // Verify the guidance tells the AI what to DO, not just what it means
+      expect(actionLoopSystemPrompt).toContain("Look for the referenced item");
+      expect(actionLoopSystemPrompt).toContain("interact with it");
+      expect(actionLoopSystemPrompt).toContain("page snapshot");
     });
   });
 
