@@ -76,7 +76,7 @@ if (!existsSync(CORE_DIST)) {
 }
 
 // Copy core's flat dist output directly into root dist/.
-// This means dist/index.js, dist/core.js, dist/browser/, etc.
+// This means dist/index.js, dist/browser/, etc.
 // Consumers can then do: import { WebAgent } from "@tabstack/spark"
 const coreEntries = readdirSync(CORE_DIST);
 for (const entry of coreEntries) {
@@ -145,8 +145,6 @@ step("5/5  Verify assembly");
 const required = [
   join(DIST, "index.js"),
   join(DIST, "index.d.ts"),
-  join(DIST, "core.js"),
-  join(DIST, "core.d.ts"),
   join(DIST, "cli", "cli.js"),
   join(DIST, "extension", "chrome", "manifest.json"),
   join(DIST, "extension", "firefox", "manifest.json"),
