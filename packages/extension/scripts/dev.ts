@@ -53,6 +53,15 @@ const proc = spawn(wxtBin, ["-b", browser], {
   env,
 });
 
+// When Ctrl+C is pressed, the OS sends SIGINT to the entire process group,
+// so both wxt and tsx receive it simultaneously. Node.js default SIGINT
+// behavior exits the process with code 130 immediately -- before our "close"
+// handler below has a chance to run and call process.exit(0). Registering an
+// explicit no-op handler suppresses that default, keeping tsx alive long
+// enough for the "close" event to fire and exit cleanly.
+process.on("SIGINT", () => {});
+process.on("SIGTERM", () => {});
+
 proc.on("error", (err) => {
   console.error(`Failed to start wxt: ${err.message}`);
   process.exit(1);
