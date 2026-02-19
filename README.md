@@ -1,6 +1,7 @@
 <h1 align="center">
   Tabstack Pilo
 </h1>
+<p align="center"><big>Tabstack Pilo</big></p>
 <p align="center"><small>pronounced <b>/ˈpaɪloʊ/</b> (PIE-low)</small></p>
 <h2 align="center">AI-powered web automation</h2>
 
