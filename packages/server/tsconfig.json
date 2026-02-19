@@ -29,10 +29,13 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
 
-    // Path aliases: resolve spark-core to source in dev (tsx watch) mode
+    // Path aliases: resolve spark-core to source in dev (tsx watch) mode.
+    // Both entries are required: the bare specifier resolves "spark-core" → index.ts,
+    // and the wildcard resolves subpaths like "spark-core/core" → core.ts.
     "baseUrl": ".",
     "paths": {
-      "spark-core": ["../core/src/index.ts"]
+      "spark-core": ["../core/src/index.ts"],
+      "spark-core/*": ["../core/src/*"]
     }
   },
   "include": ["src/**/*"],
