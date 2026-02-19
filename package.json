@@ -30,10 +30,10 @@
     "clean": "pnpm -r run clean && rm -rf dist",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck",
     "pretest": "pnpm --filter spark-core run bundle:aria",
     "test": "pnpm -r run test",
-    "check": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck && pnpm -r run test",
+    "check": "pnpm run typecheck && pnpm -r run test",
     "release": "./scripts/release.sh"
   },
   "keywords": [

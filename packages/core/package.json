@@ -19,7 +19,7 @@
     }
   },
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist src/browser/ariaTree/bundle.ts",
     "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
     "build": "pnpm run bundle:aria && tsc",
     "pretest": "pnpm run bundle:aria",
