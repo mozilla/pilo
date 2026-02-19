@@ -8,22 +8,12 @@
     "node": "^22.0.0"
   },
   "scripts": {
-    "dev": "node scripts/dev.js",
     "build:chrome": "wxt build -b chrome",
     "build:firefox": "wxt build -b firefox",
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
-    "zip:chrome": "wxt zip -b chrome",
-    "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare",
     "clean": "rm -rf dist .output",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:e2e:chrome": "playwright test",
-    "test:e2e:headless:chrome": "HEADLESS=true playwright test",
-    "test:e2e:ui:chrome": "playwright test --ui"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.20",

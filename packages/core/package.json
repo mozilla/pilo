@@ -25,7 +25,7 @@
     "pretest": "pnpm run bundle:aria",
     "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "test:watch": "pnpm run bundle:aria && vitest"
+    "test:only": "pnpm run bundle:aria && pnpm run test"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.20",
