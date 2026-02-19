@@ -146,7 +146,7 @@ There is no migration from the legacy `~/.spark/` path. If a user has an old con
 
 ### Production vs. Dev Merge Strategy
 
-The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). A build-time `__SPARK_PRODUCTION__` flag is baked into the compiled output by `packages/core/scripts/inject-prod-flag.mjs`.
+The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). The `__SPARK_PRODUCTION__` flag is injected by the root assembly step (`scripts/assemble.js`) using esbuild's `define` option. Individual package builds are always dev mode; only the root assembly produces production artifacts.
 
 | Mode                                    | Merge order                                     | Notes                                                          |
 | --------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
@@ -194,13 +194,12 @@ Internal workspace packages import `spark-core` directly and do not use root-lev
 
 ## Scripts
 
-| Script                                       | Description                                                             |
-| -------------------------------------------- | ----------------------------------------------------------------------- |
-| `scripts/assemble.js`                        | Assembles root publishable package from sub-package build outputs       |
-| `scripts/check-dep-versions.mjs`             | CI: verifies shared dependency version alignment across packages        |
-| `scripts/release.sh`                         | Release automation                                                      |
-| `packages/core/scripts/bundle-aria-tree.ts`  | Generates ariaTree bundle (auto-run during build, not committed)        |
-| `packages/core/scripts/inject-prod-flag.mjs` | Post-compile: replaces `__SPARK_PRODUCTION__` with `true` in dist files |
+| Script                                      | Description                                                                                                            |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `scripts/assemble.js`                       | Assembles root publishable package from sub-package build outputs; injects `__SPARK_PRODUCTION__` via esbuild `define` |
+| `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages                                                       |
+| `scripts/release.sh`                        | Release automation                                                                                                     |
+| `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)                                                       |
 
 ## CI Workflows
 
