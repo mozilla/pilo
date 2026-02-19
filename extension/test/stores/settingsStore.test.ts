@@ -78,9 +78,9 @@ describe("Storage Loading", () => {
     useSettingsStore.setState({
       settings: {
         apiKey: "",
-        apiEndpoint: "https://api.openai.com/v1",
-        model: "gpt-4.1-mini",
-        provider: "openai",
+        apiEndpoint: "",
+        model: "google/gemini-2.5-flash",
+        provider: "openrouter",
       },
       saveStatus: null,
     });
@@ -113,8 +113,8 @@ describe("Storage Loading", () => {
     // Load settings
     await useSettingsStore.getState().loadSettings();
 
-    // Verify provider falls back to openai
-    expect(useSettingsStore.getState().settings.provider).toBe("openai");
+    // Verify provider falls back to openrouter (the default)
+    expect(useSettingsStore.getState().settings.provider).toBe("openrouter");
   });
 
   it("should fallback to default provider for invalid values", async () => {
@@ -129,7 +129,7 @@ describe("Storage Loading", () => {
     // Load settings
     await useSettingsStore.getState().loadSettings();
 
-    // Verify provider falls back to openai
-    expect(useSettingsStore.getState().settings.provider).toBe("openai");
+    // Verify provider falls back to openrouter (the default)
+    expect(useSettingsStore.getState().settings.provider).toBe("openrouter");
   });
 });

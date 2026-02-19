@@ -32,6 +32,9 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
 export const LOGGERS = ["console", "json"] as const;
 export type LoggerType = (typeof LOGGERS)[number];
 
+export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
+export type SearchProviderName = (typeof SEARCH_PROVIDERS)[number];
+
 export type ConfigFieldType = "string" | "number" | "boolean" | "enum";
 
 export type ConfigCategory =
@@ -42,7 +45,8 @@ export type ConfigCategory =
   | "agent"
   | "playwright"
   | "navigation"
-  | "action";
+  | "action"
+  | "search";
 
 // =============================================================================
 // SparkConfig Interface (Manual for Readability)
@@ -106,6 +110,10 @@ export interface SparkConfig {
 
   // Action Configuration
   action_timeout_ms?: number;
+
+  // Search Configuration
+  search_provider?: SearchProviderName;
+  parallel_api_key?: string;
 }
 
 /** SparkConfigResolved type - output type (defaults applied) */
@@ -166,6 +174,10 @@ export interface SparkConfigResolved {
 
   // Action Configuration
   action_timeout_ms: number;
+
+  // Search Configuration
+  search_provider: SearchProviderName;
+  parallel_api_key?: string;
 }
 
 export type ConfigKey = keyof SparkConfigResolved;
@@ -499,11 +511,11 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     category: "playwright",
   },
   bypass_csp: {
-    default: true,
+    default: false,
     type: "boolean",
     cli: "--bypass-csp",
     env: ["SPARK_BYPASS_CSP"],
-    description: "Bypass Content Security Policy",
+    description: "Bypass Content Security Policy (not needed for normal operation)",
     category: "playwright",
   },
 
@@ -555,6 +567,26 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Timeout for page load and element actions in milliseconds",
     category: "action",
   },
+
+  // Search Configuration
+  search_provider: {
+    default: "none",
+    type: "enum",
+    values: SEARCH_PROVIDERS,
+    cli: "--search-provider",
+    placeholder: "name",
+    env: ["SPARK_SEARCH_PROVIDER"],
+    description: "Search provider to use (none disables search tool)",
+    category: "search",
+  },
+  parallel_api_key: {
+    type: "string",
+    cli: "--parallel-api-key",
+    placeholder: "key",
+    env: ["PARALLEL_API_KEY"],
+    description: "Parallel API key for search",
+    category: "search",
+  },
 };
 
 // =============================================================================
@@ -593,6 +625,7 @@ function buildDefaults(): SparkConfigResolved {
     "navigation_max_attempts",
     "navigation_timeout_multiplier",
     "action_timeout_ms",
+    "search_provider",
   ];
 
   for (const field of requiredFields) {

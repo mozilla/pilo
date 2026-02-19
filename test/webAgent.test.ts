@@ -20,6 +20,15 @@ vi.mock("../src/utils/retry.js", () => ({
   generateTextWithRetry: vi.fn(),
 }));
 
+// Mock SearchService so it doesn't actually create providers
+vi.mock("../src/search/searchService.js", () => ({
+  SearchService: {
+    create: vi.fn().mockResolvedValue({
+      search: vi.fn().mockResolvedValue("# Mock Results"),
+    }),
+  },
+}));
+
 const mockStreamText = vi.mocked(streamText);
 const mockGenerateTextWithRetry = vi.mocked(generateTextWithRetry);
 
@@ -182,6 +191,16 @@ class MockBrowser implements AriaBrowser {
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {}
 
   async waitForLoadState(): Promise<void> {}
+
+  async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
+    // Mock implementation that creates a simple temporary tab
+    const mockTab = {
+      goto: async () => {},
+      waitForLoadState: async () => {},
+      getMarkdown: async () => "# Mock Search Results",
+    };
+    return fn(mockTab);
+  }
 
   // Test helpers
   setPageSnapshot(snapshot: string): void {
@@ -489,7 +508,7 @@ describe("WebAgent", () => {
           {
             type: "tool-result",
             toolCallId: "plan_1",
-            toolName: "create_plan_with_url",
+            toolName: "create_plan",
             input: {
               successCriteria: "Search for flights",
               plan: "1. Go to travel site\n2. Search flights",
@@ -545,9 +564,9 @@ describe("WebAgent", () => {
 
       await webAgent.execute("Book a flight to Paris");
 
-      // Check that TASK_SETUP event was emitted with the generated URL
-      const setupEvent = mockLogger.events.find((e) => e.type === WebAgentEventType.TASK_SETUP);
-      expect(setupEvent).toBeDefined();
+      // Should navigate to the planner-provided URL
+      const startedEvent = mockLogger.events.find((e) => e.type === WebAgentEventType.TASK_STARTED);
+      expect(startedEvent?.data.url).toBe("https://travel.example.com");
     });
 
     it("should use provided starting URL in plan", async () => {
@@ -628,6 +647,222 @@ describe("WebAgent", () => {
       await expect(
         webAgent.execute("Test task", { startingUrl: "https://example.com" }),
       ).rejects.toThrow(/Failed to generate plan/);
+    });
+
+    it("should start on about:blank when planner returns no URL", async () => {
+      // Planner returns plan without url (e.g., webSearch-enabled scenario)
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {
+              successCriteria: "Find information",
+              plan: "1. Search the web\n2. Extract data",
+            },
+            output: {
+              successCriteria: "Find information",
+              plan: "1. Search the web\n2. Extract data",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock done for quick completion
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Found it" },
+              output: {
+                action: "done",
+                result: "Found it",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Found it", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      const gotoSpy = vi.spyOn(mockBrowser, "goto");
+
+      await webAgent.execute("Search for something");
+
+      // Should have navigated to about:blank
+      const startedEvent = mockLogger.events.find((e) => e.type === WebAgentEventType.TASK_STARTED);
+      expect(startedEvent?.data.url).toBe("about:blank");
+
+      // Should NOT have called goto (browser already starts at about:blank)
+      expect(gotoSpy).not.toHaveBeenCalled();
+    });
+
+    it("should prefer startingUrl over planner-provided URL", async () => {
+      const startingUrl = "https://user-provided.com";
+
+      // Planner also returns a URL (should be ignored)
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {
+              successCriteria: "Do task",
+              plan: "1. Step one",
+              url: "https://planner-picked.com",
+            },
+            output: {
+              successCriteria: "Do task",
+              plan: "1. Step one",
+              url: "https://planner-picked.com",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Complete", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      await webAgent.execute("Do task", { startingUrl });
+
+      // Should navigate to user-provided URL, not planner's
+      const navigatedEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.BROWSER_NAVIGATED,
+      );
+      expect(navigatedEvent?.data.url).toBe(startingUrl);
+    });
+
+    it("should pass webSearchEnabled to planning prompt when search provider is set", async () => {
+      // Create a WebAgent with a search provider enabled
+      const searchAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        debug: false,
+        vision: false,
+        maxIterations: 10,
+        maxConsecutiveErrors: 5,
+        maxTotalErrors: 15,
+        guardrails: null,
+        eventEmitter,
+        logger: mockLogger,
+        searchProvider: "duckduckgo",
+      });
+
+      // Planner returns no URL (search-first flow)
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {
+              successCriteria: "Find info",
+              plan: "1. Search the web",
+            },
+            output: {
+              successCriteria: "Find info",
+              plan: "1. Search the web",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock done
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Found it" },
+              output: { action: "done", result: "Found it", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Found it", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      await searchAgent.execute("Search for something");
+
+      // Verify the planning prompt contains web search hint
+      const planningCall = mockGenerateTextWithRetry.mock.calls[0][0] as any;
+      expect(planningCall.prompt).toContain("web search available");
+      expect(planningCall.prompt).toContain("url (optional)");
+
+      await searchAgent.close();
     });
   });
 
@@ -2814,20 +3049,18 @@ describe("WebAgent", () => {
       if (secondActionCall && secondActionCall[0].messages) {
         const messages = secondActionCall[0].messages;
 
-        // Find user messages with snapshots (they start with Title:)
+        // Find user messages with snapshots (they contain EXTERNAL-CONTENT page-snapshot)
         const snapshotMessages = messages.filter(
           (msg: any) =>
             msg.role === "user" &&
             typeof msg.content === "string" &&
-            msg.content.startsWith("Title:"),
+            msg.content.includes('<EXTERNAL-CONTENT label="page-snapshot">'),
         );
 
         // If there are multiple snapshot messages, the earlier ones should be clipped
         if (snapshotMessages.length > 1) {
           const firstSnapshot = snapshotMessages[0].content;
-          expect(firstSnapshot).toContain("[clipped for brevity]");
-          // Should not contain the triple backticks anymore
-          expect(firstSnapshot).not.toContain("```");
+          expect(firstSnapshot).toContain("> [clipped for brevity]");
         }
       }
 

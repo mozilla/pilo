@@ -35,6 +35,19 @@ export enum LoadState {
   Load = "load",
 }
 
+/**
+ * Limited interface for temporary tab operations.
+ * Used for "side quest" operations like search that shouldn't affect main page state.
+ */
+export interface TemporaryTab {
+  /** Navigates to the specified URL */
+  goto(url: string): Promise<void>;
+  /** Returns the page content as clean markdown */
+  getMarkdown(): Promise<string>;
+  /** Waits for a specific load state */
+  waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
+}
+
 export interface AriaBrowser {
   /** The name of the browser being used */
   browserName: string;
@@ -67,7 +80,7 @@ export interface AriaBrowser {
   getMarkdown(): Promise<string>;
 
   /** Captures and returns a screenshot of the current page */
-  getScreenshot(): Promise<Buffer>;
+  getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer>;
 
   /**
    * Performs an action on an element in the accessibility tree.
@@ -83,4 +96,12 @@ export interface AriaBrowser {
    * @param options Additional options like timeout
    */
   waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
+
+  /**
+   * Runs a function in an temporary tab, then closes it.
+   * Main page state is preserved. Useful for "side quest" operations like search.
+   * @param fn Function to execute in the temporary tab
+   * @returns The result of the function
+   */
+  runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T>;
 }

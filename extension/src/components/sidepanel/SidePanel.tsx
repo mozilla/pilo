@@ -72,11 +72,12 @@ export default function SidePanel(): ReactElement {
   }, []);
 
   // Show settings automatically if no API key is configured (only after settings load)
+  // API key is optional for Ollama
   useEffect(() => {
-    if (settingsLoaded && !settings.apiKey) {
+    if (settingsLoaded && !settings.apiKey && settings.provider !== "ollama") {
       setCurrentView("settings");
     }
-  }, [settingsLoaded, settings.apiKey]);
+  }, [settingsLoaded, settings.apiKey, settings.provider]);
 
   const loadCurrentTab = async () => {
     try {

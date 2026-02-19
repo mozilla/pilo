@@ -21,17 +21,18 @@ import {
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
-  buildPlanAndUrlPrompt,
   buildPlanPrompt,
   buildStepErrorFeedbackPrompt,
   buildTaskValidationPrompt,
   buildValidationFeedbackPrompt,
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
+import { createSearchTools } from "./tools/searchTools.js";
+import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { nanoid } from "nanoid";
-import { getConfigDefaults } from "./configDefaults.js";
+import { getConfigDefaults, type SearchProviderName } from "./configDefaults.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
@@ -65,6 +66,10 @@ export interface WebAgentOptions {
   maxRepeatedActions?: number;
   /** Number of times to retry initial navigation with browser restart (0 = no retries, default: 1) */
   initialNavigationRetries?: number;
+  /** Search provider to use for web search (default: from config, typically "none") */
+  searchProvider?: SearchProviderName;
+  /** API key for search providers that require authentication (e.g., Parallel) */
+  searchApiKey?: string;
 }
 
 export interface ExecuteOptions {
@@ -125,6 +130,21 @@ interface ExecutionState {
   validationAttempts: number;
 }
 
+interface PlanOutput {
+  plan: string;
+  successCriteria: string;
+  url?: string;
+  actionItems?: string[];
+}
+
+interface PlanningToolResult {
+  output: PlanOutput;
+}
+
+interface PlanningResponse {
+  toolResults: PlanningToolResult[];
+}
+
 type StreamTextResultGeneric = StreamTextResult<any, never>;
 // HACK: cobble together a type from StreamTextResult with promises resolved
 type ProcessedAIResponse = AwaitedProperties<
@@ -143,6 +163,7 @@ export class WebAgent {
   private url: string = "";
   private messages: ModelMessage[] = [];
   private successCriteria: string = "";
+  private actionItems?: string[];
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
@@ -152,6 +173,7 @@ export class WebAgent {
   private compressor: SnapshotCompressor;
   private eventEmitter: WebAgentEventEmitter;
   private logger: Logger;
+  private searchService: SearchService | null = null;
 
   // === Configuration ===
   private readonly providerConfig: ProviderConfig;
@@ -164,6 +186,8 @@ export class WebAgent {
   private readonly maxRepeatedActions: number;
   private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
+  private readonly searchProvider: SearchProviderName;
+  private readonly searchApiKey: string | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -182,6 +206,12 @@ export class WebAgent {
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
+    this.searchProvider = options.searchProvider ?? defaults.search_provider;
+    this.searchApiKey = options.searchApiKey;
+
+    if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
+      throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
+    }
 
     // Initialize services
     this.compressor = new SnapshotCompressor();
@@ -202,20 +232,28 @@ export class WebAgent {
     // 2. Initialize browser and internal state
     await this.initializeBrowserAndState(task, options);
 
+    // 3. Eagerly create search service so provider errors surface before the main loop
+    if (this.searchProvider !== "none") {
+      this.searchService = await SearchService.create(this.searchProvider, this.browser, {
+        apiKey: this.searchApiKey,
+      });
+    }
+
     const executionState = this.initializeExecutionState();
 
     try {
-      // 3. Planning phase
+      // 4. Planning phase
       await this.planTask(task, options.startingUrl);
 
-      // 4. Navigation phase (with retry on recoverable errors)
+      // 5. Navigation phase (with retry on recoverable errors)
       await this.navigateToStartWithRetry(task);
+
       this.initializeSystemPromptAndTask(task);
 
-      // 5. Main execution loop
+      // 6. Main execution loop
       const loopOutcome = await this.runMainLoop(task, executionState);
 
-      // 6. Return results
+      // 7. Return results
       return this.buildResult(loopOutcome, executionState);
     } catch (error) {
       // Check if aborted
@@ -263,7 +301,18 @@ export class WebAgent {
       abortSignal: this.abortSignal,
     });
 
-    let needsPageSnapshot = true;
+    // Only include search tools if a search service was created
+    const searchTools = this.searchService
+      ? createSearchTools({ searchService: this.searchService, eventEmitter: this.eventEmitter })
+      : {};
+
+    // Merge all tools
+    const allTools = { ...webActionTools, ...searchTools };
+
+    // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
+    // The empty page has no useful elements and the snapshot prompt causes the model
+    // to hallucinate refs.
+    let needsPageSnapshot = this.url !== "about:blank";
     let consecutiveErrors = 0;
     let totalErrors = 0;
 
@@ -304,7 +353,7 @@ export class WebAgent {
 
       // Single try-catch for ALL iteration logic
       try {
-        const result = await this.generateAndProcessAction(task, webActionTools, executionState);
+        const result = await this.generateAndProcessAction(task, allTools, executionState);
 
         // Reset error counter on success
         consecutiveErrors = 0;
@@ -460,60 +509,42 @@ export class WebAgent {
     });
 
     // Add error feedback to conversation for non-tool errors
-    const errorFeedback = buildStepErrorFeedbackPrompt(errorMessage, Boolean(this.guardrails));
+    const errorFeedback = buildStepErrorFeedbackPrompt(
+      errorMessage,
+      Boolean(this.guardrails),
+      this.searchProvider !== "none",
+    );
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
   /**
-   * Truncate old snapshots in messages to keep context size down
-   * Replaces everything after the first ``` with "[clipped for brevity]"
+   * Truncate old external content in messages to keep context size down.
+   * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
+   * while preserving the tag structure and warning.
    */
-  private truncateOldSnapshots(): void {
+  private truncateOldExternalContent(): void {
+    const clipExternalContent = (text: string): string =>
+      text.replace(
+        /(<EXTERNAL-CONTENT[\s\S]*?>)\n[\s\S]*?\n(<\/EXTERNAL-CONTENT>)/g,
+        "$1\n> [clipped for brevity]\n$2",
+      );
+
     this.messages = this.messages.map((msg) => {
       if (msg.role === "user") {
         // Handle text-only messages
-        // Check if this is a snapshot message (starts with Title: and URL: followed by ```)
-        if (
-          typeof msg.content === "string" &&
-          msg.content.startsWith("Title:") &&
-          msg.content.includes("URL:") &&
-          msg.content.includes("```")
-        ) {
-          // Find the first ``` and replace everything after it
-          const firstBackticksIndex = msg.content.indexOf("```");
-          if (firstBackticksIndex !== -1) {
-            return {
-              ...msg,
-              content: msg.content.substring(0, firstBackticksIndex) + "[clipped for brevity]",
-            };
-          }
+        if (typeof msg.content === "string" && msg.content.includes("<EXTERNAL-CONTENT")) {
+          return { ...msg, content: clipExternalContent(msg.content) };
         }
         // Handle multimodal messages (text + image)
         if (Array.isArray(msg.content)) {
           return {
             ...msg,
             content: msg.content.map((item: any) => {
-              if (
-                item.type === "text" &&
-                item.text.startsWith("Title:") &&
-                item.text.includes("URL:") &&
-                item.text.includes("```")
-              ) {
-                // Find the first ``` and replace everything after it
-                const firstBackticksIndex = item.text.indexOf("```");
-                if (firstBackticksIndex !== -1) {
-                  return {
-                    ...item,
-                    text: item.text.substring(0, firstBackticksIndex) + "[clipped for brevity]",
-                  };
-                }
+              if (item.type === "text" && item.text.includes("<EXTERNAL-CONTENT")) {
+                return { ...item, text: clipExternalContent(item.text) };
               }
               if (item.type === "image") {
-                // Remove the image data to save memory
-                return {
-                  type: "text",
-                  text: "[screenshot clipped for brevity]",
-                };
+                return { type: "text", text: "[screenshot clipped for brevity]" };
               }
               return item;
             }),
@@ -529,10 +560,18 @@ export class WebAgent {
    */
   private async addPageSnapshot(): Promise<void> {
     // First, truncate old snapshots to keep context size manageable
-    this.truncateOldSnapshots();
+    this.truncateOldExternalContent();
 
+    const currentUrl = await this.browser.getUrl();
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
+
+    if (this.debug) {
+      console.warn(`[WebAgent:debug] addPageSnapshot URL: ${currentUrl}`);
+      console.warn(
+        `[WebAgent:debug] addPageSnapshot tree preview (first 500 chars):\n${currentPageSnapshot.slice(0, 500)}`,
+      );
+    }
 
     // Debug compression stats if enabled
     if (this.debug) {
@@ -557,12 +596,18 @@ export class WebAgent {
     // Handle vision mode with screenshots
     if (this.vision) {
       try {
-        const screenshot = await this.browser.getScreenshot();
+        const screenshot = await this.browser.getScreenshot({ withMarks: true });
 
         // Emit screenshot captured event
         this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
           size: screenshot.length,
           format: "jpeg" as const,
+        });
+
+        // Emit full screenshot image event (opt-in for loggers)
+        this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED_IMAGE, {
+          image: screenshot.toString("base64"),
+          mediaType: "image/jpeg" as const,
         });
 
         // Add multimodal message with text and image
@@ -748,8 +793,8 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract)
-    const pageChanged = actionOutput.action !== "extract";
+    // Determine if page changed (most actions change the page, except extract and webSearch)
+    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {
@@ -1057,12 +1102,15 @@ export class WebAgent {
   }
 
   /**
-   * Plan the task using proper tool calling
+   * Plan the task using proper tool calling.
+   * Uses a single create_plan tool with optional url field.
+   * When startingUrl is provided, the prompt shows it and the planner omits url.
+   * When no startingUrl, the prompt instructs the planner to determine a url.
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
-    const planningPrompt = startingUrl
-      ? buildPlanPrompt(task, startingUrl, this.guardrails)
-      : buildPlanAndUrlPrompt(task, this.guardrails);
+    const webSearchEnabled = this.searchProvider !== "none";
+    const planningPrompt = buildPlanPrompt(task, startingUrl, this.guardrails, webSearchEnabled);
+    const planningTools = createPlanningTools();
 
     // Emit processing event before planning - planning doesn't use screenshots
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1078,8 +1126,6 @@ export class WebAgent {
     });
 
     try {
-      const planningTools = createPlanningTools();
-
       const planningResponse = await generateTextWithRetry(
         {
           ...this.providerConfig,
@@ -1105,16 +1151,17 @@ export class WebAgent {
         throw new Error("No tool results returned from planning");
       }
 
-      const { plan, successCriteria, url } = this.extractPlanOutput(planningResponse);
+      // Cast to PlanningResponse - we've validated toolResults[0] exists above
+      const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(
+        planningResponse as unknown as PlanningResponse,
+      );
 
       this.plan = plan;
       this.successCriteria = successCriteria;
+      this.actionItems = actionItems;
 
-      if (!startingUrl && url) {
-        this.url = url;
-      } else if (startingUrl) {
-        this.url = startingUrl;
-      }
+      // Determine starting point: user-provided URL > planner URL > blank
+      this.url = startingUrl || url || "about:blank";
 
       this.emit(WebAgentEventType.AGENT_STATUS, {
         message: "Task plan created",
@@ -1188,18 +1235,15 @@ export class WebAgent {
   /**
    * Extract plan output from planning response
    */
-  private extractPlanOutput(planningResponse: any): {
-    plan: string;
-    successCriteria: string;
-    url?: string;
-  } {
-    const firstToolResult = planningResponse.toolResults[0] as any;
+  private extractPlanOutput(planningResponse: PlanningResponse): PlanOutput {
+    const firstToolResult = planningResponse.toolResults[0];
     const planOutput = firstToolResult.output;
 
     return {
       plan: planOutput.plan || "",
       successCriteria: planOutput.successCriteria || "",
       url: planOutput.url,
+      actionItems: planOutput.actionItems,
     };
   }
 
@@ -1280,7 +1324,9 @@ export class WebAgent {
       throw new Error("No starting URL determined");
     }
 
-    await this.browser.goto(this.url);
+    if (this.url !== "about:blank") {
+      await this.browser.goto(this.url);
+    }
     await this.updatePageState();
 
     this.emit(WebAgentEventType.TASK_STARTED, {
@@ -1289,26 +1335,30 @@ export class WebAgent {
       plan: this.plan,
       url: this.url,
       title: this.currentPage.title,
+      actionItems: this.actionItems,
     });
   }
 
   private initializeSystemPromptAndTask(task: string): void {
     const hasGuardrails = Boolean(this.guardrails);
+    const hasWebSearch = this.searchProvider !== "none";
+
+    const taskPromptContent = buildTaskAndPlanPrompt(
+      task,
+      this.successCriteria,
+      this.plan,
+      this.data,
+      this.guardrails,
+    );
 
     this.messages = [
       {
         role: "system",
-        content: buildActionLoopSystemPrompt(hasGuardrails),
+        content: buildActionLoopSystemPrompt(hasGuardrails, hasWebSearch),
       },
       {
         role: "user",
-        content: buildTaskAndPlanPrompt(
-          task,
-          this.successCriteria,
-          this.plan,
-          this.data,
-          this.guardrails,
-        ),
+        content: taskPromptContent,
       },
     ];
   }
@@ -1362,10 +1412,12 @@ export class WebAgent {
     this.url = "";
     this.messages = [];
     this.successCriteria = "";
+    this.actionItems = undefined;
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;
     this.abortSignal = undefined;
+    this.searchService = null;
   }
 
   private initializeExecutionState(): ExecutionState {

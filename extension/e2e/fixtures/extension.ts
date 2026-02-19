@@ -16,7 +16,7 @@ function findExtensionPath(): string {
   const baseDir = path.resolve(__dirname, "../..");
 
   // Try production build first, then dev build
-  const candidates = [".output/chrome-mv3", ".output/chrome-mv3-dev"];
+  const candidates = ["dist/chrome-mv3", "dist/chrome-mv3-dev"];
 
   for (const dir of candidates) {
     const fullPath = path.join(baseDir, dir);

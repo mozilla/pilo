@@ -230,7 +230,7 @@ describe("CLI Run Command", () => {
           blockResources: ["media", "manifest"],
           pwEndpoint: undefined,
           headless: false,
-          bypassCSP: true, // Schema default
+          bypassCSP: false, // Schema default
           proxyServer: undefined,
           proxyUsername: undefined,
           proxyPassword: undefined,
@@ -460,7 +460,7 @@ describe("CLI Run Command", () => {
           blockResources: ["media", "manifest"],
           pwEndpoint: undefined,
           headless: false,
-          bypassCSP: true, // Schema default
+          bypassCSP: false, // Schema default
           proxyServer: "http://proxy.company.com:8080",
           proxyUsername: "user",
           proxyPassword: "pass",

@@ -11,7 +11,7 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
-import { AriaBrowser, PageAction, LoadState } from "./ariaBrowser.js";
+import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
@@ -24,12 +24,7 @@ import {
 import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../configDefaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
-
-// Type extension for Playwright's private AI snapshot function
-// See: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/client/page.ts#L858-L860
-type PageEx = Page & {
-  _snapshotForAI: () => Promise<{ full: string; incremental?: string }>;
-};
+import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -80,6 +75,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private browser: PlaywrightOriginalBrowser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private blocker: PlaywrightBlocker | null = null;
 
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
@@ -155,7 +151,6 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
 
     const contextOptions: BrowserContextOptions = {
-      bypassCSP: true, // Spark default
       ...this.options.contextOptions, // User-provided Playwright options
     };
 
@@ -247,27 +242,35 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Set consistent default timeout for all operations
     this.page.setDefaultTimeout(this.actionTimeoutMs);
 
-    // Enable ad blocking if requested
+    // Initialize ad blocker once (reused for temporary tabs)
     if (this.options.blockAds) {
-      const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
-      blocker.enableBlockingInPage(this.page);
+      this.blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
     }
 
-    // Set up resource blocking based on options
+    await this.setupPageBlocking(this.page);
+  }
+
+  /**
+   * Apply ad blocking and resource blocking to a page.
+   * Used for both the main page and temporary tabs.
+   */
+  private async setupPageBlocking(page: Page): Promise<void> {
+    if (this.blocker) {
+      this.blocker.enableBlockingInPage(page);
+    }
+
     if (this.options.blockResources && this.options.blockResources.length > 0) {
-      await this.page.route("**/*", async (route) => {
+      await page.route("**/*", async (route) => {
         try {
           const request = route.request();
           const resourceType = request.resourceType();
 
-          // Block if the resource type is in the block list
           if (this.options.blockResources!.includes(resourceType as any)) {
             await route.abort();
           } else {
             await route.continue();
           }
         } catch (error) {
-          // If route handling fails, continue to avoid blocking navigation
           try {
             await route.continue();
           } catch (continueError) {
@@ -289,6 +292,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       this.browser = null;
       this.context = null;
       this.page = null;
+      this.blocker = null;
     }
   }
 
@@ -451,61 +455,146 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    const snapshot = await (this.page as PageEx)._snapshotForAI();
-    return snapshot.full;
+
+    // Inject the ariaTree bundle and generate snapshot in the main frame
+    const mainResult = await this.page.evaluate(
+      ({ script }) => {
+        // Idempotent injection guard
+        const win = window as any;
+        if (!win.__sparkAriaTree) {
+          const fn = new Function(script);
+          fn();
+          win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+        }
+        const counter = { value: 0 };
+        const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(document.body, counter);
+        return { yaml, counterValue: counter.value };
+      },
+      { script: ARIA_TREE_SCRIPT },
+    );
+
+    // Handle cross-origin iframes via Playwright's frame API
+    const frames = this.page.frames();
+    const childYamls: string[] = [];
+    let counter = mainResult.counterValue;
+
+    for (const frame of frames) {
+      // Skip the main frame
+      if (frame === this.page.mainFrame()) continue;
+
+      try {
+        const frameResult = await frame.evaluate(
+          ({ script, counterStart }) => {
+            const win = window as any;
+            if (!win.__sparkAriaTree) {
+              const fn = new Function(script);
+              fn();
+              win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+            }
+            const counter = { value: counterStart };
+            const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(
+              document.body,
+              counter,
+            );
+            return { yaml, counterValue: counter.value };
+          },
+          { script: ARIA_TREE_SCRIPT, counterStart: counter },
+        );
+        if (frameResult.yaml) {
+          childYamls.push(frameResult.yaml);
+          counter = frameResult.counterValue;
+        }
+      } catch {
+        // Cross-origin or detached frame, skip
+      }
+    }
+
+    // Combine main frame and cross-origin iframe YAMLs
+    if (childYamls.length) {
+      return mainResult.yaml + "\n" + childYamls.join("\n");
+    }
+    return mainResult.yaml;
   }
 
   /**
-   * Gets simplified HTML with noise elements removed in browser context
-   * Reduces payload size by removing elements we don't need
+   * Gets simplified HTML with noise elements removed in browser context.
+   * Reduces payload size by removing elements we don't need.
    */
   async getSimpleHtml(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-
-    return await this.page.evaluate(() => {
-      const body = document.body || document.documentElement;
-      if (!body) return "";
-
-      const clone = body.cloneNode(true) as Element;
-
-      // Remove noise elements in browser context to reduce wire transfer
-      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
-
-      return clone.innerHTML;
-    });
+    return PlaywrightBrowser.getSimpleHtmlFromPage(this.page);
   }
 
   async getMarkdown(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-
-    try {
-      // Get simplified HTML (noise removed in browser context)
-      const html = await this.getSimpleHtml();
-
-      // Convert HTML to markdown using turndown
-      const turndown = new TurndownService({
-        headingStyle: "atx",
-        codeBlockStyle: "fenced",
-        emDelimiter: "*",
-        strongDelimiter: "**",
-      });
-
-      return turndown.turndown(html);
-    } catch (error) {
-      throw new Error(
-        `Failed to get markdown: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    return PlaywrightBrowser.pageToMarkdown(this.page);
   }
 
-  async getScreenshot(): Promise<Buffer> {
-    if (!this.page) throw new Error("Browser not started");
-    return await this.page.screenshot({
-      fullPage: true,
-      type: "jpeg",
-      quality: 80,
-      scale: "css",
+  /**
+   * Strip noise elements and return innerHTML. Single source of truth
+   * for HTML simplification — used by getSimpleHtml() and pageToMarkdown().
+   */
+  private static async getSimpleHtmlFromPage(page: Page): Promise<string> {
+    return page.evaluate(() => {
+      const body = document.body || document.documentElement;
+      if (!body) return "";
+      const clone = body.cloneNode(true) as Element;
+      clone.querySelectorAll("head, script, style, noscript").forEach((el) => el.remove());
+      return clone.innerHTML;
     });
+  }
+
+  /**
+   * Convert a page's HTML to markdown, stripping noise elements first.
+   */
+  private static async pageToMarkdown(page: Page): Promise<string> {
+    const html = await PlaywrightBrowser.getSimpleHtmlFromPage(page);
+
+    const turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      emDelimiter: "*",
+      strongDelimiter: "**",
+    });
+
+    return turndown.turndown(html);
+  }
+
+  async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
+    if (!this.page) throw new Error("Browser not started");
+
+    // Apply SoM overlay before screenshot if requested.
+    // Failures are non-fatal — a plain screenshot is still useful.
+    if (options?.withMarks) {
+      try {
+        await this.page.evaluate(() => {
+          const win = window as any;
+          win.__sparkAriaTree?.applySetOfMarks?.();
+        });
+      } catch {
+        // Can fail if page navigated or ariaTree bundle wasn't injected yet
+      }
+    }
+
+    try {
+      return await this.page.screenshot({
+        fullPage: true,
+        type: "jpeg",
+        quality: 80,
+        scale: "css",
+      });
+    } finally {
+      if (options?.withMarks) {
+        try {
+          await this.page.evaluate(() => {
+            const win = window as any;
+            win.__sparkAriaTree?.removeSetOfMarks?.();
+          });
+        } catch {
+          // Page may have navigated between screenshot and cleanup
+        }
+      }
+    }
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
@@ -526,7 +615,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private async validateElementRef(ref: string): Promise<Locator> {
     if (!this.page) throw new Error("Browser not started");
 
-    const locator = this.page.locator(`aria-ref=${ref}`);
+    const locator = this.page.locator(`[data-spark-ref="${ref}"]`);
     const count = await locator.count();
 
     if (count === 0) {
@@ -534,7 +623,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
 
     if (count > 1) {
-      // This shouldn't happen with aria-ref, but let's be defensive
+      // This shouldn't happen with data-spark-ref, but let's be defensive
       throw new InvalidRefException(
         ref,
         `Multiple elements found with reference '${ref}'. This may indicate a page structure issue.`,
@@ -558,6 +647,8 @@ export class PlaywrightBrowser implements AriaBrowser {
       if (requiresElement) {
         // Validate and get the locator
         locator = await this.validateElementRef(ref);
+        // Scroll element into view so developers can follow along in headed mode
+        await locator.scrollIntoViewIfNeeded({ timeout: this.actionTimeoutMs });
       }
 
       switch (action) {
@@ -665,6 +756,38 @@ export class PlaywrightBrowser implements AriaBrowser {
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
         { originalError: error },
       );
+    }
+  }
+
+  /**
+   * Runs a function in an temporary tab, then closes it.
+   * Main page state is preserved. Useful for "side quest" operations like search.
+   */
+  async runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T> {
+    if (!this.context) throw new Error("Browser not started");
+
+    const tempPage = await this.context.newPage();
+    tempPage.setDefaultTimeout(this.actionTimeoutMs);
+    await this.setupPageBlocking(tempPage);
+
+    try {
+      const tab: TemporaryTab = {
+        goto: async (url: string) => {
+          await tempPage.goto(url, { waitUntil: "domcontentloaded" });
+        },
+        getMarkdown: async () => PlaywrightBrowser.pageToMarkdown(tempPage),
+        waitForLoadState: async (state: LoadState, options?: { timeout?: number }) => {
+          await tempPage.waitForLoadState(state, options);
+        },
+      };
+
+      return await fn(tab);
+    } finally {
+      try {
+        await tempPage.close();
+      } catch {
+        // Ignore close errors to avoid masking the original error from fn()
+      }
     }
   }
 

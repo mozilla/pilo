@@ -186,6 +186,8 @@ describe("ConfigManager", () => {
         "navigation_max_attempts",
         "navigation_timeout_multiplier",
         "action_timeout_ms",
+        "search_provider",
+        "parallel_api_key",
       ];
 
       // Check that schema has all SparkConfig keys

@@ -1,17 +1,18 @@
-// Import ariaSnapshot functionality
+// Import ariaTree functionality from shared module
 import browser from "webextension-polyfill";
-import { generateAriaTree, renderAriaTree } from "../src/vendor/ariaSnapshot";
+import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "spark/ariaTree";
 import type {
   ExtensionMessage,
   GetPageInfoResponse,
   ExecutePageActionResponse,
 } from "../src/types/browser";
 
-// Make ARIA tree functions available globally for executeScript
+// Make ARIA tree function available globally for executeScript
 declare global {
   interface Window {
-    generateAriaTree: typeof generateAriaTree;
-    renderAriaTree: typeof renderAriaTree;
+    generateAndRenderAriaTree: typeof generateAndRenderAriaTree;
+    applySetOfMarks: typeof applySetOfMarks;
+    removeSetOfMarks: typeof removeSetOfMarks;
   }
 }
 
@@ -22,11 +23,9 @@ export default defineContentScript({
   main() {
     console.log("[Spark] Content script loaded at document_start");
     // Make ARIA tree functions available globally for executeScript
-    window.generateAriaTree = generateAriaTree;
-    window.renderAriaTree = renderAriaTree;
-
-    // Note: Indicator is now controlled via CSS injection from background script
-    // (see indicatorControl.ts) - no need to query state or handle messages here
+    window.generateAndRenderAriaTree = generateAndRenderAriaTree;
+    window.applySetOfMarks = applySetOfMarks;
+    window.removeSetOfMarks = removeSetOfMarks;
 
     // Listen for messages from background script
     browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {

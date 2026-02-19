@@ -5,6 +5,8 @@ import { EventStoreLogger } from "./EventStoreLogger";
 import { WebAgent, Logger } from "spark/core";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOllama } from "ollama-ai-provider-v2";
 
 /**
  * OpenRouter attribution headers
@@ -24,10 +26,10 @@ export class AgentManager {
    *
    * @param task - The task description in natural language
    * @param options - Configuration options
-   * @param options.apiKey - API key for the provider
+   * @param options.apiKey - API key for the provider (optional for Ollama)
    * @param options.provider - AI provider to use (defaults to "openai")
    * @param options.model - Model name (uses provider-specific defaults if not specified)
-   * @param options.apiEndpoint - Custom API endpoint (OpenAI only, ignored for OpenRouter)
+   * @param options.apiEndpoint - Custom API endpoint (used by OpenAI and Ollama)
    * @param options.logger - Custom logger implementation
    * @param options.tabId - Browser tab ID to operate on
    * @param options.data - Additional context data
@@ -40,7 +42,7 @@ export class AgentManager {
       apiKey: string;
       apiEndpoint?: string;
       model?: string;
-      provider?: "openai" | "openrouter";
+      provider?: "openai" | "openrouter" | "google" | "ollama";
       logger?: Logger;
       tabId?: number;
       data?: any;
@@ -83,36 +85,65 @@ export class AgentManager {
   /**
    * Get the default model for a provider
    */
-  private static getDefaultModel(provider: "openai" | "openrouter"): string {
-    return provider === "openrouter" ? "openai/gpt-4.1-mini" : "gpt-4.1-mini";
+  private static getDefaultModel(provider: "openai" | "openrouter" | "google" | "ollama"): string {
+    switch (provider) {
+      case "openrouter":
+        return "google/gemini-2.5-flash";
+      case "google":
+        return "gemini-2.5-flash";
+      case "ollama":
+        return "llama3.2";
+      default:
+        return "gpt-4.1-mini";
+    }
   }
 
   /**
    * Create a provider-specific model instance
    *
-   * Note: apiEndpoint is only used for OpenAI provider.
-   * OpenRouter uses its own fixed endpoint and ignores this parameter.
+   * Note: apiEndpoint is used by OpenAI and Ollama providers.
+   * Other providers use their own fixed endpoints and ignore this parameter.
    */
   private static createProviderModel(
-    provider: "openai" | "openrouter",
+    provider: "openai" | "openrouter" | "google" | "ollama",
     apiKey: string,
     apiEndpoint: string | undefined,
     modelName: string,
   ) {
-    if (provider === "openrouter") {
-      // OpenRouter has its own endpoint, apiEndpoint parameter is ignored
-      const openrouter = createOpenRouter({
-        apiKey,
-        headers: OPENROUTER_HEADERS,
-      });
-      return openrouter(modelName);
-    } else {
-      const endpoint = apiEndpoint || "https://api.openai.com/v1";
-      const openai = createOpenAI({
-        apiKey,
-        baseURL: endpoint,
-      });
-      return openai(modelName);
+    switch (provider) {
+      case "openrouter": {
+        // OpenRouter has its own endpoint, apiEndpoint parameter is ignored
+        const openrouter = createOpenRouter({
+          apiKey,
+          headers: OPENROUTER_HEADERS,
+        });
+        return openrouter(modelName);
+      }
+
+      case "google": {
+        const google = createGoogleGenerativeAI({
+          apiKey,
+        });
+        return google(modelName);
+      }
+
+      case "ollama": {
+        const baseURL = apiEndpoint || "http://localhost:11434/api";
+        const ollama = createOllama({
+          baseURL,
+        });
+        return ollama(modelName);
+      }
+
+      default: {
+        // OpenAI
+        const endpoint = apiEndpoint || "https://api.openai.com/v1";
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: endpoint,
+        });
+        return openai(modelName);
+      }
     }
   }
 }

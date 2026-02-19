@@ -1279,4 +1279,91 @@ describe("ChatView", () => {
       });
     });
   });
+
+  describe("Action Items Display", () => {
+    it("should display actionItems as bulleted list when present", () => {
+      // Arrange: Set up a task ID
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      // Act: Render and simulate receiving a task:started event with actionItems
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one with details\n2. Step two with more details",
+        actionItems: ["Search for recipes", "Filter results", "Select recipe"],
+      });
+
+      // Trigger the message listener
+      getMockMessageListener()(message);
+
+      // Assert: actionItems should be passed to addMessage as numbered markdown list
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "1. Search for recipes\n2. Filter results\n3. Select recipe",
+        "task-123",
+      );
+    });
+
+    it("should fall back to plan when actionItems is missing", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      // Act: Render and simulate receiving a task:started event without actionItems
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one\n2. Step two",
+      });
+
+      getMockMessageListener()(message);
+
+      // Assert: plan should be used directly
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "## Full plan\n\n1. Step one\n2. Step two",
+        "task-123",
+      );
+    });
+
+    it("should fall back to plan when actionItems is empty array", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      // Act
+      render(<ChatView {...defaultProps} />);
+
+      const message = createRealtimeMessage("task:started", {
+        plan: "## Full plan\n\n1. Step one",
+        actionItems: [],
+      });
+
+      getMockMessageListener()(message);
+
+      // Assert: plan should be used when actionItems is empty
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "plan",
+        "## Full plan\n\n1. Step one",
+        "task-123",
+      );
+    });
+
+    it("should not add message when task:started has neither actionItems nor plan", () => {
+      // Arrange
+      mockCurrentTaskId = "task-123";
+      mockStoreCurrentTaskId = "task-123";
+
+      render(<ChatView {...defaultProps} />);
+      mockAddMessage.mockClear(); // Clear any setup calls
+
+      // Act: task:started with no actionItems and no plan
+      const message = createRealtimeMessage("task:started", {});
+      getMockMessageListener()(message);
+
+      // Assert: addMessage should NOT be called
+      expect(mockAddMessage).not.toHaveBeenCalled();
+    });
+  });
 });

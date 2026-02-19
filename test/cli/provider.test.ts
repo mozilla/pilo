@@ -19,7 +19,7 @@ vi.mock("../../src/config.js", () => ({
     max_iterations: 50,
     max_validation_attempts: 3,
     max_repeated_actions: 2,
-    bypass_csp: true,
+    bypass_csp: false,
     navigation_timeout_ms: 30000,
     navigation_max_timeout_ms: 120000,
     navigation_max_attempts: 3,
@@ -673,7 +673,7 @@ describe("Provider", () => {
       mockConfig.getConfig.mockReturnValue({
         ...defaults,
         provider: "openrouter",
-        openrouter_api_key: "sk-or-global123",
+        openrouter_api_key: "fake-global-key-123",
       });
 
       const info = getAIProviderInfo();

@@ -1,0 +1,6 @@
+# Gitleaks ignore file
+# Add fingerprints of false positives to ignore specific findings
+# Format: commit_hash:file_path:rule_id:line_number
+
+# False positive: test value in historical commit (fixed in current code)
+12323684c2a470321a34fea845a9556eb8b644d1:test/cli/provider.test.ts:generic-api-key:223

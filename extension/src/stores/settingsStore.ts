@@ -7,7 +7,7 @@ export interface Settings {
   apiKey: string;
   apiEndpoint: string;
   model: string;
-  provider: "openai" | "openrouter";
+  provider: "openai" | "openrouter" | "google" | "ollama";
 }
 
 export interface SettingsStore {
@@ -23,9 +23,9 @@ export interface SettingsStore {
 
 const defaultSettings: Settings = {
   apiKey: "",
-  apiEndpoint: "https://api.openai.com/v1",
-  model: "gpt-4.1-mini",
-  provider: "openai",
+  apiEndpoint: "",
+  model: "google/gemini-2.5-flash",
+  provider: "openrouter",
 };
 
 // Create browser storage adapter for settings
@@ -96,9 +96,13 @@ export const useSettingsStore = create<SettingsStore>()(
           ]);
 
           // Validate provider value
-          const isValidProvider = stored.provider === "openai" || stored.provider === "openrouter";
+          const isValidProvider =
+            stored.provider === "openai" ||
+            stored.provider === "openrouter" ||
+            stored.provider === "google" ||
+            stored.provider === "ollama";
           const provider = isValidProvider
-            ? (stored.provider as "openai" | "openrouter")
+            ? (stored.provider as "openai" | "openrouter" | "google" | "ollama")
             : defaultSettings.provider;
 
           const newSettings: Settings = {

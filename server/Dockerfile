@@ -13,6 +13,7 @@ WORKDIR /app
 # Copy root package files and build main spark package
 COPY package.json pnpm-lock.yaml ./
 COPY src ./src
+COPY scripts ./scripts
 COPY tsconfig.json ./
 RUN pnpm install
 

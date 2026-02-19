@@ -10,9 +10,9 @@ vi.mock("src/stores/settingsStore", () => ({
   useSettings: vi.fn(() => ({
     settings: {
       apiKey: "test-key",
-      apiEndpoint: "https://api.openai.com/v1",
-      model: "gpt-4.1-mini",
-      provider: "openai",
+      apiEndpoint: "",
+      model: "google/gemini-2.5-flash",
+      provider: "openrouter",
     },
     saveStatus: null,
     updateSettings: mockUpdateSettings,
@@ -74,7 +74,7 @@ describe("SettingsView - Provider Dropdown", () => {
       render(<SettingsView onBack={mockOnBack} />);
 
       const providerSelect = screen.getByRole("combobox") as HTMLSelectElement;
-      expect(providerSelect.value).toBe("openai");
+      expect(providerSelect.value).toBe("openrouter");
     });
 
     it("should show OpenAI and OpenRouter options", () => {
@@ -107,7 +107,7 @@ describe("SettingsView - Provider Dropdown", () => {
       const providerSelect = screen.getByRole("combobox") as HTMLSelectElement;
 
       // Check that provider value is set
-      expect(providerSelect.value).toBe("openai");
+      expect(providerSelect.value).toBe("openrouter");
     });
   });
 
@@ -116,12 +116,12 @@ describe("SettingsView - Provider Dropdown", () => {
       const { rerender } = render(<SettingsView onBack={mockOnBack} />);
 
       let providerSelect = screen.getByRole("combobox") as HTMLSelectElement;
-      expect(providerSelect.value).toBe("openai");
+      expect(providerSelect.value).toBe("openrouter");
 
       rerender(<SettingsView onBack={mockOnBack} />);
 
       providerSelect = screen.getByRole("combobox") as HTMLSelectElement;
-      expect(providerSelect.value).toBe("openai");
+      expect(providerSelect.value).toBe("openrouter");
     });
 
     it("should have save button", () => {
@@ -162,13 +162,13 @@ describe("SettingsView - Provider Dropdown", () => {
   });
 
   describe("Provider-specific behavior", () => {
-    it("should display OpenAI as default provider", () => {
+    it("should display OpenRouter as default provider", () => {
       render(<SettingsView onBack={mockOnBack} />);
 
       const providerSelect = screen.getByRole("combobox");
 
-      // Should start as OpenAI
-      expect((providerSelect as HTMLSelectElement).value).toBe("openai");
+      // Should start as OpenRouter
+      expect((providerSelect as HTMLSelectElement).value).toBe("openrouter");
     });
 
     it("should have both OpenAI and OpenRouter as selectable options", () => {
@@ -189,10 +189,10 @@ describe("SettingsView - Provider Dropdown", () => {
     it("should render all required fields including provider", () => {
       render(<SettingsView onBack={mockOnBack} />);
 
-      expect(screen.getByText("API Key")).toBeInTheDocument();
       expect(screen.getByText("Provider")).toBeInTheDocument();
-      expect(screen.getByText("API Endpoint")).toBeInTheDocument();
       expect(screen.getByText("Model")).toBeInTheDocument();
+      expect(screen.getByText(/API Endpoint/)).toBeInTheDocument();
+      expect(screen.getByText(/API Key/)).toBeInTheDocument();
     });
   });
 });

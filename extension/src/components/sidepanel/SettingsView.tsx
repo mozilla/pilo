@@ -12,6 +12,58 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
 
   const focusRing = "focus:ring-2 focus:ring-blue-500 focus:border-transparent";
 
+  const getModelPlaceholder = (provider: string): string => {
+    switch (provider) {
+      case "openrouter":
+        return "google/gemini-2.5-flash";
+      case "google":
+        return "gemini-2.5-flash";
+      case "ollama":
+        return "llama3.2";
+      default:
+        return "gpt-4.1-mini";
+    }
+  };
+
+  const getEndpointLabel = (provider: string): string => {
+    switch (provider) {
+      case "openai":
+        return "API Endpoint";
+      case "ollama":
+        return "Base URL";
+      default:
+        return "API Endpoint (Not used)";
+    }
+  };
+
+  const getEndpointPlaceholder = (provider: string): string => {
+    switch (provider) {
+      case "openai":
+        return "https://api.openai.com/v1";
+      case "ollama":
+        return "http://localhost:11434/api";
+      default:
+        return "Not used by this provider";
+    }
+  };
+
+  const handleProviderChange = (newProvider: "openai" | "openrouter" | "google" | "ollama") => {
+    const updates: Partial<typeof settings> = { provider: newProvider };
+
+    // Prefill default endpoints when switching providers
+    if (newProvider === "openai" && !settings.apiEndpoint) {
+      updates.apiEndpoint = "https://api.openai.com/v1";
+    } else if (newProvider === "ollama" && !settings.apiEndpoint) {
+      updates.apiEndpoint = "http://localhost:11434/api";
+    }
+    // Clear endpoint when switching to providers that don't use it
+    else if (newProvider !== "openai" && newProvider !== "ollama") {
+      updates.apiEndpoint = "";
+    }
+
+    updateSettings(updates);
+  };
+
   const handleSave = async () => {
     await saveSettings();
     // Auto-close settings after successful save
@@ -44,12 +96,16 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
               <select
                 value={settings.provider}
                 onChange={(e) =>
-                  updateSettings({ provider: e.target.value as "openai" | "openrouter" })
+                  handleProviderChange(
+                    e.target.value as "openai" | "openrouter" | "google" | "ollama",
+                  )
                 }
                 className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} focus:outline-none ${focusRing}`}
               >
                 <option value="openai">OpenAI</option>
                 <option value="openrouter">OpenRouter</option>
+                <option value="google">Google Generative AI</option>
+                <option value="ollama">Ollama (Local)</option>
               </select>
             </div>
 
@@ -59,26 +115,32 @@ export default function SettingsView({ onBack }: SettingsViewProps): ReactElemen
                 type="text"
                 value={settings.model}
                 onChange={(e) => updateSettings({ model: e.target.value })}
-                placeholder="gpt-4.1-mini"
+                placeholder={getModelPlaceholder(settings.provider)}
                 className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
               />
             </div>
 
             <div className="space-y-2">
               <label className={`block text-sm font-medium ${t.text.secondary}`}>
-                API Endpoint
+                {getEndpointLabel(settings.provider)}
               </label>
               <input
                 type="text"
                 value={settings.apiEndpoint}
                 onChange={(e) => updateSettings({ apiEndpoint: e.target.value })}
-                placeholder="https://api.openai.com/v1"
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
+                placeholder={getEndpointPlaceholder(settings.provider)}
+                disabled={settings.provider !== "openai" && settings.provider !== "ollama"}
+                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
               />
+              {settings.provider === "ollama" && (
+                <p className={`text-xs ${t.text.secondary}`}>Make sure Ollama is running locally</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>API Key</label>
+              <label className={`block text-sm font-medium ${t.text.secondary}`}>
+                API Key {settings.provider === "ollama" && "(Optional)"}
+              </label>
               <input
                 type="password"
                 value={settings.apiKey}

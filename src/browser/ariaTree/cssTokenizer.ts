@@ -1,16 +1,12 @@
-/* eslint-disable notice/notice */
-
-/*
- * The code in this file is licensed under the CC0 license.
- * http://creativecommons.org/publicdomain/zero/1.0/
- * It is free to use for any purpose. No attribution, permission, or reproduction of this license is required.
+/**
+ * CSS Tokenizer
+ *
+ * Originally from https://github.com/tabatkins/parse-css
+ * Licensed under CC0 (public domain).
+ *
+ * Extracted from Playwright (Microsoft) under Apache 2.0.
+ * Used for parsing CSS `content:` property values in accessible name computation.
  */
-
-// Original at https://github.com/tabatkins/parse-css
-// Changes:
-//   - JS is replaced with TS.
-//   - Universal Module Definition wrapper is removed.
-//   - Everything not related to tokenizing - below the first exports block - is removed.
 
 export interface CSSTokenInterface {
   toSource(): string;
@@ -56,16 +52,7 @@ function whitespace(code: number) {
 
 const maximumallowedcodepoint = 0x10ffff;
 
-export class InvalidCharacterError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidCharacterError";
-  }
-}
-
 function preprocess(str: string): number[] {
-  // Turn a string into an array of code points,
-  // following the preprocessing cleanup rules.
   const codepoints = [];
   for (let i = 0; i < str.length; i++) {
     let code = str.charCodeAt(i);
@@ -76,7 +63,6 @@ function preprocess(str: string): number[] {
     if (code === 0xd || code === 0xc) code = 0xa;
     if (code === 0x0) code = 0xfffd;
     if (between(code, 0xd800, 0xdbff) && between(str.charCodeAt(i + 1), 0xdc00, 0xdfff)) {
-      // Decode a surrogate pair into an astral codepoint.
       const lead = code - 0xd800;
       const trail = str.charCodeAt(i + 1) - 0xdc00;
       code = Math.pow(2, 16) + lead * Math.pow(2, 10) + trail;
@@ -89,7 +75,6 @@ function preprocess(str: string): number[] {
 
 function stringFromCode(code: number) {
   if (code <= 0xffff) return String.fromCharCode(code);
-  // Otherwise, encode astral char as surrogate pair.
   code -= Math.pow(2, 16);
   const lead = Math.floor(code / Math.pow(2, 10)) + 0xd800;
   const trail = (code % Math.pow(2, 10)) + 0xdc00;
@@ -102,21 +87,17 @@ export function tokenize(str1: string): CSSTokenInterface[] {
   const tokens: CSSTokenInterface[] = [];
   let code: number;
 
-  // Line number information.
   let line = 0;
   let column = 0;
-  // The only use of lastLineLength is in reconsume().
   let lastLineLength = 0;
   const incrLineno = function () {
     line += 1;
     lastLineLength = column;
     column = 0;
   };
-  const locStart = { line: line, column: column };
 
   const codepoint = function (i: number): number {
     if (i >= str.length) return -1;
-
     return str[i];
   };
   const next = function (num?: number) {
@@ -130,7 +111,6 @@ export function tokenize(str1: string): CSSTokenInterface[] {
     code = codepoint(i);
     if (newline(code)) incrLineno();
     else column += num;
-    // console.log('Consume '+i+' '+String.fromCharCode(code) + ' 0x' + code.toString(16));
     return true;
   };
   const reconsume = function () {
@@ -141,8 +121,6 @@ export function tokenize(str1: string): CSSTokenInterface[] {
     } else {
       column -= 1;
     }
-    locStart.line = line;
-    locStart.column = column;
     return true;
   };
   const eof = function (codepoint?: number): boolean {
@@ -150,10 +128,7 @@ export function tokenize(str1: string): CSSTokenInterface[] {
     return codepoint === -1;
   };
   const donothing = function () {};
-  const parseerror = function () {
-    // Language bindings don't like writing to stdout!
-    // console.log('Parse error at index ' + i + ', processing codepoint 0x' + code.toString(16) + '.'); return true;
-  };
+  const parseerror = function () {};
 
   const consumeAToken = function (): CSSTokenInterface {
     consumeComments();
@@ -172,26 +147,12 @@ export function tokenize(str1: string): CSSTokenInterface[] {
       } else {
         return new DelimToken(code);
       }
-    } else if (code === 0x24) {
-      if (next() === 0x3d) {
-        consume();
-        return new SuffixMatchToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (code === 0x27) {
       return consumeAStringToken();
     } else if (code === 0x28) {
       return new OpenParenToken();
     } else if (code === 0x29) {
       return new CloseParenToken();
-    } else if (code === 0x2a) {
-      if (next() === 0x3d) {
-        consume();
-        return new SubstringMatchToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (code === 0x2b) {
       if (startsWithANumber()) {
         reconsume();
@@ -205,9 +166,6 @@ export function tokenize(str1: string): CSSTokenInterface[] {
       if (startsWithANumber()) {
         reconsume();
         return consumeANumericToken();
-      } else if (next(1) === 0x2d && next(2) === 0x3e) {
-        consume(2);
-        return new CDCToken();
       } else if (startsWithAnIdentifier()) {
         reconsume();
         return consumeAnIdentlikeToken();
@@ -225,13 +183,6 @@ export function tokenize(str1: string): CSSTokenInterface[] {
       return new ColonToken();
     } else if (code === 0x3b) {
       return new SemicolonToken();
-    } else if (code === 0x3c) {
-      if (next(1) === 0x21 && next(2) === 0x2d && next(3) === 0x2d) {
-        consume(3);
-        return new CDOToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (code === 0x40) {
       if (wouldStartAnIdentifier(next(1), next(2), next(3)))
         return new AtKeywordToken(consumeAName());
@@ -248,34 +199,10 @@ export function tokenize(str1: string): CSSTokenInterface[] {
       }
     } else if (code === 0x5d) {
       return new CloseSquareToken();
-    } else if (code === 0x5e) {
-      if (next() === 0x3d) {
-        consume();
-        return new PrefixMatchToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (code === 0x7b) {
       return new OpenCurlyToken();
-    } else if (code === 0x7c) {
-      if (next() === 0x3d) {
-        consume();
-        return new DashMatchToken();
-      } else if (next() === 0x7c) {
-        consume();
-        return new ColumnToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (code === 0x7d) {
       return new CloseCurlyToken();
-    } else if (code === 0x7e) {
-      if (next() === 0x3d) {
-        consume();
-        return new IncludeMatchToken();
-      } else {
-        return new DelimToken(code);
-      }
     } else if (digit(code)) {
       reconsume();
       return consumeANumericToken();
@@ -403,11 +330,8 @@ export function tokenize(str1: string): CSSTokenInterface[] {
   };
 
   const consumeEscape = function () {
-    // Assume the current character is the \
-    // and the next code point is not a newline.
     consume();
     if (hexdigit(code)) {
-      // Consume 1-6 hex digits
       const digits = [code];
       for (let total = 0; total < 5; total++) {
         if (hexdigit(next())) {
@@ -535,13 +459,8 @@ export function tokenize(str1: string): CSSTokenInterface[] {
         repr += stringFromCode(code);
       }
     }
-    const value = convertAStringToANumber(repr);
+    const value = +repr;
     return { type: type, value: value, repr: repr };
-  };
-
-  const convertAStringToANumber = function (string: string): number {
-    // CSS's number rules are identical to JS, afaik.
-    return +string;
   };
 
   const consumeTheRemnantsOfABadURL = function () {
@@ -595,20 +514,6 @@ export class WhitespaceToken extends CSSParserToken {
   }
   override toSource() {
     return " ";
-  }
-}
-
-export class CDOToken extends CSSParserToken {
-  override tokenType = "CDO";
-  override toSource() {
-    return "<!--";
-  }
-}
-
-export class CDCToken extends CSSParserToken {
-  override tokenType = "CDC";
-  override toSource() {
-    return "-->";
   }
 }
 
@@ -683,30 +588,6 @@ export class CloseParenToken extends GroupingToken {
   }
 }
 
-export class IncludeMatchToken extends CSSParserToken {
-  override tokenType = "~=";
-}
-
-export class DashMatchToken extends CSSParserToken {
-  override tokenType = "|=";
-}
-
-export class PrefixMatchToken extends CSSParserToken {
-  override tokenType = "^=";
-}
-
-export class SuffixMatchToken extends CSSParserToken {
-  override tokenType = "$=";
-}
-
-export class SubstringMatchToken extends CSSParserToken {
-  override tokenType = "*=";
-}
-
-export class ColumnToken extends CSSParserToken {
-  override tokenType = "||";
-}
-
 export class EOFToken extends CSSParserToken {
   override tokenType = "EOF";
   override toSource() {
@@ -727,12 +608,6 @@ export class DelimToken extends CSSParserToken {
     return "DELIM(" + this.value + ")";
   }
 
-  override toJSON() {
-    const json = this.constructor.prototype.constructor.prototype.toJSON.call(this);
-    json.value = this.value;
-    return json;
-  }
-
   override toSource() {
     if (this.value === "\\") return "\\\n";
     else return this.value;
@@ -741,15 +616,6 @@ export class DelimToken extends CSSParserToken {
 
 export abstract class StringValuedToken extends CSSParserToken {
   override value: string = "";
-  ASCIIMatch(str: string) {
-    return this.value.toLowerCase() === str.toLowerCase();
-  }
-
-  override toJSON() {
-    const json = this.constructor.prototype.constructor.prototype.toJSON.call(this);
-    json.value = this.value;
-    return json;
-  }
 }
 
 export class IdentToken extends StringValuedToken {
@@ -757,14 +623,7 @@ export class IdentToken extends StringValuedToken {
     super();
     this.value = val;
   }
-
   override tokenType = "IDENT";
-  override toString() {
-    return "IDENT(" + this.value + ")";
-  }
-  override toSource() {
-    return escapeIdent(this.value);
-  }
 }
 
 export class FunctionToken extends StringValuedToken {
@@ -775,14 +634,6 @@ export class FunctionToken extends StringValuedToken {
     this.value = val;
     this.mirror = ")";
   }
-
-  override toString() {
-    return "FUNCTION(" + this.value + ")";
-  }
-
-  override toSource() {
-    return escapeIdent(this.value) + "(";
-  }
 }
 
 export class AtKeywordToken extends StringValuedToken {
@@ -790,12 +641,6 @@ export class AtKeywordToken extends StringValuedToken {
   constructor(val: string) {
     super();
     this.value = val;
-  }
-  override toString() {
-    return "AT(" + this.value + ")";
-  }
-  override toSource() {
-    return "@" + escapeIdent(this.value);
   }
 }
 
@@ -807,22 +652,6 @@ export class HashToken extends StringValuedToken {
     this.value = val;
     this.type = "unrestricted";
   }
-
-  override toString() {
-    return "HASH(" + this.value + ")";
-  }
-
-  override toJSON() {
-    const json = this.constructor.prototype.constructor.prototype.toJSON.call(this);
-    json.value = this.value;
-    json.type = this.type;
-    return json;
-  }
-
-  override toSource() {
-    if (this.type === "id") return "#" + escapeIdent(this.value);
-    else return "#" + escapeHash(this.value);
-  }
 }
 
 export class StringToken extends StringValuedToken {
@@ -830,10 +659,6 @@ export class StringToken extends StringValuedToken {
   constructor(val: string) {
     super();
     this.value = val;
-  }
-
-  override toString() {
-    return '"' + escapeString(this.value) + '"';
   }
 }
 
@@ -843,38 +668,16 @@ export class URLToken extends StringValuedToken {
     super();
     this.value = val;
   }
-  override toString() {
-    return "URL(" + this.value + ")";
-  }
-  override toSource() {
-    return 'url("' + escapeString(this.value) + '")';
-  }
 }
 
 export class NumberToken extends CSSParserToken {
   override tokenType = "NUMBER";
   type: string;
   repr: string;
-
   constructor() {
     super();
     this.type = "integer";
     this.repr = "";
-  }
-
-  override toString() {
-    if (this.type === "integer") return "INT(" + this.value + ")";
-    return "NUMBER(" + this.value + ")";
-  }
-  override toJSON() {
-    const json = super.toJSON();
-    json.value = this.value;
-    json.type = this.type;
-    json.repr = this.repr;
-    return json;
-  }
-  override toSource() {
-    return this.repr;
   }
 }
 
@@ -885,18 +688,6 @@ export class PercentageToken extends CSSParserToken {
     super();
     this.repr = "";
   }
-  override toString() {
-    return "PERCENTAGE(" + this.value + ")";
-  }
-  override toJSON() {
-    const json = this.constructor.prototype.constructor.prototype.toJSON.call(this);
-    json.value = this.value;
-    json.repr = this.repr;
-    return json;
-  }
-  override toSource() {
-    return this.repr + "%";
-  }
 }
 
 export class DimensionToken extends CSSParserToken {
@@ -904,107 +695,10 @@ export class DimensionToken extends CSSParserToken {
   type: string;
   repr: string;
   unit: string;
-
   constructor() {
     super();
     this.type = "integer";
     this.repr = "";
     this.unit = "";
   }
-
-  override toString() {
-    return "DIM(" + this.value + "," + this.unit + ")";
-  }
-  override toJSON() {
-    const json = this.constructor.prototype.constructor.prototype.toJSON.call(this);
-    json.value = this.value;
-    json.type = this.type;
-    json.repr = this.repr;
-    json.unit = this.unit;
-    return json;
-  }
-  override toSource() {
-    const source = this.repr;
-    let unit = escapeIdent(this.unit);
-    if (
-      unit[0].toLowerCase() === "e" &&
-      (unit[1] === "-" || between(unit.charCodeAt(1), 0x30, 0x39))
-    ) {
-      // Unit is ambiguous with scinot
-      // Remove the leading "e", replace with escape.
-      unit = "\\65 " + unit.slice(1, unit.length);
-    }
-    return source + unit;
-  }
-}
-
-function escapeIdent(string: string) {
-  string = "" + string;
-  let result = "";
-  const firstcode = string.charCodeAt(0);
-  for (let i = 0; i < string.length; i++) {
-    const code = string.charCodeAt(i);
-    if (code === 0x0)
-      throw new InvalidCharacterError("Invalid character: the input contains U+0000.");
-
-    if (
-      between(code, 0x1, 0x1f) ||
-      code === 0x7f ||
-      (i === 0 && between(code, 0x30, 0x39)) ||
-      (i === 1 && between(code, 0x30, 0x39) && firstcode === 0x2d)
-    )
-      result += "\\" + code.toString(16) + " ";
-    else if (
-      code >= 0x80 ||
-      code === 0x2d ||
-      code === 0x5f ||
-      between(code, 0x30, 0x39) ||
-      between(code, 0x41, 0x5a) ||
-      between(code, 0x61, 0x7a)
-    )
-      result += string[i];
-    else result += "\\" + string[i];
-  }
-  return result;
-}
-
-function escapeHash(string: string) {
-  // Escapes the contents of "unrestricted"-type hash tokens.
-  // Won't preserve the ID-ness of "id"-type hash tokens;
-  // use escapeIdent() for that.
-  string = "" + string;
-  let result = "";
-  for (let i = 0; i < string.length; i++) {
-    const code = string.charCodeAt(i);
-    if (code === 0x0)
-      throw new InvalidCharacterError("Invalid character: the input contains U+0000.");
-
-    if (
-      code >= 0x80 ||
-      code === 0x2d ||
-      code === 0x5f ||
-      between(code, 0x30, 0x39) ||
-      between(code, 0x41, 0x5a) ||
-      between(code, 0x61, 0x7a)
-    )
-      result += string[i];
-    else result += "\\" + code.toString(16) + " ";
-  }
-  return result;
-}
-
-function escapeString(string: string) {
-  string = "" + string;
-  let result = "";
-  for (let i = 0; i < string.length; i++) {
-    const code = string.charCodeAt(i);
-
-    if (code === 0x0)
-      throw new InvalidCharacterError("Invalid character: the input contains U+0000.");
-
-    if (between(code, 0x1, 0x1f) || code === 0x7f) result += "\\" + code.toString(16) + " ";
-    else if (code === 0x22 || code === 0x5c) result += "\\" + string[i];
-    else result += string[i];
-  }
-  return result;
 }

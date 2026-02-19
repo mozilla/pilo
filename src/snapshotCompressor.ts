@@ -38,7 +38,6 @@ export class SnapshotCompressor {
     // Default transformations for aria tree compression
     this.transformations = config.transformations || [
       { pattern: /^listitem/g, replacement: "li" },
-      { pattern: /(?<=\[)ref=/g, replacement: "" },
       { pattern: /^link/g, replacement: "a" },
       { pattern: /^text: (.*?)$/g, replacement: '"$1"' },
       { pattern: /^heading "([^"]+)" \[level=(\d+)\]/g, replacement: 'h$2 "$1"' },

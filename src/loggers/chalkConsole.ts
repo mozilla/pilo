@@ -154,6 +154,10 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.whiteBright(data.successCriteria));
     console.log(chalk.magenta.bold("\n📋 Plan:"));
     console.log(chalk.whiteBright(data.plan));
+    if (data.actionItems) {
+      console.log(chalk.magenta.bold("\n🌐 Action items"));
+      console.log(chalk.whiteBright(data.actionItems.map((item) => `- ${item}`).join("\n")));
+    }
     console.log(chalk.blue.bold("🌐 Starting URL: "), chalk.blue.underline(data.url));
   };
 

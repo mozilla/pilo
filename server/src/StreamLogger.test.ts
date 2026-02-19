@@ -87,4 +87,65 @@ describe("StreamLogger", () => {
 
     expect(() => logger.dispose()).not.toThrow();
   });
+
+  it("should exclude screenshot image events by default", async () => {
+    const mockSendEvent = vi.fn().mockResolvedValue(undefined);
+    const logger = new StreamLogger(mockSendEvent);
+    const mockEmitter = new MockWebAgentEventEmitter();
+
+    logger.initialize(mockEmitter as any);
+
+    // Emit screenshot image event
+    mockEmitter.emit("*", "browser:screenshot_captured_image", {
+      image: "base64-encoded-data",
+      mediaType: "image/jpeg",
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should not be forwarded
+    expect(mockSendEvent).not.toHaveBeenCalled();
+  });
+
+  it("should include screenshot image events when opted in", async () => {
+    const mockSendEvent = vi.fn().mockResolvedValue(undefined);
+    const logger = new StreamLogger({
+      sendEvent: mockSendEvent,
+      includeScreenshotImages: true,
+    });
+    const mockEmitter = new MockWebAgentEventEmitter();
+
+    logger.initialize(mockEmitter as any);
+
+    // Emit screenshot image event
+    mockEmitter.emit("*", "browser:screenshot_captured_image", {
+      image: "base64-encoded-data",
+      mediaType: "image/jpeg",
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should be forwarded
+    expect(mockSendEvent).toHaveBeenCalledWith("browser:screenshot_captured_image", {
+      image: "base64-encoded-data",
+      mediaType: "image/jpeg",
+    });
+  });
+
+  it("should maintain backward compatibility with function parameter", async () => {
+    const mockSendEvent = vi.fn().mockResolvedValue(undefined);
+    // Old-style: pass function directly
+    const logger = new StreamLogger(mockSendEvent);
+    const mockEmitter = new MockWebAgentEventEmitter();
+
+    logger.initialize(mockEmitter as any);
+
+    // Emit a regular event
+    mockEmitter.emit("*", "test-event", { data: "test" });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should work as before
+    expect(mockSendEvent).toHaveBeenCalledWith("test-event", { data: "test" });
+  });
 });

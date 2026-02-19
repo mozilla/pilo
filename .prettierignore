@@ -7,6 +7,9 @@ yarn.lock
 dist/
 build/
 
+# Generated bundles
+src/browser/ariaTree/bundle.ts
+
 # Dependencies
 node_modules/
 
