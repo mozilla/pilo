@@ -10,6 +10,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const isChrome = args.includes("--chrome");
@@ -35,7 +36,12 @@ if (useTmp) {
   delete env.WEB_EXT_KEEP_PROFILE_CHANGES;
 }
 
+// Resolve the extension package root regardless of where this script is
+// invoked from. WXT uses cwd to locate entrypoints, wxt.config.ts, etc.
+const extensionRoot = resolve(import.meta.dirname, "..");
+
 const proc = spawn("wxt", ["dev", "-b", browser], {
+  cwd: extensionRoot,
   stdio: "inherit",
   env,
 });
