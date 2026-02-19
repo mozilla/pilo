@@ -58,17 +58,19 @@ pnpm run check          # typecheck (pretest + format:check + per-package typech
 ### Testing
 
 ```bash
-pnpm -r run test                          # Run all tests across all packages
-pnpm --filter spark-core run test         # Test core only
-pnpm --filter spark-cli run test          # Test CLI only
-pnpm --filter spark-extension run test    # Test extension only
-pnpm --filter spark-server run test       # Test server only
+pnpm -r run test                                       # Run all tests across all packages
+pnpm --filter spark-core run test                      # Test core only
+pnpm --filter spark-cli run test                       # Test CLI only
+pnpm --filter spark-extension run test                 # Test extension only (unit, vitest)
+pnpm --filter spark-server run test                    # Test server only
+pnpm --filter spark-extension run test:e2e             # Extension e2e tests (headed, Playwright)
+pnpm --filter spark-extension run test:e2e:headless    # Extension e2e tests (headless)
 ```
 
 ### Building
 
 ```bash
-pnpm run build          # Full assembly: prebuild (core + extension) then tsup compiles core + CLI → root dist/
+pnpm run build          # Full assembly: prebuild (core + extension) then tsup compiles core + CLI into root dist/
 pnpm -r run build       # Build all packages individually
 pnpm run clean          # Clean all packages and root dist/
 ```
@@ -76,12 +78,13 @@ pnpm run clean          # Clean all packages and root dist/
 ### Development
 
 ```bash
-pnpm run dev:server                        # Run dev server
-pnpm run dev:extension -- --chrome         # Extension dev (Chrome)
-pnpm run dev:extension -- --firefox        # Extension dev (Firefox)
-pnpm run format                            # Format all code with Prettier
-pnpm run format:check                      # Check formatting
-pnpm run typecheck                         # Generate ariaTree bundle + format:check + typecheck all packages
+pnpm run dev:server                           # Run dev server (tsx watch)
+pnpm run dev:extension -- --chrome            # Extension dev (Chrome, WXT HMR)
+pnpm run dev:extension -- --firefox           # Extension dev (Firefox, WXT HMR)
+pnpm run dev:extension -- --chrome --tmp      # Extension dev with temporary profile
+pnpm run format                               # Format all code with Prettier
+pnpm run format:check                         # Check formatting
+pnpm run typecheck                            # Generate ariaTree bundle + format:check + typecheck all packages
 ```
 
 ### Installation & Setup
@@ -103,7 +106,7 @@ pnpm spark config show
 pnpm spark config unset <key>
 pnpm spark config reset
 pnpm spark extension install chrome [--tmp]
-pnpm spark extension install firefox [--tmp]
+pnpm spark extension install firefox [--tmp] [--firefox-binary <path>]
 ```
 
 ## Development Workflow
@@ -148,10 +151,10 @@ There is no migration from the legacy `~/.spark/` path. If a user has an old con
 
 The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). The `__SPARK_PRODUCTION__` flag is injected by the root `tsup` build via the `define` option in `tsup.config.ts`. Individual package builds are always dev mode; only the root tsup build produces production artifacts.
 
-| Mode                                    | Merge order                                     | Notes                                                          |
-| --------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| **Production** (npm-installed)          | defaults → global config (required)             | No `.env` loading. No env var parsing. Config file must exist. |
-| **Dev** (running from source via `tsx`) | defaults → global config (if exists) → env vars | Loads `.env` from CWD. Global config is optional.              |
+| Mode                                    | Merge order                                       | Notes                                                          |
+| --------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| **Production** (npm-installed)          | defaults -> global config (required)              | No `.env` loading. No env var parsing. Config file must exist. |
+| **Dev** (running from source via `tsx`) | defaults -> global config (if exists) -> env vars | Loads `.env` from CWD. Global config is optional.              |
 
 ### CLI Config Guard
 
@@ -170,6 +173,8 @@ All other commands (`config`, `extension`, `examples`) work without a config fil
 - **Prettier config** is consolidated at the root only (`.prettierrc`, `.prettierignore`). Do not add package-level Prettier config.
 - **Dependency version alignment**: All packages must use the same version of any shared dependency. A CI workflow enforces this via `scripts/check-dep-versions.mjs`.
 - **Cross-package references** use `workspace:*` protocol, not relative `file:` paths.
+- **Vite aliases for spark-core subpaths**: The extension's `wxt.config.ts` must define Vite `resolve.alias` entries for `spark-core/core` and `spark-core/ariaTree`, pointing to the core package source files. Vite cannot resolve `workspace:*` subpath exports on its own.
+- **tsconfig paths for dev resolution**: The CLI and server `tsconfig.json` files define `paths` entries for `spark-core` (bare + wildcard) so `tsc` and `tsx` can resolve the workspace package to source without a prior build. Do not add `rootDir` to these tsconfigs (the paths alias pulls in files from `../core/src/`, which conflicts with a `rootDir` of `./src`).
 
 ## npm Publishing
 
@@ -179,6 +184,8 @@ The root `@tabstack/spark` is the published package.
 pnpm run build   # Runs prebuild (core + extension), then tsup compiles core + CLI into dist/
 npm pack         # Produces the tarball for inspection
 ```
+
+Build pipeline: `prebuild` (core build + extension build:publish) -> `tsup` (compiles core + CLI source into `dist/`) -> `onSuccess` (copies extension artifacts to `dist/extension/`).
 
 Published package contents (`dist/`):
 
@@ -200,6 +207,7 @@ Internal workspace packages import `spark-core` directly and do not use root-lev
 | `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages                                                                                                                                  |
 | `scripts/release.sh`                        | Release automation                                                                                                                                                                                |
 | `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)                                                                                                                                  |
+| `packages/extension/scripts/dev.ts`         | Parses `--chrome`/`--firefox`/`--tmp` flags and runs `wxt dev -b <browser>` with appropriate env                                                                                                  |
 
 ## CI Workflows
 
