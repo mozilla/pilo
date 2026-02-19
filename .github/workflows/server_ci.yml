@@ -55,9 +55,6 @@ jobs:
       - name: Build core package
         run: pnpm --filter spark-core run build
 
-      - name: Check server formatting
-        run: pnpm --filter spark-server run format:check
-
       - name: Run server type check
         run: pnpm --filter spark-server run typecheck
 

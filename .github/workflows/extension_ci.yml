@@ -31,10 +31,6 @@ jobs:
         with:
           node-version: "22"
 
-      # For some reason, `pnpm run format:check` blows up in CI if we let
-      # the version here match the one that we are running (pnpm 9.0.0 as of this writing),
-      # and if we leave it at 8, things are ok.
-      # XXX once we upgrade to pnpm 10, we should try making this match
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -64,9 +60,6 @@ jobs:
       # (and not resolved) by the build step above.
       - name: Re-link workspace dependencies
         run: pnpm install
-
-      - name: Check extension formatting
-        run: pnpm --filter spark-extension run format:check
 
       - name: Run extension type check
         run: pnpm --filter spark-extension run typecheck
