@@ -52,7 +52,7 @@ spark/
 ### Full Validation
 
 ```bash
-pnpm run check          # format:check + typecheck + test across all packages
+pnpm run check          # typecheck (pretest + format:check + per-package typechecks) + test across all packages
 ```
 
 ### Testing
@@ -81,7 +81,7 @@ pnpm run dev:extension -- --chrome         # Extension dev (Chrome)
 pnpm run dev:extension -- --firefox        # Extension dev (Firefox)
 pnpm run format                            # Format all code with Prettier
 pnpm run format:check                      # Check formatting
-pnpm run typecheck                         # Typecheck all packages
+pnpm run typecheck                         # Generate ariaTree bundle + format:check + typecheck all packages
 ```
 
 ### Installation & Setup
@@ -111,9 +111,9 @@ pnpm spark extension install firefox [--tmp]
 1. **Before making changes**: Run `pnpm run check` to verify a clean baseline.
 2. **After making changes**:
    - Run `pnpm run format` to format code.
-   - Run `pnpm run typecheck` to check types across all packages.
+   - Run `pnpm run typecheck` to run formatting checks and typecheck all packages (single entry point for both).
    - Run `pnpm -r run test` to verify all tests pass.
-3. **Full validation**: `pnpm run check` runs all three steps.
+3. **Full validation**: `pnpm run check` chains `typecheck` (which includes pretest + format:check + per-package typechecks) and then all tests.
 
 ## Testing
 
