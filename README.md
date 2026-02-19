@@ -1,10 +1,11 @@
-# Spark 🔥
+<h1 align="center">Tabstack Pilo</h1>
+<h2 align="center">AI-powered web automation</h2>
 
-AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Spark will navigate websites, fill forms, and gather information automatically.
+AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Pilo will navigate websites, fill forms, and gather information automatically.
 
 ## About Tabstack
 
-Spark is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastructure for AI agents. Tabstack provides the web execution layer that enables AI agents to automate workflows and turn web content into clean, structured data.
+Pilo is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastructure for AI agents. Tabstack provides the web execution layer that enables AI agents to automate workflows and turn web content into clean, structured data.
 
 **Learn more:**
 
@@ -21,22 +22,19 @@ Spark is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastruct
 - **AI Provider (one of):**
   - [OpenAI API key](https://platform.openai.com/api-keys) (cloud)
   - [OpenRouter API key](https://openrouter.ai/keys) (cloud)
-  - [Google Generative AI](https://ai.google.dev/) (cloud)
-  - [Ollama](https://ollama.ai) running locally (local)
-  - Google Cloud project with Vertex AI enabled
 
 ## Installation
 
 ### npm (recommended)
 
 ```bash
-npm install -g @tabstack/spark
+npm install -g @tabstack/pilo
 ```
 
 Or run without installing:
 
 ```bash
-npx @tabstack/spark <command>
+npx @tabstack/pilo <command>
 ```
 
 ### First-Time Setup
@@ -44,14 +42,14 @@ npx @tabstack/spark <command>
 After installing, configure your AI provider:
 
 ```bash
-spark config init
+pilo config init
 ```
 
-This interactive wizard walks you through selecting a provider and entering your API key. Configuration is stored at `~/.config/spark/config.json`.
+This interactive wizard walks you through selecting a provider and entering your API key. Configuration is stored at `~/.config/pilo/config.json`.
 
 ### Browser Drivers (for programmatic use)
 
-If you are using Spark as a library with Playwright, install the browser drivers:
+If you are using Pilo as a library with Playwright, install the browser drivers:
 
 ```bash
 npx playwright install
@@ -60,11 +58,11 @@ npx playwright install
 ## Quick Start
 
 ```bash
-# Configure Spark (required before first run)
-spark config init
+# Configure Pilo (required before first run)
+pilo config init
 
 # Run your first automation task
-spark run "what's the weather in Tokyo?"
+pilo run "what's the weather in Tokyo?"
 ```
 
 ## Usage
@@ -74,49 +72,49 @@ spark run "what's the weather in Tokyo?"
 **Basic syntax:**
 
 ```bash
-spark run "<task description>" [options]
+pilo run "<task description>" [options]
 ```
 
 **Examples:**
 
 ```bash
 # Simple web queries
-spark run "find the latest news on Reuters"
-spark run "what's the current price of AAPL stock?"
+pilo run "find the latest news on Reuters"
+pilo run "what's the current price of AAPL stock?"
 
 # With a specific starting URL
-spark run "find flight deals to Paris" --url https://booking.com/
+pilo run "find flight deals to Paris" --url https://booking.com/
 
 # With structured data
-spark run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
+pilo run "book a flight" --url https://booking.com/ --data '{"from":"NYC","to":"LAX","date":"2024-12-25"}'
 
 # With safety constraints
-spark run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
+pilo run "search hotels in Tokyo" --guardrails "browse only, don't book anything"
 ```
 
 **Configuration commands:**
 
 ```bash
-spark config init              # Interactive setup wizard
-spark config set <key> <value> # Set a single value
-spark config get <key>         # Get a single value
-spark config list              # List all keys
-spark config show              # Show full config
-spark config unset <key>       # Remove a key
-spark config reset             # Clear all settings
+pilo config init              # Interactive setup wizard
+pilo config set <key> <value> # Set a single value
+pilo config get <key>         # Get a single value
+pilo config list              # List all keys
+pilo config show              # Show full config
+pilo config unset <key>       # Remove a key
+pilo config reset             # Clear all settings
 ```
 
 **Extension commands:**
 
 ```bash
-spark extension install chrome   # Print Chrome load instructions
-spark extension install firefox  # Launch Firefox with extension loaded
+pilo extension install chrome   # Print Chrome load instructions
+pilo extension install firefox  # Launch Firefox with extension loaded
 ```
 
 ### Programmatic Usage
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/pilo";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
@@ -150,27 +148,27 @@ try {
 
 ## Configuration
 
-Spark supports multiple AI providers and stores configuration globally at `~/.config/spark/config.json` (XDG standard; `%APPDATA%/spark/config.json` on Windows).
+Pilo supports multiple AI providers and stores configuration globally at `~/.config/pilo/config.json` (XDG standard; `%APPDATA%/pilo/config.json` on Windows).
 
 ```bash
 # Interactive setup (recommended for first use)
-spark config init
+pilo config init
 
 # Set values directly
-spark config set provider openai
-spark config set openai_api_key sk-your-key
+pilo config set provider openai
+pilo config set openai_api_key sk-your-key
 
 # Or use OpenRouter
-spark config set provider openrouter
-spark config set openrouter_api_key sk-or-your-key
+pilo config set provider openrouter
+pilo config set openrouter_api_key sk-or-your-key
 
 # Or use a local provider
-spark config set provider ollama
-spark config set model llama3.2
+pilo config set provider ollama
+pilo config set model llama3.2
 
 # View and manage settings
-spark config show
-spark config reset
+pilo config show
+pilo config reset
 ```
 
 **Available AI Providers:**
@@ -183,14 +181,14 @@ spark config reset
 
 ## Browser Extension
 
-Spark includes a browser extension for interactive, in-browser automation. The extension is bundled with the npm package.
+Pilo includes a browser extension for interactive, in-browser automation. The extension is bundled with the npm package.
 
 ### Chrome / Brave / Edge
 
 Chrome stable ignores the `--load-extension` flag when launched programmatically, so the extension must be loaded manually:
 
 ```bash
-spark extension install chrome
+pilo extension install chrome
 ```
 
 This command prints the path to the extension directory and step-by-step instructions:
@@ -206,10 +204,10 @@ Firefox supports loading the extension directly from the CLI:
 
 ```bash
 # Launch Firefox with the extension loaded (persistent profile)
-spark extension install firefox
+pilo extension install firefox
 
 # Launch Firefox with a temporary profile
-spark extension install firefox --tmp
+pilo extension install firefox --tmp
 ```
 
 For extension development instructions, see [packages/extension/README.md](packages/extension/README.md).
@@ -219,23 +217,23 @@ For extension development instructions, see [packages/extension/README.md](packa
 ### Simple Tasks
 
 ```bash
-spark run "is it raining in London?"
-spark run "what's trending on Hacker News?"
-spark run "find the contact email for example.com"
+pilo run "is it raining in London?"
+pilo run "what's trending on Hacker News?"
+pilo run "find the contact email for example.com"
 ```
 
 ### With URLs
 
 ```bash
-spark run "find flight deals" --url https://kayak.com
-spark run "check if items are in stock" --url https://store.com
+pilo run "find flight deals" --url https://kayak.com
+pilo run "check if items are in stock" --url https://store.com
 ```
 
 ### With Structured Data
 
 ```bash
 # Hotel search
-spark run "find hotels" --url https://booking.com --data '{
+pilo run "find hotels" --url https://booking.com --data '{
   "location": "Paris",
   "checkIn": "2024-12-20",
   "checkOut": "2024-12-22",
@@ -243,7 +241,7 @@ spark run "find hotels" --url https://booking.com --data '{
 }'
 
 # Form filling
-spark run "submit contact form" --url https://company.com/contact --data '{
+pilo run "submit contact form" --url https://company.com/contact --data '{
   "name": "John Doe",
   "email": "john@example.com",
   "message": "Hello world"
@@ -254,41 +252,41 @@ spark run "submit contact form" --url https://company.com/contact --data '{
 
 ```bash
 # Browse-only mode
-spark run "research product prices" --guardrails "only browse, don't buy anything"
+pilo run "research product prices" --guardrails "only browse, don't buy anything"
 
 # Domain restrictions
-spark run "find company info" --url https://company.com --guardrails "stay on current domain only"
+pilo run "find company info" --url https://company.com --guardrails "stay on current domain only"
 
 # Form restrictions
-spark run "check shipping costs" --guardrails "don't submit any payment forms"
+pilo run "check shipping costs" --guardrails "don't submit any payment forms"
 ```
 
 ### Advanced Options
 
 ```bash
 # Run with a vanilla Firefox using WebDriver BiDi protocol
-spark run "test checkout flow" --channel moz-firefox
+pilo run "test checkout flow" --channel moz-firefox
 
 # Use a specific browser executable
-spark run "test with custom Firefox" --executable-path /usr/bin/firefox
+pilo run "test with custom Firefox" --executable-path /usr/bin/firefox
 
 # Chrome browser testing
-spark run "test checkout flow" --browser chrome --headless
+pilo run "test checkout flow" --browser chrome --headless
 
 # Headless automation
-spark run "get daily stock prices" --headless --browser firefox
+pilo run "get daily stock prices" --headless --browser firefox
 
 # Debug mode
-spark run "complex automation task" --debug
+pilo run "complex automation task" --debug
 
 # Vision mode for complex visual layouts
-spark run "fill out complex form" --vision
+pilo run "fill out complex form" --vision
 
 # Enhanced reasoning for complex tasks
-spark run "research and compare insurance plans" --reasoning-effort high
+pilo run "research and compare insurance plans" --reasoning-effort high
 
 # Combined options
-spark run "test signup flow" \
+pilo run "test signup flow" \
   --url https://app.com \
   --browser safari \
   --headless \
@@ -300,16 +298,16 @@ spark run "test signup flow" \
 
 ```bash
 # Using an HTTP proxy
-spark run "search for products" --proxy http://proxy.company.com:8080
+pilo run "search for products" --proxy http://proxy.company.com:8080
 
 # Using an authenticated proxy
-spark run "access internal site" \
+pilo run "access internal site" \
   --proxy http://proxy.company.com:8080 \
   --proxy-username myuser \
   --proxy-password mypass
 
 # Using SOCKS5 proxy
-spark run "secure browsing" --proxy socks5://127.0.0.1:1080
+pilo run "secure browsing" --proxy socks5://127.0.0.1:1080
 ```
 
 ## API Reference
@@ -317,7 +315,7 @@ spark run "secure browsing" --proxy socks5://127.0.0.1:1080
 ### WebAgent
 
 ```javascript
-import { WebAgent, PlaywrightBrowser } from "@tabstack/spark";
+import { WebAgent, PlaywrightBrowser } from "@tabstack/pilo";
 import { openai } from "@ai-sdk/openai";
 
 const browser = new PlaywrightBrowser({ headless: false });
@@ -367,7 +365,7 @@ new PlaywrightBrowser({
 
 ## Evaluation System
 
-Spark includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
+Pilo includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
 
 ```bash
 # Quick smoke test (1 task)
@@ -379,7 +377,7 @@ git checkout -b evals/partial/my-experiment
 git push origin evals/partial/my-experiment
 ```
 
-Results appear as commit status checks with links to detailed HTML reports. See [spark-evals-judge/docs/spark-evaluations.md](https://github.com/Mozilla-Ocho/spark-evals-judge/blob/main/docs/spark-evaluations.md) for complete documentation.
+Results appear as commit status checks with links to detailed HTML reports. See [pilo-evals-judge/docs/pilo-evaluations.md](https://github.com/Mozilla-Ocho/pilo-evals-judge/blob/main/docs/pilo-evaluations.md) for complete documentation.
 
 ## Configuration Reference
 
@@ -466,13 +464,13 @@ Configuration values are resolved in the following order (highest to lowest prio
 1. **Command-line options** - Directly passed to the command
 2. **Environment variables** - Set in your shell or `.env` file (dev mode only)
 3. **Local `.env` file** - In your project directory (dev mode only)
-4. **Global config file** - Set via `spark config set`
+4. **Global config file** - Set via `pilo config set`
 
-**Note:** When running an npm-installed build of Spark, environment variable parsing and `.env` file loading are disabled. Use the config file (`spark config init`) to configure Spark.
+**Note:** When running an npm-installed build of Pilo, environment variable parsing and `.env` file loading are disabled. Use the config file (`pilo config init`) to configure Pilo.
 
 ## Sharp Edges & Limitations
 
-⚠️ **Use at Your Own Risk** - Spark is experimental software that automates real browser interactions. Always use appropriate guardrails and test thoroughly before relying on it for important tasks.
+⚠️ **Use at Your Own Risk** - Pilo is experimental software that automates real browser interactions. Always use appropriate guardrails and test thoroughly before relying on it for important tasks.
 
 **Known Limitations:**
 
@@ -480,11 +478,11 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 - **Task Complexity**: Success rates decrease with task complexity. Simple information retrieval works better than multi-step form filling or complex navigation flows.
 
-- **Website Changes**: Spark adapts to websites dynamically, but major layout changes, CAPTCHAs, or anti-bot measures can cause failures.
+- **Website Changes**: Pilo adapts to websites dynamically, but major layout changes, CAPTCHAs, or anti-bot measures can cause failures.
 
 - **Flaky Behavior**: Web automation is inherently flaky. Network issues, slow page loads, dynamic content, and race conditions can cause intermittent failures.
 
-- **No Guarantee of Success**: Spark uses best-effort automation. Always verify results and have fallback plans for critical workflows.
+- **No Guarantee of Success**: Pilo uses best-effort automation. Always verify results and have fallback plans for critical workflows.
 
 - **Rate Limits & Costs**: Cloud AI providers charge per API call and have rate limits. Complex tasks can generate many API calls and screenshots, increasing costs.
 
