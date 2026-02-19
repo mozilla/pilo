@@ -11,14 +11,24 @@
  * Run via: node scripts/assemble.js
  * Called by: pnpm build (root), pnpm prepublishOnly (root)
  *
- * The script is intentionally written without any non-Node.js dependencies
- * so it runs with `node` directly without needing tsx or a bundler.
+ * Depends on esbuild (root devDependency) for the production-flag injection
+ * step. All other steps use Node.js built-ins only.
  */
 
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
-import { dirname, join, resolve } from "path";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "fs";
+import { dirname, join, relative, resolve } from "path";
 import { fileURLToPath } from "url";
 import { execFileSync } from "child_process";
+import { transform } from "esbuild";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -75,16 +85,70 @@ if (!existsSync(CORE_DIST)) {
   throw new Error(`spark-core build produced no dist/ at ${CORE_DIST}`);
 }
 
-// Copy core's flat dist output directly into root dist/.
-// This means dist/index.js, dist/browser/, etc.
-// Consumers can then do: import { WebAgent } from "@tabstack/spark"
-const coreEntries = readdirSync(CORE_DIST);
-for (const entry of coreEntries) {
-  const src = join(CORE_DIST, entry);
-  const dest = join(DIST, entry);
-  cpSync(src, dest, { recursive: true });
+// Process core's dist output into root dist/:
+//   - .js files: run through esbuild with define to inject the production flag
+//   - All other files (.d.ts, .d.ts.map, etc.): copied as-is with cpSync
+//
+// This replaces the old inject-prod-flag.mjs post-compile script. esbuild's
+// `transform` API replaces the bare `__SPARK_PRODUCTION__` identifier with
+// the literal `true`, so the runtime check evaluates correctly and bundlers
+// can dead-code-eliminate the dev-only branches.
+
+/**
+ * Recursively walk a directory, calling `fn` for every file path.
+ * @param {string} dir
+ * @param {(filePath: string) => void} fn
+ */
+function walkDir(dir, fn) {
+  for (const entry of readdirSync(dir)) {
+    const fullPath = join(dir, entry);
+    if (statSync(fullPath).isDirectory()) {
+      walkDir(fullPath, fn);
+    } else {
+      fn(fullPath);
+    }
+  }
 }
-log(`Copied ${coreEntries.length} entries from spark-core dist/ → root dist/`);
+
+let jsCount = 0;
+let otherCount = 0;
+const jsFiles = [];
+
+walkDir(CORE_DIST, (filePath) => {
+  if (filePath.endsWith(".js")) {
+    jsFiles.push(filePath);
+  } else {
+    // Non-JS file (e.g. .d.ts, .d.ts.map): copy directly.
+    const rel = relative(CORE_DIST, filePath);
+    const destPath = join(DIST, rel);
+    mkdirSync(dirname(destPath), { recursive: true });
+    cpSync(filePath, destPath);
+    otherCount++;
+  }
+});
+
+// Process all JS files through esbuild in parallel, then write results.
+const transforms = jsFiles.map(async (filePath) => {
+  const source = readFileSync(filePath, "utf-8");
+  const result = await transform(source, {
+    define: { __SPARK_PRODUCTION__: "true" },
+    format: "esm",
+    platform: "node",
+    // sourcefile keeps source map references correct
+    sourcefile: filePath,
+  });
+  const rel = relative(CORE_DIST, filePath);
+  const destPath = join(DIST, rel);
+  mkdirSync(dirname(destPath), { recursive: true });
+  writeFileSync(destPath, result.code, "utf-8");
+  jsCount++;
+});
+
+await Promise.all(transforms);
+
+log(
+  `spark-core dist/ → root dist/: processed ${jsCount} JS file${jsCount !== 1 ? "s" : ""} with esbuild define, copied ${otherCount} non-JS file${otherCount !== 1 ? "s" : ""}`,
+);
 
 // ---------------------------------------------------------------------------
 // Step 3: Build spark-cli

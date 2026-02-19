@@ -21,7 +21,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
-    "build": "pnpm run bundle:aria && tsc && node scripts/inject-prod-flag.mjs",
+    "build": "pnpm run bundle:aria && tsc",
     "pretest": "pnpm run bundle:aria",
     "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
     "test": "vitest run",

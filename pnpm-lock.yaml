@@ -66,6 +66,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      esbuild:
+        specifier: ^0.27.3
+        version: 0.27.3
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
