@@ -7,7 +7,7 @@
 declare const __SPARK_PRODUCTION__: boolean;
 
 /** Returns true only when the production build flag is set. */
-function isProduction(): boolean {
+export function isProduction(): boolean {
   return typeof __SPARK_PRODUCTION__ !== "undefined" && __SPARK_PRODUCTION__;
 }
 

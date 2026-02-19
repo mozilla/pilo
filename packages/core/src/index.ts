@@ -24,6 +24,7 @@ export { SecretsRedactor } from "./loggers/secretsRedactor.js";
 export {
   config,
   ConfigManager,
+  isProduction,
   CONFIG_SCHEMA,
   FIELDS,
   DEFAULTS,

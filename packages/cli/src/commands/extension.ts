@@ -5,15 +5,7 @@ import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
-
-// Build-time flag: replaced with `true` by the production build step.
-// In dev (running from source via tsx), this variable is undefined, which is safe.
-declare const __SPARK_PRODUCTION__: boolean;
-
-/** Returns true only when the production build flag is set. */
-function isProduction(): boolean {
-  return typeof __SPARK_PRODUCTION__ !== "undefined" && __SPARK_PRODUCTION__;
-}
+import { isProduction } from "spark-core";
 
 const SUPPORTED_BROWSERS = ["chrome", "firefox"] as const;
 type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];

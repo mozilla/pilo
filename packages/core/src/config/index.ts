@@ -45,4 +45,4 @@ export { parseEnvConfig } from "./env.js";
 export { addConfigOptions, addSchemaOptions } from "./commander.js";
 
 // Config manager and singleton
-export { ConfigManager, config } from "./manager.js";
+export { ConfigManager, config, isProduction } from "./manager.js";
