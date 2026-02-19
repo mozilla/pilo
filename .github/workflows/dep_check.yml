@@ -18,10 +18,26 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Run dependency version check
+        run: node scripts/check-dep-versions.mjs
+
+  verify-lockfile:
+    name: Verify lockfile is in sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Run dependency version check
-        run: node scripts/check-dep-versions.mjs
+      - name: Verify pnpm-lock.yaml is in sync
+        run: pnpm install --frozen-lockfile
