@@ -2,7 +2,10 @@
 import { defineConfig, type WebExtConfig, type Wxt } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Resolve module paths relative to this config file so Vite can find them
 // regardless of where the build process is invoked from. This is necessary in
@@ -72,6 +75,10 @@ let config = {
       // Pin both the WXT-module alias target and the direct specifier to the
       // concrete absolute file path so resolution always succeeds.
       alias: [
+        {
+          find: "spark-core/core",
+          replacement: resolve(__dirname, "../core/src/core.ts"),
+        },
         {
           find: "@wxt-dev/webextension-polyfill/browser",
           replacement: wxtPolyfillBrowser,
