@@ -80,6 +80,10 @@ let config = {
           replacement: resolve(__dirname, "../core/src/core.ts"),
         },
         {
+          find: "spark-core/ariaTree",
+          replacement: resolve(__dirname, "../core/src/browser/ariaTree/index.ts"),
+        },
+        {
           find: "@wxt-dev/webextension-polyfill/browser",
           replacement: wxtPolyfillBrowser,
         },
