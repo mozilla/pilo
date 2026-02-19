@@ -122,7 +122,7 @@ You adapt to situations and find creative ways to complete tasks without getting
 
 IMPORTANT:
 - You can see the entire page content through the accessibility tree snapshot.
-- You do not need to scroll or click links to navigate within a page - all content is visible to you.
+- The accessibility tree shows all currently loaded page elements. On dynamic pages, some content may only appear after scrolling or interaction — if expected data isn't visible, try scrolling or interacting to trigger loading.
 - Focus on the elements you need to interact with directly.
 `.trim();
 
@@ -285,15 +285,21 @@ Analyze the current page state and determine your next action based on previous 
 - extract() if you need more information
 
 **Best Practices:**
-- Full page content is visible - no scrolling needed
+- The accessibility tree shows currently loaded elements; dynamic pages may load more content on scroll
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
 - Submit forms via enter() or submit button after filling
 - Find alternative elements if primary ones aren't available
+- When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays
+- For autocomplete/combobox search fields (e.g., flight origin/destination, location pickers): after fill(), use focus() on a visible suggestion in the dropdown followed by enter() to select it — click() on autocomplete suggestions often times out
+- For date pickers and calendar widgets: prefer typing dates directly into the date input field using fill() rather than clicking through calendar months; if the field doesn't respond to fill(), try focus() on it first; avoid repeated calendar navigation clicks — if clicking "next month" fails twice, try filling the date field directly or using keyboard input
+- When you receive an 'Invalid element reference' error, the page DOM has changed — read the updated page snapshot on your next turn and use the new element refs; do not retry old ref IDs
 - Adapt your approach based on what's actually available
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
-- Use abort() only after trying reasonable alternatives (site down, access blocked, required data unavailable)
+- If you have found the core information requested but cannot access supplementary details due to site limitations, use done() with what you have — only use abort() when the core task cannot be completed at all
 - For research: Use extract() immediately when finding relevant data
+- For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF
+{% if hasWebSearch %}- If you need to search the web, use webSearch({query}) directly rather than filling in a browser search engine (DuckDuckGo, Google, Bing, etc.) — webSearch avoids CAPTCHA and bot detection that will block browser-based searches{% endif %}
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
 
 **When using done():**
@@ -304,6 +310,7 @@ Provide your final answer:
 - Include all requested information
 - Format results as VALID Markdown
 - NEVER return raw JSON - ALWAYS format structured data as VALID Markdown
+- If the task required finding content that meets specific criteria (minimum rating, review count, price range, ingredient count, etc.), explicitly confirm each criterion was met in your answer
 
 {% if hasGuardrails %}
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
@@ -317,6 +324,7 @@ ${toolCallInstruction}
 const buildActionLoopSystemPrompt = (hasGuardrails: boolean, hasWebSearch: boolean = false) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
+    hasWebSearch,
     toolExamples: buildToolExamples(hasWebSearch),
     currentDate: getCurrentFormattedDate(),
   });
@@ -428,6 +436,11 @@ const stepErrorFeedbackTemplate = buildPromptTemplate(
 CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 {% endif %}
 
+**Recovery guidance:**
+- If the error mentions "Invalid element reference" or "does not exist on the current page": the page DOM has changed and your cached ref IDs are stale. Do NOT retry the same ref. Wait for the next page snapshot (it will arrive automatically) and use only the new ref IDs shown there.
+- If an action keeps failing after 2 attempts, try a different approach: use a different element, navigate differently, or use extract() to re-read the current state.
+- Do NOT repeat the same action with the same arguments.
+
 **Available Tools:**
 {{ toolExamples }}
 
@@ -512,6 +525,7 @@ const taskValidationFeedbackTemplate = buildPromptTemplate(
 **Feedback:** {{ feedback }}
 
 Do not repeat your previous answer. Address the issues identified above.
+If you cannot address the feedback due to genuine site limitations (disabled UI, inaccessible content), call done() with the best answer available rather than aborting.
 `.trim(),
 );
 
