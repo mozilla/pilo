@@ -360,9 +360,9 @@ describe("CLI Extension Command", () => {
   // -------------------------------------------------------------------------
 
   describe("Dev mode (__SPARK_PRODUCTION__ === false)", () => {
-    // In dev mode __SPARK_PRODUCTION__ is undefined (not injected by tsup),
-    // which isProduction() treats as false. No stubGlobal needed here; the
-    // default test environment already has the flag undefined.
+    // __SPARK_PRODUCTION__ is only injected by the root tsup build (production).
+    // In the test environment the global is undefined, which isProduction()
+    // treats as false. No stubGlobal needed; the default state is already dev.
 
     it("should spawn pnpm with dev:chrome script for chrome", async () => {
       makeSpawnResolve(0);

@@ -145,7 +145,7 @@ async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Pr
   const args = ["-F", "spark-extension", "run", script];
 
   if (options.tmp) {
-    // Forward --tmp as an env variable for future dev scripts to pick up
+    // Forward --tmp as a CLI arg to the WXT dev script via the pnpm run `--` separator
     args.push("--", "--tmp");
   }
 
@@ -301,7 +301,7 @@ function findChromeBinary(): string | null {
 
   for (const candidate of candidates) {
     try {
-      // `which` works on macOS/Linux; for absolute paths we just check existence
+      // Absolute paths are checked with existsSync; names are resolved via `which`
       if (candidate.startsWith("/")) {
         if (existsSync(candidate)) return candidate;
       } else {
@@ -323,7 +323,7 @@ function findChromeBinary(): string | null {
 function findWebExtBinary(): string | null {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Bundled via node_modules/.bin when web-ext is a dependency of spark-cli
+  // Local bin linked by pnpm when web-ext is a dependency of spark-cli
   const localBin = resolve(__dirname, "../../node_modules/.bin/web-ext");
   if (existsSync(localBin)) return localBin;
 
