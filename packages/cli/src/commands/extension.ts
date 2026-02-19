@@ -232,22 +232,10 @@ async function launchChrome(
 
   console.log(chalk.green(`✅ Launching Chrome: ${binary}`));
   console.log(chalk.gray(`Args: ${args.join(" ")}`));
+  console.log(chalk.gray("Browser launched. The CLI will now exit; Chrome runs independently."));
 
-  const proc = spawn(binary, args, { stdio: "inherit", detached: false });
-
-  proc.on("error", (err) => {
-    console.error(chalk.red("❌ Failed to launch Chrome:"), err.message);
-    process.exit(1);
-  });
-
-  await new Promise<void>((resolve) => {
-    proc.on("close", (code) => {
-      if (code !== 0 && code !== null) {
-        console.error(chalk.yellow(`Chrome exited with code ${code}`));
-      }
-      resolve();
-    });
-  });
+  const proc = spawn(binary, args, { stdio: "ignore", detached: true });
+  proc.unref();
 }
 
 /**
@@ -294,22 +282,10 @@ async function launchFirefox(
 
   console.log(chalk.green(`✅ Launching Firefox via web-ext`));
   console.log(chalk.gray(`web-ext ${args.join(" ")}`));
+  console.log(chalk.gray("Browser launched. The CLI will now exit; Firefox runs independently."));
 
-  const proc = spawn(webExtBin, args, { stdio: "inherit", detached: false });
-
-  proc.on("error", (err) => {
-    console.error(chalk.red("❌ Failed to launch Firefox via web-ext:"), err.message);
-    process.exit(1);
-  });
-
-  await new Promise<void>((resolve) => {
-    proc.on("close", (code) => {
-      if (code !== 0 && code !== null) {
-        console.error(chalk.yellow(`web-ext exited with code ${code}`));
-      }
-      resolve();
-    });
-  });
+  const proc = spawn(webExtBin, args, { stdio: "ignore", detached: true });
+  proc.unref();
 }
 
 // ---------------------------------------------------------------------------
