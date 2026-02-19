@@ -7,14 +7,13 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "build:deploy": "tsc",
     "typecheck": "tsc --noEmit",
     "dev": "tsx --watch src/index.ts",
     "start": "node dist/index.js",
+    "clean": "rm -rf dist",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "format": "prettier --write . --list-different",
-    "format:check": "prettier --check .",
-    "check": "pnpm run format && pnpm run typecheck && pnpm test"
+    "test:watch": "vitest"
   },
   "keywords": [
     "ai",
@@ -27,7 +26,6 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.2.0",
-    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

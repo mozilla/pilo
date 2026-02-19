@@ -6,6 +6,7 @@ yarn.lock
 # Build outputs
 dist/
 build/
+.output/
 
 # Generated bundles
 packages/core/src/browser/ariaTree/bundle.ts

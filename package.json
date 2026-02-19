@@ -8,10 +8,12 @@
   },
   "scripts": {
     "dev:server": "pnpm --filter spark-server dev",
-    "dev:extension": "pnpm --filter spark-extension dev:chrome",
+    "dev:extension": "pnpm --filter spark-extension dev --",
     "clean": "pnpm -r run clean",
-    "format": "prettier --write . --list-different",
+    "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
     "check": "pnpm run format:check && pnpm -r run typecheck && pnpm -r run test",
     "release": "./scripts/release.sh"
   },
