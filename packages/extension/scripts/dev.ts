@@ -59,5 +59,7 @@ proc.on("error", (err) => {
 });
 
 proc.on("close", (code) => {
-  process.exit(code ?? 0);
+  // SIGINT (130) and SIGTERM (143) are normal shutdown signals, not errors.
+  const normalExit = code === 0 || code === 130 || code === 143;
+  process.exit(normalExit ? 0 : (code ?? 1));
 });
