@@ -1,8 +1,7 @@
 import chalk from "chalk";
 import { execFileSync, spawn } from "child_process";
-import { existsSync, mkdtempSync } from "fs";
-import { tmpdir } from "os";
-import { dirname, join, resolve } from "path";
+import { existsSync } from "fs";
+import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
 import { isProduction } from "spark-core";
@@ -27,15 +26,15 @@ export function createExtensionCommand(): Command {
 /**
  * extension install <browser> [--tmp]
  *
- * Launches the browser with the Spark extension loaded.
+ * Loads the Spark extension into a browser instance.
  *
  * Production mode (npm-installed, __SPARK_PRODUCTION__ === true):
  *   Resolves the pre-built extension from dist/extension/<browser>/ and
- *   launches the browser directly.
+ *   either prints instructions (Chrome) or launches the browser directly (Firefox).
  *
- *   Chrome: Launches with --load-extension=<path>. Pass --tmp to use a
- *           throwaway user-data directory so the default profile is never
- *           modified.
+ *   Chrome: Prints the extension path and step-by-step "Load unpacked" instructions.
+ *           Chrome stable silently ignores --load-extension, so the user must load
+ *           the extension manually via chrome://extensions.
  *
  *   Firefox: Uses `web-ext run --source-dir=<path> --no-reload`. Pass --tmp
  *            to use --profile-create-if-missing with a generated profile name
@@ -51,27 +50,21 @@ function createExtensionInstallCommand(): Command {
     .description("Load the Spark extension into a browser instance")
     .argument("<browser>", `Browser to use (${SUPPORTED_BROWSERS.join("|")})`)
     .option("--tmp", "Use a temporary profile instead of the default user profile")
-    .option("--chrome-binary <path>", "Path to the Chrome/Chromium executable")
     .option("--firefox-binary <path>", "Path to the Firefox executable")
-    .action(
-      async (
-        browser: string,
-        options: { tmp?: boolean; chromeBinary?: string; firefoxBinary?: string },
-      ) => {
-        if (!SUPPORTED_BROWSERS.includes(browser as SupportedBrowser)) {
-          console.error(chalk.red(`❌ Unsupported browser: ${browser}`));
-          console.error(chalk.gray(`Supported browsers: ${SUPPORTED_BROWSERS.join(", ")}`));
-          process.exit(1);
-          return;
-        }
+    .action(async (browser: string, options: { tmp?: boolean; firefoxBinary?: string }) => {
+      if (!SUPPORTED_BROWSERS.includes(browser as SupportedBrowser)) {
+        console.error(chalk.red(`❌ Unsupported browser: ${browser}`));
+        console.error(chalk.gray(`Supported browsers: ${SUPPORTED_BROWSERS.join(", ")}`));
+        process.exit(1);
+        return;
+      }
 
-        if (isProduction()) {
-          await runProduction(browser as SupportedBrowser, options);
-        } else {
-          await runDev(browser as SupportedBrowser, options);
-        }
-      },
-    );
+      if (isProduction()) {
+        await runProduction(browser as SupportedBrowser, options);
+      } else {
+        await runDev(browser as SupportedBrowser, options);
+      }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -80,11 +73,11 @@ function createExtensionInstallCommand(): Command {
 
 /**
  * Production mode: resolve the pre-built extension from dist/extension/<browser>/
- * and launch the browser directly.
+ * and either print instructions (Chrome) or launch the browser directly (Firefox).
  */
 async function runProduction(
   browser: SupportedBrowser,
-  options: { tmp?: boolean; chromeBinary?: string; firefoxBinary?: string },
+  options: { tmp?: boolean; firefoxBinary?: string },
 ): Promise<void> {
   const extensionPath = resolveProductionExtensionPath(browser);
 
@@ -99,12 +92,11 @@ async function runProduction(
     return;
   }
 
-  console.log(chalk.blue.bold(`🚀 Loading Spark extension in ${browser}...`));
-  console.log(chalk.gray(`Extension path: ${extensionPath}`));
-
   if (browser === "chrome") {
-    await launchChrome(extensionPath, options);
+    printChromeInstructions(extensionPath);
   } else {
+    console.log(chalk.blue.bold(`🚀 Loading Spark extension in ${browser}...`));
+    console.log(chalk.gray(`Extension path: ${extensionPath}`));
     await launchFirefox(extensionPath, options);
   }
 }
@@ -124,6 +116,36 @@ async function runProduction(
 function resolveProductionExtensionPath(browser: SupportedBrowser): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   return resolve(__dirname, "../../extension", browser);
+}
+
+/**
+ * Print step-by-step instructions for loading the Spark extension in Chrome.
+ *
+ * Chrome stable (since ~mid-2022) silently ignores the --load-extension
+ * command-line flag, so the extension must be loaded manually via the
+ * chrome://extensions UI.
+ */
+function printChromeInstructions(extensionPath: string): void {
+  const absPath = resolve(extensionPath);
+
+  console.log();
+  console.log(chalk.blue.bold("📦 Spark Extension — Chrome Setup"));
+  console.log();
+  console.log(
+    chalk.white("Chrome does not support loading unpacked extensions via command-line flags."),
+  );
+  console.log(chalk.white("Please follow these steps to load the extension manually:"));
+  console.log();
+  console.log(chalk.gray("  1. Open Chrome"));
+  console.log(chalk.gray("  2. Navigate to: ") + chalk.cyan("chrome://extensions"));
+  console.log(chalk.gray('  3. Enable "Developer mode" (toggle in the top-right corner)'));
+  console.log(chalk.gray('  4. Click "Load unpacked"'));
+  console.log(chalk.gray("  5. Select the following directory:"));
+  console.log();
+  console.log("     " + chalk.green.bold(absPath));
+  console.log();
+  console.log(chalk.gray("  (Copy the path above and paste it into the directory picker)"));
+  console.log();
 }
 
 // ---------------------------------------------------------------------------
@@ -184,60 +206,6 @@ async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Pr
 // ---------------------------------------------------------------------------
 // Browser launchers (production only)
 // ---------------------------------------------------------------------------
-
-/**
- * Launch Chrome with the extension loaded via --load-extension.
- *
- * Chrome does not support loading unpacked extensions from the default profile
- * when it is already open. Using --tmp creates a fresh data dir each time,
- * which avoids the conflict and is the recommended approach for development.
- *
- * Mechanism:
- *   chrome --load-extension=<ext-path> [--user-data-dir=<tmp-dir>]
- */
-async function launchChrome(
-  extensionPath: string,
-  options: { tmp?: boolean; chromeBinary?: string },
-): Promise<void> {
-  const binary = options.chromeBinary ?? findChromeBinary();
-
-  if (!binary) {
-    console.error(chalk.red("❌ Chrome/Chromium executable not found on PATH."));
-    console.error(
-      chalk.gray("Install Chrome or Chromium, or specify a path with --chrome-binary."),
-    );
-    process.exit(1);
-    return;
-  }
-
-  const args: string[] = [
-    `--load-extension=${extensionPath}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-  ];
-
-  if (options.tmp) {
-    const tmpDir = mkdtempSync(join(tmpdir(), "spark-chrome-"));
-    args.push(`--user-data-dir=${tmpDir}`);
-    console.log(chalk.gray(`Temporary profile: ${tmpDir}`));
-  }
-
-  console.log(chalk.green(`✅ Launching Chrome: ${binary}`));
-  console.log(chalk.gray(`Args: ${args.join(" ")}`));
-
-  const proc = spawn(binary, args, { stdio: "inherit", detached: false });
-
-  proc.on("error", (err) => {
-    console.error(chalk.red("❌ Failed to launch Chrome:"), err.message);
-    process.exit(1);
-  });
-
-  await new Promise<void>((resolve) => {
-    proc.on("close", () => {
-      resolve();
-    });
-  });
-}
 
 /**
  * Launch Firefox with the extension loaded via web-ext.
@@ -301,38 +269,6 @@ async function launchFirefox(
 // ---------------------------------------------------------------------------
 // Binary discovery helpers (production only)
 // ---------------------------------------------------------------------------
-
-/**
- * Find the Chrome/Chromium executable on PATH.
- * Tries a list of common binary names in order.
- */
-function findChromeBinary(): string | null {
-  const candidates = [
-    "google-chrome",
-    "google-chrome-stable",
-    "chromium",
-    "chromium-browser",
-    // macOS
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      // Absolute paths are checked with existsSync; names are resolved via `which`
-      if (candidate.startsWith("/")) {
-        if (existsSync(candidate)) return candidate;
-      } else {
-        execFileSync("which", [candidate], { stdio: "pipe" });
-        return candidate;
-      }
-    } catch {
-      // not found, try next
-    }
-  }
-
-  return null;
-}
 
 /**
  * Locate the web-ext binary bundled with the CLI package.

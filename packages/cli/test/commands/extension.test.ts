@@ -61,12 +61,21 @@ function getCommand(): Command {
 describe("CLI Extension Command", () => {
   let originalExit: typeof process.exit;
   let mockExit: ReturnType<typeof vi.fn>;
+  let consoleLogs: string[];
+  let originalConsoleLog: typeof console.log;
 
   beforeEach(() => {
     originalExit = process.exit;
     mockExit = vi.fn() as any;
     process.exit = mockExit as any;
     vi.clearAllMocks();
+
+    // Capture console.log output for instruction-printing tests
+    consoleLogs = [];
+    originalConsoleLog = console.log;
+    console.log = vi.fn((...args: unknown[]) => {
+      consoleLogs.push(args.map(String).join(" "));
+    });
 
     // By default extension path does not exist
     mockExistsSync.mockReturnValue(false);
@@ -78,6 +87,7 @@ describe("CLI Extension Command", () => {
 
   afterEach(() => {
     process.exit = originalExit;
+    console.log = originalConsoleLog;
     // Restore __SPARK_PRODUCTION__ to undefined (dev mode) after each test
     vi.unstubAllGlobals();
   });
@@ -105,11 +115,11 @@ describe("CLI Extension Command", () => {
       expect(flags).toContain("--tmp");
     });
 
-    it("install subcommand should accept --chrome-binary flag", () => {
+    it("install subcommand should NOT have --chrome-binary flag", () => {
       const cmd = getCommand();
       const installCmd = cmd.commands.find((c) => c.name() === "install")!;
       const flags = installCmd.options.map((o) => o.flags);
-      expect(flags).toContain("--chrome-binary <path>");
+      expect(flags.some((f) => f.includes("--chrome-binary"))).toBe(false);
     });
 
     it("install subcommand should accept --firefox-binary flag", () => {
@@ -164,107 +174,62 @@ describe("CLI Extension Command", () => {
     });
 
     // -----------------------------------------------------------------------
-    // Chrome launch (production)
+    // Chrome instructions (production)
     // -----------------------------------------------------------------------
 
-    describe("Chrome launch", () => {
+    describe("Chrome instructions", () => {
       beforeEach(() => {
-        // Make the extension path exist AND the Chrome binary exist on PATH
-        mockExistsSync.mockImplementation((p) => {
-          const path = String(p);
-          // Return true for macOS Chrome path or any extension directory
-          if (path.includes("Google Chrome") || path.includes("extension")) return true;
-          return false;
-        });
-        // execFileSync for `which google-chrome` etc. should succeed for chrome
-        mockExecFileSync.mockImplementation((cmd, args) => {
-          const argArr = args as string[];
-          if (
-            String(cmd) === "which" &&
-            ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"].includes(
-              argArr[0],
-            )
-          ) {
-            return Buffer.from("/usr/bin/google-chrome");
-          }
-          throw new Error("not found");
-        });
-      });
-
-      it("should call spawn with --load-extension flag for chrome", async () => {
-        makeSpawnResolve(0);
-
-        const cmd = getCommand();
-        await cmd.parseAsync(["install", "chrome"], { from: "user" });
-
-        expect(mockSpawn).toHaveBeenCalled();
-        const [, spawnArgs] = mockSpawn.mock.calls[0];
-        expect((spawnArgs as string[]).some((a) => a.startsWith("--load-extension="))).toBe(true);
-      });
-
-      it("should spawn chrome with detached:false and stdio:inherit (blocking)", async () => {
-        makeSpawnResolve(0);
-
-        const cmd = getCommand();
-        await cmd.parseAsync(["install", "chrome"], { from: "user" });
-
-        expect(mockSpawn).toHaveBeenCalled();
-        const [, , spawnOpts] = mockSpawn.mock.calls[0];
-        expect((spawnOpts as any).detached).toBe(false);
-        expect((spawnOpts as any).stdio).toBe("inherit");
-      });
-
-      it("should wait for chrome to close before returning (blocking)", async () => {
-        const mockProc = makeSpawnResolve(0);
-
-        const cmd = getCommand();
-        await cmd.parseAsync(["install", "chrome"], { from: "user" });
-
-        // The close handler must have been registered
-        const closeCalls = (mockProc.on as ReturnType<typeof vi.fn>).mock.calls.filter(
-          (args: unknown[]) => args[0] === "close",
-        );
-        expect(closeCalls.length).toBeGreaterThan(0);
-      });
-
-      it("should include --user-data-dir when --tmp flag is passed for chrome", async () => {
-        makeSpawnResolve(0);
-
-        const cmd = getCommand();
-        await cmd.parseAsync(["install", "chrome", "--tmp"], { from: "user" });
-
-        expect(mockSpawn).toHaveBeenCalled();
-        const [, spawnArgs] = mockSpawn.mock.calls[0];
-        expect((spawnArgs as string[]).some((a) => a.startsWith("--user-data-dir="))).toBe(true);
-      });
-
-      it("should use --chrome-binary override when provided", async () => {
-        makeSpawnResolve(0);
-
-        const cmd = getCommand();
-        await cmd.parseAsync(["install", "chrome", "--chrome-binary", "/custom/chrome"], {
-          from: "user",
-        });
-
-        expect(mockSpawn).toHaveBeenCalled();
-        const [binary] = mockSpawn.mock.calls[0];
-        expect(binary).toBe("/custom/chrome");
-      });
-
-      it("should exit(1) when Chrome binary is not found and no override given", async () => {
-        // existsSync: extension exists but macOS Chrome app does not
+        // Make the extension path exist
         mockExistsSync.mockImplementation((p) => {
           return String(p).includes("extension");
         });
-        // execFileSync always throws → no chrome on PATH
-        mockExecFileSync.mockImplementation(() => {
-          throw new Error("not found");
-        });
+      });
 
+      it("should NOT spawn Chrome for chrome in production mode", async () => {
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
-        expect(mockExit).toHaveBeenCalledWith(1);
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
+      it("should NOT call process.exit(1) for chrome when extension exists", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        expect(mockExit).not.toHaveBeenCalledWith(1);
+      });
+
+      it("should print the extension path in the instructions", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        // The resolved absolute path should appear in output
+        expect(allOutput).toMatch(/extension/);
+      });
+
+      it("should print chrome://extensions in the instructions", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toContain("chrome://extensions");
+      });
+
+      it("should print Load unpacked instructions", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toContain("Load unpacked");
+      });
+
+      it("should print Developer mode step in the instructions", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toContain("Developer mode");
       });
     });
 
