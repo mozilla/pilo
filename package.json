@@ -8,14 +8,14 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/core/src/index.d.ts",
+      "import": "./dist/core/src/index.js"
     }
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/core/src/index.js",
+  "types": "./dist/core/src/index.d.ts",
   "bin": {
-    "spark": "./dist/cli/cli.js"
+    "spark": "./dist/cli/src/cli.js"
   },
   "files": [
     "dist/",
@@ -23,13 +23,17 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/assemble.js",
+    "prebuild": "pnpm --filter spark-core run build && pnpm --filter spark-extension run build:publish",
+    "build": "tsup",
+    "prepublishOnly": "pnpm run build",
     "clean": "pnpm -r run clean && rm -rf dist",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck",
     "pretest": "pnpm --filter spark-core run bundle:aria",
     "test": "pnpm -r run test",
+    "check": "pnpm run typecheck && pnpm run test",
+    "spark": "pnpm --filter spark-cli run spark",
     "release": "./scripts/release.sh"
   },
   "keywords": [
@@ -66,6 +70,7 @@
   "devDependencies": {
     "esbuild": "^0.27.3",
     "prettier": "^3.8.1",
+    "tsup": "^8.3.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
