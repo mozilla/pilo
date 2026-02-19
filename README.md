@@ -2,7 +2,7 @@
   Tabstack Pilo
 </h1>
 <p align="center"><small>pronounced <b>/ˈpaɪloʊ/</b> (PIE-low)</small></p>
-<h3 align="center">AI-powered web automation</h3>
+<h2 align="center">AI-powered web automation</h2>
 
 AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Pilo will navigate websites, fill forms, and gather information automatically.
 
