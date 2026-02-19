@@ -135,6 +135,34 @@ The config system lives in `packages/core/src/config/` and is split by concern:
 
 **Two-tier rule**: The extension must import from `spark-core/core` (not `spark-core`), which pulls in `config/defaults.ts` but not the Node.js-dependent files.
 
+### Config File Location
+
+| Platform    | Path                                                                          |
+| ----------- | ----------------------------------------------------------------------------- |
+| macOS/Linux | `$XDG_CONFIG_HOME/spark/config.json` (default: `~/.config/spark/config.json`) |
+| Windows     | `%APPDATA%/spark/config.json`                                                 |
+
+There is no migration from the legacy `~/.spark/` path. If a user has an old config there, they must re-run `spark config init`.
+
+### Production vs. Dev Merge Strategy
+
+The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). A build-time `__SPARK_PRODUCTION__` flag is baked into the compiled output by `packages/core/scripts/inject-prod-flag.mjs`.
+
+| Mode                                    | Merge order                                     | Notes                                                          |
+| --------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| **Production** (npm-installed)          | defaults → global config (required)             | No `.env` loading. No env var parsing. Config file must exist. |
+| **Dev** (running from source via `tsx`) | defaults → global config (if exists) → env vars | Loads `.env` from CWD. Global config is optional.              |
+
+### CLI Config Guard
+
+`spark run` requires a config file to exist before executing. If no config is present, the command exits immediately with:
+
+```
+Error: No configuration found. Run 'spark config init' to set up your configuration.
+```
+
+All other commands (`config`, `extension`, `examples`) work without a config file.
+
 ## Architectural Constraints
 
 - **No barrel imports** except `index.ts` and `core.ts` in core, and `browser/ariaTree/index.ts`. Do not create new barrel files.
@@ -154,24 +182,50 @@ npm pack         # Produces the tarball for inspection
 
 Published package contents (`dist/`):
 
-- Core library (importable as `@tabstack/spark` or `@tabstack/spark/core`)
+- Core library (importable as `@tabstack/spark`)
 - CLI binary (`spark`)
 - Pre-built extension: `dist/extension/chrome/` and `dist/extension/firefox/` (unpacked)
 
 Package exports:
 
 - `.` - Full Node.js API (`dist/index.js`)
-- `./core` - Browser-safe API (`dist/core.js`)
-- `./ariaTree` - ariaTree browser module
+
+Internal workspace packages import `spark-core` directly and do not use root-level re-exports.
 
 ## Scripts
 
-| Script                                      | Description                                                       |
-| ------------------------------------------- | ----------------------------------------------------------------- |
-| `scripts/assemble.js`                       | Assembles root publishable package from sub-package build outputs |
-| `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages  |
-| `scripts/release.sh`                        | Release automation                                                |
-| `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)  |
+| Script                                       | Description                                                             |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| `scripts/assemble.js`                        | Assembles root publishable package from sub-package build outputs       |
+| `scripts/check-dep-versions.mjs`             | CI: verifies shared dependency version alignment across packages        |
+| `scripts/release.sh`                         | Release automation                                                      |
+| `packages/core/scripts/bundle-aria-tree.ts`  | Generates ariaTree bundle (auto-run during build, not committed)        |
+| `packages/core/scripts/inject-prod-flag.mjs` | Post-compile: replaces `__SPARK_PRODUCTION__` with `true` in dist files |
+
+## CI Workflows
+
+CI is defined in `.github/workflows/`.
+
+### Build & Test (`build-test.yml`)
+
+The primary CI workflow. Uses `dorny/paths-filter@v3` for smart change detection so jobs run only when relevant files are modified.
+
+| Job             | Trigger condition                        | Notes                            |
+| --------------- | ---------------------------------------- | -------------------------------- |
+| Core typecheck  | Always                                   | Runs on every push/PR.           |
+| Core tests      | Core files changed                       |                                  |
+| CLI tests       | CLI files changed, or core changed       | Core is a CLI dependency.        |
+| Server tests    | Server files changed, or core changed    | Core is a server dependency.     |
+| Extension tests | Extension files changed, or core changed | Core is an extension dependency. |
+
+The core build output is cached and shared across jobs that depend on it.
+
+### Dependency Check (`dep_check.yml`)
+
+Runs two parallel jobs:
+
+1. **Version alignment**: Verifies all packages use the same version of any shared dependency (`scripts/check-dep-versions.mjs`).
+2. **Lockfile sync**: Verifies `pnpm-lock.yaml` is in sync with all `package.json` files via `pnpm install --frozen-lockfile`.
 
 ## AI Provider Configuration
 
