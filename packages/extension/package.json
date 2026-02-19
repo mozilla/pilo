@@ -13,7 +13,8 @@
     "build:firefox": "wxt build -b firefox",
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
     "clean": "rm -rf dist .output",
-    "typecheck": "tsc --noEmit",
+    "pretest": "wxt prepare",
+    "typecheck": "wxt prepare && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:headless": "HEADLESS=true playwright test"
