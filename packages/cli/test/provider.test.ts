@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // With spark-core aliased to ../core/src/index.ts in vitest.config.ts, the internal
-// config object lives at ../core/src/config.ts. Mocking that path intercepts the
+// config object lives at ../core/src/config/index.ts. Mocking that path intercepts the
 // singleton used by createAIProvider and getAIProviderInfo at the source level.
-vi.mock("../../core/src/config.js", () => ({
+vi.mock("../../core/src/config/index.js", () => ({
   config: {
     getConfig: vi.fn(),
   },

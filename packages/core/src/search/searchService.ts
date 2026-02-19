@@ -7,7 +7,7 @@
  */
 
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
-import type { SearchProviderName } from "../configDefaults.js";
+import type { SearchProviderName } from "../config/defaults.js";
 import { SEARCH_RESULTS_REMINDER } from "../utils/promptSecurity.js";
 import {
   createSearchProvider,
