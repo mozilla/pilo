@@ -68,7 +68,7 @@ pnpm --filter spark-server run test       # Test server only
 ### Building
 
 ```bash
-pnpm run build          # Full assembly: core + CLI + extension → root dist/
+pnpm run build          # Full assembly: prebuild (core + extension) then tsup compiles core + CLI → root dist/
 pnpm -r run build       # Build all packages individually
 pnpm run clean          # Clean all packages and root dist/
 ```
@@ -146,7 +146,7 @@ There is no migration from the legacy `~/.spark/` path. If a user has an old con
 
 ### Production vs. Dev Merge Strategy
 
-The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). The `__SPARK_PRODUCTION__` flag is injected by the root assembly step (`scripts/assemble.js`) using esbuild's `define` option. Individual package builds are always dev mode; only the root assembly produces production artifacts.
+The config system behaves differently depending on whether Spark is running from compiled output (production) or from source via `tsx` (dev). The `__SPARK_PRODUCTION__` flag is injected by the root `tsup` build via the `define` option in `tsup.config.ts`. Individual package builds are always dev mode; only the root tsup build produces production artifacts.
 
 | Mode                                    | Merge order                                     | Notes                                                          |
 | --------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
@@ -176,7 +176,7 @@ All other commands (`config`, `extension`, `examples`) work without a config fil
 The root `@tabstack/spark` is the published package.
 
 ```bash
-pnpm run build   # Assembles all outputs into dist/ via scripts/assemble.js
+pnpm run build   # Runs prebuild (core + extension), then tsup compiles core + CLI into dist/
 npm pack         # Produces the tarball for inspection
 ```
 
@@ -188,18 +188,18 @@ Published package contents (`dist/`):
 
 Package exports:
 
-- `.` - Full Node.js API (`dist/index.js`)
+- `.` - Full Node.js API (`dist/core/src/index.js`)
 
 Internal workspace packages import `spark-core` directly and do not use root-level re-exports.
 
 ## Scripts
 
-| Script                                      | Description                                                                                                            |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `scripts/assemble.js`                       | Assembles root publishable package from sub-package build outputs; injects `__SPARK_PRODUCTION__` via esbuild `define` |
-| `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages                                                       |
-| `scripts/release.sh`                        | Release automation                                                                                                     |
-| `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)                                                       |
+| Script                                      | Description                                                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tsup.config.ts`                            | Root tsup build config: compiles core + CLI source into `dist/`, resolves `spark-core` workspace imports, injects `__SPARK_PRODUCTION__` via `define`, copies extension artifacts via `onSuccess` |
+| `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages                                                                                                                                  |
+| `scripts/release.sh`                        | Release automation                                                                                                                                                                                |
+| `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)                                                                                                                                  |
 
 ## CI Workflows
 
