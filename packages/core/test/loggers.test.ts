@@ -829,6 +829,91 @@ describe("JSONConsoleLogger", () => {
       expect(parsed.data.temperature).toBe(0.7);
     });
 
+    it("should sanitize image Buffer data in AI_GENERATION messages", () => {
+      const fakeJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]); // JPEG header bytes
+      const eventData: AIGenerationEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        prompt: "Analyze the page",
+        schema: {},
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What do you see?" },
+              { type: "image", image: fakeJpeg, mimeType: "image/jpeg" },
+            ] as any,
+          },
+        ],
+        finishReason: "stop",
+        usage: {
+          totalTokens: 200,
+          inputTokens: 150,
+          outputTokens: 50,
+          inputTokenDetails: { noCacheTokens: 150, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          outputTokenDetails: { textTokens: 50, reasoningTokens: 0 },
+        },
+        providerMetadata: {},
+        warnings: [],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AI_GENERATION,
+        data: eventData,
+      });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const output = mockConsole.log.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+
+      const imageBlock = parsed.data.messages[0].content[1];
+      expect(imageBlock.type).toBe("image");
+      expect(imageBlock.data).toBe("<omitted>");
+      expect(imageBlock.size).toBe(fakeJpeg.byteLength);
+      // Raw byte array must not appear in the output
+      expect(output).not.toContain("255"); // 0xff byte value
+    });
+
+    it("should preserve raw image data when sanitizeGenerationImages is false", () => {
+      logger.dispose();
+      const rawLogger = new JSONConsoleLogger({ sanitizeGenerationImages: false });
+      rawLogger.initialize(emitter);
+
+      const fakeJpeg = Buffer.from([0xff, 0xd8]);
+      const eventData: AIGenerationEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        prompt: "Analyze the page",
+        schema: {},
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "image", image: fakeJpeg, mimeType: "image/jpeg" }] as any,
+          },
+        ],
+        finishReason: "stop",
+        usage: {
+          totalTokens: 100,
+          inputTokens: 80,
+          outputTokens: 20,
+          inputTokenDetails: { noCacheTokens: 80, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          outputTokenDetails: { textTokens: 20, reasoningTokens: 0 },
+        },
+        providerMetadata: {},
+        warnings: [],
+      };
+
+      emitter.emitEvent({ type: WebAgentEventType.AI_GENERATION, data: eventData });
+
+      expect(mockConsole.log).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(mockConsole.log.mock.calls[0][0]);
+      const imageBlock = parsed.data.messages[0].content[0];
+      // data field should NOT be '<omitted>' when sanitization is disabled
+      expect(imageBlock.data).not.toBe("<omitted>");
+
+      rawLogger.dispose();
+    });
+
     it("should output JSON for AI_GENERATION_ERROR events", () => {
       const eventData: AIGenerationErrorEventData = {
         timestamp: Date.now(),
