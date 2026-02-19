@@ -90,7 +90,7 @@ importers:
       commander:
         specifier: ^14.0.3
         version: 14.0.3
-      spark-core:
+      pilo-core:
         specifier: workspace:*
         version: link:../core
       web-ext:
@@ -245,15 +245,15 @@ importers:
       ollama-ai-provider-v2:
         specifier: ^3.0.3
         version: 3.3.1(ai@6.0.87(zod@4.3.6))(zod@4.3.6)
+      pilo-core:
+        specifier: workspace:*
+        version: link:../core
       react:
         specifier: ^19.2.4
         version: 19.2.4
       react-dom:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
-      spark-core:
-        specifier: workspace:*
-        version: link:../core
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
@@ -324,7 +324,7 @@ importers:
       hono:
         specifier: ^4.11.10
         version: 4.11.10
-      spark-core:
+      pilo-core:
         specifier: workspace:*
         version: link:../core
     devDependencies:
