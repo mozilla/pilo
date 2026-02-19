@@ -20,7 +20,6 @@ vi.mock("child_process", async (importOriginal) => {
 
   const mockProc = {
     on: vi.fn(),
-    unref: vi.fn(),
   };
 
   return {
@@ -37,7 +36,7 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockSpawn = vi.mocked(spawn);
 const mockExecFileSync = vi.mocked(execFileSync);
 
-// Helper: make spawn resolve immediately via the "close" event (used for dev mode tests only)
+// Helper: make spawn resolve immediately via the "close" event (blocking mode)
 function makeSpawnResolve(code = 0) {
   const mockProc = {
     on: vi.fn().mockImplementation((event: string, handler: (code: number) => void) => {
@@ -46,7 +45,6 @@ function makeSpawnResolve(code = 0) {
         setImmediate(() => handler(code));
       }
     }),
-    unref: vi.fn(),
   };
   mockSpawn.mockReturnValue(mockProc as any);
   return mockProc;
@@ -194,6 +192,8 @@ describe("CLI Extension Command", () => {
       });
 
       it("should call spawn with --load-extension flag for chrome", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
@@ -202,27 +202,34 @@ describe("CLI Extension Command", () => {
         expect((spawnArgs as string[]).some((a) => a.startsWith("--load-extension="))).toBe(true);
       });
 
-      it("should spawn chrome with detached:true and stdio:ignore (fire-and-forget)", async () => {
+      it("should spawn chrome with detached:false and stdio:inherit (blocking)", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
         expect(mockSpawn).toHaveBeenCalled();
         const [, , spawnOpts] = mockSpawn.mock.calls[0];
-        expect((spawnOpts as any).detached).toBe(true);
-        expect((spawnOpts as any).stdio).toBe("ignore");
+        expect((spawnOpts as any).detached).toBe(false);
+        expect((spawnOpts as any).stdio).toBe("inherit");
       });
 
-      it("should call proc.unref() after spawning chrome", async () => {
-        const mockProc = { on: vi.fn(), unref: vi.fn() };
-        mockSpawn.mockReturnValue(mockProc as any);
+      it("should wait for chrome to close before returning (blocking)", async () => {
+        const mockProc = makeSpawnResolve(0);
 
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
-        expect(mockProc.unref).toHaveBeenCalled();
+        // The close handler must have been registered
+        const closeCalls = (mockProc.on as ReturnType<typeof vi.fn>).mock.calls.filter(
+          (args: unknown[]) => args[0] === "close",
+        );
+        expect(closeCalls.length).toBeGreaterThan(0);
       });
 
       it("should include --user-data-dir when --tmp flag is passed for chrome", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome", "--tmp"], { from: "user" });
 
@@ -232,6 +239,8 @@ describe("CLI Extension Command", () => {
       });
 
       it("should use --chrome-binary override when provided", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "chrome", "--chrome-binary", "/custom/chrome"], {
           from: "user",
@@ -272,6 +281,8 @@ describe("CLI Extension Command", () => {
       });
 
       it("should call spawn with web-ext run and --source-dir for firefox", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox"], { from: "user" });
 
@@ -283,6 +294,8 @@ describe("CLI Extension Command", () => {
       });
 
       it("should include --no-reload in web-ext args for firefox", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox"], { from: "user" });
 
@@ -292,27 +305,34 @@ describe("CLI Extension Command", () => {
         expect(args).toContain("--no-reload");
       });
 
-      it("should spawn web-ext with detached:true and stdio:ignore (fire-and-forget)", async () => {
+      it("should spawn web-ext with detached:false and stdio:inherit (blocking)", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox"], { from: "user" });
 
         expect(mockSpawn).toHaveBeenCalled();
         const [, , spawnOpts] = mockSpawn.mock.calls[0];
-        expect((spawnOpts as any).detached).toBe(true);
-        expect((spawnOpts as any).stdio).toBe("ignore");
+        expect((spawnOpts as any).detached).toBe(false);
+        expect((spawnOpts as any).stdio).toBe("inherit");
       });
 
-      it("should call proc.unref() after spawning firefox via web-ext", async () => {
-        const mockProc = { on: vi.fn(), unref: vi.fn() };
-        mockSpawn.mockReturnValue(mockProc as any);
+      it("should wait for web-ext to close before returning (blocking)", async () => {
+        const mockProc = makeSpawnResolve(0);
 
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox"], { from: "user" });
 
-        expect(mockProc.unref).toHaveBeenCalled();
+        // The close handler must have been registered
+        const closeCalls = (mockProc.on as ReturnType<typeof vi.fn>).mock.calls.filter(
+          (args: unknown[]) => args[0] === "close",
+        );
+        expect(closeCalls.length).toBeGreaterThan(0);
       });
 
       it("should include --profile-create-if-missing when --tmp is passed for firefox", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox", "--tmp"], { from: "user" });
 
@@ -323,6 +343,8 @@ describe("CLI Extension Command", () => {
       });
 
       it("should include --firefox flag when --firefox-binary override is given", async () => {
+        makeSpawnResolve(0);
+
         const cmd = getCommand();
         await cmd.parseAsync(["install", "firefox", "--firefox-binary", "/custom/firefox"], {
           from: "user",
