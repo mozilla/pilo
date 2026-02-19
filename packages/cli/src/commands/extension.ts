@@ -6,6 +6,15 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
 
+// Build-time flag: replaced with `true` by the production build step.
+// In dev (running from source via tsx), this variable is undefined, which is safe.
+declare const __SPARK_PRODUCTION__: boolean;
+
+/** Returns true only when the production build flag is set. */
+function isProduction(): boolean {
+  return typeof __SPARK_PRODUCTION__ !== "undefined" && __SPARK_PRODUCTION__;
+}
+
 const SUPPORTED_BROWSERS = ["chrome", "firefox"] as const;
 type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];
 
@@ -28,24 +37,22 @@ export function createExtensionCommand(): Command {
  *
  * Launches the browser with the Spark extension loaded.
  *
- * Chrome: Launches with --load-extension=<path>. Pass --tmp to use a throwaway
- *         user-data directory so the default profile is never modified.
+ * Production mode (npm-installed, __SPARK_PRODUCTION__ === true):
+ *   Resolves the pre-built extension from dist/extension/<browser>/ and
+ *   launches the browser directly.
  *
- * Firefox: Uses `web-ext run --source-dir=<path>`. Pass --tmp to use
- *          --profile-create-if-missing with a generated profile name so the
- *          default profile is never modified.
+ *   Chrome: Launches with --load-extension=<path>. Pass --tmp to use a
+ *           throwaway user-data directory so the default profile is never
+ *           modified.
  *
- * Design notes:
- *   - The pre-built extension is expected to live at:
- *       ../../extension/dist/<browser>/  (relative to this file at runtime)
- *     This path is finalised in Phase 3G when the npm package assembly is
- *     configured. The helper `resolveExtensionPath()` centralises the logic so
- *     it can be updated in one place.
- *   - Chrome is launched via `google-chrome` / `google-chrome-stable` / `chromium`
- *     (first one found on PATH). A `--chrome-binary` flag is provided to override.
- *   - Firefox is launched via `web-ext` (a devDependency bundled with the CLI).
- *     `web-ext` handles finding Firefox automatically, and a `--firefox-binary`
- *     flag lets users point at a custom binary.
+ *   Firefox: Uses `web-ext run --source-dir=<path> --no-reload`. Pass --tmp
+ *            to use --profile-create-if-missing with a generated profile name
+ *            so the default profile is never modified.
+ *
+ * Dev mode (running from source, __SPARK_PRODUCTION__ === false):
+ *   Shells out to `pnpm -F spark-extension dev:<browser>`. The WXT dev server
+ *   handles browser launch, HMR, and profile management. The --tmp flag is
+ *   forwarded if provided so future dev scripts can use it.
  */
 function createExtensionInstallCommand(): Command {
   return new Command("install")
@@ -66,92 +73,124 @@ function createExtensionInstallCommand(): Command {
           return;
         }
 
-        const extensionPath = resolveExtensionPath(browser as SupportedBrowser);
-
-        if (!existsSync(extensionPath)) {
-          console.error(chalk.red("❌ Extension not found at:"), extensionPath);
-          console.error(
-            chalk.gray(
-              "Run the extension build first: pnpm --filter spark-extension build:" + browser,
-            ),
-          );
-          process.exit(1);
-          return;
-        }
-
-        console.log(chalk.blue.bold(`🚀 Loading Spark extension in ${browser}...`));
-        console.log(chalk.gray(`Extension path: ${extensionPath}`));
-
-        if (browser === "chrome") {
-          await launchChrome(extensionPath, options);
+        if (isProduction()) {
+          await runProduction(browser as SupportedBrowser, options);
         } else {
-          await launchFirefox(extensionPath, options);
+          await runDev(browser as SupportedBrowser, options);
         }
       },
     );
 }
 
 // ---------------------------------------------------------------------------
-// Path resolution
+// Production path
 // ---------------------------------------------------------------------------
+
+/**
+ * Production mode: resolve the pre-built extension from dist/extension/<browser>/
+ * and launch the browser directly.
+ */
+async function runProduction(
+  browser: SupportedBrowser,
+  options: { tmp?: boolean; chromeBinary?: string; firefoxBinary?: string },
+): Promise<void> {
+  const extensionPath = resolveProductionExtensionPath(browser);
+
+  if (!existsSync(extensionPath)) {
+    console.error(chalk.red("❌ Extension not found at:"), extensionPath);
+    console.error(
+      chalk.gray(
+        "The pre-built extension is missing from the npm package. Try reinstalling: npm install -g @tabstack/spark",
+      ),
+    );
+    process.exit(1);
+    return;
+  }
+
+  console.log(chalk.blue.bold(`🚀 Loading Spark extension in ${browser}...`));
+  console.log(chalk.gray(`Extension path: ${extensionPath}`));
+
+  if (browser === "chrome") {
+    await launchChrome(extensionPath, options);
+  } else {
+    await launchFirefox(extensionPath, options);
+  }
+}
 
 /**
  * Resolve the path to the pre-built extension for the given browser.
  *
- * Resolution order (first existing path wins):
+ * In the npm-installed package layout, compiled CLI files live at:
+ *   dist/cli/commands/extension.js
  *
- * 1. Installed npm package layout (Phase 3G):
- *      dist/cli/commands/extension.js  →  ../../extension/<browser>/
- *    i.e.  <package-root>/dist/extension/<browser>/
+ * The extension artifacts are assembled alongside the CLI at:
+ *   dist/extension/<browser>/
  *
- * 2. Monorepo dev build via WXT (.output/<browser>-mv3/):
- *      packages/cli/dist/commands/extension.js  →  (up 4) → repo root
- *      repo root / packages/extension/.output/<browser>-mv3/
- *
- * 3. Monorepo dev build via WXT (dist/<browser>-mv2/ for firefox):
- *    Same path but inside packages/extension/dist/
- *
- * The helper is intentionally tolerant so that `spark extension install`
- * gives a clear error (path not found) rather than a stack trace if the
- * extension has not been built yet.
+ * So from __dirname (dist/cli/commands/) we go up two levels to reach
+ * dist/, then into extension/<browser>/.
  */
-function resolveExtensionPath(browser: SupportedBrowser): string {
+function resolveProductionExtensionPath(browser: SupportedBrowser): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-
-  // 1. Installed npm package: dist/cli/commands/ → dist/extension/<browser>/
-  const installedPath = resolve(__dirname, "../../extension", browser);
-  if (existsSync(installedPath)) {
-    return installedPath;
-  }
-
-  // 2. Monorepo dev: packages/cli/dist/commands/ → repo root → packages/extension/.output/
-  const repoRoot = resolve(__dirname, "../../../../");
-  const wxtOutputDir = join(repoRoot, "packages", "extension", ".output");
-
-  // WXT names the output dir <browser>-mv3 (chrome) or <browser>-mv2 (firefox)
-  const mvVariants = [`${browser}-mv3`, `${browser}-mv2`];
-  for (const variant of mvVariants) {
-    const wxtOutput = join(wxtOutputDir, variant);
-    if (existsSync(wxtOutput)) {
-      return wxtOutput;
-    }
-  }
-
-  // 3. WXT outputDir set to "dist" in wxt.config.ts: packages/extension/dist/<browser>-mv*/
-  const extensionDistDir = join(repoRoot, "packages", "extension", "dist");
-  for (const variant of mvVariants) {
-    const builtPath = join(extensionDistDir, variant);
-    if (existsSync(builtPath)) {
-      return builtPath;
-    }
-  }
-
-  // Return the installed path as the canonical "expected" location for error messaging
-  return installedPath;
+  return resolve(__dirname, "../../extension", browser);
 }
 
 // ---------------------------------------------------------------------------
-// Browser launchers
+// Dev path
+// ---------------------------------------------------------------------------
+
+/**
+ * Dev mode: shell out to `pnpm -F spark-extension dev:<browser>`.
+ *
+ * The WXT dev server handles browser launch, HMR, extension loading, and
+ * profile management. We do not need binary detection or manual Chrome/Firefox
+ * args here; those are production-only concerns.
+ *
+ * If the dev script doesn't exist yet (it's added in a future plan), pnpm will
+ * exit with a non-zero code and we surface a clear error message.
+ */
+async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Promise<void> {
+  const script = `dev:${browser}`;
+  const args = ["-F", "spark-extension", "run", script];
+
+  if (options.tmp) {
+    // Forward --tmp as an env variable for future dev scripts to pick up
+    args.push("--", "--tmp");
+  }
+
+  console.log(chalk.blue.bold(`🚀 Starting Spark extension dev server for ${browser}...`));
+  console.log(chalk.gray(`Running: pnpm ${args.join(" ")}`));
+
+  const proc = spawn("pnpm", args, { stdio: "inherit", detached: false });
+
+  proc.on("error", (err) => {
+    console.error(chalk.red("❌ Failed to start extension dev server:"), err.message);
+    console.error(
+      chalk.gray(
+        `Extension dev script not found. Run 'pnpm --filter spark-extension run ${script}' manually, ` +
+          `or build the extension first with 'pnpm --filter spark-extension run build:${browser}'.`,
+      ),
+    );
+    process.exit(1);
+  });
+
+  await new Promise<void>((resolve) => {
+    proc.on("close", (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(chalk.yellow(`pnpm ${script} exited with code ${code}`));
+        console.error(
+          chalk.gray(
+            `Extension dev script not found. Run 'pnpm --filter spark-extension run ${script}' manually, ` +
+              `or build the extension first with 'pnpm --filter spark-extension run build:${browser}'.`,
+          ),
+        );
+      }
+      resolve();
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Browser launchers (production only)
 // ---------------------------------------------------------------------------
 
 /**
@@ -218,10 +257,13 @@ async function launchChrome(
  * Firefox for development. It handles:
  *   - Temporary installation (extensions are removed when Firefox closes)
  *   - Profile management (--profile-create-if-missing)
- *   - Live reloading (not used here, but available)
+ *
+ * `--no-reload` is always passed so web-ext does not watch for file changes
+ * and auto-reload the extension. In production the extension is static; HMR
+ * is the dev server's responsibility (WXT handles it in dev mode).
  *
  * Mechanism:
- *   web-ext run --source-dir=<ext-path> [--profile-create-if-missing]
+ *   web-ext run --source-dir=<ext-path> --no-reload [--profile-create-if-missing]
  *               [--firefox=<binary>]
  */
 async function launchFirefox(
@@ -237,7 +279,7 @@ async function launchFirefox(
     return;
   }
 
-  const args: string[] = ["run", `--source-dir=${extensionPath}`];
+  const args: string[] = ["run", `--source-dir=${extensionPath}`, "--no-reload"];
 
   if (options.tmp) {
     // Create a named temporary profile so Firefox starts fresh
@@ -271,7 +313,7 @@ async function launchFirefox(
 }
 
 // ---------------------------------------------------------------------------
-// Binary discovery helpers
+// Binary discovery helpers (production only)
 // ---------------------------------------------------------------------------
 
 /**

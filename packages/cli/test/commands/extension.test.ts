@@ -78,6 +78,8 @@ describe("CLI Extension Command", () => {
 
   afterEach(() => {
     process.exit = originalExit;
+    // Restore __SPARK_PRODUCTION__ to undefined (dev mode) after each test
+    vi.unstubAllGlobals();
   });
 
   // -------------------------------------------------------------------------
@@ -132,66 +134,237 @@ describe("CLI Extension Command", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Extension path missing
+  // Production mode
   // -------------------------------------------------------------------------
 
-  describe("Extension path not found", () => {
-    it("should exit(1) for chrome when extension path does not exist", async () => {
-      // existsSync always returns false → extension not built
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "chrome"], { from: "user" });
-
-      expect(mockExit).toHaveBeenCalledWith(1);
+  describe("Production mode (__SPARK_PRODUCTION__ === true)", () => {
+    beforeEach(() => {
+      vi.stubGlobal("__SPARK_PRODUCTION__", true);
     });
 
-    it("should exit(1) for firefox when extension path does not exist", async () => {
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "firefox"], { from: "user" });
+    // -----------------------------------------------------------------------
+    // Extension path missing (production)
+    // -----------------------------------------------------------------------
 
-      expect(mockExit).toHaveBeenCalledWith(1);
+    describe("Extension path not found", () => {
+      it("should exit(1) for chrome when extension path does not exist", async () => {
+        // existsSync always returns false → extension not built
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
+
+      it("should exit(1) for firefox when extension path does not exist", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Chrome launch (production)
+    // -----------------------------------------------------------------------
+
+    describe("Chrome launch", () => {
+      beforeEach(() => {
+        // Make the extension path exist AND the Chrome binary exist on PATH
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          // Return true for macOS Chrome path or any extension directory
+          if (path.includes("Google Chrome") || path.includes("extension")) return true;
+          return false;
+        });
+        // execFileSync for `which google-chrome` etc. should succeed for chrome
+        mockExecFileSync.mockImplementation((cmd, args) => {
+          const argArr = args as string[];
+          if (
+            String(cmd) === "which" &&
+            ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"].includes(
+              argArr[0],
+            )
+          ) {
+            return Buffer.from("/usr/bin/google-chrome");
+          }
+          throw new Error("not found");
+        });
+      });
+
+      it("should call spawn with --load-extension flag for chrome", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        expect((spawnArgs as string[]).some((a) => a.startsWith("--load-extension="))).toBe(true);
+      });
+
+      it("should include --user-data-dir when --tmp flag is passed for chrome", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome", "--tmp"], { from: "user" });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        expect((spawnArgs as string[]).some((a) => a.startsWith("--user-data-dir="))).toBe(true);
+      });
+
+      it("should use --chrome-binary override when provided", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome", "--chrome-binary", "/custom/chrome"], {
+          from: "user",
+        });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [binary] = mockSpawn.mock.calls[0];
+        expect(binary).toBe("/custom/chrome");
+      });
+
+      it("should exit(1) when Chrome binary is not found and no override given", async () => {
+        // existsSync: extension exists but macOS Chrome app does not
+        mockExistsSync.mockImplementation((p) => {
+          return String(p).includes("extension");
+        });
+        // execFileSync always throws → no chrome on PATH
+        mockExecFileSync.mockImplementation(() => {
+          throw new Error("not found");
+        });
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "chrome"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Firefox launch (production)
+    // -----------------------------------------------------------------------
+
+    describe("Firefox launch", () => {
+      beforeEach(() => {
+        // Extension path exists
+        mockExistsSync.mockImplementation((p) => {
+          return String(p).includes("extension") || String(p).includes("web-ext");
+        });
+      });
+
+      it("should call spawn with web-ext run and --source-dir for firefox", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        const args = spawnArgs as string[];
+        expect(args[0]).toBe("run");
+        expect(args.some((a) => a.startsWith("--source-dir="))).toBe(true);
+      });
+
+      it("should include --no-reload in web-ext args for firefox", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        const args = spawnArgs as string[];
+        expect(args).toContain("--no-reload");
+      });
+
+      it("should include --profile-create-if-missing when --tmp is passed for firefox", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox", "--tmp"], { from: "user" });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        const args = spawnArgs as string[];
+        expect(args).toContain("--profile-create-if-missing");
+      });
+
+      it("should include --firefox flag when --firefox-binary override is given", async () => {
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox", "--firefox-binary", "/custom/firefox"], {
+          from: "user",
+        });
+
+        expect(mockSpawn).toHaveBeenCalled();
+        const [, spawnArgs] = mockSpawn.mock.calls[0];
+        const args = spawnArgs as string[];
+        expect(args.some((a) => a.startsWith("--firefox="))).toBe(true);
+      });
+
+      it("should exit(1) when web-ext is not found", async () => {
+        // Extension exists but web-ext binary does not
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          // extension path exists
+          if (path.includes("extension") && !path.includes("web-ext")) return true;
+          return false;
+        });
+        // `which web-ext` also fails
+        mockExecFileSync.mockImplementation(() => {
+          throw new Error("not found");
+        });
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
     });
   });
 
   // -------------------------------------------------------------------------
-  // Chrome - launch
+  // Dev mode
   // -------------------------------------------------------------------------
 
-  describe("Chrome launch", () => {
-    beforeEach(() => {
-      // Make the extension path exist AND the Chrome binary exist on PATH
-      mockExistsSync.mockImplementation((p) => {
-        const path = String(p);
-        // Return true for macOS Chrome path or any extension directory
-        if (path.includes("Google Chrome") || path.includes("extension")) return true;
-        return false;
-      });
-      // execFileSync for `which google-chrome` etc. should succeed for chrome
-      mockExecFileSync.mockImplementation((cmd, args) => {
-        const argArr = args as string[];
-        if (
-          String(cmd) === "which" &&
-          ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"].includes(
-            argArr[0],
-          )
-        ) {
-          return Buffer.from("/usr/bin/google-chrome");
-        }
-        throw new Error("not found");
-      });
-    });
+  describe("Dev mode (__SPARK_PRODUCTION__ === false)", () => {
+    // In dev mode __SPARK_PRODUCTION__ is undefined (not injected by tsup),
+    // which isProduction() treats as false. No stubGlobal needed here; the
+    // default test environment already has the flag undefined.
 
-    it("should call spawn with --load-extension flag for chrome", async () => {
+    it("should spawn pnpm with dev:chrome script for chrome", async () => {
       makeSpawnResolve(0);
 
       const cmd = getCommand();
       await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
       expect(mockSpawn).toHaveBeenCalled();
-      const [, spawnArgs] = mockSpawn.mock.calls[0];
-      expect((spawnArgs as string[]).some((a) => a.startsWith("--load-extension="))).toBe(true);
+      const [binary, spawnArgs] = mockSpawn.mock.calls[0];
+      expect(binary).toBe("pnpm");
+      const args = spawnArgs as string[];
+      expect(args).toContain("-F");
+      expect(args).toContain("spark-extension");
+      expect(args).toContain("dev:chrome");
     });
 
-    it("should include --user-data-dir when --tmp flag is passed for chrome", async () => {
+    it("should spawn pnpm with dev:firefox script for firefox", async () => {
+      makeSpawnResolve(0);
+
+      const cmd = getCommand();
+      await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const [binary, spawnArgs] = mockSpawn.mock.calls[0];
+      expect(binary).toBe("pnpm");
+      const args = spawnArgs as string[];
+      expect(args).toContain("dev:firefox");
+    });
+
+    it("should forward --tmp flag as extra arg to the dev script", async () => {
       makeSpawnResolve(0);
 
       const cmd = getCommand();
@@ -199,105 +372,40 @@ describe("CLI Extension Command", () => {
 
       expect(mockSpawn).toHaveBeenCalled();
       const [, spawnArgs] = mockSpawn.mock.calls[0];
-      expect((spawnArgs as string[]).some((a) => a.startsWith("--user-data-dir="))).toBe(true);
+      const args = spawnArgs as string[];
+      expect(args).toContain("--tmp");
     });
 
-    it("should use --chrome-binary override when provided", async () => {
+    it("should not check existsSync for the extension path in dev mode", async () => {
       makeSpawnResolve(0);
 
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "chrome", "--chrome-binary", "/custom/chrome"], {
-        from: "user",
-      });
-
-      expect(mockSpawn).toHaveBeenCalled();
-      const [binary] = mockSpawn.mock.calls[0];
-      expect(binary).toBe("/custom/chrome");
-    });
-
-    it("should exit(1) when Chrome binary is not found and no override given", async () => {
-      // existsSync: extension exists but macOS Chrome app does not
-      mockExistsSync.mockImplementation((p) => {
-        return String(p).includes("extension");
-      });
-      // execFileSync always throws → no chrome on PATH
-      mockExecFileSync.mockImplementation(() => {
-        throw new Error("not found");
-      });
+      // existsSync returns false for everything - dev mode should not care
+      mockExistsSync.mockReturnValue(false);
 
       const cmd = getCommand();
       await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
-      expect(mockExit).toHaveBeenCalledWith(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Firefox - launch
-  // -------------------------------------------------------------------------
-
-  describe("Firefox launch", () => {
-    beforeEach(() => {
-      // Extension path exists
-      mockExistsSync.mockImplementation((p) => {
-        return String(p).includes("extension") || String(p).includes("web-ext");
-      });
-    });
-
-    it("should call spawn with web-ext run and --source-dir for firefox", async () => {
-      makeSpawnResolve(0);
-
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "firefox"], { from: "user" });
-
+      // Should NOT have called process.exit(1)
+      expect(mockExit).not.toHaveBeenCalledWith(1);
+      // Should have spawned pnpm
       expect(mockSpawn).toHaveBeenCalled();
-      const [, spawnArgs] = mockSpawn.mock.calls[0];
-      const args = spawnArgs as string[];
-      expect(args[0]).toBe("run");
-      expect(args.some((a) => a.startsWith("--source-dir="))).toBe(true);
     });
 
-    it("should include --profile-create-if-missing when --tmp is passed for firefox", async () => {
-      makeSpawnResolve(0);
+    it("should call process.exit(1) on spawn error in dev mode", async () => {
+      const mockProc = {
+        on: vi.fn().mockImplementation((event: string, handler: (...args: any[]) => void) => {
+          if (event === "error") {
+            setImmediate(() => handler(new Error("pnpm not found")));
+          } else if (event === "close") {
+            // Fire close after the error so the Promise resolves
+            setImmediate(() => setImmediate(() => handler(1)));
+          }
+        }),
+      };
+      mockSpawn.mockReturnValue(mockProc as any);
 
       const cmd = getCommand();
-      await cmd.parseAsync(["install", "firefox", "--tmp"], { from: "user" });
-
-      expect(mockSpawn).toHaveBeenCalled();
-      const [, spawnArgs] = mockSpawn.mock.calls[0];
-      const args = spawnArgs as string[];
-      expect(args).toContain("--profile-create-if-missing");
-    });
-
-    it("should include --firefox flag when --firefox-binary override is given", async () => {
-      makeSpawnResolve(0);
-
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "firefox", "--firefox-binary", "/custom/firefox"], {
-        from: "user",
-      });
-
-      expect(mockSpawn).toHaveBeenCalled();
-      const [, spawnArgs] = mockSpawn.mock.calls[0];
-      const args = spawnArgs as string[];
-      expect(args.some((a) => a.startsWith("--firefox="))).toBe(true);
-    });
-
-    it("should exit(1) when web-ext is not found", async () => {
-      // Extension exists but web-ext binary does not
-      mockExistsSync.mockImplementation((p) => {
-        const path = String(p);
-        // extension path exists
-        if (path.includes("extension") && !path.includes("web-ext")) return true;
-        return false;
-      });
-      // `which web-ext` also fails
-      mockExecFileSync.mockImplementation(() => {
-        throw new Error("not found");
-      });
-
-      const cmd = getCommand();
-      await cmd.parseAsync(["install", "firefox"], { from: "user" });
+      await cmd.parseAsync(["install", "chrome"], { from: "user" });
 
       expect(mockExit).toHaveBeenCalledWith(1);
     });
