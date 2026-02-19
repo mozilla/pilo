@@ -34,6 +34,7 @@
     "test": "pnpm -r run test",
     "check": "pnpm run typecheck && pnpm run test",
     "spark": "pnpm --filter spark-cli run spark",
+    "dev:server": "pnpm --filter spark-server run dev",
     "release": "./scripts/release.sh"
   },
   "keywords": [
