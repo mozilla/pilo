@@ -9,9 +9,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev.js",
-    "prebuild:chrome": "pnpm --filter spark-core build",
     "build:chrome": "wxt build -b chrome",
-    "prebuild:firefox": "pnpm --filter spark-core build",
     "build:firefox": "wxt build -b firefox",
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
     "zip:chrome": "wxt zip -b chrome",

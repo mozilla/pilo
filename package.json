@@ -6,10 +6,36 @@
   "engines": {
     "node": "^22.0.0"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./ariaTree": {
+      "types": "./dist/browser/ariaTree/index.d.ts",
+      "import": "./dist/browser/ariaTree/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "spark": "./dist/cli/cli.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "node scripts/assemble.js",
+    "prepublishOnly": "pnpm run build",
     "dev:server": "pnpm --filter spark-server dev",
     "dev:extension": "pnpm --filter spark-extension dev --",
-    "clean": "pnpm -r run clean",
+    "clean": "pnpm -r run clean && rm -rf dist",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r run typecheck",
@@ -27,6 +53,27 @@
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.20",
+    "@ai-sdk/google-vertex": "^4.0.41",
+    "@ai-sdk/openai": "^3.0.25",
+    "@ai-sdk/openai-compatible": "^2.0.26",
+    "@ghostery/adblocker-playwright": "^2.13.4",
+    "@openrouter/ai-sdk-provider": "^2.1.1",
+    "ai": "^6.0.69",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "eventemitter3": "^5.0.4",
+    "liquidjs": "^10.24.0",
+    "nanoid": "^5.1.6",
+    "ollama-ai-provider-v2": "^3.0.3",
+    "playwright": "1.58.1",
+    "turndown": "^7.2.2",
+    "web-ext": "^8.4.0",
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",

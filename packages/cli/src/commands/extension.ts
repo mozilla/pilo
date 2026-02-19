@@ -98,30 +98,56 @@ function createExtensionInstallCommand(): Command {
 /**
  * Resolve the path to the pre-built extension for the given browser.
  *
- * At development time (running via tsx from packages/cli/src/commands/) the
- * path is:
- *   packages/cli/src/commands/  →  (up 4 levels)  →  repo root
- *   repo root / packages/extension/.output/<browser>-mv3/
+ * Resolution order (first existing path wins):
  *
- * After Phase 3G (npm package assembly) the path will be updated to point at
- * the dist artefact bundled inside the published package. Until then this
- * covers local development and CI.
+ * 1. Installed npm package layout (Phase 3G):
+ *      dist/cli/commands/extension.js  →  ../../extension/<browser>/
+ *    i.e.  <package-root>/dist/extension/<browser>/
+ *
+ * 2. Monorepo dev build via WXT (.output/<browser>-mv3/):
+ *      packages/cli/dist/commands/extension.js  →  (up 4) → repo root
+ *      repo root / packages/extension/.output/<browser>-mv3/
+ *
+ * 3. Monorepo dev build via WXT (dist/<browser>-mv2/ for firefox):
+ *    Same path but inside packages/extension/dist/
+ *
+ * The helper is intentionally tolerant so that `spark extension install`
+ * gives a clear error (path not found) rather than a stack trace if the
+ * extension has not been built yet.
  */
 function resolveExtensionPath(browser: SupportedBrowser): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Traverse from packages/cli/src/commands → packages/cli/src → packages/cli → packages → repo root
-  const repoRoot = resolve(__dirname, "../../../../");
-
-  // WXT outputs to .output/<browser>-mv3/ during development builds
-  const wxtOutput = join(repoRoot, "packages", "extension", ".output", `${browser}-mv3`);
-  if (existsSync(wxtOutput)) {
-    return wxtOutput;
+  // 1. Installed npm package: dist/cli/commands/ → dist/extension/<browser>/
+  const installedPath = resolve(__dirname, "../../extension", browser);
+  if (existsSync(installedPath)) {
+    return installedPath;
   }
 
-  // Phase 3G: assembled dist path (chrome/firefox unpacked)
-  const assembledDist = join(repoRoot, "dist", "extension", browser);
-  return assembledDist;
+  // 2. Monorepo dev: packages/cli/dist/commands/ → repo root → packages/extension/.output/
+  const repoRoot = resolve(__dirname, "../../../../");
+  const wxtOutputDir = join(repoRoot, "packages", "extension", ".output");
+
+  // WXT names the output dir <browser>-mv3 (chrome) or <browser>-mv2 (firefox)
+  const mvVariants = [`${browser}-mv3`, `${browser}-mv2`];
+  for (const variant of mvVariants) {
+    const wxtOutput = join(wxtOutputDir, variant);
+    if (existsSync(wxtOutput)) {
+      return wxtOutput;
+    }
+  }
+
+  // 3. WXT outputDir set to "dist" in wxt.config.ts: packages/extension/dist/<browser>-mv*/
+  const extensionDistDir = join(repoRoot, "packages", "extension", "dist");
+  for (const variant of mvVariants) {
+    const builtPath = join(extensionDistDir, variant);
+    if (existsSync(builtPath)) {
+      return builtPath;
+    }
+  }
+
+  // Return the installed path as the canonical "expected" location for error messaging
+  return installedPath;
 }
 
 // ---------------------------------------------------------------------------

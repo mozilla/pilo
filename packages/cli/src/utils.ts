@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -7,17 +7,40 @@ import { fileURLToPath } from "url";
  */
 
 /**
- * Get package.json information
+ * Get package.json information.
+ *
+ * Searches upward from the compiled file's location so the path works both:
+ *   - In development:  packages/cli/dist/utils.js  → ../package.json (spark-cli)
+ *   - When installed:  dist/cli/utils.js            → ../../package.json (@tabstack/spark)
+ *
+ * Falls back through candidate paths until a package.json is found.
  */
 export function getPackageInfo(): { version: string; name: string; description: string } {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
 
-  return {
-    version: packageJson.version,
-    name: packageJson.name,
-    description: packageJson.description,
-  };
+  // Walk up from the current file directory looking for package.json
+  const candidates = [
+    join(__dirname, "../package.json"), // dev: packages/cli/package.json
+    join(__dirname, "../../package.json"), // installed: @tabstack/spark root package.json
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      const pkg = JSON.parse(readFileSync(candidate, "utf-8")) as {
+        version?: string;
+        name?: string;
+        description?: string;
+      };
+      return {
+        version: pkg.version ?? "0.0.0",
+        name: pkg.name ?? "spark",
+        description: pkg.description ?? "",
+      };
+    }
+  }
+
+  // Should never reach here in a properly assembled package
+  return { version: "0.0.0", name: "spark", description: "AI-powered web automation" };
 }
 
 /**

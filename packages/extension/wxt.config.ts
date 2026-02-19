@@ -1,7 +1,15 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { defineConfig, type WebExtConfig, type Wxt } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
+
+// Resolve module paths relative to this config file so Vite can find them
+// regardless of where the build process is invoked from. This is necessary in
+// pnpm workspaces where hoisting is strict and the polyfill package lives only
+// in packages/extension/node_modules, not in the root node_modules.
+const _require = createRequire(import.meta.url);
+const wxtPolyfillBrowser = _require.resolve("@wxt-dev/webextension-polyfill/browser");
 
 function generateWebExtJSON(): WebExtConfig {
   const config: WebExtConfig = {
@@ -57,6 +65,23 @@ let config = {
   },
   vite: () => ({
     plugins: [tailwindcss()] as any,
+    resolve: {
+      // In pnpm workspaces, strict hoisting means @wxt-dev/webextension-polyfill
+      // lives only in packages/extension/node_modules. Vite's load-fallback plugin
+      // cannot resolve the bare specifier when traversing symlinked workspace deps.
+      // Pin both the WXT-module alias target and the direct specifier to the
+      // concrete absolute file path so resolution always succeeds.
+      alias: [
+        {
+          find: "@wxt-dev/webextension-polyfill/browser",
+          replacement: wxtPolyfillBrowser,
+        },
+        {
+          find: "wxt/browser",
+          replacement: wxtPolyfillBrowser,
+        },
+      ],
+    },
     server: {
       fs: {
         // Allow serving files from parent node_modules (for @fontsource-variable/inter)
