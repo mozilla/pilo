@@ -44,16 +44,15 @@ jobs:
       - name: Run tests
         run: pnpm -r run test
 
-      - name: Build all packages
-        run: pnpm -r run build
-
       - name: Create package tarball
-        run: npm pack
+        id: tarball
+        run: |
+          npm pack
+          echo "filename=$(ls *.tgz)" >> $GITHUB_OUTPUT
 
       - name: Get package info
         id: package
         run: |
-          echo "name=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
           echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create Release
@@ -70,8 +69,8 @@ jobs:
 
           **Option 2: Install This Specific Release (Pre-built)**
           \`\`\`bash
-          npm install https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz
-          npm install -g https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz  # global CLI
+          npm install https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.tarball.outputs.filename }}
+          npm install -g https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.tarball.outputs.filename }}  # global CLI
           \`\`\`
 
           ## What's New in v${{ steps.package.outputs.version }}
@@ -84,13 +83,13 @@ jobs:
 
           **As a library:**
           \`\`\`javascript
-          import { WebAgent, PlaywrightBrowser } from 'spark';
+          import { WebAgent, PlaywrightBrowser } from '@tabstack/spark';
           \`\`\`
 
           **As CLI:**
           \`\`\`bash
           spark \"your task here\"
           \`\`\`" \
-            ./${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.tgz
+            ./${{ steps.tarball.outputs.filename }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,6 +7,64 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@ai-sdk/google':
+        specifier: ^3.0.20
+        version: 3.0.29(zod@4.3.6)
+      '@ai-sdk/google-vertex':
+        specifier: ^4.0.41
+        version: 4.0.58(zod@4.3.6)
+      '@ai-sdk/openai':
+        specifier: ^3.0.25
+        version: 3.0.29(zod@4.3.6)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.26
+        version: 2.0.30(zod@4.3.6)
+      '@ghostery/adblocker-playwright':
+        specifier: ^2.13.4
+        version: 2.13.4(playwright@1.58.1)
+      '@openrouter/ai-sdk-provider':
+        specifier: ^2.1.1
+        version: 2.2.3(ai@6.0.87(zod@4.3.6))(zod@4.3.6)
+      ai:
+        specifier: ^6.0.69
+        version: 6.0.87(zod@4.3.6)
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      commander:
+        specifier: ^14.0.3
+        version: 14.0.3
+      cross-fetch:
+        specifier: ^4.1.0
+        version: 4.1.0
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      eventemitter3:
+        specifier: ^5.0.4
+        version: 5.0.4
+      liquidjs:
+        specifier: ^10.24.0
+        version: 10.24.0
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.6
+      ollama-ai-provider-v2:
+        specifier: ^3.0.3
+        version: 3.3.1(ai@6.0.87(zod@4.3.6))(zod@4.3.6)
+      playwright:
+        specifier: 1.58.1
+        version: 1.58.1
+      turndown:
+        specifier: ^7.2.2
+        version: 7.2.2
+      web-ext:
+        specifier: ^8.4.0
+        version: 8.10.0(node-fetch@3.3.2)
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       prettier:
         specifier: ^3.8.1
