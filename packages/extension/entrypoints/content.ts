@@ -1,6 +1,6 @@
 // Import ariaTree functionality from shared module
 import browser from "webextension-polyfill";
-import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "spark-core/ariaTree";
+import { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "pilo-core/ariaTree";
 import type {
   ExtensionMessage,
   GetPageInfoResponse,
@@ -21,7 +21,7 @@ export default defineContentScript({
   runAt: "document_start",
   registration: "manifest",
   main() {
-    console.log("[Spark] Content script loaded at document_start");
+    console.log("[Pilo] Content script loaded at document_start");
     // Make ARIA tree functions available globally for executeScript
     window.generateAndRenderAriaTree = generateAndRenderAriaTree;
     window.applySetOfMarks = applySetOfMarks;
@@ -38,7 +38,7 @@ export default defineContentScript({
       const typedRequest = request as ExtensionMessage;
       switch (typedRequest.type) {
         case "getPageInfo":
-          // Extract page information for Spark automation
+          // Extract page information for Pilo automation
           const pageInfo: GetPageInfoResponse = {
             title: document.title,
             url: window.location.href,

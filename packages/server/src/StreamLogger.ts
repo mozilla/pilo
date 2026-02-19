@@ -1,4 +1,4 @@
-import { GenericLogger, WebAgentEventType } from "spark-core";
+import { GenericLogger, WebAgentEventType } from "pilo-core";
 
 type EventSender = (event: string, data: any) => Promise<void>;
 
@@ -18,7 +18,7 @@ const BASE_EXCLUDED_EVENTS: readonly WebAgentEventType[] = [
 ] as const;
 
 /**
- * Logger that forwards all Spark events to a Server-Sent Events stream
+ * Logger that forwards all Pilo events to a Server-Sent Events stream
  * Uses the GenericLogger for automatic event forwarding
  */
 export class StreamLogger extends GenericLogger {

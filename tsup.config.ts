@@ -3,7 +3,7 @@ import { defineConfig } from "tsup";
 
 // Read root package.json to dynamically derive the external list from dependencies.
 // This prevents tsup from bundling npm packages that consumers install themselves.
-// spark-core is intentionally excluded: it's a workspace package that must be
+// pilo-core is intentionally excluded: it's a workspace package that must be
 // resolved and bundled so the published CLI has no unresolvable workspace imports.
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 const externalDeps = Object.keys(pkg.dependencies || {});
@@ -31,20 +31,20 @@ export default defineConfig({
   // Inject the production flag at build time. The ConfigManager checks this to
   // choose between production (config file required) and dev (env vars allowed) mode.
   define: {
-    __SPARK_PRODUCTION__: "true",
+    __PILO_PRODUCTION__: "true",
   },
   external: [
     // Node built-ins (node: protocol)
     /^node:/,
     // All runtime npm dependencies - resolved by the consumer's node_modules.
-    // spark-core is intentionally NOT listed here: tsup must bundle it.
+    // pilo-core is intentionally NOT listed here: tsup must bundle it.
     ...externalDeps,
   ],
   async onSuccess() {
     // Copy WXT extension build artifacts into the root dist/.
     // WXT outputs to packages/extension/dist/<browser>-<manifest>/ but we
     // publish them under the simpler dist/extension/<browser>/ paths that
-    // match what spark-cli expects at runtime.
+    // match what pilo-cli expects at runtime.
     const BROWSER_MAP: Record<string, string> = {
       "chrome-mv3": "chrome",
       "firefox-mv2": "firefox",

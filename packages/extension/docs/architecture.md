@@ -1,8 +1,8 @@
-# Spark Browser Extension Architecture
+# Pilo Browser Extension Architecture
 
 ## Overview
 
-Spark is a browser extension that enables AI-powered web automation through natural language tasks. The extension is one of three implementations in the Spark monorepo, all sharing the same core automation logic:
+Pilo is a browser extension that enables AI-powered web automation through natural language tasks. The extension is one of three implementations in the Pilo monorepo, all sharing the same core automation logic:
 
 - **Extension** (this package) - Browser extension using WebExtension APIs
 - **CLI** - Command-line tool using Playwright
@@ -16,10 +16,10 @@ The extension follows the standard WebExtension architecture with three main com
 
 ## Monorepo Structure
 
-Spark is organized as a PNPM monorepo with three packages:
+Pilo is organized as a PNPM monorepo with three packages:
 
 ```
-spark/ (root)
+pilo/ (root)
 ├── src/                      # Shared core library
 │   ├── webAgent.ts           # Main task orchestrator (used by all)
 │   ├── browser/
@@ -101,7 +101,7 @@ extension/
 │       └── typeGuards.test.ts
 ├── wxt.config.ts            # WXT framework configuration
 ├── vitest.config.ts         # Test runner configuration
-└── package.json             # Dependencies: "spark": "file:.."
+└── package.json             # Dependencies: "pilo": "file:.."
 ```
 
 ## Core Components
@@ -207,7 +207,7 @@ The extension displays a visual indicator (glowing animated purple border) on pa
 │                     FIRST TAB STARTS TASK                       │
 │                                                                  │
 │  1. registerContentScripts() with CSS + runAt: "document_start" │
-│     (single registration: id="spark-indicator")                 │
+│     (single registration: id="pilo-indicator")                 │
 │  2. Increment activeIndicators count                            │
 │  3. insertCSS() for current page (already loaded)               │
 │  4. executeScript() to add class on current page                │
@@ -243,7 +243,7 @@ The extension displays a visual indicator (glowing animated purple border) on pa
 
 3. **Tab Tracking**: A `Set<number>` called `activeIndicators` tracks which tab IDs have active indicators. CSS is only unregistered when the set is empty.
 
-4. **Class Toggle**: The indicator is activated/deactivated by adding/removing `spark-indicator-active` class from `<html>` element.
+4. **Class Toggle**: The indicator is activated/deactivated by adding/removing `pilo-indicator-active` class from `<html>` element.
 
 5. **Navigation Handling**:
    - `webNavigation.onCommitted` listener re-applies class on early navigation (requires `webNavigation` permission)
@@ -265,9 +265,9 @@ The extension displays a visual indicator (glowing animated purple border) on pa
 
 **Known Limitation**:
 
-The global `registerContentScripts` approach injects indicator CSS into **all pages matching the URL pattern**, not just tabs running Spark tasks. For example, if tabs A and B are running tasks on `example.com`, and tab C also has `example.com` open but is not under Spark control, tab C still receives the CSS injection.
+The global `registerContentScripts` approach injects indicator CSS into **all pages matching the URL pattern**, not just tabs running Pilo tasks. For example, if tabs A and B are running tasks on `example.com`, and tab C also has `example.com` open but is not under Pilo control, tab C still receives the CSS injection.
 
-This is currently harmless because the CSS only has a visible effect when the `spark-indicator-active` class is present on the `<html>` element, and that class is only added to tabs actively running tasks. However, it is wasteful - CSS is injected into pages that don't need it.
+This is currently harmless because the CSS only has a visible effect when the `pilo-indicator-active` class is present on the `<html>` element, and that class is only added to tabs actively running tasks. However, it is wasteful - CSS is injected into pages that don't need it.
 
 A future improvement could use tab-specific `insertCSS` calls instead, though this would sacrifice the `document_start` timing that reduces flash during navigation.
 
@@ -428,12 +428,12 @@ sequenceDiagram
 
 **Location**: [src/AgentManager.ts](../src/AgentManager.ts)
 
-Coordinates task execution between the extension and the core Spark agent.
+Coordinates task execution between the extension and the core Pilo agent.
 
 **Key Responsibilities**:
 
 - Creates `ExtensionBrowser` instance for the target tab
-- Initializes `WebAgent` from spark/core with AI configuration
+- Initializes `WebAgent` from pilo-core with AI configuration
 - Manages agent execution lifecycle
 - Handles cancellation via `AbortSignal`
 - Captures and broadcasts events via `EventStoreLogger`
@@ -466,7 +466,7 @@ async runTask(params: ExecuteTaskParams, signal?: AbortSignal) {
 
 **Location**: [src/ExtensionBrowser.ts](../src/ExtensionBrowser.ts)
 
-Adapts WebExtension APIs to implement the `AriaBrowser` interface from spark/core. This allows the same agent code to run in extension, CLI, and server contexts.
+Adapts WebExtension APIs to implement the `AriaBrowser` interface from pilo-core. This allows the same agent code to run in extension, CLI, and server contexts.
 
 **Key Methods**:
 
@@ -520,7 +520,7 @@ Captures events during task execution and broadcasts them to the sidebar for rea
 
 **Key Features**:
 
-- Implements the `EventLogger` interface from spark/core
+- Implements the `EventLogger` interface from pilo-core
 - Broadcasts events via `browser.runtime.sendMessage()`
 - All extension listeners receive events simultaneously
 - Non-blocking - doesn't slow down task execution
@@ -1026,7 +1026,7 @@ The extension uses `webextension-polyfill` for consistent API across browsers:
 - **Styling**: Tailwind CSS
 - **Markdown Rendering**: marked-react (with XSS protection)
 - **Web Extension API**: webextension-polyfill
-- **Agent Core**: spark/core (shared with CLI and server)
+- **Agent Core**: pilo-core (shared with CLI and server)
 
 ## Relationship to Core Codebase
 
@@ -1093,7 +1093,7 @@ export class WebAgent {
 
 ```typescript
 // extension/src/AgentManager.ts
-import { WebAgent } from "spark/core";
+import { WebAgent } from "pilo-core/core";
 import { ExtensionBrowser } from "./ExtensionBrowser";
 
 class AgentManager {
@@ -1125,7 +1125,7 @@ The extension declares a local file dependency on the root package:
 ```json
 {
   "dependencies": {
-    "spark": "file:..", // Points to root package
+    "pilo-core": "workspace:*", // Points to core package
     "react": "^19.2.0",
     "zustand": "^5.0.8",
     "webextension-polyfill": "^0.12.0"
@@ -1135,13 +1135,13 @@ The extension declares a local file dependency on the root package:
 
 This allows importing from two entry points:
 
-1. **`spark/core`** - Browser-safe exports (used by extension)
+1. **`pilo-core/core`** - Browser-safe exports (used by extension)
    - WebAgent, AriaBrowser interface, Events, Loggers
    - No Node.js dependencies
    - Safe for browser extension environment
 
-2. **`spark`** - Full exports including Node.js APIs (used by CLI/Server)
-   - Everything from `spark/core` plus:
+2. **`pilo-core`** - Full exports including Node.js APIs (used by CLI/Server)
+   - Everything from `pilo-core/core` plus:
    - PlaywrightBrowser, config utilities, Node.js-specific loggers
 
 ### Shared Components
@@ -1151,21 +1151,21 @@ The following are imported from the root package and used directly:
 **From [../../src/events.ts](../../src/events.ts)**:
 
 ```typescript
-import { WebAgentEventEmitter } from "spark/core";
+import { WebAgentEventEmitter } from "pilo-core/core";
 // Used for event emission during task execution
 ```
 
 **From [../../src/loggers/types.ts](../../src/loggers/types.ts)**:
 
 ```typescript
-import { Logger } from "spark/core";
+import { Logger } from "pilo-core/core";
 // EventStoreLogger extends GenericLogger
 ```
 
 **From [../../src/schemas.ts](../../src/schemas.ts)**:
 
 ```typescript
-import { PageAction, LoadState } from "spark/core";
+import { PageAction, LoadState } from "pilo-core/core";
 // Used by ExtensionBrowser for action types
 ```
 
@@ -1173,7 +1173,7 @@ import { PageAction, LoadState } from "spark/core";
 
 ```mermaid
 graph TB
-    subgraph "Spark Monorepo"
+    subgraph "Pilo Monorepo"
         subgraph "Root Package (src/)"
             WebAgent[WebAgent<br/>Task Orchestrator]
             AriaBrowser[AriaBrowser Interface<br/>Platform Abstraction]

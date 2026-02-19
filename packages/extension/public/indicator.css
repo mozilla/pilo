@@ -1,4 +1,4 @@
-html.spark-indicator-active::after {
+html.pilo-indicator-active::after {
   content: "";
   pointer-events: none;
   position: fixed;
@@ -13,9 +13,9 @@ html.spark-indicator-active::after {
     inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset 60px -60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
-  animation: spark-pulse 3s ease-in-out infinite;
+  animation: pilo-pulse 3s ease-in-out infinite;
 }
-@keyframes spark-pulse {
+@keyframes pilo-pulse {
   0%,
   100% {
     opacity: 0.6;

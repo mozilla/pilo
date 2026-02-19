@@ -1,6 +1,6 @@
 {
-  "name": "spark-extension",
-  "description": "Browser extension for Spark AI-powered web automation",
+  "name": "pilo-extension",
+  "description": "Browser extension for Pilo AI-powered web automation",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -32,7 +32,7 @@
     "ollama-ai-provider-v2": "^3.0.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "spark-core": "workspace:*",
+    "pilo-core": "workspace:*",
     "tailwindcss": "^4.1.18",
     "turndown": "^7.2.2",
     "webextension-polyfill": "^0.12.0",

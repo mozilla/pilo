@@ -15,7 +15,7 @@
   "main": "./dist/core/src/index.js",
   "types": "./dist/core/src/index.d.ts",
   "bin": {
-    "spark": "./dist/cli/src/cli.js"
+    "pilo": "./dist/cli/src/cli.js"
   },
   "files": [
     "dist/",
@@ -24,19 +24,19 @@
   ],
   "scripts": {
     "prepare": "pnpm --filter spark-core run build",
-    "prebuild": "pnpm --filter spark-core run build && pnpm --filter spark-extension run build:publish",
+    "prebuild": "pnpm --filter pilo-core run build && pnpm --filter pilo-extension run build:publish",
     "build": "tsup",
     "prepublishOnly": "pnpm run build",
     "clean": "pnpm -r run clean && rm -rf dist",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck",
-    "pretest": "pnpm --filter spark-core run bundle:aria",
+    "pretest": "pnpm --filter pilo-core run bundle:aria",
     "test": "pnpm -r run test",
     "check": "pnpm run typecheck && pnpm run test",
     "spark": "tsx packages/cli/src/cli.ts",
-    "dev:extension": "pnpm --filter spark-extension run dev --",
-    "dev:server": "pnpm --filter spark-server run dev",
+    "dev:extension": "pnpm --filter pilo-extension run dev --",
+    "dev:server": "pnpm --filter pilo-server run dev",
     "release": "./scripts/release.sh"
   },
   "keywords": [

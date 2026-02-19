@@ -1,6 +1,6 @@
 # Docker Setup
 
-Containerized Spark server with Browserless browser automation.
+Containerized Pilo server with Browserless browser automation.
 
 ## Quick Start
 
@@ -16,14 +16,14 @@ docker-compose -f docker-compose-firefox.yml up -d
 docker-compose -f docker-compose-chromium.yml up -d
 
 # Test it
-curl -X POST http://localhost:3000/spark/run \
+curl -X POST http://localhost:3000/pilo/run \
   -H "Content-Type: application/json" \
   -d '{"task": "find weather forecast for Tokyo"}'
 ```
 
 ## Services
 
-- **Spark Server**: http://localhost:3000
+- **Pilo Server**: http://localhost:3000
 - **Browserless Dashboard**: http://localhost:3001
 
 ## Environment
@@ -40,10 +40,10 @@ cp .env.example .env
 ```bash
 # Required - choose your AI provider
 OPENAI_API_KEY=your_openai_api_key_here
-SPARK_PROVIDER=openai
+PILO_PROVIDER=openai
 # OR
 # OPENROUTER_API_KEY=your_openrouter_api_key_here
-# SPARK_PROVIDER=openrouter
+# PILO_PROVIDER=openrouter
 ```
 
 **See `.env.example` for complete configuration options.**

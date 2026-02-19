@@ -4,8 +4,8 @@ import { resolve } from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      // Point spark-core to the source so vi.mock can intercept internal modules
-      "spark-core": resolve(__dirname, "../core/src/index.ts"),
+      // Point pilo-core to the source so vi.mock can intercept internal modules
+      "pilo-core": resolve(__dirname, "../core/src/index.ts"),
     },
   },
   test: {

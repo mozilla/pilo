@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
-import sparkRoutes from "./routes/spark.js";
+import piloRoutes from "./routes/pilo.js";
 
 const app = new Hono();
 
@@ -40,18 +40,18 @@ app.get("/health", (c) => {
 // Basic info endpoint
 app.get("/", (c) => {
   return c.json({
-    name: "Spark Server",
+    name: "Pilo Server",
     version: "0.1.0",
-    description: "Web server for Spark AI-powered web automation",
+    description: "Web server for Pilo AI-powered web automation",
   });
 });
 
-// Mount Spark routes
-app.route("/spark", sparkRoutes);
+// Mount Pilo routes
+app.route("/pilo", piloRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 
-console.log(`🚀 Spark Server starting on port ${port}`);
+console.log(`🚀 Pilo Server starting on port ${port}`);
 
 serve({
   fetch: app.fetch,

@@ -11,7 +11,7 @@
     "esModuleInterop": true,
 
     // Output
-    // rootDir is intentionally omitted: the spark-core paths alias pulls in source files from
+    // rootDir is intentionally omitted: the pilo-core paths alias pulls in source files from
     // ../core/src/, which would conflict with a rootDir of "./src". outDir is sufficient.
     "outDir": "./dist",
     "declaration": true,
@@ -29,13 +29,13 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
 
-    // Path aliases: resolve spark-core to source so tsc can type-check without a prior build.
-    // Both entries are required: the bare specifier resolves "spark-core" → index.ts,
-    // and the wildcard resolves subpaths like "spark-core/core" → core.ts.
+    // Path aliases: resolve pilo-core to source so tsc can type-check without a prior build.
+    // Both entries are required: the bare specifier resolves "pilo-core" → index.ts,
+    // and the wildcard resolves subpaths like "pilo-core/core" → core.ts.
     "baseUrl": ".",
     "paths": {
-      "spark-core": ["../core/src/index.ts"],
-      "spark-core/*": ["../core/src/*"]
+      "pilo-core": ["../core/src/index.ts"],
+      "pilo-core/*": ["../core/src/*"]
     }
   },
   "include": ["src/**/*"],

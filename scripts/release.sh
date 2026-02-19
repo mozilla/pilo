@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Spark Release Script
+# Pilo Release Script
 # Usage: ./scripts/release.sh [major|minor|patch]
 
 set -e

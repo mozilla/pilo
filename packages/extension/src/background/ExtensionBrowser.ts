@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
-import type { AriaBrowser } from "spark-core/core";
-import { PageAction, LoadState } from "spark-core/core";
+import type { AriaBrowser } from "pilo-core/core";
+import { PageAction, LoadState } from "pilo-core/core";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "../shared/utils/logger";
 import TurndownService from "turndown";
@@ -127,13 +127,13 @@ export class ExtensionBrowser implements AriaBrowser {
           }
 
           // generateAndRenderAriaTree handles everything:
-          // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-spark-ref', ref), YAML rendering
+          // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-pilo-ref', ref), YAML rendering
           return win.generateAndRenderAriaTree(document.body);
         },
       });
 
       const yaml = result as string;
-      this.logger.debug("ARIA tree generated and data-spark-ref attributes set", { tabId: tab.id });
+      this.logger.debug("ARIA tree generated and data-pilo-ref attributes set", { tabId: tab.id });
       this.logger.info("getTreeWithRefs() completed successfully", { tabId: tab.id });
       return yaml;
     } catch (error) {
@@ -353,8 +353,8 @@ export class ExtensionBrowser implements AriaBrowser {
         func: (paramsJson: string) => {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
-          // Look up the element using the data-spark-ref attribute that's now set by ariaSnapshot
-          const element = document.querySelector(`[data-spark-ref="${refParam}"]`);
+          // Look up the element using the data-pilo-ref attribute that's now set by ariaSnapshot
+          const element = document.querySelector(`[data-pilo-ref="${refParam}"]`);
 
           if (!element) {
             return {
@@ -571,10 +571,10 @@ export class ExtensionBrowser implements AriaBrowser {
     await new Promise((resolve) => setTimeout(resolve, this.PAGE_SETTLE_TIME_MS));
   }
 
-  // Clear data-spark-ref attributes from previous page
+  // Clear data-pilo-ref attributes from previous page
   private clearAriaRefs(): void {
     // No need to clear anything - new page will have new DOM
-    // data-spark-ref attributes will be set fresh on next getText() call
+    // data-pilo-ref attributes will be set fresh on next getText() call
   }
 
   // Handle page transition: wait for page to be ready

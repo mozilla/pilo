@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createRunCommand } from "../../src/commands/run.js";
-import { getConfigDefaults } from "spark-core";
+import { getConfigDefaults } from "pilo-core";
 
 // Get defaults from schema (used for mocking config.getConfig)
 const schemaDefaults = getConfigDefaults();
 
 // Mock all the dependencies
-vi.mock("spark-core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("spark-core")>();
+vi.mock("pilo-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("pilo-core")>();
   return {
     ...actual,
     WebAgent: vi.fn().mockImplementation(function () {
@@ -26,7 +26,7 @@ vi.mock("spark-core", async (importOriginal) => {
     config: {
       get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
       getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
-      getConfigPath: vi.fn(() => "/home/user/.config/spark/config.json"),
+      getConfigPath: vi.fn(() => "/home/user/.config/pilo/config.json"),
     },
     createAIProvider: vi.fn(() => ({})),
     ChalkConsoleLogger: vi.fn().mockImplementation(function () {
@@ -83,7 +83,7 @@ import {
   ChalkConsoleLogger,
   JSONConsoleLogger,
   WebAgentEventEmitter,
-} from "spark-core";
+} from "pilo-core";
 import * as fs from "fs";
 
 const mockWebAgent = vi.mocked(WebAgent);
@@ -288,7 +288,7 @@ describe("CLI Run Command", () => {
     });
 
     it("should preserve boolean false from config when CLI option not specified", async () => {
-      // Mock config returning headless=false (as if from .env SPARK_HEADLESS=false)
+      // Mock config returning headless=false (as if from .env PILO_HEADLESS=false)
       // This ensures the ?? operator doesn't override explicit false values
       mockConfig.getConfig.mockReturnValueOnce({
         ...schemaDefaults,
@@ -519,9 +519,9 @@ describe("CLI Run Command", () => {
       await command.parseAsync(args, { from: "user" });
 
       expect(mockExit).toHaveBeenCalledWith(1);
-      // Verify the error message mentions 'spark config init'
+      // Verify the error message mentions 'pilo config init'
       const errorOutput = consoleSpy.mock.calls.map((c) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("spark config init");
+      expect(errorOutput).toContain("pilo config init");
 
       consoleSpy.mockRestore();
     });

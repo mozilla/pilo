@@ -8,7 +8,7 @@ assignees: ""
 
 <!-- Thanks for taking the time to report a bug! Please fill out the following fields so we can triage it quickly. -->
 
-**Spark version:**
+**Pilo version:**
 **Node.js version:**
 **Operating System:**
 

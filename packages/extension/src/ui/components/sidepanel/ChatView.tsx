@@ -30,7 +30,7 @@ import {
 } from "../../../shared/utils/typeGuards";
 import type { BrowserActionStartedEventData } from "../../../shared/types/browser";
 import { SettingsGearIcon } from "../icons/SettingsGearIcon";
-import { SparkLogo } from "../icons/SparkLogo";
+import { PiloLogo } from "../icons/PiloLogo";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
@@ -511,7 +511,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         return;
       }
 
-      // Only use background worker for actual Spark task execution
+      // Only use background worker for actual Pilo task execution
       const message: ExecuteTaskMessage = {
         type: "executeTask",
         task: taskText,
@@ -693,7 +693,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
             className="flex flex-col items-center justify-center h-full text-center"
             data-testid="welcome-message"
           >
-            <SparkLogo className="w-28 h-28 text-gray-350 mb-4" />
+            <PiloLogo className="w-28 h-28 text-gray-350 mb-4" />
             <p className={`${t.text.muted} text-sm max-w-sm`}>
               I can help you automate tasks on any webpage. Just describe what you'd like me to do!
             </p>

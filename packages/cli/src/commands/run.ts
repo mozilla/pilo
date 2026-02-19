@@ -12,8 +12,8 @@ import {
   WebAgentEventEmitter,
   MetricsCollector,
   SecretsRedactor,
-} from "spark-core";
-import type { Logger } from "spark-core";
+} from "pilo-core";
+import type { Logger } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";

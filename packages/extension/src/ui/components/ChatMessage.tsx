@@ -75,7 +75,7 @@ export function ChatMessage({
         {type === "assistant" && (
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">⚡</span>
-            <span className={`text-xs font-medium ${t.text.secondary}`}>Spark</span>
+            <span className={`text-xs font-medium ${t.text.secondary}`}>Pilo</span>
           </div>
         )}
 

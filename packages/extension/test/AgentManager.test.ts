@@ -3,12 +3,12 @@ import { AgentManager } from "../src/background/AgentManager";
 
 vi.mock("@ai-sdk/openai");
 vi.mock("@openrouter/ai-sdk-provider");
-vi.mock("spark-core/core");
+vi.mock("pilo-core/core");
 vi.mock("../src/background/ExtensionBrowser");
 
 import { createOpenAI, type OpenAIProvider } from "@ai-sdk/openai";
 import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-provider";
-import { WebAgent } from "spark-core/core";
+import { WebAgent } from "pilo-core/core";
 import { ExtensionBrowser } from "../src/background/ExtensionBrowser";
 
 describe("AgentManager", () => {
@@ -95,8 +95,8 @@ describe("AgentManager", () => {
       expect(createOpenRouter).toHaveBeenCalledWith({
         apiKey: "test-openrouter-key",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });
@@ -133,8 +133,8 @@ describe("AgentManager", () => {
       expect(createOpenRouter).toHaveBeenCalledWith({
         apiKey: "test-openrouter-key",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });

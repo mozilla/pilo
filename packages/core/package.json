@@ -1,5 +1,5 @@
 {
-  "name": "spark-core",
+  "name": "pilo-core",
   "version": "0.12.1",
   "type": "module",
   "main": "dist/index.js",

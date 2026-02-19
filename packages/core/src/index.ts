@@ -1,8 +1,8 @@
 /**
- * Spark - AI-powered web automation library
+ * Pilo - AI-powered web automation library
  *
- * This is the main entry point for the Spark library.
- * Import this module to use Spark programmatically in your applications.
+ * This is the main entry point for the Pilo library.
+ * Import this module to use Pilo programmatically in your applications.
  */
 
 // Re-export everything from core (platform-agnostic)
@@ -43,8 +43,8 @@ export {
   addConfigOptions,
 } from "./config/index.js";
 export type {
-  SparkConfig,
-  SparkConfigResolved,
+  PiloConfig,
+  PiloConfigResolved,
   ConfigField,
   FieldDef,
   ConfigFieldType,

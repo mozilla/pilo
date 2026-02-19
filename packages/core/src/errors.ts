@@ -1,5 +1,5 @@
 /**
- * Error types for Spark
+ * Error types for Pilo
  *
  * RecoverableError: Errors the agent can recover from by retrying
  * BrowserException: Base class for browser-specific errors

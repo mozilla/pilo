@@ -29,9 +29,9 @@ describe("Server Application", () => {
 
     app.get("/", (c) => {
       return c.json({
-        name: "Spark Server",
+        name: "Pilo Server",
         version: "0.1.0",
-        description: "Web server for Spark AI-powered web automation",
+        description: "Web server for Pilo AI-powered web automation",
       });
     });
 
@@ -39,9 +39,9 @@ describe("Server Application", () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.name).toBe("Spark Server");
+    expect(data.name).toBe("Pilo Server");
     expect(data.version).toBe("0.1.0");
-    expect(data.description).toBe("Web server for Spark AI-powered web automation");
+    expect(data.description).toBe("Web server for Pilo AI-powered web automation");
   });
 
   it("should set CORS headers correctly", async () => {

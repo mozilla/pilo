@@ -8,8 +8,8 @@
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "WebWorker"],
     "paths": {
-      "spark-core/core": ["../core/src/core.ts"],
-      "spark-core/ariaTree": ["../core/src/browser/ariaTree/index.ts"]
+      "pilo-core/core": ["../core/src/core.ts"],
+      "pilo-core/ariaTree": ["../core/src/browser/ariaTree/index.ts"]
     }
   }
 }

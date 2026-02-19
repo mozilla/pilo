@@ -134,7 +134,7 @@ export class ChalkConsoleLogger implements Logger {
   }
 
   private handleTaskSetup = (data: TaskSetupEventData): void => {
-    console.log(chalk.blue.bold("🚀 Spark Automation Starting"));
+    console.log(chalk.blue.bold("🚀 Pilo Automation Starting"));
     console.log(chalk.gray(`Task: ${data.task}`));
     if (data.provider) console.log(chalk.gray(`Provider: ${data.provider}`));
     if (data.model) console.log(chalk.gray(`Model: ${data.model}`));

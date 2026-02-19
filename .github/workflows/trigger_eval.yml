@@ -1,6 +1,6 @@
-name: Trigger Spark Eval via Repository Dispatch
+name: Trigger Pilo Eval via Repository Dispatch
 
-# Triggers evaluation in spark-evals-judge via repository_dispatch event
+# Triggers evaluation in pilo-evals-judge via repository_dispatch event
 # when pushing to evals/** branches
 
 on:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   trigger-eval:
-    name: Trigger Eval in spark-evals-judge
+    name: Trigger Eval in pilo-evals-judge
     runs-on: ubuntu-latest
     steps:
       - name: Parse eval name from branch
@@ -37,7 +37,7 @@ jobs:
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          echo "Sending repository_dispatch event to spark-evals-judge..."
+          echo "Sending repository_dispatch event to pilo-evals-judge..."
           echo ""
           echo "Payload:"
           echo "  eval_name: ${{ steps.parse.outputs.eval_name }}"
@@ -57,7 +57,7 @@ jobs:
           # Create payload file with proper JSON escaping
           cat > payload.json <<EOF
           {
-            "event_type": "spark_eval",
+            "event_type": "pilo_eval",
             "client_payload": {
               "eval_name": "${{ steps.parse.outputs.eval_name }}",
               "git_sha": "${{ github.sha }}",
@@ -77,9 +77,9 @@ jobs:
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             -X POST \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.SPARK_EVALS_DISPATCH_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.PILO_EVALS_DISPATCH_TOKEN }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/Mozilla-Ocho/spark-evals-judge/dispatches \
+            https://api.github.com/repos/Mozilla-Ocho/pilo-evals-judge/dispatches \
             --data @payload.json)
 
           echo ""
@@ -112,7 +112,7 @@ jobs:
           echo "✅ Repository dispatch event sent"
           echo ""
           echo "Monitor the eval at:"
-          echo "  https://github.com/Mozilla-Ocho/spark-evals-judge/actions"
+          echo "  https://github.com/Mozilla-Ocho/pilo-evals-judge/actions"
           echo ""
           echo "Check commit status at:"
           echo "  https://github.com/${{ github.repository }}/commit/${{ github.sha }}"

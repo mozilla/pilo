@@ -109,7 +109,7 @@ export class ConsoleLogger implements Logger {
   }
 
   private handleTaskSetup = (data: TaskSetupEventData): void => {
-    console.log("🚀 Spark Automation Starting");
+    console.log("🚀 Pilo Automation Starting");
     console.log(`Task: ${data.task}`);
     if (data.provider) console.log(`Provider: ${data.provider}`);
     if (data.model) console.log(`Model: ${data.model}`);

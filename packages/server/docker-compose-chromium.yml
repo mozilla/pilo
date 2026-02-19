@@ -1,24 +1,24 @@
 services:
-  spark:
+  pilo:
     build:
       context: ..
       dockerfile: server/Dockerfile
-    container_name: spark-server
+    container_name: pilo-server
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - SPARK_PW_ENDPOINT=ws://browserless:3000/playwright/chromium
+      - PILO_PW_ENDPOINT=ws://browserless:3000/playwright/chromium
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SPARK_MODEL=gpt-5-mini
-      - SPARK_REASONING_EFFORT=low
-      - SPARK_BROWSER=chromium
+      - PILO_MODEL=gpt-5-mini
+      - PILO_REASONING_EFFORT=low
+      - PILO_BROWSER=chromium
 
   browserless:
     image: ghcr.io/browserless/chromium:latest
-    container_name: spark-browserless
+    container_name: pilo-browserless
     ports:
-      - "3001:3000" # Map browserless port to avoid conflict with spark server
+      - "3001:3000" # Map browserless port to avoid conflict with pilo server
     environment:
       - DEBUG=browserless*
       - MAX_CONCURRENT_SESSIONS=5
@@ -27,4 +27,4 @@ services:
 
 networks:
   default:
-    name: spark-network
+    name: pilo-network

@@ -1,15 +1,15 @@
-interface SparkLogoProps {
+interface PiloLogoProps {
   className?: string;
 }
 
-export function SparkLogo({ className }: SparkLogoProps) {
+export function PiloLogo({ className }: PiloLogoProps) {
   return (
     <svg
       viewBox="0 0 18.21 10.35"
       fill="currentColor"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="Spark logo"
+      aria-label="Pilo logo"
       role="img"
     >
       <path d="M6.33114 0H8.7334V1.0879C8.7334 2.9791 7.2836 4.5296 5.43471 4.6908H3.28396C3.08387 4.2426 2.99125 3.7818 2.99125 3.33355C2.99125 1.57613 4.40793 0 6.33114 0Z" />

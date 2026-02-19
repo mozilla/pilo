@@ -76,11 +76,11 @@ let config = {
       // concrete absolute file path so resolution always succeeds.
       alias: [
         {
-          find: "spark-core/core",
+          find: "pilo-core/core",
           replacement: resolve(__dirname, "../core/src/core.ts"),
         },
         {
-          find: "spark-core/ariaTree",
+          find: "pilo-core/ariaTree",
           replacement: resolve(__dirname, "../core/src/browser/ariaTree/index.ts"),
         },
         {
@@ -103,7 +103,7 @@ let config = {
   manifest: ({ browser }: { browser: string }) => {
     // Common configuration for all browsers
     const baseManifest = {
-      name: "Spark Extension",
+      name: "Pilo Extension",
       description: "AI-powered web automation browser extension",
       permissions: ["activeTab", "storage", "scripting", "tabs", "webNavigation"],
       host_permissions: ["*://*/*"],
@@ -118,7 +118,7 @@ let config = {
           default_path: "sidepanel.html",
         },
         action: {
-          default_title: "Open Spark Sidepanel",
+          default_title: "Open Pilo Sidepanel",
           default_icon: {
             16: "icon/16.png",
             24: "icon/24.png",
@@ -134,7 +134,7 @@ let config = {
         ...baseManifest,
         sidebar_action: {
           default_panel: "sidepanel.html",
-          default_title: "Spark",
+          default_title: "Pilo",
           open_at_install: true,
           default_icon: {
             16: "icon/16.png",
@@ -144,7 +144,7 @@ let config = {
           },
         },
         browser_action: {
-          default_title: "Spark Extension",
+          default_title: "Pilo Extension",
           default_icon: {
             16: "icon/16.png",
             32: "icon/32.png",
@@ -157,7 +157,7 @@ let config = {
           gecko: {
             // Need a stable identifier so wxt doesn't use a random one each
             // time and break persistence.
-            id: "spark@mozilla.org",
+            id: "pilo@mozilla.org",
           },
         },
       };

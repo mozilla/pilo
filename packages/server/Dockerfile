@@ -22,9 +22,9 @@ COPY packages/extension/package.json ./packages/extension/package.json
 # Install all workspace dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy core source and build it (server depends on spark-core)
+# Copy core source and build it (server depends on pilo-core)
 COPY packages/core/ ./packages/core/
-RUN pnpm --filter spark-core run build
+RUN pnpm --filter pilo-core run build
 
 # Install Playwright system dependencies as root (requires apt)
 RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
@@ -33,7 +33,7 @@ RUN if [ "$INSTALL_PLAYWRIGHT_BROWSERS" = "true" ]; then \
 
 # Copy server source and build
 COPY packages/server/ ./packages/server/
-RUN pnpm --filter spark-server run build
+RUN pnpm --filter pilo-server run build
 
 # Expose the port
 EXPOSE 3000

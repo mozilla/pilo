@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
-import type { WebAgentEventType } from "spark-core/core";
+import type { WebAgentEventType } from "pilo-core/core";
 import { reviver } from "../../shared/utils/storage";
 
 export interface EventData {
@@ -79,7 +79,7 @@ export const useEventStore = create<EventStore>()(
       },
     }),
     {
-      name: "spark-events",
+      name: "pilo-events",
       storage: browserStorage,
       // Only persist events for a short time (they're mainly for debugging)
       partialize: (state) => ({

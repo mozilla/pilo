@@ -1,5 +1,5 @@
 services:
-  spark-server:
+  pilo-server:
     build:
       context: ..
       dockerfile: server/Dockerfile
@@ -10,8 +10,8 @@ services:
     environment:
       - NODE_ENV=development
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SPARK_MODEL=gpt-5-mini
-      - SPARK_REASONING_EFFORT=low
+      - PILO_MODEL=gpt-5-mini
+      - PILO_REASONING_EFFORT=low
     volumes:
       # Mount server source code for hot reloading
       - ./src:/app/server/src

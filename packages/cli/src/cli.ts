@@ -8,9 +8,9 @@ import { createExtensionCommand } from "./commands/extension.js";
 import { getPackageInfo } from "./utils.js";
 
 /**
- * Spark CLI - AI-powered web automation tool
+ * Pilo CLI - AI-powered web automation tool
  *
- * This is the main entry point for the Spark command-line interface.
+ * This is the main entry point for the Pilo command-line interface.
  * It sets up the commander.js program and registers all available commands.
  */
 
