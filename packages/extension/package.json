@@ -8,6 +8,7 @@
     "node": "^22.0.0"
   },
   "scripts": {
+    "dev": "tsx scripts/dev.ts",
     "build:chrome": "wxt build -b chrome",
     "build:firefox": "wxt build -b firefox",
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",

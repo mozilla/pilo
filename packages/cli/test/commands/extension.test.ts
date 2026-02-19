@@ -351,7 +351,7 @@ describe("CLI Extension Command", () => {
     // In the test environment the global is undefined, which isProduction()
     // treats as false. No stubGlobal needed; the default state is already dev.
 
-    it("should spawn pnpm with dev:chrome script for chrome", async () => {
+    it("should spawn pnpm with dev script and --chrome flag for chrome", async () => {
       makeSpawnResolve(0);
 
       const cmd = getCommand();
@@ -363,10 +363,12 @@ describe("CLI Extension Command", () => {
       const args = spawnArgs as string[];
       expect(args).toContain("-F");
       expect(args).toContain("spark-extension");
-      expect(args).toContain("dev:chrome");
+      expect(args).toContain("dev");
+      expect(args).toContain("--");
+      expect(args).toContain("--chrome");
     });
 
-    it("should spawn pnpm with dev:firefox script for firefox", async () => {
+    it("should spawn pnpm with dev script and --firefox flag for firefox", async () => {
       makeSpawnResolve(0);
 
       const cmd = getCommand();
@@ -376,7 +378,9 @@ describe("CLI Extension Command", () => {
       const [binary, spawnArgs] = mockSpawn.mock.calls[0];
       expect(binary).toBe("pnpm");
       const args = spawnArgs as string[];
-      expect(args).toContain("dev:firefox");
+      expect(args).toContain("dev");
+      expect(args).toContain("--");
+      expect(args).toContain("--firefox");
     });
 
     it("should forward --tmp flag as extra arg to the dev script", async () => {

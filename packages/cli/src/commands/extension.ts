@@ -153,22 +153,18 @@ function printChromeInstructions(extensionPath: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Dev mode: shell out to `pnpm -F spark-extension dev:<browser>`.
+ * Dev mode: shell out to `pnpm -F spark-extension run dev -- --<browser> [--tmp]`.
  *
  * The WXT dev server handles browser launch, HMR, extension loading, and
  * profile management. We do not need binary detection or manual Chrome/Firefox
  * args here; those are production-only concerns.
- *
- * If the dev script doesn't exist yet (it's added in a future plan), pnpm will
- * exit with a non-zero code and we surface a clear error message.
  */
 async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Promise<void> {
-  const script = `dev:${browser}`;
-  const args = ["-F", "spark-extension", "run", script];
+  // Use a single "dev" script with browser flag, forwarding args via "--"
+  const args = ["-F", "spark-extension", "run", "dev", "--", `--${browser}`];
 
   if (options.tmp) {
-    // Forward --tmp as a CLI arg to the WXT dev script via the pnpm run `--` separator
-    args.push("--", "--tmp");
+    args.push("--tmp");
   }
 
   console.log(chalk.blue.bold(`🚀 Starting Spark extension dev server for ${browser}...`));
@@ -180,7 +176,7 @@ async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Pr
     console.error(chalk.red("❌ Failed to start extension dev server:"), err.message);
     console.error(
       chalk.gray(
-        `Extension dev script not found. Run 'pnpm --filter spark-extension run ${script}' manually, ` +
+        `Extension dev script not found. Run 'pnpm --filter spark-extension run dev -- --${browser}' manually, ` +
           `or build the extension first with 'pnpm --filter spark-extension run build:${browser}'.`,
       ),
     );
@@ -190,10 +186,10 @@ async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Pr
   await new Promise<void>((resolve) => {
     proc.on("close", (code) => {
       if (code !== 0 && code !== null) {
-        console.error(chalk.yellow(`pnpm ${script} exited with code ${code}`));
+        console.error(chalk.yellow(`pnpm dev exited with code ${code}`));
         console.error(
           chalk.gray(
-            `Extension dev script not found. Run 'pnpm --filter spark-extension run ${script}' manually, ` +
+            `Extension dev script not found. Run 'pnpm --filter spark-extension run dev -- --${browser}' manually, ` +
               `or build the extension first with 'pnpm --filter spark-extension run build:${browser}'.`,
           ),
         );
