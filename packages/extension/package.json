@@ -1,0 +1,58 @@
+{
+  "name": "spark-extension",
+  "description": "Browser extension for Spark AI-powered web automation",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build:chrome": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
+    "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
+    "clean": "rm -rf dist .output",
+    "pretest": "wxt prepare",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:headless": "HEADLESS=true playwright test"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.20",
+    "@ai-sdk/openai": "^3.0.25",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@openrouter/ai-sdk-provider": "^2.1.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/webextension-polyfill": "^0.12.4",
+    "@wxt-dev/webextension-polyfill": "^1.0.0",
+    "clsx": "^2.1.1",
+    "marked-react": "^3.0.2",
+    "ollama-ai-provider-v2": "^3.0.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "spark-core": "workspace:*",
+    "tailwindcss": "^4.1.18",
+    "turndown": "^7.2.2",
+    "webextension-polyfill": "^0.12.0",
+    "yaml": "^2.8.2",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.1",
+    "@tailwindcss/typography": "^0.5.19",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "@types/turndown": "^5.0.6",
+    "@wxt-dev/module-react": "^1.1.5",
+    "happy-dom": "^20.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "wxt": "0.20.13"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

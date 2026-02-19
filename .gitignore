@@ -7,3 +7,6 @@ dist
 scripts/docker-build.sh
 debug
 coverage
+
+# Auto-generated files
+packages/core/src/browser/ariaTree/bundle.ts

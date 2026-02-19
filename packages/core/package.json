@@ -1,0 +1,61 @@
+{
+  "name": "spark-core",
+  "version": "0.12.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./ariaTree": {
+      "types": "./dist/browser/ariaTree/index.d.ts",
+      "import": "./dist/browser/ariaTree/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist src/browser/ariaTree/bundle.ts",
+    "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
+    "build": "pnpm run bundle:aria && tsc",
+    "pretest": "pnpm run bundle:aria",
+    "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
+    "test": "vitest run",
+    "test:only": "pnpm run bundle:aria && pnpm run test"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.20",
+    "@ai-sdk/google-vertex": "^4.0.41",
+    "@ai-sdk/openai": "^3.0.25",
+    "@ai-sdk/openai-compatible": "^2.0.26",
+    "@ghostery/adblocker-playwright": "^2.13.4",
+    "@openrouter/ai-sdk-provider": "^2.1.1",
+    "ai": "^6.0.69",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "eventemitter3": "^5.0.4",
+    "liquidjs": "^10.24.0",
+    "nanoid": "^5.1.6",
+    "ollama-ai-provider-v2": "^3.0.3",
+    "playwright": "1.58.1",
+    "turndown": "^7.2.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^25.2.0",
+    "@types/turndown": "^5.0.6",
+    "@vitest/coverage-v8": "^4.0.18",
+    "esbuild": "^0.27.3",
+    "jsdom": "^28.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

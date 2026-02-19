@@ -1,50 +1,42 @@
 {
-  "name": "spark",
+  "name": "@tabstack/spark",
   "version": "0.13.0",
   "description": "AI-powered web automation library and CLI tool",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "type": "module",
   "engines": {
     "node": "^22.0.0"
   },
-  "bin": {
-    "spark": "./dist/cli.js"
-  },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js"
-    },
-    "./ariaTree": {
-      "types": "./dist/browser/ariaTree/index.d.ts",
-      "import": "./dist/browser/ariaTree/index.js"
+      "types": "./dist/core/src/index.d.ts",
+      "import": "./dist/core/src/index.js"
     }
   },
+  "main": "./dist/core/src/index.js",
+  "types": "./dist/core/src/index.d.ts",
+  "bin": {
+    "spark": "./dist/cli/src/cli.js"
+  },
   "files": [
-    "dist/**/*",
+    "dist/",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
-    "bundle:aria": "tsx scripts/bundle-aria-tree.ts",
-    "build": "pnpm run bundle:aria && tsc",
-    "typecheck": "tsc --project tsconfig.check.json",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
-    "spark": "NODE_NO_WARNINGS=1 tsx src/cli.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "install-cli": "npm run build && chmod +x dist/cli.js && npm install -g .",
-    "format": "prettier --write . --list-different",
+    "prebuild": "pnpm --filter spark-core run build && pnpm --filter spark-extension run build:publish",
+    "build": "tsup",
+    "prepublishOnly": "pnpm run build",
+    "clean": "pnpm -r run clean && rm -rf dist",
+    "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "release": "./scripts/release.sh",
-    "check": "pnpm run format && pnpm run typecheck && pnpm test"
+    "typecheck": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck",
+    "pretest": "pnpm --filter spark-core run bundle:aria",
+    "test": "pnpm -r run test",
+    "check": "pnpm run typecheck && pnpm run test",
+    "spark": "pnpm --filter spark-cli run spark",
+    "dev:extension": "pnpm --filter spark-extension run dev --",
+    "dev:server": "pnpm --filter spark-server run dev",
+    "release": "./scripts/release.sh"
   },
   "keywords": [
     "ai",
@@ -56,19 +48,6 @@
   ],
   "author": "",
   "license": "MIT",
-  "devDependencies": {
-    "@types/jsdom": "^27.0.0",
-    "@types/node": "^25.2.0",
-    "@types/turndown": "^5.0.6",
-    "@vitest/coverage-v8": "^4.0.18",
-    "esbuild": "^0.27.3",
-    "jsdom": "^28.0.0",
-    "nodemon": "^3.1.11",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
-  },
   "dependencies": {
     "@ai-sdk/google": "^3.0.20",
     "@ai-sdk/google-vertex": "^4.0.41",
@@ -87,7 +66,15 @@
     "ollama-ai-provider-v2": "^3.0.3",
     "playwright": "1.58.1",
     "turndown": "^7.2.2",
+    "web-ext": "^8.4.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "prettier": "^3.8.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@9.0.0"
 }
