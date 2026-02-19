@@ -40,7 +40,14 @@ if (useTmp) {
 // invoked from. WXT uses cwd to locate entrypoints, wxt.config.ts, etc.
 const extensionRoot = resolve(import.meta.dirname, "..");
 
-const proc = spawn("wxt", ["dev", "-b", browser], {
+// Resolve the wxt binary explicitly from the extension package's node_modules.
+// spawn() does not search node_modules/.bin in the child's cwd; it only uses
+// the inherited PATH, which pnpm adds as a relative "./node_modules/.bin" entry.
+// That relative entry resolves against the parent process cwd (the workspace
+// root), not extensionRoot, so bare "wxt" would ENOENT.
+const wxtBin = resolve(extensionRoot, "node_modules/.bin/wxt");
+
+const proc = spawn(wxtBin, ["dev", "-b", browser], {
   cwd: extensionRoot,
   stdio: "inherit",
   env,
