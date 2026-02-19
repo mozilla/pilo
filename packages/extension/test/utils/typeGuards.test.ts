@@ -14,7 +14,7 @@ import {
   isBrowserActionStartedData,
   isValidRealtimeEvent,
   isAgentActionData,
-} from "../../src/utils/typeGuards";
+} from "../../src/shared/utils/typeGuards";
 import type {
   TaskStartedEventData,
   AgentReasonedEventData,
@@ -23,7 +23,7 @@ import type {
   TaskValidationErrorEventData,
   BrowserActionCompletedEventData,
   BrowserActionStartedEventData,
-} from "../../src/types/browser";
+} from "../../src/shared/types/browser";
 
 describe("Type Guard Helpers", () => {
   describe("hasOptionalStringProp", () => {

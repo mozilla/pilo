@@ -4,7 +4,7 @@ import "./SidePanel.css";
 import ChatView from "./ChatView";
 import SettingsView from "./SettingsView";
 import { useSettings } from "../../stores/settingsStore";
-import { useConversationStore } from "../../stores/conversationStore";
+import { useConversationStore } from "../../../shared/conversationStore";
 
 type View = "chat" | "settings";
 

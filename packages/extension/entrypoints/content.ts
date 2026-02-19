@@ -5,7 +5,7 @@ import type {
   ExtensionMessage,
   GetPageInfoResponse,
   ExecutePageActionResponse,
-} from "../src/types/browser";
+} from "../src/shared/types/browser";
 
 // Make ARIA tree function available globally for executeScript
 declare global {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useConversationStore } from "../stores/conversationStore";
+import { useConversationStore } from "../../shared/conversationStore";
 import type { ChatMessage } from "./useConversation";
 
 /**

@@ -2,13 +2,13 @@ import { useState, useEffect, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import Markdown from "marked-react";
 import clsx from "clsx";
-import { ChatMessage } from "../../ChatMessage";
-import { useChat } from "../../useChat";
+import { ChatMessage } from "../ChatMessage";
+import { useChat } from "../../hooks/useChat";
 import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
-import { useConversationStore } from "../../stores/conversationStore";
-import { useSystemTheme } from "../../useSystemTheme";
+import { useConversationStore } from "../../../shared/conversationStore";
+import { useSystemTheme } from "../../hooks/useSystemTheme";
 import type { Theme } from "../../theme";
 import type {
   ExecuteTaskMessage,
@@ -17,7 +17,7 @@ import type {
   CancelTaskResponse,
   RealtimeEventMessage,
   RealtimeEvent,
-} from "../../types/browser";
+} from "../../../shared/types/browser";
 import {
   isTaskStartedData,
   isAgentReasonedData,
@@ -27,8 +27,8 @@ import {
   isBrowserActionCompletedData,
   isBrowserActionStartedData,
   isAgentActionData,
-} from "../../utils/typeGuards";
-import type { BrowserActionStartedEventData } from "../../types/browser";
+} from "../../../shared/utils/typeGuards";
+import type { BrowserActionStartedEventData } from "../../../shared/types/browser";
 import { SettingsGearIcon } from "../icons/SettingsGearIcon";
 import { SparkLogo } from "../icons/SparkLogo";
 

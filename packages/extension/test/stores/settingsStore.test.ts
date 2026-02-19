@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Settings } from "../../src/stores/settingsStore";
-import { useSettingsStore } from "../../src/stores/settingsStore";
+import type { Settings } from "../../src/ui/stores/settingsStore";
+import { useSettingsStore } from "../../src/ui/stores/settingsStore";
 import browser from "webextension-polyfill";
 
 // Mock webextension-polyfill

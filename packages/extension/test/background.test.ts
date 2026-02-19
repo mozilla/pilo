@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import browser from "webextension-polyfill";
-import { EventStoreLogger } from "../src/EventStoreLogger";
+import { EventStoreLogger } from "../src/shared/EventStoreLogger";
 
 // Mock the webextension-polyfill module
 vi.mock("webextension-polyfill", () => ({

@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
-import { AgentManager, EventStoreLogger } from "../src/AgentManager";
-import { useConversationStore } from "../src/stores/conversationStore";
+import { AgentManager, EventStoreLogger } from "../src/background/AgentManager";
+import { useConversationStore } from "../src/shared/conversationStore";
 import {
   showIndicator,
   hideIndicator,
@@ -15,7 +15,7 @@ import type {
   ExecuteTaskResponse,
   CancelTaskMessage,
   CancelTaskResponse,
-} from "../src/types/browser";
+} from "../src/shared/types/browser";
 
 interface StorageSettings {
   apiKey?: string;

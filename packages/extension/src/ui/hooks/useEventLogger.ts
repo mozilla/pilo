@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { EventLogger, type LogEvent } from "./EventLogger";
+import { EventLogger, type LogEvent } from "../EventLogger";
 
 export function useEventLogger(): {
   events: LogEvent[];

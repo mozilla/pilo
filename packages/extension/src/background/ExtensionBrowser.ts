@@ -2,7 +2,7 @@ import browser from "webextension-polyfill";
 import type { AriaBrowser } from "spark-core/core";
 import { PageAction, LoadState } from "spark-core/core";
 import type { Tabs } from "webextension-polyfill";
-import { createLogger } from "./utils/logger";
+import { createLogger } from "../shared/utils/logger";
 import TurndownService from "turndown";
 
 interface ActionResult {

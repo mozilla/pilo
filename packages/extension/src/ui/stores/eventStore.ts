@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import browser from "webextension-polyfill";
 import type { WebAgentEventType } from "spark-core/core";
-import { reviver } from "../utils/storage";
+import { reviver } from "../../shared/utils/storage";
 
 export interface EventData {
   id: string;

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
-import { useConversation } from "./hooks/useConversation";
-import { useAutoScroll } from "./hooks/useAutoScroll";
-import type { ChatMessage } from "./hooks/useConversation";
+import { useConversation } from "./useConversation";
+import { useAutoScroll } from "./useAutoScroll";
+import type { ChatMessage } from "./useConversation";
 
 // Re-export ChatMessage type for backwards compatibility
 export type { ChatMessage };

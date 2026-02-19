@@ -3,10 +3,10 @@ import { render, screen } from "@testing-library/react";
 import ChatView, {
   shouldDisplayError,
   formatBrowserAction,
-} from "../../../src/components/sidepanel/ChatView";
-import { theme } from "../../../src/theme";
+} from "../../../src/ui/components/sidepanel/ChatView";
+import { theme } from "../../../src/ui/theme";
 import browser from "webextension-polyfill";
-import type { RealtimeEventMessage } from "../../../src/types/browser";
+import type { RealtimeEventMessage } from "../../../src/shared/types/browser";
 
 type MessageListenerCallback = (message: RealtimeEventMessage) => void;
 
@@ -35,14 +35,14 @@ vi.mock("webextension-polyfill", () => ({
 }));
 
 // Mock the stores
-vi.mock("../../../src/stores/eventStore", () => ({
+vi.mock("../../../src/ui/stores/eventStore", () => ({
   useEvents: () => ({
     addEvent: vi.fn(),
     clearEvents: vi.fn(),
   }),
 }));
 
-vi.mock("../../../src/stores/settingsStore", () => ({
+vi.mock("../../../src/ui/stores/settingsStore", () => ({
   useSettings: () => ({
     settings: {
       apiKey: "test-api-key",
@@ -53,7 +53,7 @@ vi.mock("../../../src/stores/settingsStore", () => ({
 }));
 
 // Mock the useSystemTheme hook
-vi.mock("../../../src/useSystemTheme", () => ({
+vi.mock("../../../src/ui/hooks/useSystemTheme", () => ({
   useSystemTheme: () => ({
     theme: theme.light,
   }),
@@ -68,7 +68,7 @@ let mockCurrentTaskId: string | null = null;
 // Separate store state to simulate race condition where store is updated but React hasn't re-rendered
 let mockStoreCurrentTaskId: string | null = null;
 
-vi.mock("../../../src/useChat", () => ({
+vi.mock("../../../src/ui/hooks/useChat", () => ({
   useChat: () => ({
     messages: mockMessages,
     addMessage: mockAddMessage,
@@ -87,7 +87,7 @@ vi.mock("../../../src/useChat", () => ({
 }));
 
 // Mock conversationStore with getState() for synchronous access
-vi.mock("../../../src/stores/conversationStore", () => ({
+vi.mock("../../../src/shared/conversationStore", () => ({
   useConversationStore: Object.assign(
     // The hook itself (for React components)
     () => ({}),

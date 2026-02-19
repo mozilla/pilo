@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import SettingsView from "../../src/components/sidepanel/SettingsView";
+import SettingsView from "../../src/ui/components/sidepanel/SettingsView";
 
 // Mock the hooks
 const mockUpdateSettings = vi.fn();
 const mockSaveSettings = vi.fn();
 
-vi.mock("src/stores/settingsStore", () => ({
+vi.mock("src/ui/stores/settingsStore", () => ({
   useSettings: vi.fn(() => ({
     settings: {
       apiKey: "test-key",
@@ -43,7 +43,7 @@ const mockTheme = {
   },
 };
 
-vi.mock("src/useSystemTheme", () => ({
+vi.mock("src/ui/hooks/useSystemTheme", () => ({
   useSystemTheme: vi.fn(() => ({
     isDark: false,
     theme: mockTheme,
