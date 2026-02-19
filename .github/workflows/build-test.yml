@@ -1,0 +1,341 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      cli: ${{ steps.filter.outputs.cli }}
+      server: ${{ steps.filter.outputs.server }}
+      extension: ${{ steps.filter.outputs.extension }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect file changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'packages/core/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+            cli:
+              - 'packages/cli/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+            server:
+              - 'packages/server/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+            extension:
+              - 'packages/extension/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+            workflows:
+              - '.github/workflows/**'
+
+  setup:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core package
+        run: pnpm --filter spark-core build
+
+      - name: Re-link workspace dependencies
+        run: pnpm install
+        # pnpm resolves package exports at install time. Because dist/ is
+        # created by the build step above (after the initial install), a
+        # second install is required so that downstream packages can resolve
+        # the spark-core exports correctly.
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: packages/core/dist
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  core:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: packages/core/dist
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Typecheck core
+        run: pnpm --filter spark-core run typecheck
+
+      - name: Test core
+        if: needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+        run: pnpm --filter spark-core run test
+
+  cli:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: packages/core/dist
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Typecheck CLI
+        run: pnpm --filter spark-cli run typecheck
+
+      - name: Test CLI
+        run: pnpm --filter spark-cli run test
+
+      - name: Build CLI
+        run: pnpm --filter spark-cli run build
+
+  server:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.server == 'true' || needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: packages/core/dist
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Typecheck server
+        run: pnpm --filter spark-server run typecheck
+
+      - name: Test server
+        run: pnpm --filter spark-server run test
+
+      - name: Build server
+        run: pnpm --filter spark-server run build:deploy
+
+  extension:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.extension == 'true' || needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: packages/core/dist
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Typecheck extension
+        run: pnpm --filter spark-extension run typecheck
+
+      - name: Test extension
+        run: pnpm --filter spark-extension run test
+
+      - name: Build extension for Firefox
+        run: pnpm --filter spark-extension run build:firefox
+
+      - name: Build extension for Chrome
+        run: pnpm --filter spark-extension run build:chrome
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          set -euo pipefail
+          if [ ! -f packages/extension/package.json ]; then
+            echo "Error: packages/extension/package.json not found" >&2
+            exit 1
+          fi
+          version=$(jq -re '.devDependencies["@playwright/test"] // empty' packages/extension/package.json)
+          if [ -z "$version" ]; then
+            echo "Error: @playwright/test devDependency not found in packages/extension/package.json" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter spark-extension exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter spark-extension exec playwright install-deps chromium
+
+      - name: Run extension e2e tests
+        run: pnpm --filter spark-extension run test:e2e:headless:chrome
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: packages/extension/playwright-report/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-test-results
+          path: packages/extension/test-results/
+          retention-days: 30
+          if-no-files-found: ignore
