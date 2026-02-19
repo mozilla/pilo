@@ -14,7 +14,9 @@
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
     "clean": "rm -rf dist .output",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:headless": "HEADLESS=true playwright test"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.20",
