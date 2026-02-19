@@ -47,7 +47,7 @@ const extensionRoot = resolve(import.meta.dirname, "..");
 // root), not extensionRoot, so bare "wxt" would ENOENT.
 const wxtBin = resolve(extensionRoot, "node_modules/.bin/wxt");
 
-const proc = spawn(wxtBin, ["dev", "-b", browser], {
+const proc = spawn(wxtBin, ["-b", browser], {
   cwd: extensionRoot,
   stdio: "inherit",
   env,
