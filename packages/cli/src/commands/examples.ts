@@ -80,16 +80,18 @@ function showAdvancedOptionsExamples(): void {
  */
 function showConfigurationExamples(): void {
   console.log(chalk.white.bold("Configuration:"));
-  console.log(`  ${chalk.cyan("spark config --show")}`);
-  console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("provider=openrouter")}`);
-  console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("model=openai/gpt-4.1")}`);
-  console.log(
-    `  ${chalk.cyan("spark config --set")} ${chalk.green("openrouter_api_key=sk-or-...")}`,
-  );
-  console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("browser=chrome")}`);
-  console.log(`  ${chalk.cyan("spark config --set")} ${chalk.green("headless=true")}`);
-  console.log(`  ${chalk.cyan("spark config --get")} ${chalk.green("provider")}`);
-  console.log(`  ${chalk.cyan("spark config --list")}`);
-  console.log(`  ${chalk.cyan("spark config --init")} ${chalk.gray("# Setup wizard")}`);
-  console.log(`  ${chalk.cyan("spark config --reset")} ${chalk.gray("# Clear all settings")}`);
+  console.log(`  ${chalk.cyan("spark config show")}`);
+  console.log(`  ${chalk.cyan("spark config set")} ${chalk.green("provider openrouter")}`);
+  console.log(`  ${chalk.cyan("spark config set")} ${chalk.green("model openai/gpt-4.1")}`);
+  console.log(`  ${chalk.cyan("spark config set")} ${chalk.green("openrouter_api_key sk-or-...")}`);
+  console.log(`  ${chalk.cyan("spark config set")} ${chalk.green("browser chrome")}`);
+  console.log(`  ${chalk.cyan("spark config set")} ${chalk.green("headless true")}`);
+  console.log(`  ${chalk.cyan("spark config get")} ${chalk.green("provider")}`);
+  console.log(`  ${chalk.cyan("spark config list")}`);
+  console.log(`  ${chalk.cyan("spark config init")} ${chalk.gray("# Setup wizard")}`);
+  console.log(`  ${chalk.cyan("spark config reset")} ${chalk.gray("# Clear all settings")}`);
+  console.log("");
+  console.log(chalk.white.bold("Extension:"));
+  console.log(`  ${chalk.cyan("spark extension install chrome")}`);
+  console.log(`  ${chalk.cyan("spark extension install firefox")} ${chalk.yellow("--tmp")}`);
 }
