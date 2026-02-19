@@ -2,7 +2,16 @@
  * Config Manager (Node.js only - uses fs, path, os, dotenv)
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+// Build-time flag: replaced with `true` by the production build step.
+// In dev (running from source), this variable is undefined, which is safe.
+declare const __SPARK_PRODUCTION__: boolean;
+
+/** Returns true only when the production build flag is set. */
+function isProduction(): boolean {
+  return typeof __SPARK_PRODUCTION__ !== "undefined" && __SPARK_PRODUCTION__;
+}
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { config as loadDotenv } from "dotenv";
@@ -20,7 +29,9 @@ export class ConfigManager {
     if (platform === "win32") {
       this.configDir = join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "spark");
     } else {
-      this.configDir = join(homedir(), ".spark");
+      // XDG_CONFIG_HOME takes precedence; default is ~/.config
+      const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+      this.configDir = join(xdgConfigHome, "spark");
     }
     this.configPath = join(this.configDir, "config.json");
   }
@@ -34,12 +45,23 @@ export class ConfigManager {
 
   /**
    * Get the full merged configuration from all sources.
-   * Priority: Environment Variables > Local .env > Global Config
+   *
+   * Dev mode:   defaults → global config → env vars
+   * Production: defaults → global config (env vars and .env are skipped)
    */
   public getConfig(): SparkConfigResolved {
     const globalConfig = this.getGlobalConfig();
 
-    // Load local .env file if it exists
+    if (isProduction()) {
+      // Production: env vars and .env are intentionally skipped.
+      const merged = {
+        ...DEFAULTS,
+        ...globalConfig,
+      };
+      return merged as SparkConfigResolved;
+    }
+
+    // Dev mode: load local .env file and include env vars.
     try {
       loadDotenv({ path: ".env", quiet: true });
     } catch {
@@ -129,6 +151,21 @@ export class ConfigManager {
       throw new Error(
         `Failed to write config: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  /**
+   * Reset the global config by removing the config file.
+   */
+  public reset(): void {
+    if (existsSync(this.configPath)) {
+      try {
+        unlinkSync(this.configPath);
+      } catch (error) {
+        throw new Error(
+          `Failed to reset config: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 

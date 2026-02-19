@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Command } from "commander";
 import type { SparkConfig } from "../src/config/index.js";
 import { getSchemaConfigKeys, addConfigOptions, DEFAULTS } from "../src/config/index.js";
@@ -246,5 +246,102 @@ describe("ConfigManager", () => {
       expect(opts.browser).toBe("chrome");
       expect(opts.headless).toBe(true);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ConfigManager - XDG path resolution
+// ---------------------------------------------------------------------------
+// The ConfigManager singleton is constructed once at module load time.
+// We test path resolution by inspecting the actual singleton (which was
+// constructed using the real process.env at test startup) and by exercising
+// the XDG_CONFIG_HOME env variable via fresh module imports using vi.resetModules().
+
+describe("ConfigManager - XDG path resolution", () => {
+  it("should NOT use the legacy ~/.spark path on non-Windows", async () => {
+    // Import the already-loaded singleton
+    const { config: mgr } = await import("../src/config/manager.js");
+    const configPath = mgr.getConfigPath();
+    // The new path must contain .config/spark, never the old .spark directory
+    if (process.platform !== "win32") {
+      expect(configPath).not.toMatch(/\/\.spark\//);
+      expect(configPath).toContain("spark/config.json");
+    }
+  });
+
+  it("should use .config/spark/config.json on non-Windows (default XDG base)", async () => {
+    const { config: mgr } = await import("../src/config/manager.js");
+    if (process.platform !== "win32" && !process.env.XDG_CONFIG_HOME) {
+      const configPath = mgr.getConfigPath();
+      expect(configPath).toContain("/.config/spark/config.json");
+    }
+  });
+
+  it("should use XDG_CONFIG_HOME when set (fresh module load)", async () => {
+    // Reset modules so the singleton is re-constructed with the new env var
+    vi.resetModules();
+    const originalXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = "/tmp/testxdg";
+
+    try {
+      const { config: freshMgr } = await import("../src/config/manager.js");
+      if (process.platform !== "win32") {
+        expect(freshMgr.getConfigPath()).toBe("/tmp/testxdg/spark/config.json");
+      }
+    } finally {
+      // Restore env and module state
+      if (originalXdg === undefined) {
+        delete process.env.XDG_CONFIG_HOME;
+      } else {
+        process.env.XDG_CONFIG_HOME = originalXdg;
+      }
+      vi.resetModules();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ConfigManager - production flag behavior (dev mode default)
+// ---------------------------------------------------------------------------
+// __SPARK_PRODUCTION__ is a build-time global. In tests it is undefined,
+// so isProduction() returns false (dev mode). We verify that env vars ARE
+// included in getConfig() output, confirming dev-mode merge behavior.
+
+describe("ConfigManager - production flag behavior (dev mode default)", () => {
+  it("should include env var values in getConfig() output in dev mode", async () => {
+    vi.resetModules();
+    const originalVal = process.env.SPARK_PROVIDER;
+    process.env.SPARK_PROVIDER = "openrouter";
+
+    try {
+      const { config: freshMgr } = await import("../src/config/manager.js");
+      const result = freshMgr.getConfig();
+      // In dev mode, env vars are merged - SPARK_PROVIDER should override the default "openai"
+      expect(result.provider).toBe("openrouter");
+    } finally {
+      if (originalVal === undefined) {
+        delete process.env.SPARK_PROVIDER;
+      } else {
+        process.env.SPARK_PROVIDER = originalVal;
+      }
+      vi.resetModules();
+    }
+  });
+
+  it("should always have required resolved fields (defaults are always present)", async () => {
+    vi.resetModules();
+    const { config: freshMgr } = await import("../src/config/manager.js");
+    const result = freshMgr.getConfig();
+
+    // Required fields from SparkConfigResolved must always be present regardless
+    // of env vars or global config. These have typed defaults that can never be unset.
+    expect(typeof result.browser).toBe("string");
+    expect(typeof result.provider).toBe("string");
+    expect(typeof result.headless).toBe("boolean");
+    expect(typeof result.debug).toBe("boolean");
+    expect(typeof result.max_iterations).toBe("number");
+    expect(result.max_iterations).toBeGreaterThan(0);
+
+    vi.resetModules();
   });
 });

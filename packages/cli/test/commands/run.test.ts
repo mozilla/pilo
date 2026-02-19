@@ -26,6 +26,7 @@ vi.mock("spark-core", async (importOriginal) => {
     config: {
       get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
       getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
+      getConfigPath: vi.fn(() => "/home/user/.config/spark/config.json"),
     },
     createAIProvider: vi.fn(() => ({})),
     ChalkConsoleLogger: vi.fn().mockImplementation(function () {
@@ -69,7 +70,8 @@ vi.mock("fs", async (importOriginal) => {
     writeFileSync: vi.fn(),
     // Type assertion needed for overloaded fs functions in test mocks
     readFileSync: vi.fn().mockReturnValue("{}") as typeof actual.readFileSync,
-    existsSync: vi.fn().mockReturnValue(false) as typeof actual.existsSync,
+    // Default: config file exists so the guard passes in most tests
+    existsSync: vi.fn().mockReturnValue(true) as typeof actual.existsSync,
   };
 });
 
@@ -502,6 +504,39 @@ describe("CLI Run Command", () => {
 
       const webAgentInstance = mockWebAgent.mock.results[0].value;
       expect(webAgentInstance.close).toHaveBeenCalled();
+    });
+  });
+
+  describe("Config Guard", () => {
+    it("should exit(1) with clear message when config file does not exist", async () => {
+      const mockFs = vi.mocked(fs);
+      // Config file does not exist - guard should trigger
+      mockFs.existsSync.mockReturnValue(false);
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const args = ["test task"];
+      await command.parseAsync(args, { from: "user" });
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      // Verify the error message mentions 'spark config init'
+      const errorOutput = consoleSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(errorOutput).toContain("spark config init");
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should proceed normally when config file exists", async () => {
+      const mockFs = vi.mocked(fs);
+      // Config file exists - guard passes
+      mockFs.existsSync.mockReturnValue(true);
+
+      const args = ["test task"];
+      await command.parseAsync(args, { from: "user" });
+
+      // Should NOT have exited with 1 due to guard
+      // (WebAgent is mocked to succeed, so no exit expected)
+      expect(mockWebAgent).toHaveBeenCalled();
     });
   });
 

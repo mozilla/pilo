@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { existsSync, unlinkSync } from "fs";
+import { existsSync } from "fs";
 import { config, getAIProviderInfo } from "spark-core";
 import { getPackageInfo, parseConfigValue } from "../utils.js";
 
@@ -248,14 +248,14 @@ async function initializeGlobalConfiguration(): Promise<void> {
 }
 
 /**
- * Reset global configuration by removing the config file
+ * Reset global configuration by removing the config file via ConfigManager.
  */
 function resetGlobalConfiguration(): void {
   try {
     const configPath = config.getConfigPath();
 
     if (existsSync(configPath)) {
-      unlinkSync(configPath);
+      config.reset();
       console.log(chalk.green("✅ Global configuration reset successfully"));
       console.log(chalk.gray("Config file removed: " + configPath));
       console.log("");

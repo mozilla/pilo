@@ -14,7 +14,8 @@ vi.mock("spark-core", async (importOriginal) => {
       get: vi.fn(),
       set: vi.fn(),
       unset: vi.fn(),
-      getConfigPath: vi.fn().mockReturnValue("/home/user/.spark/config.json"),
+      reset: vi.fn(),
+      getConfigPath: vi.fn().mockReturnValue("/home/user/.config/spark/config.json"),
       listSources: vi.fn().mockReturnValue({
         global: { provider: "openai" },
         env: { browser: "chrome" },
@@ -36,7 +37,7 @@ vi.mock("fs", async (importOriginal) => {
   return {
     ...actual,
     existsSync: vi.fn().mockReturnValue(false),
-    unlinkSync: vi.fn(),
+    // unlinkSync is no longer called directly by CLI; config.reset() handles it
   };
 });
 
@@ -53,11 +54,10 @@ vi.mock("../../src/utils.js", async (importOriginal) => {
 });
 
 import { config, type SparkConfigResolved } from "spark-core";
-import { existsSync, unlinkSync } from "fs";
+import { existsSync } from "fs";
 
 const mockConfig = vi.mocked(config);
 const mockExistsSync = vi.mocked(existsSync);
-const mockUnlinkSync = vi.mocked(unlinkSync);
 
 /** Build a partial resolved config - tests only need specific keys, cast the rest */
 function partialConfig(partial: Partial<SparkConfigResolved> = {}): SparkConfigResolved {
@@ -84,7 +84,7 @@ describe("CLI Config Command (subcommands)", () => {
 
     // Restore default mocks after clearAllMocks
     mockConfig.getConfig.mockReturnValue(partialConfig());
-    mockConfig.getConfigPath.mockReturnValue("/home/user/.spark/config.json");
+    mockConfig.getConfigPath.mockReturnValue("/home/user/.config/spark/config.json");
     mockConfig.listSources.mockReturnValue({
       global: { provider: "openai" },
       env: { browser: "chrome" },
@@ -273,29 +273,30 @@ describe("CLI Config Command (subcommands)", () => {
   // -------------------------------------------------------------------------
 
   describe("config reset", () => {
-    it("should delete config file when it exists", async () => {
+    it("should call config.reset() when config file exists", async () => {
       mockExistsSync.mockReturnValue(true);
       vi.spyOn(console, "log").mockImplementation(() => {});
 
       const cmd = getCommand();
       await cmd.parseAsync(["reset"], { from: "user" });
 
-      expect(mockUnlinkSync).toHaveBeenCalledWith("/home/user/.spark/config.json");
+      // ConfigManager.reset() is called instead of direct unlinkSync
+      expect(mockConfig.reset).toHaveBeenCalled();
     });
 
-    it("should not delete when config file does not exist", async () => {
+    it("should NOT call config.reset() when config file does not exist", async () => {
       mockExistsSync.mockReturnValue(false);
       vi.spyOn(console, "log").mockImplementation(() => {});
 
       const cmd = getCommand();
       await cmd.parseAsync(["reset"], { from: "user" });
 
-      expect(mockUnlinkSync).not.toHaveBeenCalled();
+      expect(mockConfig.reset).not.toHaveBeenCalled();
     });
 
-    it("should exit(1) when unlinkSync throws", async () => {
+    it("should exit(1) when config.reset() throws", async () => {
       mockExistsSync.mockReturnValue(true);
-      mockUnlinkSync.mockImplementationOnce(() => {
+      mockConfig.reset.mockImplementationOnce(() => {
         throw new Error("permission denied");
       });
 

@@ -19,6 +19,24 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
+ * Guard: verify that the global config file exists before running a task.
+ * Returns true when the guard passes (config exists), false otherwise.
+ * Prints an error and exits with code 1 when the config is missing.
+ */
+function assertConfigExists(): boolean {
+  const configPath = config.getConfigPath();
+  if (!fs.existsSync(configPath)) {
+    console.error(
+      chalk.red.bold("Error:"),
+      "No configuration found. Run 'spark config init' to set up your configuration.",
+    );
+    process.exit(1);
+    return false; // unreachable, but satisfies the return type for tests that mock process.exit
+  }
+  return true;
+}
+
+/**
  * Creates the 'run' command for executing web automation tasks.
  * Options are generated from CONFIG_SCHEMA via addSchemaOptions().
  */
@@ -41,6 +59,9 @@ export function createRunCommand(): Command {
  * Execute the run command with the provided arguments and options
  */
 async function executeRunCommand(task: string, options: any): Promise<void> {
+  // Guard: config file must exist before we attempt to run a task.
+  assertConfigExists();
+
   try {
     // Get merged config (defaults < global config < env vars)
     const cfg = config.getConfig();
