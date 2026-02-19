@@ -4,16 +4,16 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - "extension/**"
-      - "src/**"
+      - "packages/extension/**"
+      - "packages/core/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/extension_ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
-      - "extension/**"
-      - "src/**"
+      - "packages/extension/**"
+      - "packages/core/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/extension_ci.yml"
@@ -57,7 +57,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build core package
-        run: pnpm run clean && pnpm run build
+        run: pnpm --filter spark-core run build
 
       # Re-run install to resolve package exports now that dist/ exists.
       # pnpm resolves exports during install, but dist/ is only created
@@ -84,13 +84,13 @@ jobs:
         id: playwright-version
         run: |
           set -euo pipefail
-          if [ ! -f extension/package.json ]; then
-            echo "Error: extension/package.json not found" >&2
+          if [ ! -f packages/extension/package.json ]; then
+            echo "Error: packages/extension/package.json not found" >&2
             exit 1
           fi
-          version=$(jq -re '.devDependencies["@playwright/test"] // empty' extension/package.json)
+          version=$(jq -re '.devDependencies["@playwright/test"] // empty' packages/extension/package.json)
           if [ -z "$version" ]; then
-            echo "Error: @playwright/test devDependency not found in extension/package.json" >&2
+            echo "Error: @playwright/test devDependency not found in packages/extension/package.json" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -118,7 +118,7 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: extension/playwright-report/
+          path: packages/extension/playwright-report/
           retention-days: 30
 
       - name: Upload Playwright test results
@@ -126,6 +126,6 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-test-results
-          path: extension/test-results/
+          path: packages/extension/test-results/
           retention-days: 30
           if-no-files-found: ignore

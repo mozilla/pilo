@@ -4,16 +4,16 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - "server/**"
-      - "src/**"
+      - "packages/server/**"
+      - "packages/core/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/server_ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
-      - "server/**"
-      - "src/**"
+      - "packages/server/**"
+      - "packages/core/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/server_ci.yml"
@@ -49,27 +49,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install root dependencies and build main package
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
-
-      - name: Install server dependencies
-        working-directory: ./server
+      - name: Install all dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build core package
+        run: pnpm --filter spark-core run build
+
       - name: Check server formatting
-        working-directory: ./server
-        run: pnpm run format:check
+        run: pnpm --filter spark-server run format:check
 
       - name: Run server type check
-        working-directory: ./server
-        run: pnpm run typecheck
+        run: pnpm --filter spark-server run typecheck
 
       - name: Run server tests
-        working-directory: ./server
-        run: pnpm test
+        run: pnpm --filter spark-server test
 
       - name: Build server
-        working-directory: ./server
-        run: pnpm run build
+        run: pnpm --filter spark-server run build

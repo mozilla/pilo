@@ -44,10 +44,10 @@ jobs:
         run: pnpm run format:check
 
       - name: Run type check
-        run: pnpm run typecheck
+        run: pnpm -r run typecheck
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm -r run test
 
-      - name: Build project
-        run: pnpm run build
+      - name: Build all packages
+        run: pnpm -r run build
