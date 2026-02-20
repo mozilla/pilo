@@ -1,7 +1,7 @@
-name: push image server image to GAR for TABS
+name: push image server image to GAR for Pilo
 
 env:
-  IMAGE_NAME: tabs-spark
+  IMAGE_NAME: tabstack-pilo
   GAR_LOCATION: us
   GCP_PROJECT_ID: moz-fx-tabs-prod
   GAR_REPOSITORY: tabs-prod
