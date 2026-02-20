@@ -1,7 +1,7 @@
 {
   "name": "pilo-cli",
   "version": "0.1.0",
-  "description": "AI-powered web automation CLI tool",
+  "description": "AI-powered web automation",
   "type": "module",
   "private": true,
   "scripts": {

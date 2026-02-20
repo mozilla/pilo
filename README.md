@@ -2,7 +2,7 @@
 
 # Tabstack Pilo
 
-_AI-powered web automation_
+_Automate the Web with AI_
 
 <sub><strong>pilo</strong> · /ˈpaɪloʊ/ · PIE-low</sub>
 
