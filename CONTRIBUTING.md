@@ -5,7 +5,13 @@ Thank you for your interest in contributing to Spark! This document provides gui
 ## Table of Contents
 
 - [Before You Start](#before-you-start)
+- [Prerequisites](#prerequisites)
 - [Development Setup](#development-setup)
+- [Project Structure](#project-structure)
+- [Development Workflow](#development-workflow)
+- [Testing](#testing)
+- [Building](#building)
+- [Code Style](#code-style)
 - [Making Changes](#making-changes)
 - [Submitting Your Contribution](#submitting-your-contribution)
 - [Review Process](#review-process)
@@ -17,29 +23,226 @@ Thank you for your interest in contributing to Spark! This document provides gui
 
 ### Check Existing Issues
 
-Before starting work, please check if there's already an open issue for what you'd like to contribute. If there isn't, consider opening one to discuss your proposed changes with the maintainers.
+Before starting work, check if there is already an open issue for what you would like to contribute. If there is not, consider opening one to discuss your proposed changes with the maintainers.
 
 ### Understand the Project
 
-Spark is a browser automation and AI agent framework. Familiarize yourself with the project's goals and architecture before making significant changes.
+Spark is an AI-powered web automation library and CLI tool structured as a pnpm monorepo. Familiarize yourself with the project's goals and architecture before making significant changes.
 
 ### Communication
 
 - For bug reports and feature requests, open an issue
 - For questions and discussions, use the appropriate communication channels
-- For security issues, please follow our security disclosure policy
+- For security issues, follow our security disclosure policy
+
+## Prerequisites
+
+| Tool    | Version   | Notes                                                                                                          |
+| ------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| Node.js | `^22.0.0` | Required. Use [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm) to manage versions. |
+| pnpm    | `9.0.0`   | **Required.** Do not use npm or yarn for this project.                                                         |
+
+### Installing pnpm
+
+If you do not have pnpm installed, use [Corepack](https://nodejs.org/api/corepack.html) (bundled with Node.js 16+):
+
+```bash
+corepack enable
+corepack prepare pnpm@9.0.0 --activate
+```
+
+Or install directly:
+
+```bash
+npm install -g pnpm@9.0.0
+```
+
+Verify your versions:
+
+```bash
+node --version   # should be 22.x
+pnpm --version   # should be 9.0.0
+```
 
 ## Development Setup
 
-<!-- TODO: Add technical setup instructions -->
+```bash
+# 1. Fork the repository, then clone your fork
+git clone https://github.com/<your-username>/spark.git
+cd spark
 
-This section will include:
+# 2. Install all workspace dependencies
+pnpm install
 
-- Prerequisites and dependencies
-- Local development environment setup
-- Running the project locally
-- Running tests
-- Development tools and workflows
+# 3. Install browser automation drivers (needed for Playwright-based tests and CLI use)
+pnpm playwright install
+
+# 4. Verify the baseline is clean
+pnpm run check
+```
+
+### Configure an AI Provider (optional, for running automations locally)
+
+```bash
+pnpm spark config init
+```
+
+This stores your configuration at `~/.config/spark/config.json`.
+
+## Project Structure
+
+```
+spark/
+├── packages/
+│   ├── core/        # spark-core: automation engine and config system
+│   ├── cli/         # spark-cli: CLI commands and config integration
+│   ├── server/      # spark-server: Hono-based server
+│   └── extension/   # spark-extension: WXT/React browser extension
+├── scripts/         # Build, release, and CI scripts
+├── dist/            # Assembled output (root build only, not committed)
+├── package.json     # @tabstack/spark workspace root + published package
+└── pnpm-workspace.yaml
+```
+
+| Package              | npm name          | Description                                                                                  |
+| -------------------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `packages/core`      | `spark-core`      | Core automation library. Browser-safe subset via `core.ts`; full Node.js API via `index.ts`. |
+| `packages/cli`       | `spark-cli`       | CLI entry point, commands, and config integration.                                           |
+| `packages/server`    | `spark-server`    | Hono-based server component.                                                                 |
+| `packages/extension` | `spark-extension` | WXT-based browser extension with React UI.                                                   |
+| root                 | `@tabstack/spark` | Published npm package: bundles core + CLI + pre-built extension.                             |
+
+## Development Workflow
+
+### Full Validation
+
+Before and after making changes, run the full check to confirm nothing is broken:
+
+```bash
+pnpm run check
+```
+
+This chains `typecheck` (which includes pre-test bundle generation, formatting check, and per-package typechecks) followed by all tests.
+
+### Step-by-Step (during active development)
+
+```bash
+# 1. Format code
+pnpm run format
+
+# 2. Typecheck all packages (also checks formatting)
+pnpm run typecheck
+
+# 3. Run all tests
+pnpm -r run test
+```
+
+### Running the CLI Locally
+
+```bash
+pnpm spark run "task description"
+pnpm spark config init
+pnpm spark config set <key> <value>
+pnpm spark config get <key>
+pnpm spark config list
+pnpm spark config show
+pnpm spark config unset <key>
+pnpm spark config reset
+pnpm spark extension install chrome
+pnpm spark extension install firefox [--tmp]
+```
+
+### Extension Development
+
+```bash
+# Hot-reloading dev mode (Chrome)
+pnpm run dev:extension -- --chrome
+
+# Hot-reloading dev mode (Firefox)
+pnpm run dev:extension -- --firefox
+
+# With a temporary browser profile (clean state on every start)
+pnpm run dev:extension -- --chrome --tmp
+pnpm run dev:extension -- --firefox --tmp
+```
+
+### Server Development
+
+```bash
+pnpm run dev:server
+```
+
+## Testing
+
+All packages use [Vitest](https://vitest.dev/) for unit tests. The extension additionally uses [Playwright](https://playwright.dev/) for end-to-end tests.
+
+Test files live in each package's `test/` directory, mirroring the `src/` structure.
+
+### Running Tests
+
+```bash
+# All packages
+pnpm -r run test
+
+# Specific package
+pnpm --filter spark-core run test
+pnpm --filter spark-cli run test
+pnpm --filter spark-server run test
+pnpm --filter spark-extension run test
+
+# Extension end-to-end tests
+pnpm --filter spark-extension run test:e2e           # headed
+pnpm --filter spark-extension run test:e2e:headless  # headless
+```
+
+### Writing Tests
+
+- Use `vi.mock()` from Vitest for mocking.
+- Write tests for new features and bug fixes.
+- Ensure all existing tests pass before submitting.
+- Add both unit tests and integration tests where appropriate.
+
+## Building
+
+```bash
+# Full production build (core + extension, then compiles into dist/)
+pnpm run build
+
+# Build all packages individually
+pnpm -r run build
+
+# Clean all build artifacts
+pnpm run clean
+```
+
+The root build assembles the published package at `dist/`. This includes the core library, CLI binary, and pre-built extension for both Chrome and Firefox.
+
+## Code Style
+
+### Formatter
+
+All code is formatted with [Prettier](https://prettier.io/). Configuration lives at the root `.prettierrc` only; do not add package-level Prettier config.
+
+```bash
+pnpm run format        # Format all files
+pnpm run format:check  # Check without modifying
+```
+
+Format is enforced in CI. Unformatted code will fail the typecheck step.
+
+### TypeScript
+
+- Use the latest stable TypeScript features.
+- Avoid `any`. Use `unknown` with type narrowing where the type is genuinely unknown.
+- Keep functions focused and modular.
+- Prioritize readability over cleverness.
+
+### Architectural Rules
+
+- **No barrel imports** except `index.ts` and `core.ts` in `packages/core`, and `browser/ariaTree/index.ts`. Do not create new barrel files.
+- **Cross-package references** use the `workspace:*` protocol, not relative `file:` paths.
+- **Extension imports**: The extension must import from `spark-core/core` (not `spark-core`) to avoid pulling in Node.js-only dependencies.
+- **Shared dependencies**: All packages must use the same version of any shared dependency. CI enforces this via `scripts/check-dep-versions.mjs`.
 
 ## Making Changes
 
@@ -54,14 +257,6 @@ Use descriptive branch names that follow this pattern:
 - `test/short-description` - For test additions or improvements
 
 Example: `feature/add-chrome-extension-support`
-
-### Code Style
-
-- Follow the existing code style and conventions in the project
-- Write clear, self-documenting code
-- Add comments for complex logic
-- Keep functions focused and modular
-- Prioritize readability over cleverness
 
 ### Commit Messages
 
@@ -83,12 +278,29 @@ This allows agents to interact with Chrome extensions programmatically.
 Fixes #123
 ```
 
-### Testing
+### Secret Scanning
 
-- Write tests for new features and bug fixes
-- Ensure all existing tests pass before submitting
-- Add both unit tests and integration tests where appropriate
-- Document any test-specific setup requirements
+Before committing, scan for accidentally included secrets:
+
+```bash
+# Install gitleaks (macOS)
+brew install gitleaks
+
+# Scan staged changes before each commit
+gitleaks protect -v
+```
+
+#### Optional: Pre-Commit Hook
+
+```bash
+# Enable automatic scanning before every commit
+git config core.hooksPath .githooks
+
+# Disable
+git config --unset core.hooksPath
+```
+
+Never commit real API keys. Use obviously fake values like `"fake-key-123"` in tests.
 
 ## Submitting Your Contribution
 
@@ -98,18 +310,19 @@ Fixes #123
 2. **Create a Branch**: Create a new branch for your changes
 3. **Make Changes**: Implement your changes following the guidelines above
 4. **Test**: Ensure all tests pass and add new tests as needed
-5. **Commit**: Commit your changes with clear commit messages
-6. **Push**: Push your branch to your fork
-7. **Open a Pull Request**: Open a PR against the main repository
+5. **Check**: Run `pnpm run check` to confirm everything passes
+6. **Commit**: Commit your changes with clear commit messages
+7. **Push**: Push your branch to your fork
+8. **Open a Pull Request**: Open a PR against the main repository
 
 ### Pull Request Description
 
 Your PR description should include:
 
-- **What**: A clear description of what you've changed
+- **What**: A clear description of what you have changed
 - **Why**: The motivation for the change (link to issue if applicable)
 - **How**: An overview of your implementation approach
-- **Testing**: What testing you've done
+- **Testing**: What testing you have done
 - **Screenshots**: If applicable, include before/after screenshots
 
 Example template:
@@ -197,7 +410,7 @@ Key points:
 - Be respectful and inclusive
 - Welcome diverse perspectives
 - Accept constructive criticism gracefully
-- Focus on what's best for the community
+- Focus on what is best for the community
 
 ## Questions
 
@@ -210,7 +423,7 @@ Key points:
 
 ### Getting Help
 
-If you're stuck:
+If you are stuck:
 
 1. Check existing documentation and issues
 2. Search for similar questions or problems

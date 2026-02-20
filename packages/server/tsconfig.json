@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    // Language and environment
+    "target": "ES2022",
+    "lib": ["ES2022"],
+
+    // Module system
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+
+    // Output
+    // rootDir is intentionally omitted: the spark-core paths alias pulls in source files from
+    // ../core/src/, which would conflict with a rootDir of "./src". outDir is sufficient.
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    // Type checking
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    // Interop and compatibility
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    // Path aliases: resolve spark-core to source in dev (tsx watch) mode.
+    // Both entries are required: the bare specifier resolves "spark-core" → index.ts,
+    // and the wildcard resolves subpaths like "spark-core/core" → core.ts.
+    "baseUrl": ".",
+    "paths": {
+      "spark-core": ["../core/src/index.ts"],
+      "spark-core/*": ["../core/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
