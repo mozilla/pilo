@@ -57,7 +57,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               aria-label="Toggle theme"
             >
               {mounted && resolvedTheme === "dark" ? (
@@ -89,7 +89,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               onClick={onClearChat}
               aria-label="Clear chat"
             >
@@ -98,7 +98,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               onClick={() => onNavigate("settings")}
               aria-label="Open settings"
             >
@@ -109,7 +109,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
             onClick={() => onNavigate("chat")}
             aria-label="Back to chat"
           >
