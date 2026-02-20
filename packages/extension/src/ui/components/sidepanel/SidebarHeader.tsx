@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, RotateCcw, ArrowLeft, Sun, Moon, Monitor, Zap } from "lucide-react";
+import { Settings, RotateCcw, ArrowLeft, Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import { Button } from "../ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { cn } from "../../../lib/utils";
+import { TabstackIcon } from "./TabstackIcon";
 
 type View = "chat" | "settings";
 
@@ -42,10 +43,10 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
     >
       {/* Logo + title */}
       <div className="flex items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-          <Zap className="h-3.5 w-3.5 text-primary-foreground" aria-hidden="true" />
+        <div className="flex h-7 w-7 items-center justify-center">
+          <TabstackIcon className="h-7 w-7" />
         </div>
-        <h1 className="text-sm font-semibold tracking-tight text-foreground">Tabstack Agent</h1>
+        <h1 className="text-sm font-semibold tracking-tight text-foreground">Tabstack Pilo</h1>
       </div>
 
       {/* Action buttons */}
@@ -56,7 +57,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-gray-200 hover:text-foreground dark:hover:bg-white/10"
               aria-label="Toggle theme"
             >
               {mounted && resolvedTheme === "dark" ? (
@@ -88,7 +89,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-gray-200 hover:text-foreground dark:hover:bg-white/10"
               onClick={onClearChat}
               aria-label="Clear chat"
             >
@@ -97,7 +98,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:bg-gray-200 hover:text-foreground dark:hover:bg-white/10"
               onClick={() => onNavigate("settings")}
               aria-label="Open settings"
             >
@@ -108,7 +109,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground hover:bg-gray-200 hover:text-foreground dark:hover:bg-white/10"
             onClick={() => onNavigate("chat")}
             aria-label="Back to chat"
           >
