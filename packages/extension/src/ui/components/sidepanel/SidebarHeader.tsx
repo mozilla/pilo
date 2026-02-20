@@ -59,6 +59,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               aria-label="Toggle theme"
+              title="Toggle theme"
             >
               {mounted && resolvedTheme === "dark" ? (
                 <Moon className="h-3.5 w-3.5" />
@@ -68,15 +69,15 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[140px]">
-            <DropdownMenuItem onClick={() => setTheme("light")}>
+            <DropdownMenuItem onClick={() => setTheme("light")} title="Light theme">
               <Sun className="mr-2 h-3.5 w-3.5" />
               Light
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("dark")}>
+            <DropdownMenuItem onClick={() => setTheme("dark")} title="Dark theme">
               <Moon className="mr-2 h-3.5 w-3.5" />
               Dark
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("system")}>
+            <DropdownMenuItem onClick={() => setTheme("system")} title="System theme">
               <Monitor className="mr-2 h-3.5 w-3.5" />
               System
             </DropdownMenuItem>
@@ -92,6 +93,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
               className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               onClick={onClearChat}
               aria-label="Clear chat"
+              title="Clear chat"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
@@ -101,6 +103,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
               className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               onClick={() => onNavigate("settings")}
               aria-label="Open settings"
+              title="Settings"
             >
               <Settings className="h-3.5 w-3.5" />
             </Button>
@@ -112,6 +115,7 @@ export function SidebarHeader({ view, onNavigate, onClearChat, className }: Side
             className="h-7 w-7 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
             onClick={() => onNavigate("chat")}
             aria-label="Back to chat"
+            title="Back to chat"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Button>
