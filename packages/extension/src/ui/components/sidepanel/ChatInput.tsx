@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../../lib/utils";
@@ -12,6 +12,8 @@ interface ChatInputProps {
   disabled?: boolean;
   /** Called when the user clicks the Stop button during execution. */
   onStop?: () => void;
+  /** Optional overlay rendered inside the positioning context (e.g. InputDisabledOverlay). */
+  overlay?: ReactNode;
 }
 
 /**
@@ -28,7 +30,13 @@ interface ChatInputProps {
  * execution logic (background script messaging, conversation state) lives
  * in the parent.
  */
-export function ChatInput({ onSend, isLoading, disabled = false, onStop }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  isLoading,
+  disabled = false,
+  onStop,
+  overlay,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,7 +73,8 @@ export function ChatInput({ onSend, isLoading, disabled = false, onStop }: ChatI
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
-    <div className="border-t border-border px-3 py-2">
+    <div className="relative border-t border-border px-3 py-2">
+      {overlay}
       <div
         className={cn(
           "flex items-end gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 transition-colors",

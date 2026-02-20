@@ -261,11 +261,7 @@ const TaskMessage = ({ message }: TaskMessageProps): ReactElement => {
     }
   };
 
-  return (
-    <div className="mb-2">
-      <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
-    </div>
-  );
+  return <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>;
 };
 
 // ---------------------------------------------------------------------------
@@ -354,12 +350,10 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
 // ---------------------------------------------------------------------------
 
 const TypingIndicator = (): ReactElement => (
-  <div className="flex items-start gap-3 px-4 py-3">
-    <div className="flex items-center gap-1 pt-1">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:300ms]" />
-    </div>
+  <div className="flex items-center gap-1 px-4 py-3">
+    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:0ms]" />
+    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:150ms]" />
+    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:300ms]" />
   </div>
 );
 

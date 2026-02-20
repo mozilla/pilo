@@ -120,19 +120,17 @@ interface InputDisabledOverlayProps {
 }
 
 const InputDisabledOverlay = ({ onNewRequest }: InputDisabledOverlayProps): ReactElement => (
-  <div className="absolute inset-0 bg-background/90 flex items-center justify-center backdrop-blur-sm z-10">
-    <div className="text-center px-4">
-      <p className="text-foreground text-sm mb-3">
-        Continued conversation context not yet supported.
-      </p>
-      <button
-        onClick={onNewRequest}
-        className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors font-medium"
-        data-testid="new-request-button"
-      >
-        New Request
-      </button>
-    </div>
+  <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center text-center px-4 backdrop-blur-sm z-10">
+    <p className="text-foreground text-sm mb-3">
+      Continued conversation context not yet supported.
+    </p>
+    <button
+      onClick={onNewRequest}
+      className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors font-medium"
+      data-testid="new-request-button"
+    >
+      New Request
+    </button>
   </div>
 );
 
@@ -551,7 +549,7 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   }, [handleClearChat]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <>
       {/* Message List */}
       <MessageList
         messages={messages}
@@ -560,20 +558,18 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
         tabId={stableTabId}
       />
 
-      {/* Input Area */}
-      <div className="relative">
-        {/* Overlay when task is completed */}
-        {lastCompletedTaskId && !isExecuting && (
-          <InputDisabledOverlay onNewRequest={handleNewRequest} />
-        )}
-
-        <ChatInput
-          onSend={handleSendMessage}
-          isLoading={isExecuting}
-          disabled={lastCompletedTaskId !== null && !isExecuting}
-          onStop={handleCancel}
-        />
-      </div>
-    </div>
+      {/* Input Area — overlay rendered inside ChatInput's positioning context */}
+      <ChatInput
+        onSend={handleSendMessage}
+        isLoading={isExecuting}
+        disabled={lastCompletedTaskId !== null && !isExecuting}
+        onStop={handleCancel}
+        overlay={
+          lastCompletedTaskId && !isExecuting ? (
+            <InputDisabledOverlay onNewRequest={handleNewRequest} />
+          ) : undefined
+        }
+      />
+    </>
   );
 }
