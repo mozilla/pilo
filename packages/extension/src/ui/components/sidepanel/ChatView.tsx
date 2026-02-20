@@ -112,13 +112,6 @@ export function shouldDisplayError(event: RealtimeEvent): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// DEV SEED: module-level guard so React StrictMode's mount/unmount/remount
-// cycle does not seed messages twice. A useRef resets on each mount; a
-// module-level boolean does not.
-// ---------------------------------------------------------------------------
-let devSeedApplied = false;
-
-// ---------------------------------------------------------------------------
 // InputDisabledOverlay
 // ---------------------------------------------------------------------------
 
@@ -181,8 +174,14 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (import.meta.env.MODE !== "development") return;
-    if (devSeedApplied) return;
-    devSeedApplied = true;
+
+    // Check the store directly: if messages already exist for this tab, the
+    // seed already ran (handles StrictMode remounts and HMR module resets).
+    const existing =
+      stableTabId !== undefined
+        ? useConversationStore.getState().getConversation(stableTabId)
+        : null;
+    if (existing && existing.messages.length > 0) return;
 
     // Stable task IDs for grouping.
     const TASK_A = "mock-task-001"; // Completed task with markdown result
