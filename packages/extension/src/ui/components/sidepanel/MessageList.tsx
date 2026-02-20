@@ -334,13 +334,6 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
           </span>
         </div>
       )}
-
-      {/* Timestamp for completed tasks */}
-      {resultMessage && (
-        <div className="text-xs text-muted-foreground mt-1">
-          {resultMessage.timestamp.toLocaleTimeString()}
-        </div>
-      )}
     </div>
   );
 };
