@@ -23,6 +23,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "prepare": "pnpm --filter spark-core run build",
     "prebuild": "pnpm --filter spark-core run build && pnpm --filter spark-extension run build:publish",
     "build": "tsup",
     "prepublishOnly": "pnpm run build",
@@ -33,7 +34,7 @@
     "pretest": "pnpm --filter spark-core run bundle:aria",
     "test": "pnpm -r run test",
     "check": "pnpm run typecheck && pnpm run test",
-    "spark": "pnpm --filter spark-cli run spark",
+    "spark": "tsx packages/cli/src/cli.ts",
     "dev:extension": "pnpm --filter spark-extension run dev --",
     "dev:server": "pnpm --filter spark-server run dev",
     "release": "./scripts/release.sh"

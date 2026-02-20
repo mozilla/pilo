@@ -19,21 +19,36 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
- * Guard: verify that the global config file exists before running a task.
- * Returns true when the guard passes (config exists), false otherwise.
- * Prints an error and exits with code 1 when the config is missing.
+ * Guard: verify that config exists before running a task.
+ * Passes if the global config file exists, or if an API key is available
+ * from environment variables (e.g. a local .env file in dev mode).
+ * Prints an error and exits with code 1 when neither is present.
  */
 function assertConfigExists(): boolean {
-  const configPath = config.getConfigPath();
-  if (!fs.existsSync(configPath)) {
-    console.error(
-      chalk.red.bold("Error:"),
-      "No configuration found. Run 'spark config init' to set up your configuration.",
-    );
-    process.exit(1);
-    return false; // unreachable, but satisfies the return type for tests that mock process.exit
+  if (fs.existsSync(config.getConfigPath())) {
+    return true;
   }
-  return true;
+
+  // Also accept config fully provided via environment variables (dev mode / .env)
+  const cfg = config.getConfig();
+  const hasApiKey = !!(
+    cfg.openai_api_key ||
+    cfg.openrouter_api_key ||
+    cfg.google_generative_ai_api_key ||
+    cfg.vertex_project ||
+    cfg.ollama_base_url ||
+    cfg.openai_compatible_base_url
+  );
+  if (hasApiKey) {
+    return true;
+  }
+
+  console.error(
+    chalk.red.bold("Error:"),
+    "No configuration found. Run 'spark config init' to set up your configuration.",
+  );
+  process.exit(1);
+  return false; // unreachable, but satisfies the return type for tests that mock process.exit
 }
 
 /**
