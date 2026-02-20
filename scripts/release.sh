@@ -131,9 +131,22 @@ log_info "Committing version change..."
 git add package.json
 git commit -m "Bump version to $NEW_VERSION"
 
-# Finish git flow release
-log_info "Finishing git flow release..."
-git flow release finish "$NEW_VERSION" -m "Release $NEW_VERSION"
+# Finish git flow release manually (git flow release finish uses getopt which
+# is incompatible with macOS BSD getopt when the -m message contains spaces)
+log_info "Merging release branch into main..."
+MAIN_BRANCH=$(git config --get gitflow.branch.master || echo "main")
+DEVELOP_BRANCH=$(git config --get gitflow.branch.develop || echo "develop")
+TAG_PREFIX=$(git config --get gitflow.prefix.versiontag || echo "")
+TAG="${TAG_PREFIX}${NEW_VERSION}"
+
+git checkout "$MAIN_BRANCH"
+git merge --no-ff "release/$NEW_VERSION" -m "Release $NEW_VERSION"
+git tag -a "$TAG" -m "Release $NEW_VERSION"
+
+log_info "Merging release branch back into develop..."
+git checkout "$DEVELOP_BRANCH"
+git merge --no-ff "release/$NEW_VERSION" -m "Merge release/$NEW_VERSION into $DEVELOP_BRANCH"
+git branch -d "release/$NEW_VERSION"
 
 # Push everything
 log_info "Pushing to remote..."
