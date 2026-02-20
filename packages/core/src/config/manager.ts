@@ -155,6 +155,19 @@ export class ConfigManager {
   }
 
   /**
+   * Create the config directory and an empty config file if neither exists yet.
+   * Safe to call multiple times — does nothing if the file already exists.
+   */
+  public initialize(): void {
+    if (!existsSync(this.configDir)) {
+      mkdirSync(this.configDir, { recursive: true });
+    }
+    if (!existsSync(this.configPath)) {
+      writeFileSync(this.configPath, JSON.stringify({}, null, 2), "utf-8");
+    }
+  }
+
+  /**
    * Reset the global config by removing the config file.
    */
   public reset(): void {

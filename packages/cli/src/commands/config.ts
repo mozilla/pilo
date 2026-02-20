@@ -210,6 +210,8 @@ async function initializeGlobalConfiguration(): Promise<void> {
   console.log(chalk.blue.bold("🔧 Initializing Spark Global Configuration"));
   console.log("");
 
+  config.initialize();
+
   const currentConfig = config.getConfig();
 
   // Check if already configured
@@ -244,7 +246,7 @@ async function initializeGlobalConfiguration(): Promise<void> {
   console.log(chalk.gray("2. Local .env file (development)"));
   console.log(chalk.gray("3. Global config file (lowest priority)"));
   console.log("");
-  console.log(chalk.gray("Global config saved to: " + config.getConfigPath()));
+  console.log(chalk.gray("Global config location: " + config.getConfigPath()));
 }
 
 /**
