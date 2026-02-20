@@ -105,17 +105,17 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
   // Track which section headings we've shown
   const seenTypes = new Set<string>();
 
-  const getHeading = (type: string) => {
+  const getHeading = (type: string): { emoji: string; label: string } | null => {
     if (seenTypes.has(type)) return null;
     seenTypes.add(type);
 
     switch (type) {
       case "plan":
-        return "📋 Plan:";
+        return { emoji: "📋", label: "Plan" };
       case "reasoning":
-        return "💭 Actions:";
+        return { emoji: "💭", label: "Actions" };
       case "result":
-        return "✨ Answer:";
+        return { emoji: "✨", label: "Answer" };
       default:
         return null;
     }
@@ -128,7 +128,14 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
         const heading = getHeading(msg.type);
         return (
           <div key={msg.id}>
-            {heading && <div className="text-sm font-semibold mb-2 mt-3 first:mt-0">{heading}</div>}
+            {heading && (
+              <div className="flex items-center gap-2 mb-2 mt-3 first:mt-0">
+                <span className="text-sm">{heading.emoji}</span>
+                <span className="text-sm font-medium uppercase text-foreground/70">
+                  {heading.label}
+                </span>
+              </div>
+            )}
             <TaskMessage message={msg} />
           </div>
         );
