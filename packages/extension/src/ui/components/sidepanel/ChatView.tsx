@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactElement } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
@@ -167,6 +167,126 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   // Auto-scroll is used by MessageList internally; we still need scrollToBottomOnNewMessage
   // to trigger a scroll after calling addMessage from event handlers.
   const { scrollToBottomOnNewMessage } = useAutoScroll(messages, stableTabId);
+
+  // ---------------------------------------------------------------------------
+  // DEV ONLY: Seed mock messages for UI design iteration.
+  // Guarded by import.meta.env.MODE so it is skipped in Vitest (MODE === 'test')
+  // and only runs during real WXT dev server sessions (MODE === 'development').
+  // Remove this block before shipping.
+  // ---------------------------------------------------------------------------
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.MODE !== "development") return;
+    if (seededRef.current) return;
+    seededRef.current = true;
+
+    // Stable task IDs for grouping.
+    const TASK_A = "mock-task-001"; // Completed task with markdown result
+    const TASK_B = "mock-task-002"; // Completed task with error
+    const TASK_C = "mock-task-003"; // Active / in-progress task
+
+    // --- Task A: completed, markdown result ----------------------------------
+    addMessage("user", "Summarize the privacy policy on this page");
+
+    addMessage(
+      "plan",
+      "1. Navigate to the privacy policy section\n2. Extract the key data points\n3. Format a structured summary",
+      TASK_A,
+    );
+    addMessage(
+      "reasoning",
+      "The page contains a long-form privacy policy. I will extract sections on data collection, sharing, and retention.",
+      TASK_A,
+    );
+    addMessage("status", "Navigating to privacy policy", TASK_A);
+    addMessage("status", "Extracting data", TASK_A);
+    addMessage(
+      "result",
+      [
+        "## Privacy Policy Summary",
+        "",
+        "Here are the **key takeaways** from the policy:",
+        "",
+        "- **Data collected**: Name, email, IP address, and browsing behaviour",
+        "- **Third-party sharing**: Data is shared with advertising partners",
+        "- **Retention period**: Up to `36 months` after account closure",
+        "",
+        "### Your Rights",
+        "",
+        "You may request deletion at any time via the **Account Settings** page.",
+        "",
+        "```json",
+        '{ "contact": "privacy@example.com" }',
+        "```",
+      ].join("\n"),
+      TASK_A,
+    );
+
+    // --- Task B: completed, with an error -----------------------------------
+    addMessage("user", "Click the Subscribe button");
+
+    addMessage(
+      "plan",
+      "1. Locate the Subscribe button in the page\n2. Click it\n3. Confirm the action",
+      TASK_B,
+    );
+    addMessage("reasoning", "Searching for a button element with the label 'Subscribe'.", TASK_B);
+    addMessage("status", "Clicking", TASK_B);
+    addMessage(
+      "error",
+      "Action Failed: Element not found — the Subscribe button is not present in the current viewport.",
+      TASK_B,
+    );
+    addMessage(
+      "result",
+      "Could not complete the task because the Subscribe button was not found on the page.",
+      TASK_B,
+    );
+
+    // --- System message -----------------------------------------------------
+    addMessage(
+      "system",
+      "Session restored. Continued conversation context is not yet supported — messages above are from a previous session.",
+    );
+
+    // --- Task C: active / in-progress (no result yet) -----------------------
+    addMessage("user", "Fill in the contact form with my details");
+
+    addMessage(
+      "plan",
+      "1. Locate the contact form\n2. Fill in name, email, and message fields\n3. Submit the form",
+      TASK_C,
+    );
+    addMessage(
+      "reasoning",
+      "I can see the contact form. I will fill in the fields one by one using the provided details.",
+      TASK_C,
+    );
+    addMessage("status", "Filling", TASK_C);
+
+    // Mark Task C as the active task so the spinner + InputDisabledOverlay render.
+    // We also set isExecuting so the TaskBubble shows the loading state.
+    //
+    // startTask() generates a timestamp-based ID; we patch the store directly
+    // so currentTaskId === TASK_C, which matches the seeded messages above.
+    startTask();
+    if (stableTabId !== undefined) {
+      const storeState = useConversationStore.getState();
+      // Guard for test environments where setTaskId may not be mocked.
+      if (typeof storeState.setTaskId === "function") {
+        storeState.setTaskId(stableTabId, TASK_C);
+      }
+    }
+    setExecutionState(true);
+
+    // Trigger the InputDisabledOverlay for visual review.
+    // Comment this line out to hide the overlay and see the active spinner instead.
+    // setLastCompletedTaskId(TASK_C);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ---------------------------------------------------------------------------
+  // END DEV SEED
+  // ---------------------------------------------------------------------------
 
   // Helper to add events to logger
   const addEventsToLogger = (eventList: EventData[]) => {

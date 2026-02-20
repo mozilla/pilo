@@ -1,6 +1,6 @@
 import { type ReactElement } from "react";
 import Markdown from "marked-react";
-import { Bot, User } from "lucide-react";
+
 import { cn } from "../../../lib/utils";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import type { ChatMessage } from "../../hooks/useConversation";
@@ -125,11 +125,6 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
 
   return (
     <div className="flex items-start gap-3 px-4 py-3">
-      {/* Bot avatar */}
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
-        <Bot className="h-3.5 w-3.5" />
-      </div>
-
       {/* Task content */}
       <div
         className={cn(
@@ -178,9 +173,6 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
 
 const TypingIndicator = (): ReactElement => (
   <div className="flex items-start gap-3 px-4 py-3">
-    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
-      <Bot className="h-3.5 w-3.5" />
-    </div>
     <div className="flex items-center gap-1 pt-1">
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:0ms]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:150ms]" />
@@ -198,9 +190,6 @@ const EmptyState = (): ReactElement => (
     className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center h-full"
     data-testid="welcome-message"
   >
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-      <Bot className="h-5 w-5 text-primary" />
-    </div>
     <div>
       <p className="text-sm font-medium text-foreground">What can I help with?</p>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -219,18 +208,13 @@ interface UserMessageBubbleProps {
 }
 
 const UserMessageBubble = ({ message }: UserMessageBubbleProps): ReactElement => (
-  <div className="flex items-start gap-3 px-4 py-3">
-    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-      <User className="h-3.5 w-3.5" />
-    </div>
-    <div className="min-w-0 flex-1 pt-0.5">
-      <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
-        {message.content}
-      </p>
-      <p className="mt-1 text-[10px] text-muted-foreground">
-        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-      </p>
-    </div>
+  <div className="w-full bg-secondary/70 px-4 py-3">
+    <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+      {message.content}
+    </p>
+    <p className="mt-1 text-[10px] text-muted-foreground">
+      {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+    </p>
   </div>
 );
 
