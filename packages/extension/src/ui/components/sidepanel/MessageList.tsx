@@ -129,9 +129,9 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
         return (
           <div key={msg.id}>
             {heading && (
-              <div className="flex items-center gap-2 mb-2 mt-3 first:mt-0">
+              <div className="flex items-center gap-2 mb-2 mt-6 first:mt-0">
                 <span className="text-sm">{heading.emoji}</span>
-                <span className="text-sm font-medium uppercase text-foreground/70">
+                <span className="text-sm font-medium uppercase text-foreground">
                   {heading.label}
                 </span>
               </div>
