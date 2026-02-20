@@ -3,7 +3,7 @@ import {
   mapConfigToExtensionSettings,
   EXTENSION_SUPPORTED_PROVIDERS,
 } from "../src/extensionConfig.js";
-import type { PiloConfig } from "../../core/src/config/defaults.js";
+import type { PiloConfig } from "pilo-core";
 
 // ---------------------------------------------------------------------------
 // Helpers
