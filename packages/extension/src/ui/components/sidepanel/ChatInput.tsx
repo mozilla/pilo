@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../../lib/utils";
@@ -8,12 +8,8 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   /** Whether a task is currently executing. Shows the Stop button instead of Send. */
   isLoading: boolean;
-  /** Whether the input is fully disabled (e.g. post-task-completion until a new request is started). */
-  disabled?: boolean;
   /** Called when the user clicks the Stop button during execution. */
   onStop?: () => void;
-  /** Optional overlay rendered inside the positioning context (e.g. InputDisabledOverlay). */
-  overlay?: ReactNode;
 }
 
 /**
@@ -30,13 +26,7 @@ interface ChatInputProps {
  * execution logic (background script messaging, conversation state) lives
  * in the parent.
  */
-export function ChatInput({
-  onSend,
-  isLoading,
-  disabled = false,
-  onStop,
-  overlay,
-}: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -55,7 +45,7 @@ export function ChatInput({
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || isLoading || disabled) return;
+    if (!trimmed || isLoading) return;
     onSend(trimmed);
     setValue("");
     if (textareaRef.current) {
@@ -70,16 +60,14 @@ export function ChatInput({
     }
   };
 
-  const canSend = value.trim().length > 0 && !isLoading && !disabled;
+  const canSend = value.trim().length > 0 && !isLoading;
 
   return (
-    <div className="relative border-t border-border px-3 py-2">
-      {overlay}
+    <div className="border-t border-border px-3 py-2">
       <div
         className={cn(
           "flex items-end gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 transition-colors",
           "focus-within:border-primary/40",
-          disabled && "opacity-60",
         )}
       >
         <textarea
@@ -91,7 +79,7 @@ export function ChatInput({
           }}
           onKeyDown={handleKeyDown}
           placeholder="What would you like me to do?"
-          disabled={disabled || isLoading}
+          disabled={isLoading}
           rows={1}
           className="flex-1 self-center resize-none bg-transparent text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
           aria-label="Task instruction input"

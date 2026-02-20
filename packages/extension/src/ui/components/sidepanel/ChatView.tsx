@@ -112,25 +112,27 @@ export function shouldDisplayError(event: RealtimeEvent): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// InputDisabledOverlay
+// NewConversationPrompt
 // ---------------------------------------------------------------------------
 
-interface InputDisabledOverlayProps {
+interface NewConversationPromptProps {
   onNewRequest: () => void;
 }
 
-const InputDisabledOverlay = ({ onNewRequest }: InputDisabledOverlayProps): ReactElement => (
-  <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center text-center px-4 backdrop-blur-sm z-10">
-    <p className="text-foreground text-sm mb-3">
-      Continued conversation context not yet supported.
-    </p>
-    <button
-      onClick={onNewRequest}
-      className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors font-medium"
-      data-testid="new-request-button"
-    >
-      New Request
-    </button>
+const NewConversationPrompt = ({ onNewRequest }: NewConversationPromptProps): ReactElement => (
+  <div className="border-t border-border px-3 py-3">
+    <div className="rounded-lg border border-border bg-secondary/30 px-3 py-3 text-center">
+      <p className="text-[12px] text-muted-foreground">
+        Continued conversation context is not yet supported.
+      </p>
+      <button
+        onClick={onNewRequest}
+        className="mt-2 text-[12px] font-medium text-primary hover:text-primary/80 transition-colors"
+        data-testid="new-request-button"
+      >
+        Start a new conversation
+      </button>
+    </div>
   </div>
 );
 
@@ -443,18 +445,12 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
         tabId={stableTabId}
       />
 
-      {/* Input Area — overlay rendered inside ChatInput's positioning context */}
-      <ChatInput
-        onSend={handleSendMessage}
-        isLoading={isExecuting}
-        disabled={lastCompletedTaskId !== null && !isExecuting}
-        onStop={handleCancel}
-        overlay={
-          lastCompletedTaskId && !isExecuting ? (
-            <InputDisabledOverlay onNewRequest={handleNewRequest} />
-          ) : undefined
-        }
-      />
+      {/* Input Area — replaced by prompt when a task has completed */}
+      {lastCompletedTaskId && !isExecuting ? (
+        <NewConversationPrompt onNewRequest={handleNewRequest} />
+      ) : (
+        <ChatInput onSend={handleSendMessage} isLoading={isExecuting} onStop={handleCancel} />
+      )}
     </>
   );
 }
