@@ -238,16 +238,6 @@ const LoadingSpinner = (): ReactElement => (
 );
 
 // ---------------------------------------------------------------------------
-// TaskCompletionSeparator
-// ---------------------------------------------------------------------------
-
-const TaskCompletionSeparator = (): ReactElement => (
-  <div className="my-8 flex items-center px-4">
-    <div className="flex-1 border-t-2 border-border/50" />
-  </div>
-);
-
-// ---------------------------------------------------------------------------
 // TaskMessage
 // ---------------------------------------------------------------------------
 
@@ -438,7 +428,6 @@ export interface MessageListProps {
  * - user / system messages render directly as their own rows
  * - task-related messages (plan, reasoning, result, error, status) are grouped
  *   into a single TaskBubble per taskId, rendered at first occurrence
- * - A TaskCompletionSeparator is inserted after each completed (non-active) task
  *
  * The TypingIndicator appears when `isExecuting` is true and there is no active
  * TaskBubble yet (i.e., the task has started but no events have been received).
@@ -454,12 +443,6 @@ export function MessageList({
   if (messages.length === 0 && !isExecuting) {
     return <EmptyState />;
   }
-
-  /**
-   * Determines whether the task associated with taskId has a result message.
-   */
-  const isTaskCompleted = (taskId: string): boolean =>
-    messages.some((msg) => msg.taskId === taskId && msg.type === "result");
 
   /**
    * Build ordered list of elements — same algorithm as the original
@@ -485,11 +468,6 @@ export function MessageList({
             currentTaskId={currentTaskId}
           />,
         );
-
-        // Separator after completed tasks that are no longer active
-        if (isTaskCompleted(message.taskId) && currentTaskId !== message.taskId) {
-          elements.push(<TaskCompletionSeparator key={`separator-${message.taskId}`} />);
-        }
       }
     });
 
