@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactElement } from "react";
+import { useState, useEffect, useCallback, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
@@ -35,7 +35,6 @@ interface EventData {
 
 interface ChatViewProps {
   currentTab: browser.Tabs.Tab | null;
-  onOpenSettings: () => void;
 }
 
 /**
@@ -141,10 +140,7 @@ const InputDisabledOverlay = ({ onNewRequest }: InputDisabledOverlayProps): Reac
 // ChatView
 // ---------------------------------------------------------------------------
 
-export default function ChatView({
-  currentTab,
-  onOpenSettings: _onOpenSettings,
-}: ChatViewProps): ReactElement {
+export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   const [stableTabId, setStableTabId] = useState<number | undefined>(currentTab?.id);
   const [lastCompletedTaskId, setLastCompletedTaskId] = useState<string | null>(null);
   const { addEvent, clearEvents } = useEvents();
@@ -427,18 +423,17 @@ export default function ChatView({
     }
   };
 
-  const handleClearChat = () => {
+  const handleClearChat = useCallback(() => {
     clearMessages();
     setLastCompletedTaskId(null);
-  };
+  }, [clearMessages]);
 
   // Expose handleClearChat via a custom event so SidePanel (SidebarHeader) can call it
   useEffect(() => {
     const el = document.documentElement;
-    const listener = () => handleClearChat();
-    el.addEventListener("pilo:clear-chat", listener);
-    return () => el.removeEventListener("pilo:clear-chat", listener);
-  });
+    el.addEventListener("pilo:clear-chat", handleClearChat);
+    return () => el.removeEventListener("pilo:clear-chat", handleClearChat);
+  }, [handleClearChat]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

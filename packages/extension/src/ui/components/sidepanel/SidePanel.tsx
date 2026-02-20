@@ -136,7 +136,7 @@ export default function SidePanel(): ReactElement {
             <SettingsView onBack={() => handleNavigate("chat")} />
           </div>
         ) : (
-          <ChatView currentTab={currentTab} onOpenSettings={() => handleNavigate("settings")} />
+          <ChatView currentTab={currentTab} />
         )}
       </div>
     </ThemeProvider>

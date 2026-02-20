@@ -5,7 +5,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { ScrollArea } from "../ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { useSettings } from "../../stores/settingsStore";
+import { useSettings, useSettingsStore } from "../../stores/settingsStore";
 import { cn } from "../../../lib/utils";
 import type { Settings } from "../../stores/settingsStore";
 
@@ -60,7 +60,7 @@ function getEndpointLabel(provider: Provider): string {
 const showsEndpoint = (provider: Provider) => provider === "openai" || provider === "ollama";
 
 export default function SettingsView({ onBack }: SettingsViewProps) {
-  const { settings, saveSettings, updateSettings, saveStatus } = useSettings();
+  const { settings, saveSettings, updateSettings } = useSettings();
 
   // Local draft state — changes only commit to the store on Save
   const [draft, setDraft] = useState<Settings>(() => ({ ...settings }));
@@ -99,12 +99,16 @@ export default function SettingsView({ onBack }: SettingsViewProps) {
     updateSettings({ ...draft });
     await saveSettings();
 
-    if (!saveStatus?.startsWith("Error")) {
+    // Read latest status directly from the store — saveSettings() updates it
+    // asynchronously, so the `saveStatus` closure value from the render cycle
+    // that created this callback may already be stale.
+    const latestStatus = useSettingsStore.getState().saveStatus;
+    if (!latestStatus?.startsWith("Error")) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       setTimeout(() => onBack(), 1500);
     }
-  }, [draft, updateSettings, saveSettings, saveStatus, onBack]);
+  }, [draft, updateSettings, saveSettings, onBack]);
 
   const handleReset = useCallback(() => {
     setDraft({ ...DEFAULT_SETTINGS });

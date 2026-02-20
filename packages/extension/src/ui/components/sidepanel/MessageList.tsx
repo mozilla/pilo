@@ -66,7 +66,7 @@ const TaskMessage = ({ message }: TaskMessageProps): ReactElement => {
       case "reasoning":
         return "text-message-assistant text-muted-foreground";
       case "error":
-        return "text-message-assistant text-red-600 p-2 bg-red-50 rounded border border-red-200";
+        return "text-message-assistant text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-950/50 rounded border border-red-200 dark:border-red-800";
       case "result":
         return "text-message-assistant text-sm";
       default:
