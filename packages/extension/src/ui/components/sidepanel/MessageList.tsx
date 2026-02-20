@@ -1,7 +1,6 @@
 import { type ReactElement } from "react";
 import Markdown from "marked-react";
 import { Bot, User } from "lucide-react";
-import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../../lib/utils";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import type { ChatMessage } from "../../hooks/useConversation";
@@ -329,16 +328,14 @@ export function MessageList({
     currentTaskId !== null && messages.some((msg) => msg.taskId === currentTaskId);
 
   return (
-    <ScrollArea className="flex-1">
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex flex-col divide-y divide-border/50"
-      >
-        {renderMessages()}
-        {isExecuting && !hasActiveTaskMessages && <TypingIndicator />}
-        <div ref={messagesEndRef} />
-      </div>
-    </ScrollArea>
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="flex-1 min-h-0 overflow-y-auto flex flex-col divide-y divide-border/50"
+    >
+      {renderMessages()}
+      {isExecuting && !hasActiveTaskMessages && <TypingIndicator />}
+      <div ref={messagesEndRef} />
+    </div>
   );
 }
