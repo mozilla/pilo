@@ -377,7 +377,7 @@ interface UserMessageBubbleProps {
 }
 
 const UserMessageBubble = ({ message }: UserMessageBubbleProps): ReactElement => (
-  <div className="w-full bg-secondary/70 px-4 py-3">
+  <div className="border border-border bg-secondary/40 rounded-lg px-3 py-2.5">
     <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
       {message.content}
     </p>
