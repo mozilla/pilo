@@ -1,185 +1,248 @@
-import { type ReactElement } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Eye, EyeOff, Check } from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { ScrollArea } from "../ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useSettings } from "../../stores/settingsStore";
-import { useSystemTheme } from "../../hooks/useSystemTheme";
+import { cn } from "../../../lib/utils";
+import type { Settings } from "../../stores/settingsStore";
 
 interface SettingsViewProps {
   onBack: () => void;
 }
 
-export default function SettingsView({ onBack }: SettingsViewProps): ReactElement {
-  const { settings, saveStatus, updateSettings, saveSettings } = useSettings();
-  const { isDark, theme: t } = useSystemTheme();
+type Provider = Settings["provider"];
 
-  const focusRing = "focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+const DEFAULT_SETTINGS: Settings = {
+  apiKey: "",
+  apiEndpoint: "",
+  model: "google/gemini-2.5-flash",
+  provider: "openrouter",
+};
 
-  const getModelPlaceholder = (provider: string): string => {
-    switch (provider) {
-      case "openrouter":
-        return "google/gemini-2.5-flash";
-      case "google":
-        return "gemini-2.5-flash";
-      case "ollama":
-        return "llama3.2";
-      default:
-        return "gpt-4.1-mini";
-    }
-  };
+const PROVIDER_LABELS: Record<Provider, string> = {
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  google: "Google Generative AI",
+  ollama: "Ollama",
+};
 
-  const getEndpointLabel = (provider: string): string => {
-    switch (provider) {
-      case "openai":
-        return "API Endpoint";
-      case "ollama":
-        return "Base URL";
-      default:
-        return "API Endpoint (Not used)";
-    }
-  };
+function getModelPlaceholder(provider: Provider): string {
+  switch (provider) {
+    case "openrouter":
+      return "google/gemini-2.5-flash";
+    case "google":
+      return "gemini-2.5-flash";
+    case "ollama":
+      return "llama3.2";
+    default:
+      return "gpt-4.1-mini";
+  }
+}
 
-  const getEndpointPlaceholder = (provider: string): string => {
-    switch (provider) {
-      case "openai":
-        return "https://api.openai.com/v1";
-      case "ollama":
-        return "http://localhost:11434/api";
-      default:
-        return "Not used by this provider";
-    }
-  };
+function getEndpointPlaceholder(provider: Provider): string {
+  switch (provider) {
+    case "openai":
+      return "https://api.openai.com/v1";
+    case "ollama":
+      return "http://localhost:11434/api";
+    default:
+      return "";
+  }
+}
 
-  const handleProviderChange = (newProvider: "openai" | "openrouter" | "google" | "ollama") => {
-    const updates: Partial<typeof settings> = { provider: newProvider };
+function getEndpointLabel(provider: Provider): string {
+  return provider === "ollama" ? "Base URL" : "API Endpoint";
+}
 
-    // Prefill default endpoints when switching providers
-    if (newProvider === "openai" && !settings.apiEndpoint) {
-      updates.apiEndpoint = "https://api.openai.com/v1";
-    } else if (newProvider === "ollama" && !settings.apiEndpoint) {
-      updates.apiEndpoint = "http://localhost:11434/api";
-    }
-    // Clear endpoint when switching to providers that don't use it
-    else if (newProvider !== "openai" && newProvider !== "ollama") {
-      updates.apiEndpoint = "";
-    }
+const showsEndpoint = (provider: Provider) => provider === "openai" || provider === "ollama";
 
-    updateSettings(updates);
-  };
+export default function SettingsView({ onBack }: SettingsViewProps) {
+  const { settings, saveSettings, updateSettings, saveStatus } = useSettings();
 
-  const handleSave = async () => {
+  // Local draft state — changes only commit to the store on Save
+  const [draft, setDraft] = useState<Settings>(() => ({ ...settings }));
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Sync draft when store settings change externally (e.g. initial load)
+  useEffect(() => {
+    setDraft({ ...settings });
+  }, [settings]);
+
+  const updateDraft = useCallback(<K extends keyof Settings>(field: K, value: Settings[K]) => {
+    setDraft((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleProviderChange = useCallback((newProvider: Provider) => {
+    setDraft((prev) => {
+      const updates: Partial<Settings> = { provider: newProvider };
+
+      // Prefill default endpoints when switching to providers that use them
+      if (newProvider === "openai" && !prev.apiEndpoint) {
+        updates.apiEndpoint = "https://api.openai.com/v1";
+      } else if (newProvider === "ollama" && !prev.apiEndpoint) {
+        updates.apiEndpoint = "http://localhost:11434/api";
+      } else if (newProvider !== "openai" && newProvider !== "ollama") {
+        // Clear endpoint for providers that don't use it
+        updates.apiEndpoint = "";
+      }
+
+      return { ...prev, ...updates };
+    });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    // Push draft into the store then persist to browser.storage
+    updateSettings({ ...draft });
     await saveSettings();
-    // Auto-close settings after successful save
+
     if (!saveStatus?.startsWith("Error")) {
-      setTimeout(() => {
-        onBack();
-      }, 1500);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => onBack(), 1500);
     }
+  }, [draft, updateSettings, saveSettings, saveStatus, onBack]);
+
+  const handleReset = useCallback(() => {
+    setDraft({ ...DEFAULT_SETTINGS });
+  }, []);
+
+  // Compare draft against the live store snapshot (not the local draft baseline)
+  const currentSettings: Settings = {
+    apiKey: settings.apiKey,
+    apiEndpoint: settings.apiEndpoint,
+    model: settings.model,
+    provider: settings.provider,
   };
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(currentSettings);
 
   return (
-    <div className={`h-screen flex flex-col ${t.bg.sidebar}`}>
-      <div
-        className={`${t.bg.panel} m-6 rounded-2xl flex-1 overflow-hidden shadow-lg flex flex-col`}
-      >
-        <div className={`${t.bg.secondary} border-b ${t.border.secondary} p-4`}>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-2xl">⚡</span>
-            <div>
-              <h1 className={`text-lg font-medium ${t.text.primary}`}>Pilo Settings</h1>
-              <p className={`${t.text.secondary} text-xs`}>Configure your AI provider</p>
-            </div>
-          </div>
+    <ScrollArea className="h-full w-full">
+      <div className="flex flex-col gap-5 px-4 py-4">
+        {/* Header */}
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Settings</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Configure your AI provider connection.
+          </p>
         </div>
 
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>Provider</label>
-              <select
-                value={settings.provider}
-                onChange={(e) =>
-                  handleProviderChange(
-                    e.target.value as "openai" | "openrouter" | "google" | "ollama",
-                  )
-                }
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} focus:outline-none ${focusRing}`}
-              >
-                <option value="openai">OpenAI</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="google">Google Generative AI</option>
-                <option value="ollama">Ollama (Local)</option>
-              </select>
-            </div>
+        {/* Provider */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="provider" className="text-xs font-medium text-foreground">
+            Provider
+          </Label>
+          <Select
+            value={draft.provider}
+            onValueChange={(value) => handleProviderChange(value as Provider)}
+          >
+            <SelectTrigger
+              id="provider"
+              className="h-8 w-full bg-secondary/50 border-border text-[13px] text-foreground"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              {(Object.entries(PROVIDER_LABELS) as [Provider, string][]).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>Model</label>
-              <input
-                type="text"
-                value={settings.model}
-                onChange={(e) => updateSettings({ model: e.target.value })}
-                placeholder={getModelPlaceholder(settings.provider)}
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
-              />
-            </div>
+        {/* Model */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="model" className="text-xs font-medium text-foreground">
+            Model
+          </Label>
+          <Input
+            id="model"
+            type="text"
+            value={draft.model}
+            onChange={(e) => updateDraft("model", e.target.value)}
+            placeholder={getModelPlaceholder(draft.provider)}
+            className="h-8 bg-secondary/50 border-border text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/40"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>
-                {getEndpointLabel(settings.provider)}
-              </label>
-              <input
-                type="text"
-                value={settings.apiEndpoint}
-                onChange={(e) => updateSettings({ apiEndpoint: e.target.value })}
-                placeholder={getEndpointPlaceholder(settings.provider)}
-                disabled={settings.provider !== "openai" && settings.provider !== "ollama"}
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
-              />
-              {settings.provider === "ollama" && (
-                <p className={`text-xs ${t.text.secondary}`}>Make sure Ollama is running locally</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className={`block text-sm font-medium ${t.text.secondary}`}>
-                API Key {settings.provider === "ollama" && "(Optional)"}
-              </label>
-              <input
-                type="password"
-                value={settings.apiKey}
-                onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                placeholder="sk-..."
-                className={`w-full px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing}`}
-              />
-            </div>
-
-            {saveStatus && (
-              <div
-                className={`p-3 rounded-lg text-sm font-medium ${
-                  saveStatus.startsWith("Error")
-                    ? `${t.bg.error} ${t.text.error} border ${t.border.error}`
-                    : `${t.bg.success} ${t.text.success} border ${t.border.success}`
-                }`}
-              >
-                {saveStatus}
-              </div>
+        {/* API Endpoint — only shown for providers that use it */}
+        {showsEndpoint(draft.provider) && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="api-endpoint" className="text-xs font-medium text-foreground">
+              {getEndpointLabel(draft.provider)}
+            </Label>
+            <Input
+              id="api-endpoint"
+              type="text"
+              value={draft.apiEndpoint}
+              onChange={(e) => updateDraft("apiEndpoint", e.target.value)}
+              placeholder={getEndpointPlaceholder(draft.provider)}
+              className="h-8 bg-secondary/50 border-border text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/40"
+            />
+            {draft.provider === "ollama" && (
+              <p className="text-xs text-muted-foreground">Make sure Ollama is running locally.</p>
             )}
+          </div>
+        )}
 
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleSave}
-                disabled={!!saveStatus}
-                className="flex-1 px-4 py-2 bg-[#FF6B35] text-white rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Save Settings
-              </button>
-              <button
-                onClick={onBack}
-                className={`flex-1 px-4 py-2 ${isDark ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} ${isDark ? "text-gray-100" : "text-gray-900"} rounded-lg transition-colors font-medium`}
-              >
-                Back to Chat
-              </button>
-            </div>
+        {/* API Key */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="api-key" className="text-xs font-medium text-foreground">
+            API Key{" "}
+            {draft.provider === "ollama" && (
+              <span className="text-muted-foreground font-normal">(Optional)</span>
+            )}
+          </Label>
+          <div className="relative">
+            <Input
+              id="api-key"
+              type={showApiKey ? "text" : "password"}
+              value={draft.apiKey}
+              onChange={(e) => updateDraft("apiKey", e.target.value)}
+              placeholder="sk-..."
+              className="h-8 pr-9 bg-secondary/50 border-border text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/40"
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey((prev) => !prev)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showApiKey ? "Hide API key" : "Show API key"}
+            >
+              {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
           </div>
         </div>
+
+        {/* Save Button */}
+        <Button
+          onClick={handleSave}
+          disabled={!hasChanges && !saved}
+          className={cn("h-8 mt-1 text-xs font-medium", saved && "bg-primary/80")}
+        >
+          {saved ? (
+            <>
+              <Check className="mr-1.5 h-3.5 w-3.5" />
+              Saved
+            </>
+          ) : (
+            "Save Settings"
+          )}
+        </Button>
+
+        {/* Reset to defaults */}
+        <button
+          type="button"
+          onClick={handleReset}
+          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors text-center"
+        >
+          Reset to defaults
+        </button>
       </div>
-    </div>
+    </ScrollArea>
   );
 }
