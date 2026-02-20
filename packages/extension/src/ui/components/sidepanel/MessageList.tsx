@@ -474,7 +474,7 @@ export function MessageList({
     <div
       ref={scrollContainerRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 overflow-y-auto flex flex-col divide-y divide-border/50"
+      className="flex-1 min-h-0 overflow-y-auto flex flex-col"
     >
       {renderMessages()}
       {isExecuting && !hasActiveTaskMessages && <TypingIndicator />}
