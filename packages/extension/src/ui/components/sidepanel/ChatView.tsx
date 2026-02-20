@@ -170,18 +170,11 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   // DEV ONLY: Seed mock messages for UI design iteration.
   // Guarded by import.meta.env.MODE so it is skipped in Vitest (MODE === 'test')
   // and only runs during real WXT dev server sessions (MODE === 'development').
+  // StrictMode is intentionally absent from main.tsx so this fires exactly once.
   // Remove this block before shipping.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (import.meta.env.MODE !== "development") return;
-
-    // Check the store directly: if messages already exist for this tab, the
-    // seed already ran (handles StrictMode remounts and HMR module resets).
-    const existing =
-      stableTabId !== undefined
-        ? useConversationStore.getState().getConversation(stableTabId)
-        : null;
-    if (existing && existing.messages.length > 0) return;
 
     // Stable task IDs for grouping.
     const TASK_A = "mock-task-001"; // Completed task with markdown result
