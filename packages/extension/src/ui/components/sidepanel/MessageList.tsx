@@ -102,8 +102,6 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
 
   if (taskMessages.length === 0 && !latestStatus) return <></>;
 
-  const hasPlan = taskMessages.some((msg) => msg.type === "plan");
-
   // Track which section headings we've shown
   const seenTypes = new Set<string>();
 
@@ -124,45 +122,34 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
   };
 
   return (
-    <div className="flex items-start gap-3 px-4 py-3">
-      {/* Task content */}
-      <div
-        className={cn(
-          "min-w-0 flex-1 rounded-lg border border-border px-4 py-2",
-          hasPlan ? "w-full" : "max-w-xs lg:max-w-md",
-          "bg-secondary text-foreground",
-        )}
-      >
-        {/* Render messages chronologically with dynamic headings */}
-        {taskMessages.map((msg) => {
-          const heading = getHeading(msg.type);
-          return (
-            <div key={msg.id}>
-              {heading && (
-                <div className="text-sm font-semibold mb-2 mt-3 first:mt-0">{heading}</div>
-              )}
-              <TaskMessage message={msg} />
-            </div>
-          );
-        })}
-
-        {/* Current status for active tasks or early phase status-only tasks */}
-        {!resultMessage && (isActive || isEarlyPhase) && (
-          <div className="flex items-center gap-2 text-sm mt-2">
-            <LoadingSpinner />
-            <span className="text-primary">
-              {latestStatus ? latestStatus.content : "Starting task..."}
-            </span>
+    <div className="px-4 py-3">
+      {/* Render messages chronologically with dynamic headings */}
+      {taskMessages.map((msg) => {
+        const heading = getHeading(msg.type);
+        return (
+          <div key={msg.id}>
+            {heading && <div className="text-sm font-semibold mb-2 mt-3 first:mt-0">{heading}</div>}
+            <TaskMessage message={msg} />
           </div>
-        )}
+        );
+      })}
 
-        {/* Timestamp for completed tasks */}
-        {resultMessage && (
-          <div className="text-xs text-muted-foreground mt-1">
-            {resultMessage.timestamp.toLocaleTimeString()}
-          </div>
-        )}
-      </div>
+      {/* Current status for active tasks or early phase status-only tasks */}
+      {!resultMessage && (isActive || isEarlyPhase) && (
+        <div className="flex items-center gap-2 text-sm mt-2">
+          <LoadingSpinner />
+          <span className="text-primary">
+            {latestStatus ? latestStatus.content : "Starting task..."}
+          </span>
+        </div>
+      )}
+
+      {/* Timestamp for completed tasks */}
+      {resultMessage && (
+        <div className="text-xs text-muted-foreground mt-1">
+          {resultMessage.timestamp.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 };
