@@ -39,9 +39,9 @@ jobs:
         uses: mozilla-it/deploy-actions/docker-build@v4.3.2
         with:
           gar_location: us
-          image_name: tabs-spark
-          gar_name: tabs-prod
-          project_id: moz-fx-tabs-prod
+          image_name: ${{ env.IMAGE_NAME }}
+          gar_name: ${{ env.GAR_REPOSITORY }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
           should_tag_latest: true
           image_build_context: .
           dockerfile_path: "./packages/server/Dockerfile"
