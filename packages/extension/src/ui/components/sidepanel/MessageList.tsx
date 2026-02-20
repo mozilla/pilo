@@ -144,9 +144,7 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
           return (
             <div key={msg.id}>
               {heading && (
-                <div className="text-sm font-semibold text-primary mb-2 mt-3 first:mt-0">
-                  {heading}
-                </div>
+                <div className="text-sm font-semibold mb-2 mt-3 first:mt-0">{heading}</div>
               )}
               <TaskMessage message={msg} />
             </div>
