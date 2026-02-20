@@ -68,7 +68,7 @@ export function ChatInput({ onSend, isLoading, disabled = false, onStop }: ChatI
     <div className="border-t border-border px-3 py-2">
       <div
         className={cn(
-          "flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 transition-colors",
+          "flex items-end gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 transition-colors",
           "focus-within:border-primary/40",
           disabled && "opacity-60",
         )}
@@ -84,7 +84,7 @@ export function ChatInput({ onSend, isLoading, disabled = false, onStop }: ChatI
           placeholder="What would you like me to do?"
           disabled={disabled || isLoading}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+          className="flex-1 self-center resize-none bg-transparent text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
           aria-label="Task instruction input"
           data-testid="task-input"
         />
