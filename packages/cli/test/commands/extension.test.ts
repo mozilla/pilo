@@ -106,8 +106,10 @@ describe("CLI Extension Command", () => {
   let mockExit: ReturnType<typeof vi.fn>;
   let consoleLogs: string[];
   let consoleWarns: string[];
+  let consoleErrors: string[];
   let originalConsoleLog: typeof console.log;
   let originalConsoleWarn: typeof console.warn;
+  let originalConsoleError: typeof console.error;
 
   beforeEach(() => {
     originalExit = process.exit;
@@ -129,6 +131,13 @@ describe("CLI Extension Command", () => {
       consoleWarns.push(args.map(String).join(" "));
     });
 
+    // Capture console.error for error-message tests
+    consoleErrors = [];
+    originalConsoleError = console.error;
+    console.error = vi.fn((...args: unknown[]) => {
+      consoleErrors.push(args.map(String).join(" "));
+    });
+
     // By default extension path does not exist
     mockExistsSync.mockReturnValue(false);
     // By default execFileSync (used for `which`) throws → binary not found
@@ -146,6 +155,7 @@ describe("CLI Extension Command", () => {
     process.exit = originalExit;
     console.log = originalConsoleLog;
     console.warn = originalConsoleWarn;
+    console.error = originalConsoleError;
     // Restore __PILO_PRODUCTION__ to undefined (dev mode) after each test
     vi.unstubAllGlobals();
   });
@@ -670,6 +680,294 @@ describe("CLI Extension Command", () => {
         expect(mockExit).not.toHaveBeenCalledWith(1);
         const warnOutput = consoleWarns.join("\n");
         expect(warnOutput).toMatch(/Failed to write extension seed config/);
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // config-sync subcommand
+  // -------------------------------------------------------------------------
+
+  describe("config-sync subcommand", () => {
+    // -----------------------------------------------------------------------
+    // Command structure
+    // -----------------------------------------------------------------------
+
+    describe("Command structure", () => {
+      it("should expose 'config-sync' subcommand", () => {
+        const cmd = getCommand();
+        const subNames = cmd.commands.map((c) => c.name());
+        expect(subNames).toContain("config-sync");
+      });
+
+      it("config-sync should have no required arguments", () => {
+        const cmd = getCommand();
+        const syncCmd = cmd.commands.find((c) => c.name() === "config-sync")!;
+        expect(syncCmd.registeredArguments.length).toBe(0);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // No config file → exit with error
+    // -----------------------------------------------------------------------
+
+    describe("when no global config file exists", () => {
+      it("should exit(1) and print error in dev mode", async () => {
+        // existsSync returns false for everything (no config file)
+        mockExistsSync.mockReturnValue(false);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+        expect(consoleErrors.join("\n")).toMatch(/No configuration found/);
+      });
+
+      it("should exit(1) and print error in production mode", async () => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        mockExistsSync.mockReturnValue(false);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Dev mode
+    // -----------------------------------------------------------------------
+
+    describe("Dev mode", () => {
+      const fakeSettings = { provider: "openai" as const, apiKey: "sk-abc" };
+
+      beforeEach(() => {
+        mockMapConfigToExtensionSettings.mockReturnValue(fakeSettings);
+        // Config file exists; extension public/ dir can be created
+        mockExistsSync.mockImplementation((p) => String(p).includes("config.json"));
+      });
+
+      it("should write pilo.config.json into extension public/ dir", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockWriteFileSync).toHaveBeenCalledOnce();
+        const [filePath] = mockWriteFileSync.mock.calls[0] as [string, string, string];
+        expect(filePath).toMatch(/extension[/\\]public[/\\]pilo\.config\.json$/);
+      });
+
+      it("should print dev mode success message", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/dev mode/i);
+      });
+
+      it("should print reload reminder", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/Reload the extension/i);
+      });
+
+      it("should not call process.exit(1) when successful", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockExit).not.toHaveBeenCalledWith(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Production mode: both browser dirs exist
+    // -----------------------------------------------------------------------
+
+    describe("Production mode — both browser dirs exist", () => {
+      const fakeSettings = { provider: "openai" as const, apiKey: "sk-abc" };
+
+      beforeEach(() => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        mockMapConfigToExtensionSettings.mockReturnValue(fakeSettings);
+        // Config file exists; both browser extension dirs exist
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          return path.includes("config.json") || path.includes("extension");
+        });
+      });
+
+      it("should write pilo.config.json to both chrome and firefox dirs", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        // writeFileSync called twice: once per browser
+        expect(mockWriteFileSync).toHaveBeenCalledTimes(2);
+        const paths = mockWriteFileSync.mock.calls.map((c) => String(c[0]));
+        expect(paths.some((p) => p.includes("chrome"))).toBe(true);
+        expect(paths.some((p) => p.includes("firefox"))).toBe(true);
+      });
+
+      it("should print success message listing both browsers", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/chrome/i);
+        expect(allOutput).toMatch(/firefox/i);
+      });
+
+      it("should print reload reminder", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/Reload the extension/i);
+      });
+
+      it("should not call process.exit(1) when both dirs exist", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockExit).not.toHaveBeenCalledWith(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Production mode: only chrome dir exists
+    // -----------------------------------------------------------------------
+
+    describe("Production mode — only chrome dir exists", () => {
+      const fakeSettings = { provider: "openai" as const, apiKey: "sk-abc" };
+
+      beforeEach(() => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        mockMapConfigToExtensionSettings.mockReturnValue(fakeSettings);
+        // Config file exists; only the chrome extension dir exists
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          if (path.includes("config.json")) return true;
+          if (path.includes("extension") && path.includes("chrome")) return true;
+          return false;
+        });
+      });
+
+      it("should write pilo.config.json only to the chrome dir", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockWriteFileSync).toHaveBeenCalledOnce();
+        const [filePath] = mockWriteFileSync.mock.calls[0] as [string, string, string];
+        expect(filePath).toMatch(/chrome/);
+        expect(filePath).not.toMatch(/firefox/);
+      });
+
+      it("should print success message listing only chrome", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/chrome/i);
+        expect(allOutput).not.toMatch(/firefox/i);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Production mode: only firefox dir exists
+    // -----------------------------------------------------------------------
+
+    describe("Production mode — only firefox dir exists", () => {
+      const fakeSettings = { provider: "openai" as const, apiKey: "sk-abc" };
+
+      beforeEach(() => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        mockMapConfigToExtensionSettings.mockReturnValue(fakeSettings);
+        // Config file exists; only the firefox extension dir exists
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          if (path.includes("config.json")) return true;
+          if (path.includes("extension") && path.includes("firefox")) return true;
+          return false;
+        });
+      });
+
+      it("should write pilo.config.json only to the firefox dir", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockWriteFileSync).toHaveBeenCalledOnce();
+        const [filePath] = mockWriteFileSync.mock.calls[0] as [string, string, string];
+        expect(filePath).toMatch(/firefox/);
+        expect(filePath).not.toMatch(/chrome/);
+      });
+
+      it("should print success message listing only firefox", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        const allOutput = consoleLogs.join("\n");
+        expect(allOutput).toMatch(/firefox/i);
+        expect(allOutput).not.toMatch(/chrome/i);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Production mode: no browser dirs exist
+    // -----------------------------------------------------------------------
+
+    describe("Production mode — no browser dirs exist", () => {
+      beforeEach(() => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        // Config file exists, but NO extension dirs exist
+        mockExistsSync.mockImplementation((p) => String(p).includes("config.json"));
+      });
+
+      it("should exit(1) when no browser extension dirs are found", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+      });
+
+      it("should print a helpful error message", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(consoleErrors.join("\n")).toMatch(/No installed extension directories found/i);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Empty config mapping
+    // -----------------------------------------------------------------------
+
+    describe("when config maps to empty settings", () => {
+      beforeEach(() => {
+        // Config file exists but mapping yields nothing useful
+        mockExistsSync.mockImplementation((p) => String(p).includes("config.json"));
+        mockMapConfigToExtensionSettings.mockReturnValue({});
+      });
+
+      it("should not write pilo.config.json in dev mode", async () => {
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockWriteFileSync).not.toHaveBeenCalled();
+      });
+
+      it("should not write pilo.config.json in production mode when only chrome exists", async () => {
+        vi.stubGlobal("__PILO_PRODUCTION__", true);
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          return (
+            path.includes("config.json") || (path.includes("extension") && path.includes("chrome"))
+          );
+        });
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["config-sync"], { from: "user" });
+
+        expect(mockWriteFileSync).not.toHaveBeenCalled();
       });
     });
   });

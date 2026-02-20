@@ -15,11 +15,13 @@ type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];
  *
  * Subcommands:
  *   extension install <browser> [--tmp]  - Install extension in the specified browser
+ *   extension config-sync               - Re-write pilo.config.json into extension directory(ies)
  */
 export function createExtensionCommand(): Command {
   const extensionCmd = new Command("extension").description("Manage the Pilo browser extension");
 
   extensionCmd.addCommand(createExtensionInstallCommand());
+  extensionCmd.addCommand(createExtensionConfigSyncCommand());
 
   return extensionCmd;
 }
@@ -66,6 +68,88 @@ function createExtensionInstallCommand(): Command {
         await runDev(browser as SupportedBrowser, options);
       }
     });
+}
+
+/**
+ * extension config-sync
+ *
+ * Re-writes the `pilo.config.json` file into the extension directory(ies) so
+ * that an already-installed extension picks up the latest global config on its
+ * next reload. No reinstall required.
+ *
+ * Production mode: writes into both dist/extension/chrome/ and
+ *   dist/extension/firefox/, but only for directories that actually exist (the
+ *   user may have installed only one browser).
+ *
+ * Dev mode: writes into packages/extension/public/. WXT's file watcher
+ *   propagates the change to all browser output directories.
+ *
+ * Exits with an error if no global config file is found.
+ */
+function createExtensionConfigSyncCommand(): Command {
+  return new Command("config-sync")
+    .description("Push updated global config to an already-installed extension")
+    .action(async () => {
+      const configPath = configManager.getConfigPath();
+
+      if (!existsSync(configPath)) {
+        console.error(
+          chalk.red(
+            "❌ No configuration found. Run 'pilo config init' to set up your configuration.",
+          ),
+        );
+        process.exit(1);
+        return;
+      }
+
+      if (isProduction()) {
+        await syncConfigProduction();
+      } else {
+        syncConfigDev();
+      }
+    });
+}
+
+/**
+ * Production config-sync: write pilo.config.json into every browser extension
+ * directory that exists. Skips browsers whose directory is absent (the user
+ * may have installed only one).
+ */
+async function syncConfigProduction(): Promise<void> {
+  const synced: string[] = [];
+
+  for (const browser of SUPPORTED_BROWSERS) {
+    const extPath = resolveProductionExtensionPath(browser);
+    if (existsSync(extPath)) {
+      seedExtensionConfig(extPath);
+      synced.push(browser);
+    }
+  }
+
+  if (synced.length === 0) {
+    console.error(chalk.red("❌ No installed extension directories found."));
+    console.error(
+      chalk.gray(
+        "Run 'pilo extension install <browser>' first, or rebuild the package with 'pnpm run build'.",
+      ),
+    );
+    process.exit(1);
+    return;
+  }
+
+  console.log(chalk.green(`✅ Synced config to extension (${synced.join(", ")})`));
+  console.log(chalk.gray("Reload the extension for changes to take effect."));
+}
+
+/**
+ * Dev config-sync: write pilo.config.json into packages/extension/public/.
+ * WXT's file watcher propagates the file to all browser output directories.
+ */
+function syncConfigDev(): void {
+  const publicDir = resolveDevExtensionPublicPath();
+  seedExtensionConfig(publicDir);
+  console.log(chalk.green("✅ Synced config to extension (dev mode)"));
+  console.log(chalk.gray("Reload the extension for changes to take effect."));
 }
 
 // ---------------------------------------------------------------------------
