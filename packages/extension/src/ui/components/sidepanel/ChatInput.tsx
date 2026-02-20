@@ -65,10 +65,10 @@ export function ChatInput({ onSend, isLoading, disabled = false, onStop }: ChatI
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
-    <div className="border-t border-border px-3 py-3">
+    <div className="border-t border-border px-3 py-2">
       <div
         className={cn(
-          "flex items-end gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 transition-colors",
+          "flex items-end gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 transition-colors",
           "focus-within:border-primary/40",
           disabled && "opacity-60",
         )}
