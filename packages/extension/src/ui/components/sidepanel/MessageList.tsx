@@ -1,9 +1,203 @@
-import { type ReactElement } from "react";
-import Markdown from "marked-react";
+import { type ReactElement, type ReactNode, createElement } from "react";
+import Markdown, { type ReactRenderer } from "marked-react";
 
 import { cn } from "../../../lib/utils";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import type { ChatMessage } from "../../hooks/useConversation";
+
+// ---------------------------------------------------------------------------
+// chatRenderer — custom marked-react renderer for the sidebar design language
+// ---------------------------------------------------------------------------
+
+/**
+ * Custom renderer object passed to marked-react's <Markdown renderer={...} />.
+ *
+ * Methods are called with `this` bound to the internal ReactRenderer instance,
+ * so `this.elementId` is always available for React key assignment. The library
+ * increments the element id counter before invoking each method, so every call
+ * produces a unique key automatically.
+ *
+ * Design tokens used here intentionally mirror the sidebar's established
+ * conventions: Geist sans/mono fonts, text-[13px] body copy, CSS variable
+ * color references, and tight-but-readable spacing.
+ */
+const chatRenderer: Partial<ReactRenderer> = {
+  // Headings — keep them modest inside the narrow sidebar
+  heading(this: ReactRenderer, children: ReactNode, level: 1 | 2 | 3 | 4 | 5 | 6): ReactElement {
+    const sizeClass = level <= 2 ? "text-sm font-semibold" : "text-xs font-semibold";
+    return createElement(
+      `h${level}`,
+      { key: this.elementId, className: `${sizeClass} text-foreground mt-3 mb-1` },
+      children,
+    );
+  },
+
+  // Paragraph
+  paragraph(this: ReactRenderer, children: ReactNode): ReactElement {
+    return createElement(
+      "p",
+      { key: this.elementId, className: "text-[13px] leading-relaxed text-foreground my-1.5" },
+      children,
+    );
+  },
+
+  // Fenced code block (pre > code)
+  code(this: ReactRenderer, code: ReactNode, _lang: string | undefined): ReactElement {
+    return createElement(
+      "pre",
+      {
+        key: this.elementId,
+        className:
+          "bg-secondary/50 rounded-md p-3 text-xs font-mono overflow-x-auto my-2 border border-border/50",
+      },
+      createElement("code", null, code),
+    );
+  },
+
+  // Inline code
+  codespan(this: ReactRenderer, code: ReactNode): ReactElement {
+    return createElement(
+      "code",
+      {
+        key: this.elementId,
+        className: "bg-secondary/50 rounded px-1.5 py-0.5 text-xs font-mono",
+      },
+      code,
+    );
+  },
+
+  // Unordered / ordered lists
+  list(
+    this: ReactRenderer,
+    children: ReactNode,
+    ordered: boolean,
+    start: number | undefined,
+  ): ReactElement {
+    const tag = ordered ? "ol" : "ul";
+    const markerClass = ordered ? "list-decimal" : "list-disc";
+    return createElement(
+      tag,
+      {
+        key: this.elementId,
+        className: `${markerClass} text-[13px] leading-relaxed my-1.5 pl-5 space-y-1`,
+        ...(ordered && start !== undefined && start !== 1 ? { start } : {}),
+      },
+      children,
+    );
+  },
+
+  // List items
+  listItem(this: ReactRenderer, children: ReactNode[]): ReactElement {
+    return createElement(
+      "li",
+      { key: this.elementId, className: "text-[13px] text-foreground" },
+      children,
+    );
+  },
+
+  // Links
+  link(this: ReactRenderer, href: string, text: ReactNode): ReactElement {
+    return createElement(
+      "a",
+      {
+        key: this.elementId,
+        href,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        className:
+          "text-primary underline underline-offset-2 hover:text-primary/80 transition-colors",
+      },
+      text,
+    );
+  },
+
+  // Blockquote
+  blockquote(this: ReactRenderer, children: ReactNode): ReactElement {
+    return createElement(
+      "blockquote",
+      {
+        key: this.elementId,
+        className:
+          "border-l-2 border-primary/30 pl-3 my-2 text-muted-foreground italic text-[13px]",
+      },
+      children,
+    );
+  },
+
+  // Strong / bold
+  strong(this: ReactRenderer, children: ReactNode): ReactElement {
+    return createElement(
+      "strong",
+      { key: this.elementId, className: "font-semibold text-foreground" },
+      children,
+    );
+  },
+
+  // Emphasis / italic
+  em(this: ReactRenderer, children: ReactNode): ReactElement {
+    return createElement("em", { key: this.elementId, className: "italic" }, children);
+  },
+
+  // Horizontal rule
+  hr(this: ReactRenderer): ReactElement {
+    return createElement("hr", { key: this.elementId, className: "border-border my-3" });
+  },
+
+  // Table container
+  table(this: ReactRenderer, children: ReactNode[]): ReactElement {
+    return createElement(
+      "div",
+      { key: this.elementId, className: "overflow-x-auto my-2" },
+      createElement(
+        "table",
+        { className: "w-full text-xs border-collapse border border-border" },
+        children,
+      ),
+    );
+  },
+
+  // Table header section (<thead>)
+  tableHeader(this: ReactRenderer, children: ReactNode): ReactElement {
+    return createElement("thead", { key: this.elementId, className: "bg-secondary/50" }, children);
+  },
+
+  // Table body section (<tbody>)
+  tableBody(this: ReactRenderer, children: ReactNode[]): ReactElement {
+    return createElement("tbody", { key: this.elementId }, children);
+  },
+
+  // Table row
+  tableRow(this: ReactRenderer, children: ReactNode[]): ReactElement {
+    return createElement(
+      "tr",
+      { key: this.elementId, className: "border-b border-border" },
+      children,
+    );
+  },
+
+  // Table cell (th or td)
+  tableCell(
+    this: ReactRenderer,
+    children: ReactNode[],
+    flags: { header?: boolean; align?: "center" | "left" | "right" | null },
+  ): ReactElement {
+    const tag = flags.header ? "th" : "td";
+    const alignClass =
+      flags.align === "center"
+        ? "text-center"
+        : flags.align === "right"
+          ? "text-right"
+          : "text-left";
+    return createElement(
+      tag,
+      {
+        key: this.elementId,
+        className: `px-2 py-1.5 border border-border ${alignClass} ${flags.header ? "font-semibold text-foreground" : "text-foreground/90"}`,
+      },
+      children,
+    );
+  },
+};
 
 // ---------------------------------------------------------------------------
 // MarkdownContent
@@ -15,12 +209,16 @@ interface MarkdownContentProps {
 }
 
 /**
- * Renders markdown with marked-react. Uses the `prose-chat` utility class for
- * typography tokens that are preserved from the original CSS foundation.
+ * Renders markdown with marked-react using the custom `chatRenderer`.
+ *
+ * The renderer handles all element styling directly, so we no longer need
+ * Tailwind Typography's `prose` / `prose-chat` utility classes here.
+ * `markdown-content` is kept so the CSS list-style restoration rules in
+ * SidePanel.css still apply as a safety net.
  */
 const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div className={cn("markdown-content", "prose", "prose-chat", "max-w-none", className)}>
-    <Markdown value={children} breaks gfm />
+  <div className={cn("markdown-content", "max-w-none", className)}>
+    <Markdown value={children} breaks gfm renderer={chatRenderer} />
   </div>
 );
 
