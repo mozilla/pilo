@@ -176,6 +176,10 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   useEffect(() => {
     if (import.meta.env.MODE !== "development") return;
 
+    // Clear any messages persisted from previous dev runs so each reload
+    // starts with a clean slate and seeds exactly once with no accumulation.
+    clearMessages();
+
     // Stable task IDs for grouping.
     const TASK_A = "mock-task-001"; // Completed task with markdown result
     const TASK_B = "mock-task-002"; // Completed task with error
