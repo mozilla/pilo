@@ -187,83 +187,78 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
     const TASK_C = "mock-task-003"; // Active / in-progress task
 
     // --- Task A: completed, markdown result ----------------------------------
-    addMessage("user", "Summarize the privacy policy on this page");
+    addMessage("user", "Summarize the key features on the Stripe pricing page");
 
     addMessage(
       "plan",
-      "1. Navigate to the privacy policy section\n2. Extract the key data points\n3. Format a structured summary",
+      "1. Navigate to the Stripe pricing page\n2. Extract feature comparison data\n3. Summarize key features and pricing tiers",
       TASK_A,
     );
-    addMessage(
-      "reasoning",
-      "The page contains a long-form privacy policy. I will extract sections on data collection, sharing, and retention.",
-      TASK_A,
-    );
-    addMessage("status", "Navigating to privacy policy", TASK_A);
-    addMessage("status", "Extracting data", TASK_A);
+    addMessage("status", "Navigating to stripe.com", TASK_A);
+    addMessage("status", "Extracting feature comparison data", TASK_A);
+    addMessage("status", "Summarizing pricing tiers", TASK_A);
     addMessage(
       "result",
       [
-        "## Privacy Policy Summary",
+        "## Stripe Pricing: Key Features",
         "",
-        "Here are the **key takeaways** from the policy:",
+        "**Pay-as-you-go** pricing with no setup fees or monthly charges.",
         "",
-        "- **Data collected**: Name, email, IP address, and browsing behaviour",
-        "- **Third-party sharing**: Data is shared with advertising partners",
-        "- **Retention period**: Up to `36 months` after account closure",
+        "### Core Plans",
         "",
-        "### Your Rights",
+        "- **Integrated**: `2.9% + 30¢` per successful card charge. Includes the full payments platform.",
+        "- **Customized**: Volume discounts, multi-product bundles, and country-specific rates available for high-volume businesses.",
         "",
-        "You may request deletion at any time via the **Account Settings** page.",
+        "### Included Features (all plans)",
         "",
-        "```json",
-        '{ "contact": "privacy@example.com" }',
-        "```",
+        "- Supports **135+ currencies** and dozens of local payment methods",
+        "- Built-in **fraud protection** via Stripe Radar",
+        "- **Dashboard**, reporting, and developer APIs included at no extra cost",
+        "- Instant payouts available for an additional `1.5%` fee",
+        "",
+        "### Add-ons (billed separately)",
+        "",
+        "- **Stripe Billing** (subscriptions): starting at `0.5%` of recurring revenue",
+        "- **Stripe Connect** (marketplace payouts): `0.25%` per payout",
+        "- **Stripe Tax**: `0.5%` of transactions where tax is calculated",
       ].join("\n"),
       TASK_A,
     );
 
     // --- Task B: completed, with an error -----------------------------------
-    addMessage("user", "Click the Subscribe button");
+    addMessage("user", "Click the Sign Up button on the page");
 
     addMessage(
       "plan",
-      "1. Locate the Subscribe button in the page\n2. Click it\n3. Confirm the action",
+      "1. Locate the Sign Up button on the current page\n2. Click the button",
       TASK_B,
     );
-    addMessage("reasoning", "Searching for a button element with the label 'Subscribe'.", TASK_B);
-    addMessage("status", "Clicking", TASK_B);
+    addMessage("status", "Scanning page for Sign Up button", TASK_B);
+    addMessage("status", "Clicking Sign Up button", TASK_B);
     addMessage(
       "error",
-      "Action Failed: Element not found — the Subscribe button is not present in the current viewport.",
+      "Action Failed: Element not found - the Sign Up button is not visible on the current page",
       TASK_B,
     );
     addMessage(
       "result",
-      "Could not complete the task because the Subscribe button was not found on the page.",
+      "Could not complete the task. The Sign Up button was not found on the current page - it may be behind a modal, off-screen, or not present at this URL.",
       TASK_B,
     );
 
     // --- System message -----------------------------------------------------
-    addMessage(
-      "system",
-      "Session restored. Continued conversation context is not yet supported — messages above are from a previous session.",
-    );
+    addMessage("system", "Task completed");
 
     // --- Task C: active / in-progress (no result yet) -----------------------
     addMessage("user", "Fill in the contact form with my details");
 
     addMessage(
       "plan",
-      "1. Locate the contact form\n2. Fill in name, email, and message fields\n3. Submit the form",
+      "1. Locate the contact form on the page\n2. Fill in the name, email, and message fields\n3. Submit the form",
       TASK_C,
     );
-    addMessage(
-      "reasoning",
-      "I can see the contact form. I will fill in the fields one by one using the provided details.",
-      TASK_C,
-    );
-    addMessage("status", "Filling", TASK_C);
+    addMessage("status", "Locating contact form", TASK_C);
+    addMessage("status", "Filling in name field", TASK_C);
 
     // Mark Task C as the active task so the spinner + InputDisabledOverlay render.
     // We also set isExecuting so the TaskBubble shows the loading state.
