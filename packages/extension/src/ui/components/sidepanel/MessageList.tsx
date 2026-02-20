@@ -124,20 +124,22 @@ const TaskBubble = ({ taskId, messages, currentTaskId }: TaskBubbleProps): React
   return (
     <div className="px-4 py-3">
       {/* Render messages chronologically with dynamic headings */}
-      {taskMessages.map((msg) => {
-        const heading = getHeading(msg.type);
-        return (
-          <div key={msg.id}>
-            {heading && (
-              <div className="flex items-center gap-2 mt-6 first:mt-0 border-b border-border pb-2 mb-2">
-                <span className="text-sm">{heading.emoji}</span>
-                <span className="text-sm font-medium text-foreground">{heading.label}</span>
-              </div>
-            )}
-            <TaskMessage message={msg} />
-          </div>
-        );
-      })}
+      <div className="flex flex-col gap-6">
+        {taskMessages.map((msg) => {
+          const heading = getHeading(msg.type);
+          return (
+            <div key={msg.id}>
+              {heading && (
+                <div className="flex items-center gap-2 border-b border-border pb-2 mb-2">
+                  <span className="text-sm">{heading.emoji}</span>
+                  <span className="text-sm font-medium text-foreground">{heading.label}</span>
+                </div>
+              )}
+              <TaskMessage message={msg} />
+            </div>
+          );
+        })}
+      </div>
 
       {/* Current status for active tasks or early phase status-only tasks */}
       {!resultMessage && (isActive || isEarlyPhase) && (
