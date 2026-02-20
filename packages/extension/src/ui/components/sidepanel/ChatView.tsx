@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ReactElement } from "react";
+import { useState, useEffect, useCallback, type ReactElement } from "react";
 import browser from "webextension-polyfill";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
@@ -112,6 +112,13 @@ export function shouldDisplayError(event: RealtimeEvent): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// DEV SEED: module-level guard so React StrictMode's mount/unmount/remount
+// cycle does not seed messages twice. A useRef resets on each mount; a
+// module-level boolean does not.
+// ---------------------------------------------------------------------------
+let devSeedApplied = false;
+
+// ---------------------------------------------------------------------------
 // InputDisabledOverlay
 // ---------------------------------------------------------------------------
 
@@ -172,12 +179,10 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   // and only runs during real WXT dev server sessions (MODE === 'development').
   // Remove this block before shipping.
   // ---------------------------------------------------------------------------
-  const seededRef = useRef(false);
-
   useEffect(() => {
     if (import.meta.env.MODE !== "development") return;
-    if (seededRef.current) return;
-    seededRef.current = true;
+    if (devSeedApplied) return;
+    devSeedApplied = true;
 
     // Stable task IDs for grouping.
     const TASK_A = "mock-task-001"; // Completed task with markdown result
