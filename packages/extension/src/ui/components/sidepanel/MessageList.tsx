@@ -441,7 +441,11 @@ export function MessageList({
 
     messages.forEach((message) => {
       if (message.type === "user") {
-        elements.push(<UserMessageBubble key={message.id} message={message} />);
+        elements.push(
+          <div key={message.id} className="p-3">
+            <UserMessageBubble message={message} />
+          </div>,
+        );
       } else if (message.type === "system") {
         elements.push(<SystemMessageBubble key={message.id} message={message} />);
       } else if (message.taskId && !renderedTaskIds.has(message.taskId)) {
