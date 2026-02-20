@@ -245,9 +245,6 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
       TASK_B,
     );
 
-    // --- System message -----------------------------------------------------
-    addMessage("system", "Task completed");
-
     // --- Task C: active / in-progress (no result yet) -----------------------
     addMessage("user", "Fill in the contact form with my details");
 
