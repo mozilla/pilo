@@ -45,7 +45,7 @@ function assertConfigExists(): boolean {
 
   console.error(
     chalk.red.bold("Error:"),
-    "No configuration found. Run 'spark config init' to set up your configuration.",
+    "No configuration found. Run 'pilo config init' to set up your configuration.",
   );
   process.exit(1);
   return false; // unreachable, but satisfies the return type for tests that mock process.exit

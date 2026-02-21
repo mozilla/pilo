@@ -9,7 +9,7 @@
     "build": "tsc",
     "typecheck": "tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "spark": "tsx src/cli.ts"
+    "pilo": "tsx src/cli.ts"
   },
   "dependencies": {
     "chalk": "^5.6.2",
