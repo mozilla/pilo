@@ -1,2 +1,7 @@
 packages:
   - "packages/*"
+
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
+  - spawn-sync
