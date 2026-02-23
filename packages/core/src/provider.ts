@@ -88,7 +88,7 @@ export function createProviderFromConfig(
       return createOpenRouter({
         apiKey,
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       })(model);
@@ -123,7 +123,7 @@ export function createProviderFromConfig(
       if (!baseUrl) {
         throw new Error(
           `OpenAI-compatible provider requires a base URL. To get started:
-          
+
 1. Set the base URL with: pilo config --set openai_compatible_base_url=http://localhost:8080/v1
 2. Or set environment variable: export PILO_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
 

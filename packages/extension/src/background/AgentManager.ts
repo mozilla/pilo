@@ -12,7 +12,7 @@ import { createOllama } from "ollama-ai-provider-v2";
  * OpenRouter attribution headers
  */
 const OPENROUTER_HEADERS = {
-  "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+  "HTTP-Referer": "https://github.com/mozilla/pilo",
   "X-Title": "Pilo Web Automation Tool",
 };
 
