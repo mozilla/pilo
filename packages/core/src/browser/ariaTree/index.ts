@@ -1,5 +1,5 @@
 /**
- * Spark Aria Tree Module
+ * Pilo Aria Tree Module
  *
  * Shared accessibility tree generation for both CLI (Playwright) and Extension consumers.
  * Extracted from Playwright's aria snapshot code, stripped to AI-mode only.

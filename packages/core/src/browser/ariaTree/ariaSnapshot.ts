@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  * ---
- * Adapted for Spark: stripped to AI-mode only, unified sequential refs (E1, E2, ...),
- * sets data-spark-ref attribute during tree generation, walks same-origin iframes inline.
+ * Adapted for Pilo: stripped to AI-mode only, unified sequential refs (E1, E2, ...),
+ * sets data-pilo-ref attribute during tree generation, walks same-origin iframes inline.
  */
 
 import { normalizeWhiteSpace } from "./stringUtils.js";
@@ -28,7 +28,7 @@ import type { AriaNode, RefCounter } from "./types.js";
  * Generate an ARIA tree from a root element and render it as YAML.
  *
  * Uses a global sequential counter (E1, E2, ...) for refs across the entire page.
- * Sets `data-spark-ref` attributes on DOM elements during generation for fast lookup.
+ * Sets `data-pilo-ref` attributes on DOM elements during generation for fast lookup.
  *
  * @param root - The root element to start from (typically document.body)
  * @param counter - Mutable counter for sequential ref numbering across frames.
@@ -38,10 +38,10 @@ import type { AriaNode, RefCounter } from "./types.js";
 export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): string {
   const refCounter = counter || { value: 0 };
 
-  // Clean up any existing data-spark-ref attributes from a previous snapshot
-  root.querySelectorAll("[data-spark-ref]").forEach((el) => {
-    el.removeAttribute("data-spark-ref");
-    el.removeAttribute("data-spark-role");
+  // Clean up any existing data-pilo-ref attributes from a previous snapshot
+  root.querySelectorAll("[data-pilo-ref]").forEach((el) => {
+    el.removeAttribute("data-pilo-ref");
+    el.removeAttribute("data-pilo-role");
   });
 
   const ariaTree = generateAriaTree(root);
@@ -98,8 +98,8 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
         if (iframeDoc && iframeDoc.body) {
           // Same-origin iframe: walk into it inline
           iframeDoc.body
-            .querySelectorAll("[data-spark-ref]")
-            .forEach((el) => el.removeAttribute("data-spark-ref"));
+            .querySelectorAll("[data-pilo-ref]")
+            .forEach((el) => el.removeAttribute("data-pilo-ref"));
           const iframeTree = generateAriaTree(iframeDoc.body, iframeDepth + 1);
           // Merge iframe children into current node
           for (const child of iframeTree.children) {
@@ -290,7 +290,7 @@ function normalizeStringChildren(rootA11yNode: AriaNode) {
 
 // === Set-of-Marks (SoM) overlay ===
 
-const SOM_CONTAINER_ID = "__spark-som-container";
+const SOM_CONTAINER_ID = "__pilo-som-container";
 
 const SOM_COLORS = [
   "#e6194b", // red
@@ -336,7 +336,7 @@ export function isInteractiveElement(el: Element): boolean {
 
   // Use computed role (set during renderAriaTree) for accurate role detection,
   // falling back to the raw role attribute which may contain space-separated fallback values
-  const computedRole = el.getAttribute("data-spark-role");
+  const computedRole = el.getAttribute("data-pilo-role");
   if (computedRole && SOM_INTERACTIVE_ROLES.has(computedRole)) return true;
   const rawRole = el.getAttribute("role");
   if (rawRole) {
@@ -357,7 +357,7 @@ export function isInteractiveElement(el: Element): boolean {
 }
 
 /**
- * Overlay labeled badges on interactive elements that have `data-spark-ref` attributes.
+ * Overlay labeled badges on interactive elements that have `data-pilo-ref` attributes.
  * Each badge shows the ref ID (e.g., "E1") positioned at the element's top-left corner
  * with a colored outline. Only interactive elements get marks — structural containers
  * are skipped to reduce visual noise.
@@ -373,11 +373,11 @@ export function applySetOfMarks(): void {
   container.style.cssText =
     "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483647;";
 
-  const elements = document.querySelectorAll("[data-spark-ref]");
+  const elements = document.querySelectorAll("[data-pilo-ref]");
   let colorIndex = 0;
 
   elements.forEach((el) => {
-    const ref = el.getAttribute("data-spark-ref");
+    const ref = el.getAttribute("data-pilo-ref");
     if (!ref) return;
 
     // Skip non-interactive structural containers
@@ -460,9 +460,9 @@ function renderAriaTree(root: AriaNode, counter: RefCounter): string {
       const ref = "E" + ++counter.value;
       const cursor = hasPointerCursor(ariaNode) ? " [cursor=pointer]" : "";
       key += ` [ref=${ref}]${cursor}`;
-      ariaNode.element?.setAttribute("data-spark-ref", ref);
+      ariaNode.element?.setAttribute("data-pilo-ref", ref);
       // Store computed role for accurate SoM filtering (avoids re-computing or parsing raw role attribute)
-      ariaNode.element?.setAttribute("data-spark-role", ariaNode.role);
+      ariaNode.element?.setAttribute("data-pilo-role", ariaNode.role);
     }
 
     const escapedKey = indent + "- " + yamlEscapeKeyIfNeeded(key);

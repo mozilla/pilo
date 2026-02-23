@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the end-to-end flow of a user task execution in the Spark browser extension, from user input in the sidebar to final response display. It covers all component interactions, event broadcasting, and key decision points.
+This document describes the end-to-end flow of a user task execution in the Pilo browser extension, from user input in the sidebar to final response display. It covers all component interactions, event broadcasting, and key decision points.
 
 ## Example Scenario
 
@@ -495,7 +495,7 @@ sequenceDiagram
 
 ```
 ┌─────────────────────────────┐
-│ ⚡ Spark                     │
+│ ⚡ Pilo                      │
 │                              │
 │ 📋 Plan:                     │
 │ 1. Navigate to weather site  │ ← Action items displayed as
@@ -636,7 +636,7 @@ sequenceDiagram
 
 35. **User sees complete response**:
     ```
-    ⚡ Spark
+    ⚡ Pilo
     📋 Plan: [...]
     💭 Actions: [...]
     ✨ Answer:
@@ -678,7 +678,7 @@ The indicator system provides visual feedback during task execution by showing a
 
 1. **Trigger**: When `task:started` event is emitted, the indicator is shown via `showIndicator(tabId)`
 2. **CSS Injection**: Injects indicator CSS into the current page via `browser.scripting.insertCSS()`
-3. **Class Toggle**: Adds `spark-indicator-active` class to `<html>` element
+3. **Class Toggle**: Adds `pilo-indicator-active` class to `<html>` element
 4. **Animation**: CSS creates a pulsing purple glow effect using `box-shadow` and `@keyframes`
 5. **Hide**: When `task:completed` or `task:aborted` event is emitted, the indicator is hidden via `hideIndicator(tabId)`
 
@@ -1260,7 +1260,7 @@ sequenceDiagram
 
 ## Conclusion
 
-The Spark extension architecture provides a solid foundation for AI-powered web automation with clear component boundaries and event-driven communication. The key areas for improving observability are:
+The Pilo extension architecture provides a solid foundation for AI-powered web automation with clear component boundaries and event-driven communication. The key areas for improving observability are:
 
 1. **ExtensionBrowser action logging** - Critical for debugging
 2. **Event broadcasting error handling** - Prevents silent failures

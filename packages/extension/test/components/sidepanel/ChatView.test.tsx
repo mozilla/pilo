@@ -148,7 +148,7 @@ describe("ChatView", () => {
     render(<ChatView {...defaultProps} />);
 
     // Logo should be displayed (svg with aria-label)
-    expect(screen.getByRole("img", { name: "Spark logo" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Pilo logo" })).toBeInTheDocument();
     // Description text should still be present
     expect(screen.getByText(/I can help you automate tasks/)).toBeInTheDocument();
   });
@@ -212,7 +212,7 @@ describe("ChatView", () => {
       const messageTexts: string[] = [];
       allMessages.forEach((el) => {
         const text = el.textContent || "";
-        if (text && !text.includes("Welcome to Spark")) {
+        if (text && !text.includes("Welcome to Pilo")) {
           messageTexts.push(text);
         }
       });
@@ -285,7 +285,7 @@ describe("ChatView", () => {
             text.includes("I'll help you with that task")
           ) {
             taskBubbleFound = true;
-          } else if (text && !text.includes("Welcome to Spark")) {
+          } else if (text && !text.includes("Welcome to Pilo")) {
             elementsBetween++;
           }
         }
@@ -358,7 +358,7 @@ describe("ChatView", () => {
       const renderedTexts: string[] = [];
       allElements.forEach((el) => {
         const text = el.textContent || "";
-        if (text && !text.includes("Welcome to Spark")) {
+        if (text && !text.includes("Welcome to Pilo")) {
           renderedTexts.push(text);
         }
       });
@@ -418,7 +418,7 @@ describe("ChatView", () => {
       const renderedTexts: string[] = [];
       allElements.forEach((el) => {
         const text = el.textContent || "";
-        if (text && !text.includes("Welcome to Spark")) {
+        if (text && !text.includes("Welcome to Pilo")) {
           renderedTexts.push(text);
         }
       });
@@ -468,7 +468,7 @@ describe("ChatView", () => {
       const renderedTexts: string[] = [];
       allElements.forEach((el) => {
         const text = el.textContent || "";
-        if (text && !text.includes("Welcome to Spark")) {
+        if (text && !text.includes("Welcome to Pilo")) {
           renderedTexts.push(text);
         }
       });
@@ -534,7 +534,7 @@ describe("ChatView", () => {
       const renderedTexts: string[] = [];
       allElements.forEach((el) => {
         const text = el.textContent || "";
-        if (text && !text.includes("Welcome to Spark!")) {
+        if (text && !text.includes("Welcome to Pilo!")) {
           // Exclude the static welcome
           renderedTexts.push(text);
         }

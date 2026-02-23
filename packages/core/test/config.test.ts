@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { Command } from "commander";
-import type { SparkConfig } from "../src/config/index.js";
+import type { PiloConfig } from "../src/config/index.js";
 import { getSchemaConfigKeys, addConfigOptions, DEFAULTS } from "../src/config/index.js";
 
 describe("ConfigManager", () => {
   describe("get() method with default values", () => {
     it("should return default value when config value is undefined", () => {
       // Create a mock config object
-      const mockConfigData: Partial<SparkConfig> = {
+      const mockConfigData: Partial<PiloConfig> = {
         provider: undefined,
         browser: undefined,
       };
@@ -21,7 +21,7 @@ describe("ConfigManager", () => {
     });
 
     it("should return config value when it exists", () => {
-      const mockConfigData: Partial<SparkConfig> = {
+      const mockConfigData: Partial<PiloConfig> = {
         provider: "openrouter",
         browser: "chrome",
         headless: true,
@@ -40,7 +40,7 @@ describe("ConfigManager", () => {
     });
 
     it("should handle falsy values correctly with nullish coalescing", () => {
-      const mockConfigData: SparkConfig = {
+      const mockConfigData: PiloConfig = {
         headless: false,
         max_iterations: 0,
         block_ads: false,
@@ -74,7 +74,7 @@ describe("ConfigManager", () => {
     });
 
     it("should handle undefined values with nullish coalescing", () => {
-      const mockConfigData: Partial<SparkConfig> = {
+      const mockConfigData: Partial<PiloConfig> = {
         model: undefined,
         starting_url: undefined,
       };
@@ -88,7 +88,7 @@ describe("ConfigManager", () => {
     });
 
     it("should work with newly added config options", () => {
-      const mockConfigData: Partial<SparkConfig> = {};
+      const mockConfigData: Partial<PiloConfig> = {};
 
       const startingUrl = mockConfigData.starting_url ?? "https://default.com";
       const data = mockConfigData.data ?? '{"default": true}';
@@ -122,7 +122,7 @@ describe("ConfigManager", () => {
 
   describe("type safety", () => {
     it("should maintain proper types", () => {
-      const mockConfigData: SparkConfig = {
+      const mockConfigData: PiloConfig = {
         provider: "openai",
         headless: false,
         max_iterations: 50,
@@ -138,13 +138,13 @@ describe("ConfigManager", () => {
   });
 
   describe("schema-config synchronization", () => {
-    it("should have all SparkConfig keys in CONFIG_SCHEMA", () => {
+    it("should have all PiloConfig keys in CONFIG_SCHEMA", () => {
       // Get keys from schema
       const schemaKeys = new Set(getSchemaConfigKeys());
 
-      // Get keys from SparkConfig by creating a full object and checking its keys
+      // Get keys from PiloConfig by creating a full object and checking its keys
       // We use a type assertion to get all possible keys
-      const sparkConfigKeys: (keyof SparkConfig)[] = [
+      const piloConfigKeys: (keyof PiloConfig)[] = [
         "provider",
         "model",
         "openai_api_key",
@@ -190,18 +190,18 @@ describe("ConfigManager", () => {
         "parallel_api_key",
       ];
 
-      // Check that schema has all SparkConfig keys
-      for (const key of sparkConfigKeys) {
-        expect(schemaKeys.has(key), `SparkConfig key "${key}" missing from CONFIG_SCHEMA`).toBe(
+      // Check that schema has all PiloConfig keys
+      for (const key of piloConfigKeys) {
+        expect(schemaKeys.has(key), `PiloConfig key "${key}" missing from CONFIG_SCHEMA`).toBe(
           true,
         );
       }
 
-      // Check that schema doesn't have extra keys not in SparkConfig
+      // Check that schema doesn't have extra keys not in PiloConfig
       for (const key of schemaKeys) {
         expect(
-          sparkConfigKeys.includes(key as keyof SparkConfig),
-          `CONFIG_SCHEMA key "${key}" not in SparkConfig`,
+          piloConfigKeys.includes(key as keyof PiloConfig),
+          `CONFIG_SCHEMA key "${key}" not in PiloConfig`,
         ).toBe(true);
       }
     });
@@ -258,22 +258,22 @@ describe("ConfigManager", () => {
 // the XDG_CONFIG_HOME env variable via fresh module imports using vi.resetModules().
 
 describe("ConfigManager - XDG path resolution", () => {
-  it("should NOT use the legacy ~/.spark path on non-Windows", async () => {
+  it("should NOT use the legacy ~/.pilo path on non-Windows", async () => {
     // Import the already-loaded singleton
     const { config: mgr } = await import("../src/config/manager.js");
     const configPath = mgr.getConfigPath();
-    // The new path must contain .config/spark, never the old .spark directory
+    // The new path must contain .config/pilo, never the old .pilo directory
     if (process.platform !== "win32") {
-      expect(configPath).not.toMatch(/\/\.spark\//);
-      expect(configPath).toContain("spark/config.json");
+      expect(configPath).not.toMatch(/\/\.pilo\//);
+      expect(configPath).toContain("pilo/config.json");
     }
   });
 
-  it("should use .config/spark/config.json on non-Windows (default XDG base)", async () => {
+  it("should use .config/pilo/config.json on non-Windows (default XDG base)", async () => {
     const { config: mgr } = await import("../src/config/manager.js");
     if (process.platform !== "win32" && !process.env.XDG_CONFIG_HOME) {
       const configPath = mgr.getConfigPath();
-      expect(configPath).toContain("/.config/spark/config.json");
+      expect(configPath).toContain("/.config/pilo/config.json");
     }
   });
 
@@ -286,7 +286,7 @@ describe("ConfigManager - XDG path resolution", () => {
     try {
       const { config: freshMgr } = await import("../src/config/manager.js");
       if (process.platform !== "win32") {
-        expect(freshMgr.getConfigPath()).toBe("/tmp/testxdg/spark/config.json");
+        expect(freshMgr.getConfigPath()).toBe("/tmp/testxdg/pilo/config.json");
       }
     } finally {
       // Restore env and module state
@@ -303,26 +303,26 @@ describe("ConfigManager - XDG path resolution", () => {
 // ---------------------------------------------------------------------------
 // ConfigManager - production flag behavior (dev mode default)
 // ---------------------------------------------------------------------------
-// __SPARK_PRODUCTION__ is a build-time global. In tests it is undefined,
+// __PILO_PRODUCTION__ is a build-time global. In tests it is undefined,
 // so isProduction() returns false (dev mode). We verify that env vars ARE
 // included in getConfig() output, confirming dev-mode merge behavior.
 
 describe("ConfigManager - production flag behavior (dev mode default)", () => {
   it("should include env var values in getConfig() output in dev mode", async () => {
     vi.resetModules();
-    const originalVal = process.env.SPARK_PROVIDER;
-    process.env.SPARK_PROVIDER = "openrouter";
+    const originalVal = process.env.PILO_PROVIDER;
+    process.env.PILO_PROVIDER = "openrouter";
 
     try {
       const { config: freshMgr } = await import("../src/config/manager.js");
       const result = freshMgr.getConfig();
-      // In dev mode, env vars are merged - SPARK_PROVIDER should override the default "openai"
+      // In dev mode, env vars are merged - PILO_PROVIDER should override the default "openai"
       expect(result.provider).toBe("openrouter");
     } finally {
       if (originalVal === undefined) {
-        delete process.env.SPARK_PROVIDER;
+        delete process.env.PILO_PROVIDER;
       } else {
-        process.env.SPARK_PROVIDER = originalVal;
+        process.env.PILO_PROVIDER = originalVal;
       }
       vi.resetModules();
     }
@@ -333,7 +333,7 @@ describe("ConfigManager - production flag behavior (dev mode default)", () => {
     const { config: freshMgr } = await import("../src/config/manager.js");
     const result = freshMgr.getConfig();
 
-    // Required fields from SparkConfigResolved must always be present regardless
+    // Required fields from PiloConfigResolved must always be present regardless
     // of env vars or global config. These have typed defaults that can never be unset.
     expect(typeof result.browser).toBe("string");
     expect(typeof result.provider).toBe("string");

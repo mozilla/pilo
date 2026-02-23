@@ -3,10 +3,10 @@ import { Command } from "commander";
 import { createConfigCommand } from "../../src/commands/config.js";
 
 // ---------------------------------------------------------------------------
-// Mock spark-core so tests do not touch real config files
+// Mock pilo-core so tests do not touch real config files
 // ---------------------------------------------------------------------------
-vi.mock("spark-core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("spark-core")>();
+vi.mock("pilo-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("pilo-core")>();
   return {
     ...actual,
     config: {
@@ -16,7 +16,7 @@ vi.mock("spark-core", async (importOriginal) => {
       unset: vi.fn(),
       reset: vi.fn(),
       initialize: vi.fn(),
-      getConfigPath: vi.fn().mockReturnValue("/home/user/.config/spark/config.json"),
+      getConfigPath: vi.fn().mockReturnValue("/home/user/.config/spapilork/config.json"),
       listSources: vi.fn().mockReturnValue({
         global: { provider: "openai" },
         env: { browser: "chrome" },
@@ -49,20 +49,20 @@ vi.mock("../../src/utils.js", async (importOriginal) => {
     ...actual,
     getPackageInfo: vi
       .fn()
-      .mockReturnValue({ name: "spark-cli", version: "0.1.0", description: "test" }),
+      .mockReturnValue({ name: "pilo-cli", version: "0.1.0", description: "test" }),
     parseConfigValue: actual.parseConfigValue,
   };
 });
 
-import { config, type SparkConfigResolved } from "spark-core";
+import { config, type PiloConfigResolved } from "pilo-core";
 import { existsSync } from "fs";
 
 const mockConfig = vi.mocked(config);
 const mockExistsSync = vi.mocked(existsSync);
 
 /** Build a partial resolved config - tests only need specific keys, cast the rest */
-function partialConfig(partial: Partial<SparkConfigResolved> = {}): SparkConfigResolved {
-  return partial as SparkConfigResolved;
+function partialConfig(partial: Partial<PiloConfigResolved> = {}): PiloConfigResolved {
+  return partial as PiloConfigResolved;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ describe("CLI Config Command (subcommands)", () => {
 
     // Restore default mocks after clearAllMocks
     mockConfig.getConfig.mockReturnValue(partialConfig());
-    mockConfig.getConfigPath.mockReturnValue("/home/user/.config/spark/config.json");
+    mockConfig.getConfigPath.mockReturnValue("/home/user/.config/pilo/config.json");
     mockConfig.listSources.mockReturnValue({
       global: { provider: "openai" },
       env: { browser: "chrome" },

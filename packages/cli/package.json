@@ -1,7 +1,7 @@
 {
-  "name": "spark-cli",
+  "name": "pilo-cli",
   "version": "0.1.0",
-  "description": "AI-powered web automation CLI tool",
+  "description": "AI-powered web automation",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,12 +9,12 @@
     "build": "tsc",
     "typecheck": "tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "spark": "tsx src/cli.ts"
+    "pilo": "tsx src/cli.ts"
   },
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
-    "spark-core": "workspace:*",
+    "pilo-core": "workspace:*",
     "web-ext": "^8.4.0"
   },
   "devDependencies": {

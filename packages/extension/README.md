@@ -1,17 +1,17 @@
-# Spark Extension
+# Pilo Extension
 
-Browser extension for Spark AI-powered web automation. The extension adds a side panel to your browser that lets you run Spark automation tasks interactively on any page, without leaving the browser.
+Browser extension for Pilo AI-powered web automation. The extension adds a side panel to your browser that lets you run Pilo automation tasks interactively on any page, without leaving the browser.
 
 ## Installation (from npm package)
 
-The Spark extension is bundled with `@tabstack/spark`. After installing the npm package, use the `spark extension install` command to load it into your browser.
+The Pilo extension is bundled with `@tabstack/pilo`. After installing the npm package, use the `pilo extension install` command to load it into your browser.
 
 ### Chrome / Brave / Edge
 
 Chrome stable ignores the `--load-extension` flag when launched programmatically, so the extension must be loaded manually:
 
 ```bash
-spark extension install chrome
+pilo extension install chrome
 ```
 
 This command prints the extension directory path and step-by-step instructions:
@@ -27,10 +27,10 @@ Firefox supports loading the extension directly from the CLI via `web-ext`:
 
 ```bash
 # Launch Firefox with the extension loaded (persistent profile)
-spark extension install firefox
+pilo extension install firefox
 
 # Launch Firefox with a temporary profile
-spark extension install firefox --tmp
+pilo extension install firefox --tmp
 ```
 
 ## Supported AI Providers
@@ -145,4 +145,4 @@ packages/extension/
 └── test/            # Test files
 ```
 
-The extension is built with [WXT](https://wxt.dev/) and React. It imports from `spark-core/core` (the browser-safe subset of the core library) rather than `spark-core`, which avoids pulling in Node.js-only dependencies.
+The extension is built with [WXT](https://wxt.dev/) and React. It imports from `pilo-core/core` (the browser-safe subset of the core library) rather than `pilo-core`, which avoids pulling in Node.js-only dependencies.

@@ -10,14 +10,14 @@ describe("indicator CSS file for dynamic registration", () => {
     expect(fs.existsSync(cssPath)).toBe(true);
   });
 
-  it("should target html.spark-indicator-active::after", () => {
+  it("should target html.pilo-indicator-active::after", () => {
     const css = fs.readFileSync(cssPath, "utf-8");
-    expect(css).toContain("html.spark-indicator-active::after");
+    expect(css).toContain("html.pilo-indicator-active::after");
   });
 
   it("should include the pulse animation keyframes", () => {
     const css = fs.readFileSync(cssPath, "utf-8");
-    expect(css).toContain("@keyframes spark-pulse");
+    expect(css).toContain("@keyframes pilo-pulse");
   });
 
   it("should use highest z-index", () => {

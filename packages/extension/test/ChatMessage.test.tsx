@@ -16,11 +16,11 @@ describe("ChatMessage", () => {
     expect(screen.getByText("Hello world")).toBeInTheDocument();
   });
 
-  it("renders assistant message with Spark branding", () => {
+  it("renders assistant message with Pilo branding", () => {
     render(<ChatMessage {...defaultProps} type="assistant" />);
 
     expect(screen.getByText("⚡")).toBeInTheDocument();
-    expect(screen.getByText("Spark")).toBeInTheDocument();
+    expect(screen.getByText("Pilo")).toBeInTheDocument();
     expect(screen.getByText("Hello world")).toBeInTheDocument();
   });
 

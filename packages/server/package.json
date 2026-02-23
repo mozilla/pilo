@@ -1,7 +1,7 @@
 {
-  "name": "spark-server",
+  "name": "pilo-server",
   "version": "0.1.0",
-  "description": "Web server for Spark AI-powered web automation",
+  "description": "Web server for Pilo AI-powered web automation",
   "main": "dist/server/src/index.js",
   "types": "dist/server/src/index.d.ts",
   "type": "module",
@@ -18,7 +18,7 @@
     "automation",
     "web-server",
     "hono",
-    "spark"
+    "pilo"
   ],
   "author": "",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.3",
     "hono": "^4.11.10",
-    "spark-core": "workspace:*"
+    "pilo-core": "workspace:*"
   },
   "packageManager": "pnpm@9.0.0"
 }

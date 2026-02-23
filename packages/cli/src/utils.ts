@@ -10,8 +10,8 @@ import { fileURLToPath } from "url";
  * Get package.json information.
  *
  * Searches upward from the compiled file's location so the path works both:
- *   - In development:  packages/cli/dist/utils.js  → ../package.json (spark-cli)
- *   - When installed:  dist/cli/utils.js            → ../../package.json (@tabstack/spark)
+ *   - In development:  packages/cli/dist/utils.js  → ../package.json (pilo-cli)
+ *   - When installed:  dist/cli/utils.js            → ../../package.json (@tabstack/pilo)
  *
  * Falls back through candidate paths until a package.json is found.
  */
@@ -21,7 +21,7 @@ export function getPackageInfo(): { version: string; name: string; description: 
   // Walk up from the current file directory looking for package.json
   const candidates = [
     join(__dirname, "../package.json"), // dev: packages/cli/package.json
-    join(__dirname, "../../package.json"), // installed: @tabstack/spark root package.json
+    join(__dirname, "../../package.json"), // installed: @tabstack/pilo root package.json
   ];
 
   for (const candidate of candidates) {
@@ -33,14 +33,14 @@ export function getPackageInfo(): { version: string; name: string; description: 
       };
       return {
         version: pkg.version ?? "0.0.0",
-        name: pkg.name ?? "spark",
+        name: pkg.name ?? "pilo",
         description: pkg.description ?? "",
       };
     }
   }
 
   // Should never reach here in a properly assembled package
-  return { version: "0.0.0", name: "spark", description: "AI-powered web automation" };
+  return { version: "0.0.0", name: "pilo", description: "AI-powered web automation" };
 }
 
 /**

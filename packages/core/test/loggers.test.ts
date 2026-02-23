@@ -637,7 +637,7 @@ describe("ConsoleLogger", () => {
       const calls = mockConsole.log.mock.calls;
       const allOutput = calls.flat().join(" ");
 
-      expect(allOutput).toContain("🚀 Spark Automation Starting");
+      expect(allOutput).toContain("🚀 Pilo Automation Starting");
       expect(allOutput).toContain("Complete a web form");
       expect(allOutput).toContain("playwright:firefox");
       expect(allOutput).toContain("proxy.example.com");

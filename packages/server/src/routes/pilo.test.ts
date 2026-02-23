@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import sparkRoutes from "./spark.js";
+import piloRoutes from "./pilo.js";
 
-// Mock the spark library
-vi.mock("spark-core", () => ({
+// Mock the pilo library
+vi.mock("pilo-core", () => ({
   WebAgent: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({
       success: true,
@@ -57,23 +57,23 @@ vi.mock("../StreamLogger.js", () => ({
   StreamLogger: vi.fn().mockImplementation(() => ({})),
 }));
 
-describe("Spark Routes", () => {
+describe("Pilo Routes", () => {
   let app: Hono;
 
   beforeEach(() => {
     app = new Hono();
-    app.route("/spark", sparkRoutes);
+    app.route("/pilo", piloRoutes);
 
     // Don't clear mocks - it breaks our mock setup
     // vi.clearAllMocks();
   });
 
-  describe("POST /spark/run", () => {
+  describe("POST /pilo/run", () => {
     beforeEach(async () => {
       process.env.OPENAI_API_KEY = "test-key";
 
       // Reset the getAIProviderInfo mock to its default success state
-      const { getAIProviderInfo } = await import("spark-core");
+      const { getAIProviderInfo } = await import("pilo-core");
       vi.mocked(getAIProviderInfo).mockReturnValue({
         provider: "openai",
         model: "gpt-4.1",
@@ -87,7 +87,7 @@ describe("Spark Routes", () => {
     });
 
     it("should reject requests without task", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -103,14 +103,14 @@ describe("Spark Routes", () => {
 
     it("should reject requests without OpenAI API key", async () => {
       // Mock getAIProviderInfo to throw an error for missing API key
-      const { getAIProviderInfo } = await import("spark-core");
+      const { getAIProviderInfo } = await import("pilo-core");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error(
           "No OpenAI API key found. Please set OPENAI_API_KEY environment variable or configure globally.",
         );
       });
 
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: "test task" }),
@@ -125,7 +125,7 @@ describe("Spark Routes", () => {
     });
 
     it("should return SSE headers for valid request", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: "test task" }),
@@ -138,7 +138,7 @@ describe("Spark Routes", () => {
     });
 
     it("should accept optional parameters", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -154,7 +154,7 @@ describe("Spark Routes", () => {
     });
 
     it("should handle malformed JSON", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "invalid json",
@@ -169,7 +169,7 @@ describe("Spark Routes", () => {
     });
 
     it("should return readable stream for SSE", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: "test task" }),
@@ -183,7 +183,7 @@ describe("Spark Routes", () => {
     });
 
     it("should stream SSE events with proper format", async () => {
-      const res = await app.request("/spark/run", {
+      const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: "test task" }),

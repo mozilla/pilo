@@ -11,7 +11,7 @@ vi.mock("fs", async (importOriginal) => {
   return {
     ...actual,
     existsSync: vi.fn().mockReturnValue(false),
-    mkdtempSync: vi.fn().mockReturnValue("/tmp/spark-chrome-abc123"),
+    mkdtempSync: vi.fn().mockReturnValue("/tmp/pilo-chrome-abc123"),
   };
 });
 
@@ -88,7 +88,7 @@ describe("CLI Extension Command", () => {
   afterEach(() => {
     process.exit = originalExit;
     console.log = originalConsoleLog;
-    // Restore __SPARK_PRODUCTION__ to undefined (dev mode) after each test
+    // Restore __PILO_PRODUCTION__ to undefined (dev mode) after each test
     vi.unstubAllGlobals();
   });
 
@@ -147,9 +147,9 @@ describe("CLI Extension Command", () => {
   // Production mode
   // -------------------------------------------------------------------------
 
-  describe("Production mode (__SPARK_PRODUCTION__ === true)", () => {
+  describe("Production mode (__PILO_PRODUCTION__ === true)", () => {
     beforeEach(() => {
-      vi.stubGlobal("__SPARK_PRODUCTION__", true);
+      vi.stubGlobal("__PILO_PRODUCTION__", true);
     });
 
     // -----------------------------------------------------------------------
@@ -346,8 +346,8 @@ describe("CLI Extension Command", () => {
   // Dev mode
   // -------------------------------------------------------------------------
 
-  describe("Dev mode (__SPARK_PRODUCTION__ === false)", () => {
-    // __SPARK_PRODUCTION__ is only injected by the root tsup build (production).
+  describe("Dev mode (__PILO_PRODUCTION__ === false)", () => {
+    // __PILO_PRODUCTION__ is only injected by the root tsup build (production).
     // In the test environment the global is undefined, which isProduction()
     // treats as false. No stubGlobal needed; the default state is already dev.
 
@@ -362,7 +362,7 @@ describe("CLI Extension Command", () => {
       expect(binary).toBe("pnpm");
       const args = spawnArgs as string[];
       expect(args).toContain("-F");
-      expect(args).toContain("spark-extension");
+      expect(args).toContain("pilo-extension");
       expect(args).toContain("dev");
       expect(args).toContain("--");
       expect(args).toContain("--chrome");

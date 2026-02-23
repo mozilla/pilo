@@ -12,8 +12,8 @@ import {
   WebAgentEventEmitter,
   MetricsCollector,
   SecretsRedactor,
-} from "spark-core";
-import type { Logger } from "spark-core";
+} from "pilo-core";
+import type { Logger } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -45,7 +45,7 @@ function assertConfigExists(): boolean {
 
   console.error(
     chalk.red.bold("Error:"),
-    "No configuration found. Run 'spark config init' to set up your configuration.",
+    "No configuration found. Run 'pilo config init' to set up your configuration.",
   );
   process.exit(1);
   return false; // unreachable, but satisfies the return type for tests that mock process.exit
