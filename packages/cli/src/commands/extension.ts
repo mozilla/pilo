@@ -1,10 +1,11 @@
 import chalk from "chalk";
 import { execFileSync, spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
-import { isProduction } from "pilo-core";
+import { isProduction, config as configManager } from "pilo-core";
+import { mapConfigToExtensionSettings } from "../extensionConfig.js";
 
 const SUPPORTED_BROWSERS = ["chrome", "firefox"] as const;
 type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];
@@ -14,11 +15,13 @@ type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];
  *
  * Subcommands:
  *   extension install <browser> [--tmp]  - Install extension in the specified browser
+ *   extension config-sync               - Re-write pilo.config.json into extension directory(ies)
  */
 export function createExtensionCommand(): Command {
   const extensionCmd = new Command("extension").description("Manage the Pilo browser extension");
 
   extensionCmd.addCommand(createExtensionInstallCommand());
+  extensionCmd.addCommand(createExtensionConfigSyncCommand());
 
   return extensionCmd;
 }
@@ -67,6 +70,141 @@ function createExtensionInstallCommand(): Command {
     });
 }
 
+/**
+ * extension config-sync
+ *
+ * Re-writes the `pilo.config.json` file into the extension directory(ies) so
+ * that an already-installed extension picks up the latest global config on its
+ * next reload. No reinstall required.
+ *
+ * Production mode: writes into both dist/extension/chrome/ and
+ *   dist/extension/firefox/, but only for directories that actually exist (the
+ *   user may have installed only one browser).
+ *
+ * Dev mode: writes into packages/extension/public/. WXT's file watcher
+ *   propagates the change to all browser output directories.
+ *
+ * Exits with an error if no global config file is found.
+ */
+function createExtensionConfigSyncCommand(): Command {
+  return new Command("config-sync")
+    .description("Push updated global config to an already-installed extension")
+    .action(async () => {
+      const configPath = configManager.getConfigPath();
+
+      if (!existsSync(configPath)) {
+        console.error(
+          chalk.red(
+            "❌ No configuration found. Run 'pilo config init' to set up your configuration.",
+          ),
+        );
+        process.exit(1);
+        return;
+      }
+
+      if (isProduction()) {
+        await syncConfigProduction();
+      } else {
+        syncConfigDev();
+      }
+    });
+}
+
+/**
+ * Production config-sync: write pilo.config.json into every browser extension
+ * directory that exists. Skips browsers whose directory is absent (the user
+ * may have installed only one).
+ */
+async function syncConfigProduction(): Promise<void> {
+  const synced: string[] = [];
+
+  for (const browser of SUPPORTED_BROWSERS) {
+    const extPath = resolveProductionExtensionPath(browser);
+    if (existsSync(extPath)) {
+      seedExtensionConfig(extPath);
+      synced.push(browser);
+    }
+  }
+
+  if (synced.length === 0) {
+    console.error(chalk.red("❌ No installed extension directories found."));
+    console.error(
+      chalk.gray(
+        "Run 'pilo extension install <browser>' first, or rebuild the package with 'pnpm run build'.",
+      ),
+    );
+    process.exit(1);
+    return;
+  }
+
+  console.log(chalk.green(`✅ Synced config to extension (${synced.join(", ")})`));
+  console.log(chalk.gray("Reload the extension for changes to take effect."));
+}
+
+/**
+ * Dev config-sync: write pilo.config.json into packages/extension/public/.
+ * WXT's file watcher propagates the file to all browser output directories.
+ */
+function syncConfigDev(): void {
+  const publicDir = resolveDevExtensionPublicPath();
+  seedExtensionConfig(publicDir);
+  console.log(chalk.green("✅ Synced config to extension (dev mode)"));
+  console.log(chalk.gray("Reload the extension for changes to take effect."));
+}
+
+// ---------------------------------------------------------------------------
+// Config seeding
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed the extension directory with a `pilo.config.json` file derived from
+ * the user's global Pilo config. Best-effort: if no config exists, or if the
+ * mapped result has no useful fields, or if writing fails, a warning is logged
+ * and the install proceeds normally.
+ *
+ * @param extensionDir - Absolute path to the directory that will be loaded as
+ *   the unpacked extension (Chrome) or passed to web-ext (Firefox), or the
+ *   WXT public/ directory for dev mode.
+ */
+function seedExtensionConfig(extensionDir: string): void {
+  const configPath = configManager.getConfigPath();
+
+  if (!existsSync(configPath)) {
+    console.warn(chalk.yellow("⚠  No config file found, skipping extension config seeding"));
+    return;
+  }
+
+  let settings: ReturnType<typeof mapConfigToExtensionSettings>;
+  try {
+    const globalConfig = configManager.getGlobalConfig();
+    settings = mapConfigToExtensionSettings(globalConfig);
+  } catch (err) {
+    console.warn(
+      chalk.yellow("⚠  Failed to read config for extension seeding, skipping:"),
+      err instanceof Error ? err.message : String(err),
+    );
+    return;
+  }
+
+  // Skip writing if there are no meaningful fields to seed.
+  if (Object.keys(settings).length === 0) {
+    return;
+  }
+
+  const seedFilePath = resolve(extensionDir, "pilo.config.json");
+
+  try {
+    mkdirSync(extensionDir, { recursive: true });
+    writeFileSync(seedFilePath, JSON.stringify(settings, null, 2), "utf-8");
+    console.log(chalk.green(`✅ Seeded extension with config from ${configPath}`));
+  } catch (err) {
+    console.warn(
+      chalk.yellow("⚠  Failed to write extension seed config, skipping:"),
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Production path
 // ---------------------------------------------------------------------------
@@ -91,6 +229,10 @@ async function runProduction(
     process.exit(1);
     return;
   }
+
+  // Seed before instructions are printed (Chrome) or browser is launched (Firefox),
+  // so the file is in place when the extension loads.
+  seedExtensionConfig(extensionPath);
 
   if (browser === "chrome") {
     printChromeInstructions(extensionPath);
@@ -153,6 +295,25 @@ function printChromeInstructions(extensionPath: string): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Resolve the path to the WXT public/ directory for dev mode seeding.
+ *
+ * WXT copies every file from public/ into the extension output directory
+ * during the build/serve step. Writing pilo.config.json here is idempotent
+ * and works with WXT's file watching (any rebuild picks up the file).
+ *
+ * From __dirname (dist/cli/commands/ in production, or src/commands/ in dev
+ * when running via tsx), we navigate up to the monorepo root and then into
+ * packages/extension/public/.
+ */
+function resolveDevExtensionPublicPath(): string {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  // __dirname is .../packages/cli/src/commands (dev) or .../dist/cli/commands (prod)
+  // Walk up to monorepo root: 4 levels in dev, same in prod (dist is still inside workspace).
+  // We use a relative path from the known CLI package position.
+  return resolve(__dirname, "../../../extension/public");
+}
+
+/**
  * Dev mode: shell out to `pnpm -F pilo-extension run dev -- --<browser> [--tmp]`.
  *
  * The WXT dev server handles browser launch, HMR, extension loading, and
@@ -160,6 +321,11 @@ function printChromeInstructions(extensionPath: string): void {
  * args here; those are production-only concerns.
  */
 async function runDev(browser: SupportedBrowser, options: { tmp?: boolean }): Promise<void> {
+  // Seed the extension public/ directory so WXT copies pilo.config.json into
+  // the output when it builds. This must happen before the dev server starts.
+  const publicDir = resolveDevExtensionPublicPath();
+  seedExtensionConfig(publicDir);
+
   // Use a single "dev" script with browser flag, forwarding args via "--"
   const args = ["-F", "pilo-extension", "run", "dev", "--", `--${browser}`];
 
