@@ -72,6 +72,7 @@ interface PiloTaskRequest {
   blockResources?: string[];
   pwEndpoint?: string;
   pwCdpEndpoint?: string;
+  pwCdpEndpoints?: string[];
   bypassCSP?: boolean;
 
   // WebAgent behavior overrides
@@ -188,6 +189,10 @@ pilo.post("/run", async (c) => {
             | undefined,
           pwEndpoint: body.pwEndpoint ?? serverConfig.pw_endpoint,
           pwCdpEndpoint: body.pwCdpEndpoint ?? serverConfig.pw_cdp_endpoint,
+          pwCdpEndpoints:
+            body.pwCdpEndpoints ??
+            serverConfig.pw_cdp_endpoints ??
+            (serverConfig.pw_cdp_endpoint ? [serverConfig.pw_cdp_endpoint] : undefined),
           bypassCSP: body.bypassCSP ?? serverConfig.bypass_csp,
           proxyServer: body.proxy ?? serverConfig.proxy,
           proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,

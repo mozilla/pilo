@@ -135,6 +135,9 @@ describe("WebAgentEventEmitter", () => {
         "browser:screenshot_captured_image",
         "system:debug_compression",
         "system:debug_message",
+        "cdp:endpoint_connected",
+        "cdp:endpoint_cycle",
+        "browser:reconnected",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);

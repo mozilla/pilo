@@ -135,8 +135,8 @@ describe("MetricsCollector", () => {
           data: {
             timestamp: Date.now(),
             iterationId: "test-1",
-          } as any, // Explicitly cast as any to bypass type checking for this test
-        });
+          },
+        } as any); // Cast as any to bypass discriminated union type checking for this test
       });
 
       const counts = metricsCollector.getEventCounts();
@@ -471,7 +471,10 @@ describe("MetricsCollector", () => {
       expect(metricsData.totalOutputTokens).toBe(0);
     });
 
-    it("should emit metrics on TASK_ABORTED", () => {
+    it("should NOT emit metrics on TASK_ABORTED (metrics fire via TASK_COMPLETED which always follows)", () => {
+      // TASK_ABORTED does not trigger metrics to avoid double-reporting.
+      // buildResult() always emits TASK_COMPLETED after any outcome (abort, complete, max iterations),
+      // so metrics are emitted exactly once via TASK_COMPLETED.
       const metricsListener = vi.fn();
       emitter.onEvent(WebAgentEventType.TASK_METRICS, metricsListener);
 
@@ -487,9 +490,7 @@ describe("MetricsCollector", () => {
         data: abortData,
       });
 
-      expect(metricsListener).toHaveBeenCalledTimes(1);
-      const metricsData = metricsListener.mock.calls[0][0] as TaskMetricsEventData;
-      expect(metricsData.iterationId).toBe("test-1");
+      expect(metricsListener).not.toHaveBeenCalled();
     });
   });
 

@@ -35,7 +35,7 @@ export type LoggerType = (typeof LOGGERS)[number];
 export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
 export type SearchProviderName = (typeof SEARCH_PROVIDERS)[number];
 
-export type ConfigFieldType = "string" | "number" | "boolean" | "enum";
+export type ConfigFieldType = "string" | "string[]" | "number" | "boolean" | "enum";
 
 export type ConfigCategory =
   | "ai"
@@ -100,6 +100,7 @@ export interface PiloConfig {
   // Playwright Configuration
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
+  pw_cdp_endpoints?: string[];
   bypass_csp?: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -164,6 +165,7 @@ export interface PiloConfigResolved {
   // Playwright Configuration
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
+  pw_cdp_endpoints?: string[];
   bypass_csp: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -508,6 +510,15 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "url",
     env: ["PILO_PW_CDP_ENDPOINT"],
     description: "Chrome DevTools Protocol endpoint URL (chromium only)",
+    category: "playwright",
+  },
+  pw_cdp_endpoints: {
+    type: "string[]",
+    cli: "--pw-cdp-endpoints",
+    placeholder: "url1,url2,...",
+    env: ["PILO_PW_CDP_ENDPOINTS"],
+    description:
+      "Comma-separated list of CDP endpoint URLs to try in order (chromium only, takes precedence over --pw-cdp-endpoint)",
     category: "playwright",
   },
   bypass_csp: {
