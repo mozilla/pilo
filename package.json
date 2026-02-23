@@ -1,5 +1,5 @@
 {
-  "name": "@tabstack/spark",
+  "name": "@tabstack/pilo",
   "version": "0.17.0",
   "description": "AI-powered web automation library and CLI tool",
   "type": "module",
@@ -23,7 +23,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "prepare": "pnpm --filter spark-core run build",
+    "prepare": "pnpm --filter pilo-core run build",
     "prebuild": "pnpm --filter pilo-core run build && pnpm --filter pilo-extension run build:publish",
     "build": "tsup",
     "prepublishOnly": "pnpm run build",
@@ -34,7 +34,7 @@
     "pretest": "pnpm --filter pilo-core run bundle:aria",
     "test": "pnpm -r run test",
     "check": "pnpm run typecheck && pnpm run test",
-    "spark": "tsx packages/cli/src/cli.ts",
+    "pilo": "pnpm --filter pilo-cli run pilo",
     "dev:extension": "pnpm --filter pilo-extension run dev --",
     "dev:server": "pnpm --filter pilo-server run dev",
     "release": "./scripts/release.sh"

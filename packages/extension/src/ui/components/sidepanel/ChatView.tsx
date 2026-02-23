@@ -1,15 +1,12 @@
-import { useState, useEffect, type ReactElement } from "react";
+import { useState, useEffect, useCallback, type ReactElement } from "react";
 import browser from "webextension-polyfill";
-import Markdown from "marked-react";
-import clsx from "clsx";
-import { ChatMessage } from "../ChatMessage";
-import { useChat } from "../../hooks/useChat";
-import type { ChatMessage as ChatMessageType } from "../../hooks/useConversation";
 import { useEvents } from "../../stores/eventStore";
 import { useSettings } from "../../stores/settingsStore";
 import { useConversationStore } from "../../../shared/conversationStore";
-import { useSystemTheme } from "../../hooks/useSystemTheme";
-import type { Theme } from "../../theme";
+import { useConversation } from "../../hooks/useConversation";
+import { useAutoScroll } from "../../hooks/useAutoScroll";
+import { MessageList } from "./MessageList";
+import { ChatInput } from "./ChatInput";
 import type {
   ExecuteTaskMessage,
   ExecuteTaskResponse,
@@ -29,8 +26,6 @@ import {
   isAgentActionData,
 } from "../../../shared/utils/typeGuards";
 import type { BrowserActionStartedEventData } from "../../../shared/types/browser";
-import { SettingsGearIcon } from "../icons/SettingsGearIcon";
-import { PiloLogo } from "../icons/PiloLogo";
 
 // Interface for events in ExecuteTaskResponse
 interface EventData {
@@ -40,7 +35,6 @@ interface EventData {
 
 interface ChatViewProps {
   currentTab: browser.Tabs.Tab | null;
-  onOpenSettings: () => void;
 }
 
 /**
@@ -117,214 +111,40 @@ export function shouldDisplayError(event: RealtimeEvent): boolean {
   return true;
 }
 
-/**
- * Renders markdown with marked-react which provides better security by preventing XSS attacks through
- * HTML injection. The component supports GitHub Flavored Markdown (GFM) and handles
- * line breaks properly.
- *
- * @param children - The markdown content to render
- * @param className - Optional additional CSS classes to apply
- */
-interface MarkdownContentProps {
-  children: string;
-  className?: string;
-}
+// ---------------------------------------------------------------------------
+// NewConversationPrompt
+// ---------------------------------------------------------------------------
 
-const MarkdownContent = ({ children, className }: MarkdownContentProps): ReactElement => (
-  <div className={clsx("markdown-content", "prose", "prose-chat", "max-w-none", className)}>
-    <Markdown value={children} breaks gfm />
-  </div>
-);
-
-// Task message component
-interface TaskMessageProps {
-  message: ChatMessageType;
-  theme: Theme;
-}
-
-const TaskMessage = ({ message, theme: t }: TaskMessageProps): ReactElement => {
-  const getClassName = () => {
-    switch (message.type) {
-      case "plan":
-        return `text-message-assistant ${t.text.secondary} text-xs`;
-      case "reasoning":
-        return `text-message-assistant ${t.text.secondary}`;
-      case "error":
-        return "text-message-assistant text-red-600 p-2 bg-red-50 rounded border border-red-200";
-      case "result":
-        return "text-message-assistant text-sm";
-      default:
-        return "text-message-assistant";
-    }
-  };
-
-  return (
-    <div className="mb-2">
-      <MarkdownContent className={getClassName()}>{message.content}</MarkdownContent>
-    </div>
-  );
-};
-
-// Loading spinner component
-const LoadingSpinner = ({ theme: t }: { theme: Theme }): ReactElement => (
-  <svg className={`animate-spin ${t.stroke.accent} h-4 w-4`} fill="none" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    ></circle>
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-    ></path>
-  </svg>
-);
-
-// Task completion separator component
-const TaskCompletionSeparator = ({ theme: t }: { theme: Theme }): ReactElement => (
-  <div className="my-8 flex items-center">
-    <div className={`flex-1 border-t-2 ${t.border.secondary}`}></div>
-  </div>
-);
-
-// Input disabled overlay component
-interface InputDisabledOverlayProps {
+interface NewConversationPromptProps {
   onNewRequest: () => void;
-  theme: Theme;
 }
 
-const InputDisabledOverlay = ({
-  onNewRequest,
-  theme: t,
-}: InputDisabledOverlayProps): ReactElement => (
-  <div className="absolute inset-0 bg-white/90 dark:bg-stone-925/90 flex items-center justify-center backdrop-blur-sm z-10">
-    <div className="text-center px-4">
-      <p className={`${t.text.primary} dark:text-white text-sm mb-3`}>
-        Continued conversation context not yet supported.
+const NewConversationPrompt = ({ onNewRequest }: NewConversationPromptProps): ReactElement => (
+  <div className="border-t border-border px-3 py-3">
+    <div className="rounded-lg border border-border bg-secondary/30 px-3 py-3 text-center">
+      <p className="text-[12px] text-muted-foreground">
+        Continued conversation context is not yet supported.
       </p>
       <button
         onClick={onNewRequest}
-        className="px-4 py-2 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] transition-colors font-medium"
+        className="mt-2 text-[12px] font-medium text-primary hover:text-primary/80 transition-colors"
         data-testid="new-request-button"
       >
-        New Request
+        Start a new conversation
       </button>
     </div>
   </div>
 );
 
-// Task bubble component
-interface TaskBubbleProps {
-  taskId: string;
-  messages: ChatMessageType[];
-  currentTaskId: string | null;
-  theme: Theme;
-}
+// ---------------------------------------------------------------------------
+// ChatView
+// ---------------------------------------------------------------------------
 
-const TaskBubble = ({
-  taskId,
-  messages,
-  currentTaskId,
-  theme: t,
-}: TaskBubbleProps): ReactElement => {
-  const taskMessages = messages.filter((msg) => msg.taskId === taskId && msg.type !== "status");
-  const statusMessages = messages.filter((msg) => msg.taskId === taskId && msg.type === "status");
-  const latestStatus = statusMessages.length > 0 ? statusMessages[statusMessages.length - 1] : null;
-  const resultMessage = taskMessages.find((msg) => msg.type === "result");
-  const isActive = currentTaskId === taskId;
-  // Show spinner when only status messages exist (before any task messages arrive),
-  // such as during the initial planning phase.
-  const isEarlyPhase = taskMessages.length === 0 && latestStatus !== null;
-
-  if (taskMessages.length === 0 && !latestStatus) return <></>;
-
-  const hasPlan = taskMessages.some((msg) => msg.type === "plan");
-
-  // Track which section headings we've shown
-  const seenTypes = new Set<string>();
-
-  const getHeading = (type: string) => {
-    if (seenTypes.has(type)) return null;
-    seenTypes.add(type);
-
-    switch (type) {
-      case "plan":
-        return "📋 Plan:";
-      case "reasoning":
-        return "💭 Actions:";
-      case "result":
-        return "✨ Answer:";
-      default:
-        return null;
-    }
-  };
-
-  let liClass = "";
-  let divClass = "";
-
-  if (hasPlan) {
-    liClass = "flex mb-4";
-    divClass = clsx("w-full px-4 py-2 rounded-lg", t.bg.secondary, t.text.primary);
-  } else {
-    liClass = "flex mb-4 justify-start";
-    divClass = clsx(
-      "max-w-xs lg:max-w-md px-4 py-2 rounded-lg border",
-      t.bg.secondary,
-      t.text.primary,
-      t.border.primary,
-    );
-  }
-
-  return (
-    <li className={liClass}>
-      <div className={divClass}>
-        {/* Render messages chronologically with dynamic headings */}
-        {taskMessages.map((msg) => {
-          const heading = getHeading(msg.type);
-          return (
-            <div key={msg.id}>
-              {heading && (
-                <div className={`text-sm font-semibold ${t.text.accent} mb-2 mt-3 first:mt-0`}>
-                  {heading}
-                </div>
-              )}
-              <TaskMessage message={msg} theme={t} />
-            </div>
-          );
-        })}
-
-        {/* Current status for active tasks or early phase status-only tasks */}
-        {!resultMessage && (isActive || isEarlyPhase) && (
-          <div className="flex items-center gap-2 text-sm">
-            <LoadingSpinner theme={t} />
-            <span className={t.text.accent}>
-              {latestStatus ? latestStatus.content : "Starting task..."}
-            </span>
-          </div>
-        )}
-
-        {/* Timestamp for completed tasks */}
-        {resultMessage && (
-          <div className={`text-xs ${t.text.muted} mt-1`}>
-            {resultMessage.timestamp.toLocaleTimeString()}
-          </div>
-        )}
-      </div>
-    </li>
-  );
-};
-
-export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps): ReactElement {
-  const [task, setTask] = useState("");
+export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
   const [stableTabId, setStableTabId] = useState<number | undefined>(currentTab?.id);
   const [lastCompletedTaskId, setLastCompletedTaskId] = useState<string | null>(null);
   const { addEvent, clearEvents } = useEvents();
   const { settings } = useSettings();
-  const { theme: t } = useSystemTheme();
 
   // Update stable tab ID only when current tab actually changes
   useEffect(() => {
@@ -338,21 +158,31 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     addMessage,
     startTask,
     endTask,
-    messagesEndRef,
-    scrollContainerRef,
-    handleScroll,
     currentTaskId,
     isExecuting,
     setExecutionState,
-  } = useChat(stableTabId);
+    clearMessages,
+  } = useConversation(stableTabId);
 
-  const focusRing = "focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+  // Auto-scroll is used by MessageList internally; we still need scrollToBottomOnNewMessage
+  // to trigger a scroll after calling addMessage from event handlers.
+  const { scrollToBottomOnNewMessage } = useAutoScroll(messages, stableTabId);
 
-  // Helper function to add events to logger
+  // Helper to add events to logger
   const addEventsToLogger = (eventList: EventData[]) => {
     eventList.forEach((event) => {
       addEvent(event.type, event.data);
     });
+  };
+
+  // Enhanced addMessage that also triggers scroll
+  const addMessageAndScroll = (
+    type: Parameters<typeof addMessage>[0],
+    content: string,
+    taskId?: string,
+  ) => {
+    addMessage(type, content, taskId);
+    scrollToBottomOnNewMessage();
   };
 
   // Listen for real-time events from background script
@@ -385,9 +215,9 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
               const displayPlan = typedMessage.event.data.actionItems
                 .map((item, index) => `${index + 1}. ${item}`)
                 .join("\n");
-              addMessage("plan", displayPlan, taskId);
+              addMessageAndScroll("plan", displayPlan, taskId);
             } else if (typedMessage.event.data.plan) {
-              addMessage("plan", typedMessage.event.data.plan, taskId);
+              addMessageAndScroll("plan", typedMessage.event.data.plan, taskId);
             }
           }
         }
@@ -398,7 +228,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           isAgentReasonedData(typedMessage.event.data)
         ) {
           if (typedMessage.event.data.thought && taskId) {
-            addMessage("reasoning", typedMessage.event.data.thought, taskId);
+            addMessageAndScroll("reasoning", typedMessage.event.data.thought, taskId);
           }
         }
 
@@ -408,7 +238,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           isAgentStatusData(typedMessage.event.data)
         ) {
           if (typedMessage.event.data.message && taskId) {
-            addMessage("status", typedMessage.event.data.message, taskId);
+            addMessageAndScroll("status", typedMessage.event.data.message, taskId);
           }
         }
 
@@ -418,7 +248,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           if (isBrowserActionStartedData(eventData) && taskId) {
             const statusMessage = formatBrowserAction(eventData);
             if (statusMessage) {
-              addMessage("status", statusMessage, taskId);
+              addMessageAndScroll("status", statusMessage, taskId);
             }
           }
         }
@@ -428,7 +258,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           const eventData = typedMessage.event.data;
           if (isAgentActionData(eventData) && taskId) {
             if (eventData.action === "extract") {
-              addMessage("status", "Extracting data", taskId);
+              addMessageAndScroll("status", "Extracting data", taskId);
             }
           }
         }
@@ -441,7 +271,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           taskId &&
           shouldDisplayError(typedMessage.event)
         ) {
-          addMessage("error", `AI Error: ${typedMessage.event.data.error}`, taskId);
+          addMessageAndScroll("error", `AI Error: ${typedMessage.event.data.error}`, taskId);
         }
 
         // Handle validation errors (only show if max retries exceeded)
@@ -453,7 +283,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           shouldDisplayError(typedMessage.event)
         ) {
           const errorMessages = typedMessage.event.data.errors.join(", ");
-          addMessage("error", `Validation Error: ${errorMessages}`, taskId);
+          addMessageAndScroll("error", `Validation Error: ${errorMessages}`, taskId);
         }
 
         // Handle browser action result failures (only show non-recoverable errors)
@@ -465,7 +295,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
           shouldDisplayError(typedMessage.event)
         ) {
           const errorText = typedMessage.event.data.error || "Browser action failed";
-          addMessage("error", `Action Failed: ${errorText}`, taskId);
+          addMessageAndScroll("error", `Action Failed: ${errorText}`, taskId);
         }
       }
     };
@@ -479,39 +309,28 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
 
   const handleNewRequest = () => {
     setLastCompletedTaskId(null);
-    setTask("");
   };
 
-  const handleExecute = async () => {
-    if (!task.trim()) return;
+  const handleSendMessage = async (taskText: string) => {
     // API key is optional for Ollama
     if (!settings.apiKey && settings.provider !== "ollama") {
-      addMessage("system", "Please configure your API key in settings first");
-      onOpenSettings();
+      addMessageAndScroll("system", "Please configure your API key in settings first");
       return;
     }
 
-    // Save task before clearing input
-    const taskText = task.trim();
-
     // Add user message and start task
-    addMessage("user", taskText);
+    addMessageAndScroll("user", taskText);
     const taskId = startTask();
-
-    // Clear input immediately after sending
-    setTask("");
 
     setExecutionState(true);
     clearEvents(); // Clear previous events
 
     try {
-      // Use current tab from state instead of querying
       if (!currentTab?.id) {
-        addMessage("error", "No active tab found", taskId);
+        addMessageAndScroll("error", "No active tab found", taskId);
         return;
       }
 
-      // Only use background worker for actual Pilo task execution
       const message: ExecuteTaskMessage = {
         type: "executeTask",
         task: taskText,
@@ -545,7 +364,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
 
       if (response && response.success) {
         const resultText = response.result || "Task completed successfully!";
-        addMessage("result", resultText, taskId);
+        addMessageAndScroll("result", resultText, taskId);
 
         // Add events from background script to our logger (fallback for any missed real-time events)
         if (response.events && response.events.length > 0) {
@@ -553,7 +372,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
         }
       } else {
         const errorText = `Error: ${response?.message || "Task execution failed"}`;
-        addMessage("result", errorText, taskId);
+        addMessageAndScroll("result", errorText, taskId);
 
         // Add events even on error
         if (response?.events && response.events.length > 0) {
@@ -562,7 +381,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       }
     } catch (error) {
       const errorText = `Error: ${error instanceof Error ? error.message : String(error)}`;
-      addMessage("result", errorText, taskId);
+      addMessageAndScroll("result", errorText, taskId);
     } finally {
       setExecutionState(false);
       endTask();
@@ -585,7 +404,7 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       } else {
         // Handle cancellation request failure
         if (currentTaskId) {
-          addMessage(
+          addMessageAndScroll(
             "error",
             `Failed to cancel task: ${response?.message || "Unknown error"}`,
             currentTaskId,
@@ -594,9 +413,8 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
       }
     } catch (error) {
       console.error("Failed to cancel task:", error);
-      // Handle cancellation request failure
       if (currentTaskId) {
-        addMessage(
+        addMessageAndScroll(
           "error",
           `Cancellation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
           currentTaskId,
@@ -605,149 +423,34 @@ export default function ChatView({ currentTab, onOpenSettings }: ChatViewProps):
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleExecute();
-    }
-  };
+  const handleClearChat = useCallback(() => {
+    clearMessages();
+    setLastCompletedTaskId(null);
+  }, [clearMessages]);
 
-  /**
-   * Checks if a task has been completed by looking for a result message
-   */
-  const isTaskCompleted = (taskId: string): boolean => {
-    const taskMessages = messages.filter((msg) => msg.taskId === taskId);
-    return taskMessages.some((msg) => msg.type === "result");
-  };
-
-  /**
-   * Renders all messages in the order they exist in the enclosing scope's
-   * messages array.
-   *
-   * We iterate through them once, rendering user/system messages directly
-   * and task bubbles at the first occurrence of each unique taskId. This
-   * ensures task-related messages (plan, reasoning, result)
-   * are grouped together in a single bubble while maintaining overall
-   * chronological order.
-   *
-   * @returns Array of React elements to render in the message list
-   */
-  const renderMessages = () => {
-    const renderedTaskIds = new Set<string>();
-    const elements: React.ReactElement[] = [];
-
-    messages.forEach((message) => {
-      if (message.type === "user" || message.type === "system") {
-        elements.push(
-          <ChatMessage
-            key={message.id}
-            type={message.type as "user" | "assistant" | "system"}
-            content={message.content}
-            timestamp={message.timestamp}
-            theme={t}
-          />,
-        );
-      }
-
-      // Render task bubble when we encounter the first message with this taskId
-      else if (message.taskId && !renderedTaskIds.has(message.taskId)) {
-        renderedTaskIds.add(message.taskId);
-        elements.push(
-          <TaskBubble
-            key={message.taskId}
-            taskId={message.taskId}
-            messages={messages}
-            currentTaskId={currentTaskId}
-            theme={t}
-          />,
-        );
-
-        // Add separator after completed task (but not if it's currently executing)
-        if (isTaskCompleted(message.taskId) && currentTaskId !== message.taskId) {
-          elements.push(<TaskCompletionSeparator key={`separator-${message.taskId}`} theme={t} />);
-        }
-      }
-    });
-
-    return elements;
-  };
+  // Expose handleClearChat via a custom event so SidePanel (SidebarHeader) can call it
+  useEffect(() => {
+    const el = document.documentElement;
+    el.addEventListener("pilo:clear-chat", handleClearChat);
+    return () => el.removeEventListener("pilo:clear-chat", handleClearChat);
+  }, [handleClearChat]);
 
   return (
-    <div className={`h-screen flex flex-col ${t.bg.sidebar}`}>
-      {/* Header */}
-      <div className="p-2 gap-2.5 flex items-center justify-end">
-        <button
-          onClick={onOpenSettings}
-          className={`p-2.5 ${t.text.muted} ${t.hover.settings} rounded-xl transition-colors`}
-          title="Settings"
-          data-testid="settings-button"
-        >
-          <SettingsGearIcon className="w-5 h-5" />
-        </button>
-      </div>
+    <>
+      {/* Message List */}
+      <MessageList
+        messages={messages}
+        currentTaskId={currentTaskId}
+        isExecuting={isExecuting}
+        tabId={stableTabId}
+      />
 
-      {/* Chat Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 && (
-          <div
-            className="flex flex-col items-center justify-center h-full text-center"
-            data-testid="welcome-message"
-          >
-            <PiloLogo className="w-28 h-28 text-gray-350 mb-4" />
-            <p className={`${t.text.muted} text-sm max-w-sm`}>
-              I can help you automate tasks on any webpage. Just describe what you'd like me to do!
-            </p>
-          </div>
-        )}
-
-        <ul className="space-y-4" role="list">
-          {renderMessages()}
-        </ul>
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className={`border-t ${t.border.primary} p-4 relative`}>
-        {/* Overlay when task is completed */}
-        {lastCompletedTaskId && !isExecuting && (
-          <InputDisabledOverlay onNewRequest={handleNewRequest} theme={t} />
-        )}
-
-        <div className="flex items-center gap-2">
-          <textarea
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="What would you like me to do?"
-            rows={2}
-            disabled={isExecuting || lastCompletedTaskId !== null}
-            className={`flex-1 px-3 py-2 ${t.bg.input} border ${t.border.input} rounded-lg ${t.text.primary} placeholder-gray-400 focus:outline-none ${focusRing} resize-none`}
-            data-testid="task-input"
-          />
-          {isExecuting ? (
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
-              data-testid="stop-button"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              onClick={handleExecute}
-              disabled={!task.trim()}
-              className="px-3 py-1.5 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A2B] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-              data-testid="send-button"
-            >
-              Send
-            </button>
-          )}
-        </div>
-        <div className={`text-xs ${t.text.muted} mt-2 text-center`}>
-          Press Enter to send • Shift+Enter for new line
-        </div>
-      </div>
-    </div>
+      {/* Input Area — replaced by prompt when a task has completed */}
+      {lastCompletedTaskId && !isExecuting ? (
+        <NewConversationPrompt onNewRequest={handleNewRequest} />
+      ) : (
+        <ChatInput onSend={handleSendMessage} isLoading={isExecuting} onStop={handleCancel} />
+      )}
+    </>
   );
 }

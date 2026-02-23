@@ -16,7 +16,7 @@ vi.mock("pilo-core", async (importOriginal) => {
       unset: vi.fn(),
       reset: vi.fn(),
       initialize: vi.fn(),
-      getConfigPath: vi.fn().mockReturnValue("/home/user/.config/spapilork/config.json"),
+      getConfigPath: vi.fn().mockReturnValue("/home/user/.config/pilo/config.json"),
       listSources: vi.fn().mockReturnValue({
         global: { provider: "openai" },
         env: { browser: "chrome" },
