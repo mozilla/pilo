@@ -9,8 +9,8 @@
   },
   "scripts": {
     "dev": "tsx scripts/dev.ts",
-    "build:chrome": "wxt build -b chrome",
-    "build:firefox": "wxt build -b firefox",
+    "build:chrome": "node -e \"require('fs').rmSync('public/pilo.config.json', { force: true })\" && wxt build -b chrome",
+    "build:firefox": "node -e \"require('fs').rmSync('public/pilo.config.json', { force: true })\" && wxt build -b firefox",
     "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
     "clean": "rm -rf dist .output",
     "pretest": "wxt prepare",
