@@ -95,7 +95,7 @@ describe("AgentManager", () => {
       expect(createOpenRouter).toHaveBeenCalledWith({
         apiKey: "test-openrouter-key",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });
@@ -133,7 +133,7 @@ describe("AgentManager", () => {
       expect(createOpenRouter).toHaveBeenCalledWith({
         apiKey: "test-openrouter-key",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });

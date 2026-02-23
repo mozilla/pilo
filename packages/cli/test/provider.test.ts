@@ -168,7 +168,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });
@@ -365,7 +365,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });
@@ -404,7 +404,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-override123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });
@@ -427,7 +427,7 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-override123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/pilo",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
           "X-Title": "Pilo Web Automation Tool",
         },
       });
