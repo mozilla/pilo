@@ -389,6 +389,36 @@ describe("CLI Extension Command", () => {
         expect(args.some((a) => a.startsWith("--firefox="))).toBe(true);
       });
 
+      it("should resolve web-ext 3 levels up from __dirname (package root)", async () => {
+        const checkedPaths: string[] = [];
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          checkedPaths.push(path);
+          // Extension dir exists so runProduction doesn't bail before reaching launchFirefox
+          if (path.includes("extension") && !path.includes("web-ext")) return true;
+          // web-ext binary found so findWebExtBinary returns the first candidate (the one we assert on)
+          if (path.includes("web-ext")) return true;
+          return false;
+        });
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        // In production tsup bundles all CLI source into a single file:
+        //   <pkg_root>/dist/cli/src/cli.js  (no commands/ subdir)
+        // so __dirname = <pkg_root>/dist/cli/src/ → 3 levels up = <pkg_root>/
+        //
+        // In tests __dirname is the source commands/ dir, but the
+        // relative offset is the same (../../../node_modules/.bin/web-ext).
+        const { resolve, dirname } = await import("path");
+        const { fileURLToPath } = await import("url");
+        const commandsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../src/commands");
+        const expectedLocal = resolve(commandsDir, "../../../node_modules/.bin/web-ext");
+        const webExtPaths = checkedPaths.filter((p) => p.includes("web-ext"));
+        expect(webExtPaths[0]).toBe(expectedLocal);
+      });
+
       it("should exit(1) when web-ext is not found", async () => {
         // Extension exists but web-ext binary does not
         mockExistsSync.mockImplementation((p) => {

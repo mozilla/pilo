@@ -439,8 +439,10 @@ async function launchFirefox(
 function findWebExtBinary(): string | null {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Local bin linked by pnpm when web-ext is a dependency of pilo-cli
-  const localBin = resolve(__dirname, "../../node_modules/.bin/web-ext");
+  // Local bin linked by pnpm when web-ext is a dependency of pilo.
+  // In production tsup bundles into dist/cli/src/cli.js (no commands/ subdir)
+  // so __dirname = <pkg_root>/dist/cli/src/ → 3 levels up = <pkg_root>/
+  const localBin = resolve(__dirname, "../../../node_modules/.bin/web-ext");
   if (existsSync(localBin)) return localBin;
 
   // Monorepo root node_modules
