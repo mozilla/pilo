@@ -9,9 +9,10 @@
   },
   "scripts": {
     "dev": "tsx scripts/dev.ts",
-    "build:chrome": "pnpm run clean && wxt build -b chrome",
-    "build:firefox": "pnpm run clean && wxt build -b firefox",
-    "build:publish": "pnpm run build:chrome && pnpm run build:firefox",
+    "prebuild": "pnpm run clean",
+    "build:chrome": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
+    "build:publish": "pnpm run prebuild && pnpm run build:chrome && pnpm run build:firefox",
     "clean": "rm -rf dist .output && rm -f public/pilo.config.json",
     "pretest": "wxt prepare",
     "typecheck": "wxt prepare && tsc --noEmit",
