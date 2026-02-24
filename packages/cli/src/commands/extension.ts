@@ -246,13 +246,13 @@ async function runProduction(
 /**
  * Resolve the path to the pre-built extension for the given browser.
  *
- * In the npm-installed package layout, compiled CLI files live at:
- *   dist/cli/commands/extension.js
+ * In the npm-installed package layout, tsup bundles all CLI source into:
+ *   dist/cli/src/cli.js  (no commands/ subdir)
  *
  * The extension artifacts are assembled alongside the CLI at:
  *   dist/extension/<browser>/
  *
- * So from __dirname (dist/cli/commands/) we go up two levels to reach
+ * So from __dirname (dist/cli/src/) we go up two levels to reach
  * dist/, then into extension/<browser>/.
  */
 function resolveProductionExtensionPath(browser: SupportedBrowser): string {
@@ -437,6 +437,10 @@ async function launchFirefox(
  * Falls back to a global web-ext on PATH.
  */
 function findWebExtBinary(): string | null {
+  if (!isProduction()) {
+    throw new Error("findWebExtBinary() must only be called in production mode");
+  }
+
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   // Local bin linked by pnpm when web-ext is a dependency of pilo.
