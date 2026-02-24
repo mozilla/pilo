@@ -297,19 +297,20 @@ function printChromeInstructions(extensionPath: string): void {
 /**
  * Resolve the path to the WXT public/ directory for dev mode seeding.
  *
- * WXT copies every file from public/ into the extension output directory
- * during the build/serve step. Writing pilo.config.json here is idempotent
- * and works with WXT's file watching (any rebuild picks up the file).
+ * Only called in dev mode (isProduction() is false). WXT copies every file
+ * from public/ into the extension output directory during the build/serve
+ * step. Writing pilo.config.json here is idempotent and works with WXT's
+ * file watching (any rebuild picks up the file).
  *
- * From __dirname (dist/cli/commands/ in production, or src/commands/ in dev
- * when running via tsx), we navigate up to the monorepo root and then into
- * packages/extension/public/.
+ * In dev (tsx): __dirname is packages/cli/src/commands/.
+ *   ../../../extension/public resolves as:
+ *     ../ → packages/cli/src/
+ *     ../../ → packages/cli/
+ *     ../../../ → packages/
+ *     then into extension/public/ → packages/extension/public/
  */
 function resolveDevExtensionPublicPath(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  // __dirname is .../packages/cli/src/commands (dev) or .../dist/cli/commands (prod)
-  // Walk up to monorepo root: 4 levels in dev, same in prod (dist is still inside workspace).
-  // We use a relative path from the known CLI package position.
   return resolve(__dirname, "../../../extension/public");
 }
 
@@ -460,7 +461,8 @@ export function findWebExtBinaryFrom(dir: string): string | null {
   try {
     const cmd = process.platform === "win32" ? "where" : "which";
     const result = execFileSync(cmd, ["web-ext"], { stdio: "pipe", encoding: "utf8" });
-    const resolvedPath = result.trim();
+    // `where` on Windows returns all matches, one per line — take only the first.
+    const resolvedPath = result.trim().split(/\r?\n/)[0].trim();
     return resolvedPath || null;
   } catch {
     return null;

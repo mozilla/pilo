@@ -1105,6 +1105,31 @@ describe("findWebExtBinaryFrom", () => {
     Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
   });
 
+  it("should return only the first line when 'where' returns multiple matches", () => {
+    mockExistsSync.mockReturnValue(false);
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+
+    try {
+      mockExecFileSync.mockReturnValue(
+        "C:\\Users\\user\\AppData\\Roaming\\npm\\web-ext\r\nC:\\Program Files\\nodejs\\web-ext\r\n",
+      );
+
+      const result = findWebExtBinaryFrom(fakeGlobalDir);
+      expect(result).toBe("C:\\Users\\user\\AppData\\Roaming\\npm\\web-ext");
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
+    }
+  });
+
+  it("should return null when which returns only whitespace", () => {
+    mockExistsSync.mockReturnValue(false);
+    mockExecFileSync.mockReturnValue("   \n");
+
+    const result = findWebExtBinaryFrom(fakeGlobalDir);
+    expect(result).toBeNull();
+  });
+
   it("should return null when web-ext is not found anywhere", () => {
     mockExistsSync.mockReturnValue(false);
     mockExecFileSync.mockImplementation(() => {
