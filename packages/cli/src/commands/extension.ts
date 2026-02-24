@@ -458,8 +458,10 @@ export function findWebExtBinaryFrom(dir: string): string | null {
 
   // Global PATH fallback
   try {
-    execFileSync("which", ["web-ext"], { stdio: "pipe" });
-    return "web-ext";
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const result = execFileSync(cmd, ["web-ext"], { stdio: "pipe", encoding: "utf8" });
+    const resolvedPath = result.trim();
+    return resolvedPath || null;
   } catch {
     return null;
   }

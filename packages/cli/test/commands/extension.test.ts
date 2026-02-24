@@ -1,3 +1,4 @@
+import { resolve } from "path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { createExtensionCommand, findWebExtBinaryFrom } from "../../src/commands/extension.js";
@@ -974,10 +975,16 @@ describe("CLI Extension Command", () => {
 // ---------------------------------------------------------------------------
 
 describe("findWebExtBinaryFrom", () => {
-  // Simulate a global npm install: <prefix>/lib/node_modules/@tabstack/pilo/dist/cli/src/
-  const fakeGlobalDir = "/fake/root/dist/cli/src";
-  // Simulate a local scoped install: <project>/node_modules/@tabstack/pilo/dist/cli/src/
+  // Realistic global npm install: <prefix>/lib/node_modules/@tabstack/pilo/dist/cli/src/
+  const fakeGlobalDir = "/usr/local/lib/node_modules/@tabstack/pilo/dist/cli/src";
+  // Local scoped install: <project>/node_modules/@tabstack/pilo/dist/cli/src/
   const fakeLocalDir = "/fake/project/node_modules/@tabstack/pilo/dist/cli/src";
+
+  // Derive expected paths from fixtures so tests stay in sync with path depth
+  const globalPkgRoot = resolve(fakeGlobalDir, "../../../node_modules/.bin/web-ext");
+  const globalHoisted = resolve(fakeGlobalDir, "../../../../../../node_modules/.bin/web-ext");
+  const localPkgRoot = resolve(fakeLocalDir, "../../../node_modules/.bin/web-ext");
+  const localHoisted = resolve(fakeLocalDir, "../../../../../../node_modules/.bin/web-ext");
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -997,17 +1004,17 @@ describe("findWebExtBinaryFrom", () => {
 
     findWebExtBinaryFrom(fakeGlobalDir);
 
-    expect(checkedPaths[0]).toBe("/fake/root/node_modules/.bin/web-ext");
+    expect(checkedPaths[0]).toBe(globalPkgRoot);
   });
 
   it("should return the binary path when found at package root node_modules", () => {
-    mockExistsSync.mockImplementation((p) => String(p) === "/fake/root/node_modules/.bin/web-ext");
+    mockExistsSync.mockImplementation((p) => String(p) === globalPkgRoot);
 
     const result = findWebExtBinaryFrom(fakeGlobalDir);
-    expect(result).toBe("/fake/root/node_modules/.bin/web-ext");
+    expect(result).toBe(globalPkgRoot);
   });
 
-  it("should check hoisted node_modules when package root bin is missing (6 levels up)", () => {
+  it("should check hoisted node_modules for local install (6 levels up)", () => {
     const checkedPaths: string[] = [];
     mockExistsSync.mockImplementation((p) => {
       checkedPaths.push(String(p));
@@ -1017,16 +1024,31 @@ describe("findWebExtBinaryFrom", () => {
     findWebExtBinaryFrom(fakeLocalDir);
 
     // Second path checked: 6 levels up to project root
-    expect(checkedPaths[1]).toBe("/fake/project/node_modules/.bin/web-ext");
+    expect(checkedPaths[1]).toBe(localHoisted);
+    // Sanity: hoisted path lands at the project's node_modules
+    expect(localHoisted).toBe("/fake/project/node_modules/.bin/web-ext");
+  });
+
+  it("should check hoisted node_modules for global install (6 levels up)", () => {
+    const checkedPaths: string[] = [];
+    mockExistsSync.mockImplementation((p) => {
+      checkedPaths.push(String(p));
+      return false;
+    });
+
+    findWebExtBinaryFrom(fakeGlobalDir);
+
+    // Second path checked: 6 levels up to the global prefix's node_modules
+    expect(checkedPaths[1]).toBe(globalHoisted);
+    // Sanity: hoisted path lands at the global lib/node_modules
+    expect(globalHoisted).toBe("/usr/local/lib/node_modules/.bin/web-ext");
   });
 
   it("should return the binary path when found at hoisted node_modules", () => {
-    mockExistsSync.mockImplementation(
-      (p) => String(p) === "/fake/project/node_modules/.bin/web-ext",
-    );
+    mockExistsSync.mockImplementation((p) => String(p) === localHoisted);
 
     const result = findWebExtBinaryFrom(fakeLocalDir);
-    expect(result).toBe("/fake/project/node_modules/.bin/web-ext");
+    expect(result).toBe(localHoisted);
   });
 
   it("should prefer package root bin over hoisted bin", () => {
@@ -1034,15 +1056,53 @@ describe("findWebExtBinaryFrom", () => {
     mockExistsSync.mockReturnValue(true);
 
     const result = findWebExtBinaryFrom(fakeLocalDir);
-    expect(result).toBe("/fake/project/node_modules/@tabstack/pilo/node_modules/.bin/web-ext");
+    expect(result).toBe(localPkgRoot);
   });
 
-  it("should fall back to global PATH when no local binary exists", () => {
+  it("should fall back to global PATH and return the resolved absolute path", () => {
     mockExistsSync.mockReturnValue(false);
-    mockExecFileSync.mockReturnValue(Buffer.from("/usr/local/bin/web-ext"));
+    // With encoding: "utf8", execFileSync returns a string
+    mockExecFileSync.mockReturnValue("/usr/local/bin/web-ext\n");
 
     const result = findWebExtBinaryFrom(fakeGlobalDir);
-    expect(result).toBe("web-ext");
+    expect(result).toBe("/usr/local/bin/web-ext");
+  });
+
+  it("should use 'where' instead of 'which' on Windows", () => {
+    mockExistsSync.mockReturnValue(false);
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+
+    mockExecFileSync.mockReturnValue("C:\\Users\\user\\AppData\\Roaming\\npm\\web-ext\n");
+
+    const result = findWebExtBinaryFrom(fakeGlobalDir);
+
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "where",
+      ["web-ext"],
+      expect.objectContaining({ stdio: "pipe", encoding: "utf8" }),
+    );
+    expect(result).toBe("C:\\Users\\user\\AppData\\Roaming\\npm\\web-ext");
+
+    Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
+  });
+
+  it("should use 'which' on non-Windows platforms", () => {
+    mockExistsSync.mockReturnValue(false);
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+
+    mockExecFileSync.mockReturnValue("/usr/local/bin/web-ext\n");
+
+    findWebExtBinaryFrom(fakeGlobalDir);
+
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "which",
+      ["web-ext"],
+      expect.objectContaining({ stdio: "pipe", encoding: "utf8" }),
+    );
+
+    Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
   });
 
   it("should return null when web-ext is not found anywhere", () => {
