@@ -301,15 +301,13 @@ function printChromeInstructions(extensionPath: string): void {
  * during the build/serve step. Writing pilo.config.json here is idempotent
  * and works with WXT's file watching (any rebuild picks up the file).
  *
- * From __dirname (dist/cli/commands/ in production, or src/commands/ in dev
- * when running via tsx), we navigate up to the monorepo root and then into
- * packages/extension/public/.
+ * From __dirname (src/commands/ in dev when running via tsx), we navigate
+ * up to the monorepo root and then into packages/extension/public/.
  */
 function resolveDevExtensionPublicPath(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  // __dirname is .../packages/cli/src/commands (dev) or .../dist/cli/commands (prod)
-  // Walk up to monorepo root: 4 levels in dev, same in prod (dist is still inside workspace).
-  // We use a relative path from the known CLI package position.
+  // __dirname is .../packages/cli/src/commands
+  // Walk up 3 levels to packages/, then into extension/public/.
   return resolve(__dirname, "../../../extension/public");
 }
 
