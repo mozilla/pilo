@@ -18,8 +18,13 @@ COPY packages/cli/package.json ./packages/cli/package.json
 COPY packages/server/package.json ./packages/server/package.json
 COPY packages/extension/package.json ./packages/extension/package.json
 
-# Install all workspace dependencies
-RUN pnpm install --frozen-lockfile
+# Install all workspace dependencies.
+# --ignore-scripts prevents the root prepare lifecycle script from running
+# pilo-core build before its source has been copied into the image.
+# We then selectively rebuild only packages with native binaries (esbuild)
+# so their postinstall scripts run without triggering the root prepare.
+RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm rebuild esbuild
 
 # Copy core source and build it (CLI depends on pilo-core)
 COPY packages/core/ ./packages/core/
