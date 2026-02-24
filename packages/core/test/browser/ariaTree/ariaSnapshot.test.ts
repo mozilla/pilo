@@ -4,7 +4,7 @@ import { JSDOM, VirtualConsole } from "jsdom";
 // We test the ariaSnapshot module by importing it directly and running in jsdom.
 // NOTE: jsdom lacks a layout engine, so getBoundingClientRect() returns 0x0 rects.
 // This means elements aren't considered "visible" by the box check, so refs won't
-// appear in YAML output. However, data-spark-ref attributes ARE set on the DOM elements.
+// appear in YAML output. However, data-pilo-ref attributes ARE set on the DOM elements.
 // We test both: YAML structure (roles, names, hierarchy) and ref assignment via DOM.
 
 let dom: JSDOM;
@@ -57,10 +57,10 @@ describe("ariaTree module", () => {
       expect(yaml).toContain("Click me");
     });
 
-    it("should only set data-spark-ref on visible interactable elements", async () => {
+    it("should only set data-pilo-ref on visible interactable elements", async () => {
       // jsdom has no layout engine — getBoundingClientRect() returns 0x0 —
       // so elements are not considered visible/interactable.
-      // data-spark-ref should NOT be set in jsdom because refs are only assigned
+      // data-pilo-ref should NOT be set in jsdom because refs are only assigned
       // to elements that pass nodeReceivesPointerEvents (visible + pointer events).
       setupDOM(`<html><body>
         <button id="btn1">First</button>
@@ -73,16 +73,16 @@ describe("ariaTree module", () => {
 
       generateAndRenderAriaTree(document.body);
 
-      // In jsdom, no elements are visible so no data-spark-ref should be set
+      // In jsdom, no elements are visible so no data-pilo-ref should be set
       for (const id of ["btn1", "btn2", "btn3"]) {
         const el = document.getElementById(id)!;
-        expect(el.getAttribute("data-spark-ref")).toBeNull();
+        expect(el.getAttribute("data-pilo-ref")).toBeNull();
       }
     });
 
-    it("should clean up previous data-spark-ref and data-spark-role attributes", async () => {
+    it("should clean up previous data-pilo-ref and data-pilo-role attributes", async () => {
       setupDOM(
-        '<html><body><button id="btn" data-spark-ref="old-ref" data-spark-role="button">Click</button></body></html>',
+        '<html><body><button id="btn" data-pilo-ref="old-ref" data-pilo-role="button">Click</button></body></html>',
       );
 
       const { generateAndRenderAriaTree } =
@@ -92,8 +92,8 @@ describe("ariaTree module", () => {
 
       // Old attributes should be removed (new ones won't be set since jsdom has no layout)
       const btn = document.getElementById("btn")!;
-      expect(btn.getAttribute("data-spark-ref")).toBeNull();
-      expect(btn.getAttribute("data-spark-role")).toBeNull();
+      expect(btn.getAttribute("data-pilo-ref")).toBeNull();
+      expect(btn.getAttribute("data-pilo-role")).toBeNull();
     });
 
     it("should accept a counter parameter for cross-frame numbering", async () => {
@@ -184,8 +184,8 @@ describe("ariaTree module", () => {
       expect(yaml).not.toMatch(/\[E\d+\]/);
     });
 
-    it("should not set data-spark-ref in jsdom (no layout engine)", async () => {
-      // data-spark-ref is only set on visible/interactable elements.
+    it("should not set data-pilo-ref in jsdom (no layout engine)", async () => {
+      // data-pilo-ref is only set on visible/interactable elements.
       // In jsdom, getBoundingClientRect returns 0x0 so no elements qualify.
       setupDOM(`<html><body>
         <button id="btn1">First</button>
@@ -197,8 +197,8 @@ describe("ariaTree module", () => {
 
       generateAndRenderAriaTree(document.body);
 
-      // No data-spark-ref attributes should exist
-      const refsFound = document.querySelectorAll("[data-spark-ref]");
+      // No data-pilo-ref attributes should exist
+      const refsFound = document.querySelectorAll("[data-pilo-ref]");
       expect(refsFound.length).toBe(0);
     });
 
@@ -327,9 +327,9 @@ describe("ariaTree module", () => {
       const yaml = generateAndRenderAriaTree(document.body);
       expect(yaml).toContain("button");
       expect(yaml).toContain("Real");
-      // presentation role elements should not get data-spark-ref
+      // presentation role elements should not get data-pilo-ref
       const img = document.querySelector("img")!;
-      expect(img.getAttribute("data-spark-ref")).toBeNull();
+      expect(img.getAttribute("data-pilo-ref")).toBeNull();
     });
 
     it("should skip elements with role=none", async () => {
@@ -341,9 +341,9 @@ describe("ariaTree module", () => {
       const yaml = generateAndRenderAriaTree(document.body);
       expect(yaml).toContain("button");
       expect(yaml).toContain("Inside");
-      // role=none div should not get data-spark-ref
+      // role=none div should not get data-pilo-ref
       const div = document.querySelector("[role=none]")!;
-      expect(div.getAttribute("data-spark-ref")).toBeNull();
+      expect(div.getAttribute("data-pilo-ref")).toBeNull();
     });
 
     it("should skip hidden elements with aria-hidden", async () => {
@@ -426,44 +426,44 @@ describe("ariaTree module", () => {
   describe("applySetOfMarks / removeSetOfMarks", () => {
     it("should create a container element with the correct id", async () => {
       setupDOM(`<html><body>
-        <button data-spark-ref="E1">Click</button>
+        <button data-pilo-ref="E1">Click</button>
       </body></html>`);
 
       const { applySetOfMarks } = await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
       applySetOfMarks();
 
-      const container = document.getElementById("__spark-som-container");
+      const container = document.getElementById("__pilo-som-container");
       expect(container).not.toBeNull();
     });
 
     it("should set pointer-events: none and high z-index on container", async () => {
       setupDOM(`<html><body>
-        <button data-spark-ref="E1">Click</button>
+        <button data-pilo-ref="E1">Click</button>
       </body></html>`);
 
       const { applySetOfMarks } = await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
       applySetOfMarks();
 
-      const container = document.getElementById("__spark-som-container")!;
+      const container = document.getElementById("__pilo-som-container")!;
       expect(container.style.pointerEvents).toBe("none");
       expect(container.style.zIndex).toBe("2147483647");
     });
 
     it("should remove the container via removeSetOfMarks", async () => {
       setupDOM(`<html><body>
-        <button data-spark-ref="E1">Click</button>
+        <button data-pilo-ref="E1">Click</button>
       </body></html>`);
 
       const { applySetOfMarks, removeSetOfMarks } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
       applySetOfMarks();
-      expect(document.getElementById("__spark-som-container")).not.toBeNull();
+      expect(document.getElementById("__pilo-som-container")).not.toBeNull();
 
       removeSetOfMarks();
-      expect(document.getElementById("__spark-som-container")).toBeNull();
+      expect(document.getElementById("__pilo-som-container")).toBeNull();
     });
 
     it("should be safe to call removeSetOfMarks when no marks exist", async () => {
@@ -477,15 +477,15 @@ describe("ariaTree module", () => {
 
     it("should detect contenteditable elements as interactive", async () => {
       setupDOM(`<html><body>
-        <div contenteditable="true" data-spark-ref="E1">Editable</div>
-        <div contenteditable="" data-spark-ref="E2">Also editable</div>
-        <div data-spark-ref="E3">Not editable</div>
+        <div contenteditable="true" data-pilo-ref="E1">Editable</div>
+        <div contenteditable="" data-pilo-ref="E2">Also editable</div>
+        <div data-pilo-ref="E3">Not editable</div>
       </body></html>`);
 
       const { isInteractiveElement } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const els = document.querySelectorAll("[data-spark-ref]");
+      const els = document.querySelectorAll("[data-pilo-ref]");
       expect(isInteractiveElement(els[0])).toBe(true); // contenteditable="true"
       expect(isInteractiveElement(els[1])).toBe(true); // contenteditable=""
       expect(isInteractiveElement(els[2])).toBe(false); // plain div
@@ -493,15 +493,15 @@ describe("ariaTree module", () => {
 
     it("should handle multi-value role attributes", async () => {
       setupDOM(`<html><body>
-        <div role="switch checkbox" data-spark-ref="E1">Toggle</div>
-        <div role="presentation button" data-spark-ref="E2">Fallback</div>
-        <div role="presentation none" data-spark-ref="E3">Non-interactive</div>
+        <div role="switch checkbox" data-pilo-ref="E1">Toggle</div>
+        <div role="presentation button" data-pilo-ref="E2">Fallback</div>
+        <div role="presentation none" data-pilo-ref="E3">Non-interactive</div>
       </body></html>`);
 
       const { isInteractiveElement } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const els = document.querySelectorAll("[data-spark-ref]");
+      const els = document.querySelectorAll("[data-pilo-ref]");
       expect(isInteractiveElement(els[0])).toBe(true); // switch and checkbox both match
       expect(isInteractiveElement(els[1])).toBe(true); // button matches
       expect(isInteractiveElement(els[2])).toBe(false); // neither matches
@@ -509,35 +509,35 @@ describe("ariaTree module", () => {
 
     it("should detect elements with tabindex >= 0 as interactive", async () => {
       setupDOM(`<html><body>
-        <div tabindex="0" data-spark-ref="E1">Focusable</div>
-        <div tabindex="-1" data-spark-ref="E2">Not focusable</div>
-        <div tabindex="0" role="button" data-spark-role="button" data-spark-ref="E3">Already has role</div>
-        <div data-spark-ref="E4">No tabindex</div>
+        <div tabindex="0" data-pilo-ref="E1">Focusable</div>
+        <div tabindex="-1" data-pilo-ref="E2">Not focusable</div>
+        <div tabindex="0" role="button" data-pilo-role="button" data-pilo-ref="E3">Already has role</div>
+        <div data-pilo-ref="E4">No tabindex</div>
       </body></html>`);
 
       const { isInteractiveElement } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const els = document.querySelectorAll("[data-spark-ref]");
+      const els = document.querySelectorAll("[data-pilo-ref]");
       expect(isInteractiveElement(els[0])).toBe(true); // tabindex=0, no role
       expect(isInteractiveElement(els[1])).toBe(false); // tabindex=-1
       expect(isInteractiveElement(els[2])).toBe(true); // has button role (matched by role check)
       expect(isInteractiveElement(els[3])).toBe(false); // no tabindex, no role
     });
 
-    it("should use data-spark-role for computed role detection", async () => {
+    it("should use data-pilo-role for computed role detection", async () => {
       setupDOM(`<html><body>
         <table><tr>
-          <td data-spark-role="gridcell" data-spark-ref="E1">Cell</td>
-          <th data-spark-role="columnheader" data-spark-ref="E2">Header</th>
+          <td data-pilo-role="gridcell" data-pilo-ref="E1">Cell</td>
+          <th data-pilo-role="columnheader" data-pilo-ref="E2">Header</th>
         </tr></table>
-        <div data-spark-role="generic" data-spark-ref="E3">Generic</div>
+        <div data-pilo-role="generic" data-pilo-ref="E3">Generic</div>
       </body></html>`);
 
       const { isInteractiveElement } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const els = document.querySelectorAll("[data-spark-ref]");
+      const els = document.querySelectorAll("[data-pilo-ref]");
       expect(isInteractiveElement(els[0])).toBe(true); // gridcell
       expect(isInteractiveElement(els[1])).toBe(true); // columnheader
       expect(isInteractiveElement(els[2])).toBe(false); // generic
@@ -545,20 +545,20 @@ describe("ariaTree module", () => {
 
     it("should not mark DETAILS as interactive (only SUMMARY)", async () => {
       setupDOM(`<html><body>
-        <details data-spark-ref="E1"><summary data-spark-ref="E2">Toggle</summary>Content</details>
+        <details data-pilo-ref="E1"><summary data-pilo-ref="E2">Toggle</summary>Content</details>
       </body></html>`);
 
       const { isInteractiveElement } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const els = document.querySelectorAll("[data-spark-ref]");
+      const els = document.querySelectorAll("[data-pilo-ref]");
       expect(isInteractiveElement(els[0])).toBe(false); // details
       expect(isInteractiveElement(els[1])).toBe(true); // summary
     });
 
-    it("should only create marks for elements with data-spark-ref attributes", async () => {
+    it("should only create marks for elements with data-pilo-ref attributes", async () => {
       setupDOM(`<html><body>
-        <button data-spark-ref="E1">Has ref</button>
+        <button data-pilo-ref="E1">Has ref</button>
         <button>No ref</button>
       </body></html>`);
 
@@ -566,7 +566,7 @@ describe("ariaTree module", () => {
 
       applySetOfMarks();
 
-      const container = document.getElementById("__spark-som-container")!;
+      const container = document.getElementById("__pilo-som-container")!;
       // In jsdom, getBoundingClientRect returns 0x0, so no marks will be rendered
       // for any elements. This is expected behavior - marks are skipped for
       // invisible elements. The test verifies the container still gets created.

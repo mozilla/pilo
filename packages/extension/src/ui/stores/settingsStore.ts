@@ -124,7 +124,7 @@ export const useSettingsStore = create<SettingsStore>()(
       },
     }),
     {
-      name: "spark-settings",
+      name: "pilo-settings",
       storage: browserStorage,
       // Only persist settings, not saveStatus
       partialize: (state) => ({

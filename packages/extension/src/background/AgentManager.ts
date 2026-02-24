@@ -2,7 +2,7 @@ import { ExtensionBrowser } from "./ExtensionBrowser";
 import { EventStoreLogger } from "../shared/EventStoreLogger";
 
 // Import shared code - browser-safe imports only
-import { WebAgent, Logger } from "spark-core/core";
+import { WebAgent, Logger } from "pilo-core/core";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -12,17 +12,17 @@ import { createOllama } from "ollama-ai-provider-v2";
  * OpenRouter attribution headers
  */
 const OPENROUTER_HEADERS = {
-  "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-  "X-Title": "Spark Web Automation Tool",
+  "HTTP-Referer": "https://github.com/mozilla/pilo",
+  "X-Title": "Pilo Web Automation Tool",
 };
 
 /**
- * AgentManager - Main entry point for running Spark tasks in the extension
+ * AgentManager - Main entry point for running Pilo tasks in the extension
  * Uses the same shared provider system as CLI and server
  */
 export class AgentManager {
   /**
-   * Run a web automation task using Spark
+   * Run a web automation task using Pilo
    *
    * @param task - The task description in natural language
    * @param options - Configuration options

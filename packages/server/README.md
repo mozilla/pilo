@@ -1,6 +1,6 @@
-# Spark Server 🔥🌐
+# Pilo Server 🔥🌐
 
-Web server for Spark AI-powered web automation. Provides HTTP API endpoints to execute web automation tasks using natural language.
+Web server for Pilo AI-powered web automation. Provides HTTP API endpoints to execute web automation tasks using natural language.
 
 ## Quick Start
 
@@ -20,16 +20,16 @@ pnpm run dev
 
 ```bash
 # Simple web query
-curl -X POST http://localhost:3000/spark/run \
+curl -X POST http://localhost:3000/pilo/run \
   -H "Content-Type: application/json" \
   -d '{"task": "what is the weather in Tokyo?"}'
 ```
 
 ## API Endpoints
 
-### Execute Spark Task
+### Execute Pilo Task
 
-**POST** `/spark/run`
+**POST** `/pilo/run`
 
 Execute a web automation task using natural language.
 
@@ -92,7 +92,7 @@ Execute a web automation task using natural language.
 
 **Note on Screenshot Events:**
 
-When `vision: true` is enabled, Spark captures screenshots for AI analysis. By default, screenshot events in the SSE stream only include metadata (size, format). Set `includeScreenshotImages: true` to receive the full base64-encoded image data in `browser:screenshot_captured_image` events. This is useful for clients that need to display or process screenshots, but note that it significantly increases bandwidth usage.
+When `vision: true` is enabled, Pilo captures screenshots for AI analysis. By default, screenshot events in the SSE stream only include metadata (size, format). Set `includeScreenshotImages: true` to receive the full base64-encoded image data in `browser:screenshot_captured_image` events. This is useful for clients that need to display or process screenshots, but note that it significantly increases bandwidth usage.
 
 ### Health Check
 
@@ -111,15 +111,15 @@ Create a `.env` file with server-level defaults. All CLI environment variables a
 ```bash
 # Required - choose your AI provider
 OPENAI_API_KEY=sk-your-key-here
-SPARK_PROVIDER=openai
+PILO_PROVIDER=openai
 # OR
 # OPENROUTER_API_KEY=sk-or-your-key-here
-# SPARK_PROVIDER=openrouter
+# PILO_PROVIDER=openrouter
 
 # Optional server settings
 PORT=3000
-SPARK_BROWSER=firefox
-SPARK_HEADLESS=true
+PILO_BROWSER=firefox
+PILO_HEADLESS=true
 ```
 
 **See `.env.example` for all available configuration options including:**

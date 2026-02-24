@@ -83,12 +83,12 @@ jobs:
 
           **As a library:**
           \`\`\`javascript
-          import { WebAgent, PlaywrightBrowser } from '@tabstack/spark';
+          import { WebAgent, PlaywrightBrowser } from '@tabstack/pilo';
           \`\`\`
 
           **As CLI:**
           \`\`\`bash
-          spark \"your task here\"
+          pilo \"your task here\"
           \`\`\`" \
             ./${{ steps.tarball.outputs.filename }}
         env:

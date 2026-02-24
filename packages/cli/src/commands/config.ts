@@ -1,11 +1,11 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync } from "fs";
-import { config, getAIProviderInfo } from "spark-core";
+import { config, getAIProviderInfo } from "pilo-core";
 import { getPackageInfo, parseConfigValue } from "../utils.js";
 
 /**
- * Creates the 'config' command group with subcommands for managing Spark configuration.
+ * Creates the 'config' command group with subcommands for managing Pilo configuration.
  *
  * Subcommands:
  *   config init              - Guided setup for global configuration
@@ -17,7 +17,7 @@ import { getPackageInfo, parseConfigValue } from "../utils.js";
  *   config reset             - Reset global configuration (removes all settings)
  */
 export function createConfigCommand(): Command {
-  const configCmd = new Command("config").description("Manage Spark configuration");
+  const configCmd = new Command("config").description("Manage Pilo configuration");
 
   configCmd.addCommand(createConfigInitCommand());
   configCmd.addCommand(createConfigSetCommand());
@@ -142,7 +142,7 @@ async function showConfiguration(currentConfig: any): Promise<void> {
   const packageInfo = getPackageInfo();
   console.log(`Config File: ${config.getConfigPath()}`);
   console.log(`Node Version: ${process.version}`);
-  console.log(`Spark Version: ${packageInfo.version}`);
+  console.log(`Pilo Version: ${packageInfo.version}`);
 }
 
 /**
@@ -185,7 +185,7 @@ function setConfigurationValue(key: string, value: string): void {
     console.log(chalk.green(`✅ Set ${key} = ${value}`));
   } catch (error) {
     console.error(chalk.red("❌ Error:"), error instanceof Error ? error.message : String(error));
-    console.log(chalk.gray("Example: spark config set browser chrome"));
+    console.log(chalk.gray("Example: pilo config set browser chrome"));
     process.exit(1);
   }
 }
@@ -207,8 +207,10 @@ function unsetConfigurationValue(key: string): void {
  * Initialize global configuration with guided setup
  */
 async function initializeGlobalConfiguration(): Promise<void> {
-  console.log(chalk.blue.bold("🔧 Initializing Spark Global Configuration"));
+  console.log(chalk.blue.bold("🔧 Initializing Pilo Global Configuration"));
   console.log("");
+
+  config.initialize();
 
   const currentConfig = config.getConfig();
 
@@ -219,8 +221,8 @@ async function initializeGlobalConfiguration(): Promise<void> {
   ) {
     console.log(chalk.yellow("⚠️  Configuration already exists"));
     console.log(chalk.gray("Current provider: " + (currentConfig.provider || "openai")));
-    console.log(chalk.gray("Use 'spark config show' to see full configuration"));
-    console.log(chalk.gray("Use 'spark config set key value' to modify settings"));
+    console.log(chalk.gray("Use 'pilo config show' to see full configuration"));
+    console.log(chalk.gray("Use 'pilo config set key value' to modify settings"));
     return;
   }
 
@@ -229,22 +231,22 @@ async function initializeGlobalConfiguration(): Promise<void> {
   console.log("");
   console.log(chalk.cyan.bold("Option 1: OpenAI (Default)"));
   console.log("1. Get an API key from " + chalk.underline("https://platform.openai.com/api-keys"));
-  console.log("2. Run: " + chalk.green("spark config set openai_api_key your-key"));
+  console.log("2. Run: " + chalk.green("pilo config set openai_api_key your-key"));
   console.log("");
   console.log(chalk.cyan.bold("Option 2: OpenRouter (Alternative)"));
   console.log("1. Get an API key from " + chalk.underline("https://openrouter.ai/keys"));
-  console.log("2. Run: " + chalk.green("spark config set provider openrouter"));
-  console.log("3. Run: " + chalk.green("spark config set openrouter_api_key your-key"));
+  console.log("2. Run: " + chalk.green("pilo config set provider openrouter"));
+  console.log("3. Run: " + chalk.green("pilo config set openrouter_api_key your-key"));
   console.log("");
   console.log(chalk.white.bold("Verification:"));
-  console.log("Run " + chalk.green("spark config show") + " to verify your configuration");
+  console.log("Run " + chalk.green("pilo config show") + " to verify your configuration");
   console.log("");
   console.log(chalk.white.bold("Configuration Priority:"));
   console.log(chalk.gray("1. Environment variables (highest priority)"));
   console.log(chalk.gray("2. Local .env file (development)"));
   console.log(chalk.gray("3. Global config file (lowest priority)"));
   console.log("");
-  console.log(chalk.gray("Global config saved to: " + config.getConfigPath()));
+  console.log(chalk.gray("Global config location: " + config.getConfigPath()));
 }
 
 /**
@@ -259,7 +261,7 @@ function resetGlobalConfiguration(): void {
       console.log(chalk.green("✅ Global configuration reset successfully"));
       console.log(chalk.gray("Config file removed: " + configPath));
       console.log("");
-      console.log(chalk.white("To get started again, run: ") + chalk.green("spark config init"));
+      console.log(chalk.white("To get started again, run: ") + chalk.green("pilo config init"));
     } else {
       console.log(chalk.yellow("⚠️  No global configuration found to reset"));
       console.log(chalk.gray("Config file: " + configPath));

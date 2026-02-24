@@ -1,5 +1,5 @@
 /**
- * Spark - Core exports
+ * Pilo - Core exports
  *
  * Platform-agnostic core functionality.
  */

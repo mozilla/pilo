@@ -1,6 +1,6 @@
-# Contributing to Spark
+# Contributing to Pilo
 
-Thank you for your interest in contributing to Spark! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to Pilo! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ Before starting work, check if there is already an open issue for what you would
 
 ### Understand the Project
 
-Spark is an AI-powered web automation library and CLI tool structured as a pnpm monorepo. Familiarize yourself with the project's goals and architecture before making significant changes.
+Pilo is an AI-powered web automation library and CLI tool structured as a pnpm monorepo. Familiarize yourself with the project's goals and architecture before making significant changes.
 
 ### Communication
 
@@ -68,8 +68,8 @@ pnpm --version   # should be 9.0.0
 
 ```bash
 # 1. Fork the repository, then clone your fork
-git clone https://github.com/<your-username>/spark.git
-cd spark
+git clone https://github.com/<your-username>/pilo.git
+cd pilo
 
 # 2. Install all workspace dependencies
 pnpm install
@@ -84,33 +84,33 @@ pnpm run check
 ### Configure an AI Provider (optional, for running automations locally)
 
 ```bash
-pnpm spark config init
+pnpm pilo config init
 ```
 
-This stores your configuration at `~/.config/spark/config.json`.
+This stores your configuration at `~/.config/pilo/config.json`.
 
 ## Project Structure
 
 ```
-spark/
+pilo/
 ├── packages/
-│   ├── core/        # spark-core: automation engine and config system
-│   ├── cli/         # spark-cli: CLI commands and config integration
-│   ├── server/      # spark-server: Hono-based server
-│   └── extension/   # spark-extension: WXT/React browser extension
+│   ├── core/        # pilo-core: automation engine and config system
+│   ├── cli/         # pilo-cli: CLI commands and config integration
+│   ├── server/      # pilo-server: Hono-based server
+│   └── extension/   # pilo-extension: WXT/React browser extension
 ├── scripts/         # Build, release, and CI scripts
 ├── dist/            # Assembled output (root build only, not committed)
-├── package.json     # @tabstack/spark workspace root + published package
+├── package.json     # @tabstack/pilo workspace root + published package
 └── pnpm-workspace.yaml
 ```
 
-| Package              | npm name          | Description                                                                                  |
-| -------------------- | ----------------- | -------------------------------------------------------------------------------------------- |
-| `packages/core`      | `spark-core`      | Core automation library. Browser-safe subset via `core.ts`; full Node.js API via `index.ts`. |
-| `packages/cli`       | `spark-cli`       | CLI entry point, commands, and config integration.                                           |
-| `packages/server`    | `spark-server`    | Hono-based server component.                                                                 |
-| `packages/extension` | `spark-extension` | WXT-based browser extension with React UI.                                                   |
-| root                 | `@tabstack/spark` | Published npm package: bundles core + CLI + pre-built extension.                             |
+| Package              | npm name         | Description                                                                                  |
+| -------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `packages/core`      | `pilo-core`      | Core automation library. Browser-safe subset via `core.ts`; full Node.js API via `index.ts`. |
+| `packages/cli`       | `pilo-cli`       | CLI entry point, commands, and config integration.                                           |
+| `packages/server`    | `pilo-server`    | Hono-based server component.                                                                 |
+| `packages/extension` | `pilo-extension` | WXT-based browser extension with React UI.                                                   |
+| root                 | `@tabstack/pilo` | Published npm package: bundles core + CLI + pre-built extension.                             |
 
 ## Development Workflow
 
@@ -140,16 +140,16 @@ pnpm -r run test
 ### Running the CLI Locally
 
 ```bash
-pnpm spark run "task description"
-pnpm spark config init
-pnpm spark config set <key> <value>
-pnpm spark config get <key>
-pnpm spark config list
-pnpm spark config show
-pnpm spark config unset <key>
-pnpm spark config reset
-pnpm spark extension install chrome
-pnpm spark extension install firefox [--tmp]
+pnpm pilo run "task description"
+pnpm pilo config init
+pnpm pilo config set <key> <value>
+pnpm pilo config get <key>
+pnpm pilo config list
+pnpm pilo config show
+pnpm pilo config unset <key>
+pnpm pilo config reset
+pnpm pilo extension install chrome
+pnpm pilo extension install firefox [--tmp]
 ```
 
 ### Extension Development
@@ -185,14 +185,14 @@ Test files live in each package's `test/` directory, mirroring the `src/` struct
 pnpm -r run test
 
 # Specific package
-pnpm --filter spark-core run test
-pnpm --filter spark-cli run test
-pnpm --filter spark-server run test
-pnpm --filter spark-extension run test
+pnpm --filter pilo-core run test
+pnpm --filter pilo-cli run test
+pnpm --filter pilo-server run test
+pnpm --filter pilo-extension run test
 
 # Extension end-to-end tests
-pnpm --filter spark-extension run test:e2e           # headed
-pnpm --filter spark-extension run test:e2e:headless  # headless
+pnpm --filter pilo-extension run test:e2e           # headed
+pnpm --filter pilo-extension run test:e2e:headless  # headless
 ```
 
 ### Writing Tests
@@ -241,7 +241,7 @@ Format is enforced in CI. Unformatted code will fail the typecheck step.
 
 - **No barrel imports** except `index.ts` and `core.ts` in `packages/core`, and `browser/ariaTree/index.ts`. Do not create new barrel files.
 - **Cross-package references** use the `workspace:*` protocol, not relative `file:` paths.
-- **Extension imports**: The extension must import from `spark-core/core` (not `spark-core`) to avoid pulling in Node.js-only dependencies.
+- **Extension imports**: The extension must import from `pilo-core/core` (not `pilo-core`) to avoid pulling in Node.js-only dependencies.
 - **Shared dependencies**: All packages must use the same version of any shared dependency. CI enforces this via `scripts/check-dep-versions.mjs`.
 
 ## Making Changes
@@ -432,8 +432,8 @@ If you are stuck:
 
 ## License
 
-By contributing to Spark, you agree that your contributions will be licensed under the same license as the project.
+By contributing to Pilo, you agree that your contributions will be licensed under the same license as the project.
 
 ---
 
-Thank you for contributing to Spark! Your efforts help make browser automation and AI agents more accessible and powerful for everyone.
+Thank you for contributing to Pilo! Your efforts help make browser automation and AI agents more accessible and powerful for everyone.

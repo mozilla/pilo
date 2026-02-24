@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// With spark-core aliased to ../core/src/index.ts in vitest.config.ts, the internal
+// With pilo-core aliased to ../core/src/index.ts in vitest.config.ts, the internal
 // config object lives at ../core/src/config/index.ts. Mocking that path intercepts the
 // singleton used by createAIProvider and getAIProviderInfo at the source level.
 vi.mock("../../core/src/config/index.js", () => ({
@@ -87,7 +87,7 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
 }));
 
 import { createAIProvider, getAIProviderInfo } from "../src/provider.js";
-import { config, getConfigDefaults } from "spark-core";
+import { config, getConfigDefaults } from "pilo-core";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -111,11 +111,11 @@ describe("Provider", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    // Clear only Spark-related environment variables that could interfere with tests
+    // Clear only Pilo-related environment variables that could interfere with tests
     delete process.env.OPENAI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
-    delete process.env.SPARK_PROVIDER;
-    delete process.env.SPARK_MODEL;
+    delete process.env.PILO_PROVIDER;
+    delete process.env.PILO_MODEL;
     vi.clearAllMocks();
   });
 
@@ -168,8 +168,8 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });
@@ -365,8 +365,8 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-test123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });
@@ -404,8 +404,8 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-override123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });
@@ -427,8 +427,8 @@ describe("Provider", () => {
       expect(mockCreateOpenRouter).toHaveBeenCalledWith({
         apiKey: "sk-or-override123",
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       });
     });
@@ -857,7 +857,7 @@ describe("Provider", () => {
     });
 
     it("should return OpenAI-compatible provider info with env base URL", () => {
-      process.env.SPARK_OPENAI_COMPATIBLE_BASE_URL = "http://localhost:8080/v1";
+      process.env.PILO_OPENAI_COMPATIBLE_BASE_URL = "http://localhost:8080/v1";
 
       mockConfig.getConfig.mockReturnValue({ ...defaults, provider: "openai-compatible" });
 

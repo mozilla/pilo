@@ -3,6 +3,6 @@ export {
   config,
   ConfigManager,
   getConfigDefaults,
-  type SparkConfig,
-  type SparkConfigResolved,
-} from "spark-core";
+  type PiloConfig,
+  type PiloConfigResolved,
+} from "pilo-core";

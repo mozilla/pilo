@@ -1,2 +1,2 @@
 // Re-export shared config system for server
-export { config, ConfigManager, type SparkConfig } from "spark-core";
+export { config, ConfigManager, type PiloConfig } from "pilo-core";

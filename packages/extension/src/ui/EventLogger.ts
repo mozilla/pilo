@@ -1,4 +1,4 @@
-import type { WebAgentEventType } from "spark-core/core";
+import type { WebAgentEventType } from "pilo-core/core";
 
 export interface LogEvent {
   id: string;

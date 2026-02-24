@@ -1,6 +1,6 @@
 {
-  "name": "@tabstack/spark",
-  "version": "0.17.0",
+  "name": "@tabstack/pilo",
+  "version": "0.17.3",
   "description": "AI-powered web automation library and CLI tool",
   "type": "module",
   "engines": {
@@ -15,7 +15,7 @@
   "main": "./dist/core/src/index.js",
   "types": "./dist/core/src/index.d.ts",
   "bin": {
-    "spark": "./dist/cli/src/cli.js"
+    "pilo": "./dist/cli/src/cli.js"
   },
   "files": [
     "dist/",
@@ -23,19 +23,20 @@
     "LICENSE"
   ],
   "scripts": {
-    "prebuild": "pnpm --filter spark-core run build && pnpm --filter spark-extension run build:publish",
+    "prepare": "pnpm --filter pilo-core run build",
+    "prebuild": "pnpm --filter pilo-core run build && pnpm --filter pilo-extension run build:publish",
     "build": "tsup",
     "prepublishOnly": "pnpm run build",
     "clean": "pnpm -r run clean && rm -rf dist",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm run pretest && pnpm run format:check && pnpm -r run typecheck",
-    "pretest": "pnpm --filter spark-core run bundle:aria",
+    "pretest": "pnpm --filter pilo-core run bundle:aria",
     "test": "pnpm -r run test",
     "check": "pnpm run typecheck && pnpm run test",
-    "spark": "pnpm --filter spark-cli run spark",
-    "dev:extension": "pnpm --filter spark-extension run dev --",
-    "dev:server": "pnpm --filter spark-server run dev",
+    "pilo": "pnpm --filter pilo-cli run pilo",
+    "dev:extension": "pnpm --filter pilo-extension run dev --",
+    "dev:server": "pnpm --filter pilo-server run dev",
     "release": "./scripts/release.sh"
   },
   "keywords": [

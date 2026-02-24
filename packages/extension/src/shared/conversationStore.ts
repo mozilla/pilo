@@ -175,7 +175,7 @@ export const useConversationStore = create<ConversationStore>()(
       },
     }),
     {
-      name: "spark-conversations",
+      name: "pilo-conversations",
       storage: browserStorage,
     },
   ),

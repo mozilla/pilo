@@ -11,7 +11,7 @@ test.describe("Sidepanel", () => {
     await page.waitForLoadState("networkidle");
 
     // Verify settings page is shown (extension auto-redirects when no API key)
-    await expect(page.getByText("Spark Settings")).toBeVisible();
+    await expect(page.getByText("Pilo Settings")).toBeVisible();
     await expect(page.getByText("API Key")).toBeVisible();
     await expect(page.getByText("Save Settings")).toBeVisible();
   });
@@ -85,7 +85,7 @@ test.describe("Sidepanel", () => {
     await settingsButton.click();
 
     // Should be back on settings page
-    await expect(page.getByText("Spark Settings")).toBeVisible();
+    await expect(page.getByText("Pilo Settings")).toBeVisible();
     await expect(page.getByText("API Key")).toBeVisible();
   });
 });

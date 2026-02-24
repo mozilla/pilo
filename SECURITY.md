@@ -4,7 +4,7 @@
 
 We at [Tabstack](https://tabstack.ai/) take the security of our projects seriously. We appreciate your efforts to responsibly disclose security vulnerabilities.
 
-This document outlines the process for reporting vulnerabilities in Spark.
+This document outlines the process for reporting vulnerabilities in Pilo.
 
 ### Supported Versions
 
@@ -50,11 +50,11 @@ Our typical disclosure timeline for critical issues is up to 30 days from the in
 
 ## Security Best Practices for Contributors
 
-When contributing to Spark:
+When contributing to Pilo:
 
 - Never commit secrets, API keys, or credentials
 - Use environment variables for sensitive configuration
 - Follow the principle of least privilege in code design
 - Keep dependencies up to date
 
-Thank you for helping us keep Spark secure for everyone.
+Thank you for helping us keep Pilo secure for everyone.

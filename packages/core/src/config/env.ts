@@ -2,7 +2,7 @@
  * Environment Variable Parsing (Node.js only - uses process.env)
  */
 
-import { FIELDS, type SparkConfig, type ConfigFieldType } from "./defaults.js";
+import { FIELDS, type PiloConfig, type ConfigFieldType } from "./defaults.js";
 
 /**
  * Coerce a string value to the appropriate type.
@@ -45,9 +45,9 @@ function coerceValue(
 }
 
 /**
- * Parse environment variables into a partial SparkConfig object.
+ * Parse environment variables into a partial PiloConfig object.
  */
-export function parseEnvConfig(): Partial<SparkConfig> {
+export function parseEnvConfig(): Partial<PiloConfig> {
   const result: Record<string, unknown> = {};
 
   for (const [key, field] of Object.entries(FIELDS)) {
@@ -82,5 +82,5 @@ export function parseEnvConfig(): Partial<SparkConfig> {
     }
   }
 
-  return result as Partial<SparkConfig>;
+  return result as Partial<PiloConfig>;
 }

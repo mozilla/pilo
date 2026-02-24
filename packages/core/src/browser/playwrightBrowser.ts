@@ -131,7 +131,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Maps Spark's top-level options into the appropriate Playwright options
+   * Maps Pilo's top-level options into the appropriate Playwright options
    * Top-level options take precedence over Playwright options
    */
   private mapOptionsToPlaywright(): {
@@ -140,7 +140,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     connectOptions: ConnectOptions;
   } {
     const launchOptions: LaunchOptions = {
-      headless: false, // Spark default
+      headless: false, // Pilo default
       channel: this.options.channel ?? this.getDefaultChannel(),
       ...this.options.launchOptions, // User-provided Playwright options
     };
@@ -461,13 +461,13 @@ export class PlaywrightBrowser implements AriaBrowser {
       ({ script }) => {
         // Idempotent injection guard
         const win = window as any;
-        if (!win.__sparkAriaTree) {
+        if (!win.__piloAriaTree) {
           const fn = new Function(script);
           fn();
-          win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+          win.__piloAriaTree = (globalThis as any).__piloAriaTree;
         }
         const counter = { value: 0 };
-        const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(document.body, counter);
+        const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
         return { yaml, counterValue: counter.value };
       },
       { script: ARIA_TREE_SCRIPT },
@@ -486,13 +486,13 @@ export class PlaywrightBrowser implements AriaBrowser {
         const frameResult = await frame.evaluate(
           ({ script, counterStart }) => {
             const win = window as any;
-            if (!win.__sparkAriaTree) {
+            if (!win.__piloAriaTree) {
               const fn = new Function(script);
               fn();
-              win.__sparkAriaTree = (globalThis as any).__sparkAriaTree;
+              win.__piloAriaTree = (globalThis as any).__piloAriaTree;
             }
             const counter = { value: counterStart };
-            const yaml: string = win.__sparkAriaTree.generateAndRenderAriaTree(
+            const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
               document.body,
               counter,
             );
@@ -569,7 +569,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       try {
         await this.page.evaluate(() => {
           const win = window as any;
-          win.__sparkAriaTree?.applySetOfMarks?.();
+          win.__piloAriaTree?.applySetOfMarks?.();
         });
       } catch {
         // Can fail if page navigated or ariaTree bundle wasn't injected yet
@@ -588,7 +588,7 @@ export class PlaywrightBrowser implements AriaBrowser {
         try {
           await this.page.evaluate(() => {
             const win = window as any;
-            win.__sparkAriaTree?.removeSetOfMarks?.();
+            win.__piloAriaTree?.removeSetOfMarks?.();
           });
         } catch {
           // Page may have navigated between screenshot and cleanup
@@ -615,7 +615,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private async validateElementRef(ref: string): Promise<Locator> {
     if (!this.page) throw new Error("Browser not started");
 
-    const locator = this.page.locator(`[data-spark-ref="${ref}"]`);
+    const locator = this.page.locator(`[data-pilo-ref="${ref}"]`);
     const count = await locator.count();
 
     if (count === 0) {
@@ -623,7 +623,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     }
 
     if (count > 1) {
-      // This shouldn't happen with data-spark-ref, but let's be defensive
+      // This shouldn't happen with data-pilo-ref, but let's be defensive
       throw new InvalidRefException(
         ref,
         `Multiple elements found with reference '${ref}'. This may indicate a page structure issue.`,

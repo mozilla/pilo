@@ -5,7 +5,7 @@
  *
  * IMPORTANT: This module must remain free of Node.js dependencies.
  * Do NOT import: fs, path, os, dotenv, commander, or access process.env.
- * The browser extension (spark/core) depends on this module being bundleable.
+ * The browser extension (pilo/core) depends on this module being bundleable.
  */
 
 // =============================================================================
@@ -49,11 +49,11 @@ export type ConfigCategory =
   | "search";
 
 // =============================================================================
-// SparkConfig Interface (Manual for Readability)
+// PiloConfig Interface (Manual for Readability)
 // =============================================================================
 
-/** SparkConfig type - input type (all optional, before defaults applied) */
-export interface SparkConfig {
+/** PiloConfig type - input type (all optional, before defaults applied) */
+export interface PiloConfig {
   // AI Configuration
   provider?: Provider;
   model?: string;
@@ -116,8 +116,8 @@ export interface SparkConfig {
   parallel_api_key?: string;
 }
 
-/** SparkConfigResolved type - output type (defaults applied) */
-export interface SparkConfigResolved {
+/** PiloConfigResolved type - output type (defaults applied) */
+export interface PiloConfigResolved {
   // AI Configuration
   provider: Provider;
   model?: string;
@@ -180,7 +180,7 @@ export interface SparkConfigResolved {
   parallel_api_key?: string;
 }
 
-export type ConfigKey = keyof SparkConfigResolved;
+export type ConfigKey = keyof PiloConfigResolved;
 
 // =============================================================================
 // Field Definition Interface
@@ -218,7 +218,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     values: PROVIDERS,
     cli: "--provider",
     placeholder: "name",
-    env: ["SPARK_PROVIDER"],
+    env: ["PILO_PROVIDER"],
     description: "AI provider to use",
     category: "ai",
   },
@@ -226,7 +226,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--model",
     placeholder: "name",
-    env: ["SPARK_MODEL"],
+    env: ["PILO_MODEL"],
     description: "AI model to use",
     category: "ai",
   },
@@ -266,19 +266,19 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
   },
   ollama_base_url: {
     type: "string",
-    env: ["SPARK_OLLAMA_BASE_URL"],
+    env: ["PILO_OLLAMA_BASE_URL"],
     description: "Ollama base URL",
     category: "ai",
   },
   openai_compatible_base_url: {
     type: "string",
-    env: ["SPARK_OPENAI_COMPATIBLE_BASE_URL"],
+    env: ["PILO_OPENAI_COMPATIBLE_BASE_URL"],
     description: "OpenAI-compatible API base URL",
     category: "ai",
   },
   openai_compatible_name: {
     type: "string",
-    env: ["SPARK_OPENAI_COMPATIBLE_NAME"],
+    env: ["PILO_OPENAI_COMPATIBLE_NAME"],
     description: "OpenAI-compatible provider name",
     category: "ai",
   },
@@ -288,7 +288,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     values: REASONING_LEVELS,
     cli: "--reasoning-effort",
     placeholder: "level",
-    env: ["SPARK_REASONING_EFFORT"],
+    env: ["PILO_REASONING_EFFORT"],
     description: "Reasoning effort level",
     category: "ai",
   },
@@ -301,7 +301,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     cli: "--browser",
     cliShort: "-b",
     placeholder: "name",
-    env: ["SPARK_BROWSER"],
+    env: ["PILO_BROWSER"],
     description: "Browser to use",
     category: "browser",
   },
@@ -309,7 +309,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--channel",
     placeholder: "name",
-    env: ["SPARK_CHANNEL"],
+    env: ["PILO_CHANNEL"],
     description: "Browser channel (e.g., chrome, msedge, chrome-beta)",
     category: "browser",
   },
@@ -317,7 +317,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--executable-path",
     placeholder: "path",
-    env: ["SPARK_EXECUTABLE_PATH"],
+    env: ["PILO_EXECUTABLE_PATH"],
     description: "Path to browser executable",
     category: "browser",
   },
@@ -325,7 +325,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: false,
     type: "boolean",
     cli: "--headless",
-    env: ["SPARK_HEADLESS"],
+    env: ["PILO_HEADLESS"],
     description: "Run browser in headless mode",
     category: "browser",
   },
@@ -333,7 +333,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: true,
     type: "boolean",
     cli: "--block-ads",
-    env: ["SPARK_BLOCK_ADS"],
+    env: ["PILO_BLOCK_ADS"],
     description: "Enable ad blocking",
     category: "browser",
     negatable: true,
@@ -343,7 +343,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--block-resources",
     placeholder: "types",
-    env: ["SPARK_BLOCK_RESOURCES"],
+    env: ["PILO_BLOCK_RESOURCES"],
     description: "Comma-separated list of resources to block",
     category: "browser",
   },
@@ -353,7 +353,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--proxy",
     placeholder: "url",
-    env: ["SPARK_PROXY"],
+    env: ["PILO_PROXY"],
     description: "Proxy server URL (http, https, or socks5)",
     category: "proxy",
   },
@@ -361,7 +361,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--proxy-username",
     placeholder: "user",
-    env: ["SPARK_PROXY_USERNAME"],
+    env: ["PILO_PROXY_USERNAME"],
     description: "Proxy authentication username",
     category: "proxy",
   },
@@ -369,7 +369,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--proxy-password",
     placeholder: "pass",
-    env: ["SPARK_PROXY_PASSWORD"],
+    env: ["PILO_PROXY_PASSWORD"],
     description: "Proxy authentication password",
     category: "proxy",
   },
@@ -381,7 +381,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     values: LOGGERS,
     cli: "--logger",
     placeholder: "type",
-    env: ["SPARK_LOGGER"],
+    env: ["PILO_LOGGER"],
     description: "Logger to use",
     category: "logging",
   },
@@ -389,7 +389,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: false,
     type: "boolean",
     cli: "--metrics-incremental",
-    env: ["SPARK_METRICS_INCREMENTAL"],
+    env: ["PILO_METRICS_INCREMENTAL"],
     description: "Show incremental metrics updates",
     category: "logging",
   },
@@ -399,7 +399,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: false,
     type: "boolean",
     cli: "--debug",
-    env: ["SPARK_DEBUG"],
+    env: ["PILO_DEBUG"],
     description: "Enable debug mode with page snapshots",
     category: "agent",
   },
@@ -407,7 +407,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: false,
     type: "boolean",
     cli: "--vision",
-    env: ["SPARK_VISION"],
+    env: ["PILO_VISION"],
     description: "Enable vision capabilities to include screenshots",
     category: "agent",
   },
@@ -416,7 +416,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--max-iterations",
     placeholder: "n",
-    env: ["SPARK_MAX_ITERATIONS"],
+    env: ["PILO_MAX_ITERATIONS"],
     description: "Maximum total iterations to prevent infinite loops",
     category: "agent",
   },
@@ -425,7 +425,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--max-validation-attempts",
     placeholder: "n",
-    env: ["SPARK_MAX_VALIDATION_ATTEMPTS"],
+    env: ["PILO_MAX_VALIDATION_ATTEMPTS"],
     description: "Maximum validation attempts",
     category: "agent",
   },
@@ -434,7 +434,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--max-repeated-actions",
     placeholder: "n",
-    env: ["SPARK_MAX_REPEATED_ACTIONS"],
+    env: ["PILO_MAX_REPEATED_ACTIONS"],
     description: "Maximum times an action can be repeated before warning",
     category: "agent",
   },
@@ -443,7 +443,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--max-consecutive-errors",
     placeholder: "n",
-    env: ["SPARK_MAX_CONSECUTIVE_ERRORS"],
+    env: ["PILO_MAX_CONSECUTIVE_ERRORS"],
     description: "Maximum consecutive errors before failing the task",
     category: "agent",
   },
@@ -452,7 +452,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--max-total-errors",
     placeholder: "n",
-    env: ["SPARK_MAX_TOTAL_ERRORS"],
+    env: ["PILO_MAX_TOTAL_ERRORS"],
     description: "Maximum total errors before failing the task",
     category: "agent",
   },
@@ -461,7 +461,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--initial-navigation-retries",
     placeholder: "n",
-    env: ["SPARK_INITIAL_NAVIGATION_RETRIES"],
+    env: ["PILO_INITIAL_NAVIGATION_RETRIES"],
     description: "Retries for initial navigation with browser restart (0 = no retries)",
     category: "agent",
   },
@@ -470,7 +470,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     cli: "--url",
     cliShort: "-u",
     placeholder: "url",
-    env: ["SPARK_STARTING_URL"],
+    env: ["PILO_STARTING_URL"],
     description: "Starting URL for the task",
     category: "agent",
   },
@@ -479,7 +479,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     cli: "--data",
     cliShort: "-d",
     placeholder: "json",
-    env: ["SPARK_DATA"],
+    env: ["PILO_DATA"],
     description: "JSON data to provide context for the task",
     category: "agent",
   },
@@ -488,7 +488,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     cli: "--guardrails",
     cliShort: "-g",
     placeholder: "text",
-    env: ["SPARK_GUARDRAILS"],
+    env: ["PILO_GUARDRAILS"],
     description: "Safety constraints for the task execution",
     category: "agent",
   },
@@ -498,7 +498,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--pw-endpoint",
     placeholder: "url",
-    env: ["SPARK_PW_ENDPOINT"],
+    env: ["PILO_PW_ENDPOINT"],
     description: "Playwright endpoint URL to connect to remote browser",
     category: "playwright",
   },
@@ -506,7 +506,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "string",
     cli: "--pw-cdp-endpoint",
     placeholder: "url",
-    env: ["SPARK_PW_CDP_ENDPOINT"],
+    env: ["PILO_PW_CDP_ENDPOINT"],
     description: "Chrome DevTools Protocol endpoint URL (chromium only)",
     category: "playwright",
   },
@@ -514,7 +514,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     default: false,
     type: "boolean",
     cli: "--bypass-csp",
-    env: ["SPARK_BYPASS_CSP"],
+    env: ["PILO_BYPASS_CSP"],
     description: "Bypass Content Security Policy (not needed for normal operation)",
     category: "playwright",
   },
@@ -525,7 +525,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--navigation-timeout-ms",
     placeholder: "ms",
-    env: ["SPARK_NAVIGATION_TIMEOUT_MS"],
+    env: ["PILO_NAVIGATION_TIMEOUT_MS"],
     description: "Base navigation timeout in milliseconds",
     category: "navigation",
   },
@@ -534,7 +534,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--navigation-max-timeout-ms",
     placeholder: "ms",
-    env: ["SPARK_NAVIGATION_MAX_TIMEOUT_MS"],
+    env: ["PILO_NAVIGATION_MAX_TIMEOUT_MS"],
     description: "Maximum timeout for navigation retries in milliseconds",
     category: "navigation",
   },
@@ -543,7 +543,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--navigation-max-attempts",
     placeholder: "n",
-    env: ["SPARK_NAVIGATION_MAX_ATTEMPTS"],
+    env: ["PILO_NAVIGATION_MAX_ATTEMPTS"],
     description: "Maximum navigation attempts (e.g., 3 = try up to 3 times)",
     category: "navigation",
   },
@@ -552,7 +552,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--navigation-timeout-multiplier",
     placeholder: "n",
-    env: ["SPARK_NAVIGATION_TIMEOUT_MULTIPLIER"],
+    env: ["PILO_NAVIGATION_TIMEOUT_MULTIPLIER"],
     description: "Timeout multiplier for each retry (e.g., 2 = 30s → 60s → 120s)",
     category: "navigation",
   },
@@ -563,7 +563,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     type: "number",
     cli: "--action-timeout-ms",
     placeholder: "ms",
-    env: ["SPARK_ACTION_TIMEOUT_MS"],
+    env: ["PILO_ACTION_TIMEOUT_MS"],
     description: "Timeout for page load and element actions in milliseconds",
     category: "action",
   },
@@ -575,7 +575,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     values: SEARCH_PROVIDERS,
     cli: "--search-provider",
     placeholder: "name",
-    env: ["SPARK_SEARCH_PROVIDER"],
+    env: ["PILO_SEARCH_PROVIDER"],
     description: "Search provider to use (none disables search tool)",
     category: "search",
   },
@@ -593,7 +593,7 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
 // DEFAULTS - Derived from FIELDS
 // =============================================================================
 
-function buildDefaults(): SparkConfigResolved {
+function buildDefaults(): PiloConfigResolved {
   const defaults: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(FIELDS)) {
     if (field.default !== undefined) {
@@ -601,8 +601,8 @@ function buildDefaults(): SparkConfigResolved {
     }
   }
 
-  // Runtime validation for required fields (fields with non-optional types in SparkConfigResolved)
-  const requiredFields: (keyof SparkConfigResolved)[] = [
+  // Runtime validation for required fields (fields with non-optional types in PiloConfigResolved)
+  const requiredFields: (keyof PiloConfigResolved)[] = [
     "provider",
     "reasoning_effort",
     "browser",
@@ -634,13 +634,13 @@ function buildDefaults(): SparkConfigResolved {
     }
   }
 
-  return defaults as unknown as SparkConfigResolved;
+  return defaults as unknown as PiloConfigResolved;
 }
 
-export const DEFAULTS: SparkConfigResolved = buildDefaults();
+export const DEFAULTS: PiloConfigResolved = buildDefaults();
 
 /** Get all config defaults */
-export function getConfigDefaults(): SparkConfigResolved {
+export function getConfigDefaults(): PiloConfigResolved {
   return DEFAULTS;
 }
 

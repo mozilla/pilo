@@ -31,7 +31,7 @@ export function createAIProvider(overrides?: {
   reasoning_effort?: "none" | "low" | "medium" | "high";
 }): ProviderConfig {
   const currentConfig = config.getConfig();
-  // currentConfig is SparkConfigResolved, so provider and reasoning_effort are guaranteed
+  // currentConfig is PiloConfigResolved, so provider and reasoning_effort are guaranteed
   const provider = overrides?.provider ?? currentConfig.provider;
   const reasoningEffort = overrides?.reasoning_effort ?? currentConfig.reasoning_effort;
 
@@ -88,8 +88,8 @@ export function createProviderFromConfig(
       return createOpenRouter({
         apiKey,
         headers: {
-          "HTTP-Referer": "https://github.com/Mozilla-Ocho/spark",
-          "X-Title": "Spark Web Automation Tool",
+          "HTTP-Referer": "https://github.com/mozilla/pilo",
+          "X-Title": "Pilo Web Automation Tool",
         },
       })(model);
 
@@ -123,11 +123,11 @@ export function createProviderFromConfig(
       if (!baseUrl) {
         throw new Error(
           `OpenAI-compatible provider requires a base URL. To get started:
-          
-1. Set the base URL with: spark config --set openai_compatible_base_url=http://localhost:8080/v1
-2. Or set environment variable: export SPARK_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
 
-Run 'spark config --show' to check your current configuration.`,
+1. Set the base URL with: pilo config --set openai_compatible_base_url=http://localhost:8080/v1
+2. Or set environment variable: export PILO_OPENAI_COMPATIBLE_BASE_URL=http://localhost:8080/v1
+
+Run 'pilo config --show' to check your current configuration.`,
         );
       }
       return createOpenAICompatible({
@@ -165,10 +165,10 @@ function getProviderConfig(provider: string, currentConfig: any, modelOverride?:
         `No OpenRouter API key found. To get started:
 
 1. Get an API key from https://openrouter.ai/keys
-2. Set it with: spark config --set openrouter_api_key=your-key
-3. Or use OpenAI instead: spark config --set provider=openai
+2. Set it with: pilo config --set openrouter_api_key=your-key
+3. Or use OpenAI instead: pilo config --set provider=openai
 
-Run 'spark config --show' to check your current configuration.`,
+Run 'pilo config --show' to check your current configuration.`,
       );
     }
   } else if (provider === "google") {
@@ -178,10 +178,10 @@ Run 'spark config --show' to check your current configuration.`,
         `No Google Generative AI API key found. To get started:
 
 1. Get an API key from https://aistudio.google.com/apikey
-2. Set it with: spark config --set google_generative_ai_api_key=your-key
-3. Or use OpenAI instead: spark config --set provider=openai
+2. Set it with: pilo config --set google_generative_ai_api_key=your-key
+3. Or use OpenAI instead: pilo config --set provider=openai
 
-Run 'spark config --show' to check your current configuration.`,
+Run 'pilo config --show' to check your current configuration.`,
       );
     }
   } else if (provider === "vertex") {
@@ -197,10 +197,10 @@ Run 'spark config --show' to check your current configuration.`,
         `No OpenAI API key found. To get started:
 
 1. Get an API key from https://platform.openai.com/api-keys
-2. Set it with: spark config --set openai_api_key=your-key
-3. Or use OpenRouter instead: spark config --set provider=openrouter
+2. Set it with: pilo config --set openai_api_key=your-key
+3. Or use OpenRouter instead: pilo config --set provider=openrouter
 
-Run 'spark config --show' to check your current configuration.`,
+Run 'pilo config --show' to check your current configuration.`,
       );
     }
   }
@@ -237,12 +237,12 @@ function getVertexConfig(currentConfig: any) {
     throw new Error(
       `No Google Cloud project ID found. To get started:
 
-1. Set your project ID with: spark config --set vertex_project=your-project-id
+1. Set your project ID with: pilo config --set vertex_project=your-project-id
 2. Or set environment variable: export GOOGLE_VERTEX_PROJECT=your-project-id
 3. When running in Google Cloud (Cloud Run, Compute Engine, etc.), the project should be auto-detected
 4. Ensure Application Default Credentials are set up: gcloud auth application-default login
 
-Run 'spark config --show' to check your current configuration.`,
+Run 'pilo config --show' to check your current configuration.`,
     );
   }
 
@@ -360,7 +360,7 @@ export function getAIProviderInfo() {
     keySource = "global";
   } else if (provider === "openai-compatible") {
     // Check if base URL is configured
-    if (currentConfig.openai_compatible_base_url || getEnv("SPARK_OPENAI_COMPATIBLE_BASE_URL")) {
+    if (currentConfig.openai_compatible_base_url || getEnv("PILO_OPENAI_COMPATIBLE_BASE_URL")) {
       hasApiKey = true;
       keySource = currentConfig.openai_compatible_base_url ? "global" : "env";
     }

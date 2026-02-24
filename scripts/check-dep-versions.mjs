@@ -87,7 +87,7 @@ function loadPackageJson(filePath) {
 const packageFiles = [];
 
 // Root package.json
-packageFiles.push({ label: "@tabstack/spark (root)", path: join(ROOT, "package.json") });
+packageFiles.push({ label: "@tabstack/pilo (root)", path: join(ROOT, "package.json") });
 
 // packages/* directories
 const packagesDir = join(ROOT, "packages");

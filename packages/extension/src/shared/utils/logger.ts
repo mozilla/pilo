@@ -1,5 +1,5 @@
 /**
- * Centralized logging utility for the Spark extension
+ * Centralized logging utility for the Pilo extension
  * Provides consistent logging across all components
  */
 

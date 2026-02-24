@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for Spark
+about: Suggest an idea for Pilo
 title: "[FEATURE]"
 labels: enhancement
 assignees: ""

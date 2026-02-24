@@ -71,7 +71,7 @@ describe("indicatorControl", () => {
       });
     });
 
-    it("should add spark-indicator-active class to html element", async () => {
+    it("should add pilo-indicator-active class to html element", async () => {
       await showIndicator(123);
 
       // Capture and test the injected function
@@ -94,7 +94,7 @@ describe("indicatorControl", () => {
       expect(options.func).toBeDefined();
       options.func!();
 
-      expect(mockClassList.add).toHaveBeenCalledWith("spark-indicator-active");
+      expect(mockClassList.add).toHaveBeenCalledWith("pilo-indicator-active");
 
       // Restore
       if (originalDocumentElement) {
@@ -137,7 +137,7 @@ describe("indicatorControl", () => {
       });
     });
 
-    it("should remove spark-indicator-active class from html element", async () => {
+    it("should remove pilo-indicator-active class from html element", async () => {
       await showIndicator(123);
       await hideIndicator(123);
 
@@ -162,7 +162,7 @@ describe("indicatorControl", () => {
       expect(options.func).toBeDefined();
       options.func!();
 
-      expect(mockClassList.remove).toHaveBeenCalledWith("spark-indicator-active");
+      expect(mockClassList.remove).toHaveBeenCalledWith("pilo-indicator-active");
 
       // Restore
       if (originalDocumentElement) {
@@ -349,7 +349,7 @@ describe("indicatorControl", () => {
 
       expect(browser.scripting.registerContentScripts).toHaveBeenCalledWith([
         {
-          id: "spark-indicator",
+          id: "pilo-indicator",
           matches: ["<all_urls>"],
           css: ["indicator.css"],
           runAt: "document_start",
@@ -362,7 +362,7 @@ describe("indicatorControl", () => {
       await ensureIndicatorCSSRegistered();
 
       expect(browser.scripting.registerContentScripts).toHaveBeenCalledWith([
-        expect.objectContaining({ id: "spark-indicator" }),
+        expect.objectContaining({ id: "pilo-indicator" }),
       ]);
     });
 
@@ -416,7 +416,7 @@ describe("indicatorControl", () => {
       await hideIndicator(123);
 
       expect(browser.scripting.unregisterContentScripts).toHaveBeenCalledWith({
-        ids: ["spark-indicator"],
+        ids: ["pilo-indicator"],
       });
     });
 
@@ -460,7 +460,7 @@ describe("indicatorControl", () => {
 
       expect(browser.scripting.registerContentScripts).toHaveBeenCalledWith([
         expect.objectContaining({
-          id: "spark-indicator",
+          id: "pilo-indicator",
           css: ["indicator.css"],
           runAt: "document_start",
         }),
@@ -479,7 +479,7 @@ describe("indicatorControl", () => {
 
       expect(browser.scripting.insertCSS).toHaveBeenCalledWith({
         target: { tabId: 123 },
-        css: expect.stringContaining("spark-indicator-active"),
+        css: expect.stringContaining("pilo-indicator-active"),
       });
     });
 
@@ -542,7 +542,7 @@ describe("indicatorControl", () => {
 
       expect(browser.scripting.removeCSS).toHaveBeenCalledWith({
         target: { tabId: 123 },
-        css: expect.stringContaining("spark-indicator-active"),
+        css: expect.stringContaining("pilo-indicator-active"),
       });
     });
 
@@ -553,7 +553,7 @@ describe("indicatorControl", () => {
       await hideIndicator(123);
 
       expect(browser.scripting.unregisterContentScripts).toHaveBeenCalledWith({
-        ids: ["spark-indicator"],
+        ids: ["pilo-indicator"],
       });
     });
 
@@ -735,9 +735,9 @@ describe("indicatorControl", () => {
       resetIndicatorState();
     });
 
-    it("should unregister spark-indicator script on startup", async () => {
+    it("should unregister pilo-indicator script on startup", async () => {
       const mockScripts: RegisteredContentScriptMock[] = [
-        { id: "spark-indicator", matches: ["<all_urls>"], js: [], css: ["indicator.css"] },
+        { id: "pilo-indicator", matches: ["<all_urls>"], js: [], css: ["indicator.css"] },
         { id: "other-script", matches: ["<all_urls>"], js: [], css: [] },
       ];
       vi.mocked(browser.scripting.getRegisteredContentScripts).mockResolvedValue(
@@ -747,7 +747,7 @@ describe("indicatorControl", () => {
       await cleanupStaleRegistrations();
 
       expect(browser.scripting.unregisterContentScripts).toHaveBeenCalledWith({
-        ids: ["spark-indicator"],
+        ids: ["pilo-indicator"],
       });
     });
 
@@ -823,7 +823,7 @@ describe("indicatorControl", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(browser.scripting.unregisterContentScripts).toHaveBeenCalledWith({
-        ids: ["spark-indicator"],
+        ids: ["pilo-indicator"],
       });
     });
 

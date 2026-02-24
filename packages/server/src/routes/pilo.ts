@@ -7,8 +7,8 @@ import {
   getAIProviderInfo,
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
-} from "spark-core";
-import type { TaskExecutionResult } from "spark-core";
+} from "pilo-core";
+import type { TaskExecutionResult } from "pilo-core";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 
@@ -35,9 +35,9 @@ const createErrorResponse = (message: string, code: string): ErrorResponse => ({
   },
 });
 
-const spark = new Hono();
+const pilo = new Hono();
 
-interface SparkTaskRequest {
+interface PiloTaskRequest {
   // Core task parameters
   task: string;
   url?: string;
@@ -102,10 +102,10 @@ interface SparkTaskRequest {
   includeScreenshotImages?: boolean;
 }
 
-// POST /spark/run - Execute a Spark task with real-time streaming
-spark.post("/run", async (c) => {
+// POST /pilo/run - Execute a Pilo task with real-time streaming
+pilo.post("/run", async (c) => {
   try {
-    const body = (await c.req.json()) as SparkTaskRequest;
+    const body = (await c.req.json()) as PiloTaskRequest;
 
     if (!body.task) {
       return c.json(createErrorResponse("Task is required", "MISSING_TASK"), 400);
@@ -269,7 +269,7 @@ spark.post("/run", async (c) => {
           console.log("🛑 Task execution aborted due to client disconnection");
           // Don't try to write to stream - client is gone
         } else {
-          console.error("Spark task execution failed:", error);
+          console.error("Pilo task execution failed:", error);
           await stream.writeSSE({
             event: "error",
             data: JSON.stringify(
@@ -289,9 +289,9 @@ spark.post("/run", async (c) => {
       }
     });
   } catch (error) {
-    console.error("Spark task setup failed:", error);
+    console.error("Pilo task setup failed:", error);
     return c.json(createErrorResponse(errorToString(error), "TASK_SETUP_FAILED"), 500);
   }
 });
 
-export default spark;
+export default pilo;

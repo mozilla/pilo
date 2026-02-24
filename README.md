@@ -1,5 +1,12 @@
-<h1 align="center">Tabstack Pilo</h1>
-<h2 align="center">AI-powered web automation</h2>
+<div align="center">
+
+# Tabstack Pilo
+
+_Automate the Web with AI_
+
+<sub><strong>pilo</strong> · /ˈpaɪloʊ/ · PIE-low</sub>
+
+</div>
 
 AI-powered web automation that lets you control browsers using natural language. Just describe what you want to do, and Pilo will navigate websites, fill forms, and gather information automatically.
 
@@ -363,7 +370,7 @@ new PlaywrightBrowser({
 });
 ```
 
-## Evaluation System
+## Evaluation System (Internal Only)
 
 Pilo includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
 
@@ -416,46 +423,46 @@ Results appear as commit status checks with links to detailed HTML reports. See 
 
 All configuration options can be set via environment variables (dev mode only; not available in production npm installs).
 
-| Environment Variable               | Description                                      | CLI Equivalent              |
-| ---------------------------------- | ------------------------------------------------ | --------------------------- |
-| **AI Configuration**               |                                                  |                             |
-| `SPARK_PROVIDER`                   | AI provider (openai, openrouter, vertex, ollama) | `--provider`                |
-| `SPARK_MODEL`                      | AI model to use                                  | `--model`                   |
-| `OPENAI_API_KEY`                   | OpenAI API key                                   | `--openai-api-key`          |
-| `OPENROUTER_API_KEY`               | OpenRouter API key                               | `--openrouter-api-key`      |
-| `GOOGLE_VERTEX_PROJECT`            | Google Cloud project for Vertex AI               | -                           |
-| `GOOGLE_CLOUD_PROJECT`             | Alternative for Vertex project                   | -                           |
-| `GCP_PROJECT`                      | Alternative for Vertex project                   | -                           |
-| `GOOGLE_VERTEX_LOCATION`           | Vertex AI location/region                        | -                           |
-| `GOOGLE_CLOUD_REGION`              | Alternative for Vertex location                  | -                           |
-| **Local AI Providers**             |                                                  |                             |
-| `SPARK_OLLAMA_BASE_URL`            | Ollama server base URL                           | -                           |
-| `SPARK_OPENAI_COMPATIBLE_BASE_URL` | OpenAI-compatible API base URL                   | -                           |
-| `SPARK_OPENAI_COMPATIBLE_NAME`     | OpenAI-compatible provider name                  | -                           |
-| **Browser Configuration**          |                                                  |                             |
-| `SPARK_BROWSER`                    | Browser to use                                   | `--browser`                 |
-| `SPARK_CHANNEL`                    | Browser channel                                  | `--channel`                 |
-| `SPARK_EXECUTABLE_PATH`            | Path to browser executable                       | `--executable-path`         |
-| `SPARK_HEADLESS`                   | Run headless (true/false)                        | `--headless`                |
-| `SPARK_BLOCK_ADS`                  | Block ads (true/false)                           | `--no-block-ads`            |
-| `SPARK_BLOCK_RESOURCES`            | Resources to block (comma-separated)             | `--block-resources`         |
-| **Proxy Configuration**            |                                                  |                             |
-| `SPARK_PROXY`                      | Proxy server URL                                 | `--proxy`                   |
-| `SPARK_PROXY_USERNAME`             | Proxy username                                   | `--proxy-username`          |
-| `SPARK_PROXY_PASSWORD`             | Proxy password                                   | `--proxy-password`          |
-| **Logging Configuration**          |                                                  |                             |
-| `SPARK_LOGGER`                     | Logger type (console, json)                      | `--logger`                  |
-| **WebAgent Configuration**         |                                                  |                             |
-| `SPARK_DEBUG`                      | Enable debug mode (true/false)                   | `--debug`                   |
-| `SPARK_VISION`                     | Enable vision (true/false)                       | `--vision`                  |
-| `SPARK_MAX_ITERATIONS`             | Maximum iterations                               | `--max-iterations`          |
-| `SPARK_MAX_VALIDATION_ATTEMPTS`    | Maximum validation attempts                      | `--max-validation-attempts` |
-| `SPARK_MAX_REPEATED_ACTIONS`       | Maximum action repetitions                       | `--max-repeated-actions`    |
-| `SPARK_REASONING_EFFORT`           | Reasoning effort level                           | `--reasoning-effort`        |
-| **Playwright Configuration**       |                                                  |                             |
-| `SPARK_PW_ENDPOINT`                | Playwright endpoint URL                          | `--pw-endpoint`             |
-| `SPARK_PW_CDP_ENDPOINT`            | CDP endpoint URL                                 | `--pw-cdp-endpoint`         |
-| `SPARK_BYPASS_CSP`                 | Bypass CSP (true/false)                          | `--bypass-csp`              |
+| Environment Variable              | Description                                      | CLI Equivalent              |
+| --------------------------------- | ------------------------------------------------ | --------------------------- |
+| **AI Configuration**              |                                                  |                             |
+| `PILO_PROVIDER`                   | AI provider (openai, openrouter, vertex, ollama) | `--provider`                |
+| `PILO_MODEL`                      | AI model to use                                  | `--model`                   |
+| `OPENAI_API_KEY`                  | OpenAI API key                                   | `--openai-api-key`          |
+| `OPENROUTER_API_KEY`              | OpenRouter API key                               | `--openrouter-api-key`      |
+| `GOOGLE_VERTEX_PROJECT`           | Google Cloud project for Vertex AI               | -                           |
+| `GOOGLE_CLOUD_PROJECT`            | Alternative for Vertex project                   | -                           |
+| `GCP_PROJECT`                     | Alternative for Vertex project                   | -                           |
+| `GOOGLE_VERTEX_LOCATION`          | Vertex AI location/region                        | -                           |
+| `GOOGLE_CLOUD_REGION`             | Alternative for Vertex location                  | -                           |
+| **Local AI Providers**            |                                                  |                             |
+| `PILO_OLLAMA_BASE_URL`            | Ollama server base URL                           | -                           |
+| `PILO_OPENAI_COMPATIBLE_BASE_URL` | OpenAI-compatible API base URL                   | -                           |
+| `PILO_OPENAI_COMPATIBLE_NAME`     | OpenAI-compatible provider name                  | -                           |
+| **Browser Configuration**         |                                                  |                             |
+| `PILO_BROWSER`                    | Browser to use                                   | `--browser`                 |
+| `PILO_CHANNEL`                    | Browser channel                                  | `--channel`                 |
+| `PILO_EXECUTABLE_PATH`            | Path to browser executable                       | `--executable-path`         |
+| `PILO_HEADLESS`                   | Run headless (true/false)                        | `--headless`                |
+| `PILO_BLOCK_ADS`                  | Block ads (true/false)                           | `--no-block-ads`            |
+| `PILO_BLOCK_RESOURCES`            | Resources to block (comma-separated)             | `--block-resources`         |
+| **Proxy Configuration**           |                                                  |                             |
+| `PILO_PROXY`                      | Proxy server URL                                 | `--proxy`                   |
+| `PILO_PROXY_USERNAME`             | Proxy username                                   | `--proxy-username`          |
+| `PILO_PROXY_PASSWORD`             | Proxy password                                   | `--proxy-password`          |
+| **Logging Configuration**         |                                                  |                             |
+| `PILO_LOGGER`                     | Logger type (console, json)                      | `--logger`                  |
+| **WebAgent Configuration**        |                                                  |                             |
+| `PILO_DEBUG`                      | Enable debug mode (true/false)                   | `--debug`                   |
+| `PILO_VISION`                     | Enable vision (true/false)                       | `--vision`                  |
+| `PILO_MAX_ITERATIONS`             | Maximum iterations                               | `--max-iterations`          |
+| `PILO_MAX_VALIDATION_ATTEMPTS`    | Maximum validation attempts                      | `--max-validation-attempts` |
+| `PILO_MAX_REPEATED_ACTIONS`       | Maximum action repetitions                       | `--max-repeated-actions`    |
+| `PILO_REASONING_EFFORT`           | Reasoning effort level                           | `--reasoning-effort`        |
+| **Playwright Configuration**      |                                                  |                             |
+| `PILO_PW_ENDPOINT`                | Playwright endpoint URL                          | `--pw-endpoint`             |
+| `PILO_PW_CDP_ENDPOINT`            | CDP endpoint URL                                 | `--pw-cdp-endpoint`         |
+| `PILO_BYPASS_CSP`                 | Bypass CSP (true/false)                          | `--bypass-csp`              |
 
 ### Configuration Priority
 

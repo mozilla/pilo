@@ -32,7 +32,7 @@ let tabRemovedListener: ((tabId: number) => void) | null = null;
 
 // CSS for the indicator - injected programmatically for reliability
 // Exported for testing (to verify it matches public/indicator.css)
-export const INDICATOR_CSS = `html.spark-indicator-active::after {
+export const INDICATOR_CSS = `html.pilo-indicator-active::after {
   content: "";
   pointer-events: none;
   position: fixed;
@@ -47,9 +47,9 @@ export const INDICATOR_CSS = `html.spark-indicator-active::after {
     inset -60px 60px 80px -40px rgba(139, 92, 246, 0.6),
     inset 60px -60px 80px -40px rgba(139, 92, 246, 0.6),
     inset -60px -60px 80px -40px rgba(139, 92, 246, 0.6);
-  animation: spark-pulse 3s ease-in-out infinite;
+  animation: pilo-pulse 3s ease-in-out infinite;
 }
-@keyframes spark-pulse {
+@keyframes pilo-pulse {
   0%,
   100% {
     opacity: 0.6;
@@ -89,7 +89,7 @@ export async function ensureIndicatorCSSRegistered(): Promise<void> {
     try {
       await browser.scripting.registerContentScripts([
         {
-          id: "spark-indicator",
+          id: "pilo-indicator",
           matches: ["<all_urls>"],
           css: ["indicator.css"],
           runAt: "document_start",
@@ -102,7 +102,7 @@ export async function ensureIndicatorCSSRegistered(): Promise<void> {
       // Check if it exists
       try {
         const scripts = await browser.scripting.getRegisteredContentScripts({
-          ids: ["spark-indicator"],
+          ids: ["pilo-indicator"],
         });
         if (scripts.length > 0) {
           cssRegistered = true;
@@ -129,7 +129,7 @@ async function unregisterIndicatorCSSIfUnused(): Promise<void> {
   }
   try {
     await browser.scripting.unregisterContentScripts({
-      ids: ["spark-indicator"],
+      ids: ["pilo-indicator"],
     });
     cssRegistered = false;
   } catch {
@@ -155,7 +155,7 @@ export async function showIndicator(tabId: number): Promise<void> {
     await browser.scripting.executeScript({
       target: { tabId },
       func: () => {
-        document.documentElement.classList.add("spark-indicator-active");
+        document.documentElement.classList.add("pilo-indicator-active");
       },
     });
   } catch {
@@ -172,7 +172,7 @@ export async function hideIndicator(tabId: number): Promise<void> {
     await browser.scripting.executeScript({
       target: { tabId },
       func: () => {
-        document.documentElement.classList.remove("spark-indicator-active");
+        document.documentElement.classList.remove("pilo-indicator-active");
       },
     });
 
@@ -202,7 +202,7 @@ export function isIndicatorActive(tabId: number): boolean {
  * This helper assumes that the indicator CSS has already been registered and
  * loaded via {@link browser.scripting.registerContentScripts} at
  * {@code document_start}. It only toggles the visual indicator by adding the
- * {@code spark-indicator-active} class to the tab's root HTML element.
+ * {@code pilo-indicator-active} class to the tab's root HTML element.
  *
  * @param tabId - The ID of the tab into which the indicator class should be injected.
  */
@@ -213,7 +213,7 @@ function injectIndicator(tabId: number): void {
     .executeScript({
       target: { tabId },
       func: () => {
-        document.documentElement.classList.add("spark-indicator-active");
+        document.documentElement.classList.add("pilo-indicator-active");
       },
     })
     .catch(() => {
@@ -290,11 +290,11 @@ export function cleanupNavigationListener(): void {
 export async function cleanupStaleRegistrations(): Promise<void> {
   try {
     const scripts = await browser.scripting.getRegisteredContentScripts();
-    const hasSparkIndicator = scripts.some((s) => s.id === "spark-indicator");
+    const hasPiloIndicator = scripts.some((s) => s.id === "pilo-indicator");
 
-    if (hasSparkIndicator) {
+    if (hasPiloIndicator) {
       // Chrome API enforces unique IDs, so there can only be one script with this ID
-      await browser.scripting.unregisterContentScripts({ ids: ["spark-indicator"] });
+      await browser.scripting.unregisterContentScripts({ ids: ["pilo-indicator"] });
       cssRegistered = false;
     }
   } catch {

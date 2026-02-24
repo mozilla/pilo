@@ -80,14 +80,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build core package
-        run: pnpm --filter spark-core build
+        run: pnpm --filter pilo-core build
 
       - name: Re-link workspace dependencies
         run: pnpm install
         # pnpm resolves package exports at install time. Because dist/ is
         # created by the build step above (after the initial install), a
         # second install is required so that downstream packages can resolve
-        # the spark-core exports correctly.
+        # the pilo-core exports correctly.
 
       - name: Cache core build
         uses: actions/cache@v4
@@ -141,11 +141,11 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck core
-        run: pnpm --filter spark-core run typecheck
+        run: pnpm --filter pilo-core run typecheck
 
       - name: Test core
         if: needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
-        run: pnpm --filter spark-core run test
+        run: pnpm --filter pilo-core run test
 
   cli:
     runs-on: ubuntu-latest
@@ -189,13 +189,13 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck CLI
-        run: pnpm --filter spark-cli run typecheck
+        run: pnpm --filter pilo-cli run typecheck
 
       - name: Test CLI
-        run: pnpm --filter spark-cli run test
+        run: pnpm --filter pilo-cli run test
 
       - name: Build CLI
-        run: pnpm --filter spark-cli run build
+        run: pnpm --filter pilo-cli run build
 
   server:
     runs-on: ubuntu-latest
@@ -239,13 +239,13 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck server
-        run: pnpm --filter spark-server run typecheck
+        run: pnpm --filter pilo-server run typecheck
 
       - name: Test server
-        run: pnpm --filter spark-server run test
+        run: pnpm --filter pilo-server run test
 
       - name: Build server
-        run: pnpm --filter spark-server run build:deploy
+        run: pnpm --filter pilo-server run build:deploy
 
   extension:
     runs-on: ubuntu-latest
@@ -289,16 +289,16 @@ jobs:
           key: ${{ runner.os }}-core-dist-${{ github.sha }}
 
       - name: Typecheck extension
-        run: pnpm --filter spark-extension run typecheck
+        run: pnpm --filter pilo-extension run typecheck
 
       - name: Test extension
-        run: pnpm --filter spark-extension run test
+        run: pnpm --filter pilo-extension run test
 
       - name: Build extension for Firefox
-        run: pnpm --filter spark-extension run build:firefox
+        run: pnpm --filter pilo-extension run build:firefox
 
       - name: Build extension for Chrome
-        run: pnpm --filter spark-extension run build:chrome
+        run: pnpm --filter pilo-extension run build:chrome
 
       - name: Get Playwright version
         id: playwright-version
@@ -324,14 +324,14 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter spark-extension exec playwright install --with-deps chromium
+        run: pnpm --filter pilo-extension exec playwright install --with-deps chromium
 
       - name: Install Playwright system dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm --filter spark-extension exec playwright install-deps chromium
+        run: pnpm --filter pilo-extension exec playwright install-deps chromium
 
       - name: Run extension e2e tests
-        run: pnpm --filter spark-extension run test:e2e:headless:chrome
+        run: pnpm --filter pilo-extension run test:e2e:headless:chrome
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
