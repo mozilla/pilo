@@ -246,13 +246,13 @@ async function runProduction(
 /**
  * Resolve the path to the pre-built extension for the given browser.
  *
- * In the npm-installed package layout, compiled CLI files live at:
- *   dist/cli/commands/extension.js
+ * In the npm-installed package the compiled CLI is bundled at:
+ *   dist/cli/src/cli.js
  *
- * The extension artifacts are assembled alongside the CLI at:
+ * The extension artifacts are assembled at:
  *   dist/extension/<browser>/
  *
- * So from __dirname (dist/cli/commands/) we go up two levels to reach
+ * From __dirname (dist/cli/src/) we go up two levels to reach
  * dist/, then into extension/<browser>/.
  */
 function resolveProductionExtensionPath(browser: SupportedBrowser): string {
@@ -433,19 +433,28 @@ async function launchFirefox(
 // ---------------------------------------------------------------------------
 
 /**
- * Locate the web-ext binary bundled with the CLI package.
+ * Locate the web-ext binary relative to the given directory.
+ * @internal Exported only for testing. Production callers should use the private findWebExtBinary() wrapper.
+ *
+ * In the npm-installed package the compiled CLI is bundled into a single file
+ * at dist/cli/src/cli.js (tsup with splitting: false). node_modules lives at
+ * the package root, 3 levels up from dist/cli/src/.
+ *
+ * For local scoped installs (<project>/node_modules/@tabstack/pilo/), web-ext
+ * may be hoisted to the project root's node_modules, 6 levels up.
+ *
  * Falls back to a global web-ext on PATH.
  */
-function findWebExtBinary(): string | null {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-
-  // Local bin linked by pnpm when web-ext is a dependency of pilo-cli
-  const localBin = resolve(__dirname, "../../node_modules/.bin/web-ext");
+export function findWebExtBinaryFrom(dir: string): string | null {
+  // Package root node_modules: dist/cli/src/ → ../../.. → <package-root>/
+  const localBin = resolve(dir, "../../../node_modules/.bin/web-ext");
   if (existsSync(localBin)) return localBin;
 
-  // Monorepo root node_modules
-  const rootBin = resolve(__dirname, "../../../../node_modules/.bin/web-ext");
-  if (existsSync(rootBin)) return rootBin;
+  // Hoisted node_modules in a local scoped install:
+  // dist/cli/src/ → ../../../../../.. → <project>/
+  // (covers <project>/node_modules/@tabstack/pilo/dist/cli/src/)
+  const hoistedBin = resolve(dir, "../../../../../../node_modules/.bin/web-ext");
+  if (existsSync(hoistedBin)) return hoistedBin;
 
   // Global PATH fallback
   try {
@@ -454,4 +463,9 @@ function findWebExtBinary(): string | null {
   } catch {
     return null;
   }
+}
+
+function findWebExtBinary(): string | null {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  return findWebExtBinaryFrom(__dirname);
 }

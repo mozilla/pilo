@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-import { createExtensionCommand } from "../../src/commands/extension.js";
+import { createExtensionCommand, findWebExtBinaryFrom } from "../../src/commands/extension.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -81,10 +81,6 @@ function makeSpawnResolve(code = 0) {
 function getCommand(): Command {
   return createExtensionCommand();
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Stub configManager so it reports a config file exists and returns the given config. */
 function stubConfigExists(globalConfig: Record<string, unknown> = { provider: "openai" }) {
@@ -970,5 +966,92 @@ describe("CLI Extension Command", () => {
         expect(mockWriteFileSync).not.toHaveBeenCalled();
       });
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findWebExtBinaryFrom – path resolution unit tests
+// ---------------------------------------------------------------------------
+
+describe("findWebExtBinaryFrom", () => {
+  // Simulate a global npm install: <prefix>/lib/node_modules/@tabstack/pilo/dist/cli/src/
+  const fakeGlobalDir = "/fake/root/dist/cli/src";
+  // Simulate a local scoped install: <project>/node_modules/@tabstack/pilo/dist/cli/src/
+  const fakeLocalDir = "/fake/project/node_modules/@tabstack/pilo/dist/cli/src";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: nothing exists, `which` fails
+    mockExistsSync.mockReturnValue(false);
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+  });
+
+  it("should check package root node_modules first (3 levels up from dist/cli/src/)", () => {
+    const checkedPaths: string[] = [];
+    mockExistsSync.mockImplementation((p) => {
+      checkedPaths.push(String(p));
+      return false;
+    });
+
+    findWebExtBinaryFrom(fakeGlobalDir);
+
+    expect(checkedPaths[0]).toBe("/fake/root/node_modules/.bin/web-ext");
+  });
+
+  it("should return the binary path when found at package root node_modules", () => {
+    mockExistsSync.mockImplementation((p) => String(p) === "/fake/root/node_modules/.bin/web-ext");
+
+    const result = findWebExtBinaryFrom(fakeGlobalDir);
+    expect(result).toBe("/fake/root/node_modules/.bin/web-ext");
+  });
+
+  it("should check hoisted node_modules when package root bin is missing (6 levels up)", () => {
+    const checkedPaths: string[] = [];
+    mockExistsSync.mockImplementation((p) => {
+      checkedPaths.push(String(p));
+      return false;
+    });
+
+    findWebExtBinaryFrom(fakeLocalDir);
+
+    // Second path checked: 6 levels up to project root
+    expect(checkedPaths[1]).toBe("/fake/project/node_modules/.bin/web-ext");
+  });
+
+  it("should return the binary path when found at hoisted node_modules", () => {
+    mockExistsSync.mockImplementation(
+      (p) => String(p) === "/fake/project/node_modules/.bin/web-ext",
+    );
+
+    const result = findWebExtBinaryFrom(fakeLocalDir);
+    expect(result).toBe("/fake/project/node_modules/.bin/web-ext");
+  });
+
+  it("should prefer package root bin over hoisted bin", () => {
+    // Both exist, but package root should win
+    mockExistsSync.mockReturnValue(true);
+
+    const result = findWebExtBinaryFrom(fakeLocalDir);
+    expect(result).toBe("/fake/project/node_modules/@tabstack/pilo/node_modules/.bin/web-ext");
+  });
+
+  it("should fall back to global PATH when no local binary exists", () => {
+    mockExistsSync.mockReturnValue(false);
+    mockExecFileSync.mockReturnValue(Buffer.from("/usr/local/bin/web-ext"));
+
+    const result = findWebExtBinaryFrom(fakeGlobalDir);
+    expect(result).toBe("web-ext");
+  });
+
+  it("should return null when web-ext is not found anywhere", () => {
+    mockExistsSync.mockReturnValue(false);
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = findWebExtBinaryFrom(fakeGlobalDir);
+    expect(result).toBeNull();
   });
 });
