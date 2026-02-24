@@ -246,13 +246,13 @@ async function runProduction(
 /**
  * Resolve the path to the pre-built extension for the given browser.
  *
- * In the npm-installed package layout, compiled CLI files live at:
- *   dist/cli/commands/extension.js
+ * In the npm-installed package layout, tsup bundles all CLI source into:
+ *   dist/cli/src/cli.js  (no commands/ subdir)
  *
  * The extension artifacts are assembled alongside the CLI at:
  *   dist/extension/<browser>/
  *
- * So from __dirname (dist/cli/commands/) we go up two levels to reach
+ * So from __dirname (dist/cli/src/) we go up two levels to reach
  * dist/, then into extension/<browser>/.
  */
 function resolveProductionExtensionPath(browser: SupportedBrowser): string {
@@ -301,15 +301,13 @@ function printChromeInstructions(extensionPath: string): void {
  * during the build/serve step. Writing pilo.config.json here is idempotent
  * and works with WXT's file watching (any rebuild picks up the file).
  *
- * From __dirname (dist/cli/commands/ in production, or src/commands/ in dev
- * when running via tsx), we navigate up to the monorepo root and then into
- * packages/extension/public/.
+ * From __dirname (src/commands/ in dev when running via tsx), we navigate
+ * up to the monorepo root and then into packages/extension/public/.
  */
 function resolveDevExtensionPublicPath(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  // __dirname is .../packages/cli/src/commands (dev) or .../dist/cli/commands (prod)
-  // Walk up to monorepo root: 4 levels in dev, same in prod (dist is still inside workspace).
-  // We use a relative path from the known CLI package position.
+  // __dirname is .../packages/cli/src/commands
+  // Walk up 3 levels to packages/, then into extension/public/.
   return resolve(__dirname, "../../../extension/public");
 }
 
@@ -437,10 +435,16 @@ async function launchFirefox(
  * Falls back to a global web-ext on PATH.
  */
 function findWebExtBinary(): string | null {
+  if (!isProduction()) {
+    throw new Error("findWebExtBinary() must only be called in production mode");
+  }
+
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Local bin linked by pnpm when web-ext is a dependency of pilo-cli
-  const localBin = resolve(__dirname, "../../node_modules/.bin/web-ext");
+  // Local bin linked by pnpm when web-ext is a dependency of pilo.
+  // In production tsup bundles into dist/cli/src/cli.js (no commands/ subdir)
+  // so __dirname = <pkg_root>/dist/cli/src/ → 3 levels up = <pkg_root>/
+  const localBin = resolve(__dirname, "../../../node_modules/.bin/web-ext");
   if (existsSync(localBin)) return localBin;
 
   // Monorepo root node_modules
