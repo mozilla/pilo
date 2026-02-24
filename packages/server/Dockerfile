@@ -20,7 +20,7 @@ COPY packages/server/package.json ./packages/server/package.json
 COPY packages/extension/package.json ./packages/extension/package.json
 
 # Install all workspace dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy core source and build it (server depends on pilo-core)
 COPY packages/core/ ./packages/core/

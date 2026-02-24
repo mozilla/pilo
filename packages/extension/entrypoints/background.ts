@@ -8,6 +8,7 @@ import {
   setupNavigationListener,
   cleanupStaleRegistrations,
 } from "../src/background/indicatorControl";
+import { applyConfigSeed } from "../src/background/configSeed";
 import type {
   ChromeBrowser,
   ExtensionMessage,
@@ -26,6 +27,10 @@ interface StorageSettings {
 
 export default defineBackground(() => {
   console.log("Background script loaded");
+
+  // Apply any CLI-seeded config (pilo.config.json) before the sidepanel mounts.
+  // Runs once per extension startup; silently no-ops if the file is absent.
+  applyConfigSeed().catch(() => {});
 
   // Clean up any orphaned registrations from previous session (e.g., after crash)
   cleanupStaleRegistrations().catch(() => {});

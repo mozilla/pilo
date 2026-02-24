@@ -3,6 +3,8 @@ import browser from "webextension-polyfill";
 import "./SidePanel.css";
 import ChatView from "./ChatView";
 import SettingsView from "./SettingsView";
+import { SidebarHeader } from "./SidebarHeader";
+import { ThemeProvider } from "../ThemeProvider";
 import { useSettings } from "../../stores/settingsStore";
 import { useConversationStore } from "../../../shared/conversationStore";
 
@@ -95,32 +97,48 @@ export default function SidePanel(): ReactElement {
     }
   };
 
-  const handleOpenSettings = () => {
-    setCurrentView("settings");
+  const handleNavigate = (view: View) => {
+    setCurrentView(view);
   };
 
-  const handleBackToChat = () => {
-    setCurrentView("chat");
+  // Clear chat is dispatched to ChatView via a custom DOM event so the header
+  // can trigger it without prop-drilling through the view switcher.
+  const handleClearChat = () => {
+    document.documentElement.dispatchEvent(new CustomEvent("pilo:clear-chat"));
   };
 
   // Don't render anything until settings are loaded to prevent render loops
   if (!settingsLoaded) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-2xl">⚡</span>
-          <p className="text-sm text-gray-500 mt-2">Loading...</p>
+      <ThemeProvider>
+        <div className="h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <span className="text-2xl">⚡</span>
+            <p className="text-sm text-muted-foreground mt-2">Loading...</p>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
-  // Simple routing
-  switch (currentView) {
-    case "settings":
-      return <SettingsView onBack={handleBackToChat} />;
-    case "chat":
-    default:
-      return <ChatView currentTab={currentTab} onOpenSettings={handleOpenSettings} />;
-  }
+  return (
+    <ThemeProvider>
+      <div className="h-screen flex flex-col bg-background text-foreground">
+        <SidebarHeader
+          view={currentView}
+          onNavigate={handleNavigate}
+          onClearChat={handleClearChat}
+        />
+
+        {/* Route between views */}
+        {currentView === "settings" ? (
+          <div className="flex-1 overflow-hidden">
+            <SettingsView onBack={() => handleNavigate("chat")} />
+          </div>
+        ) : (
+          <ChatView currentTab={currentTab} />
+        )}
+      </div>
+    </ThemeProvider>
+  );
 }

@@ -370,7 +370,7 @@ new PlaywrightBrowser({
 });
 ```
 
-## Evaluation System
+## Evaluation System (Internal Only)
 
 Pilo includes an automated evaluation system that tests changes against the WebVoyager benchmark. Push to an `evals/**` branch to trigger evaluation runs:
 

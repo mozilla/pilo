@@ -15,6 +15,9 @@ stats-*.json
 .wxt
 web-ext.config.ts
 
+# Runtime config injected by CLI during dev/install - may contain API keys
+public/pilo.config.json
+
 # Playwright
 playwright-report/
 test-results/
