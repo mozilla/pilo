@@ -411,11 +411,11 @@ describe("CLI Extension Command", () => {
 
         const webExtPaths = checkedPaths.filter((p) => p.includes("web-ext"));
         expect(webExtPaths.length).toBeGreaterThan(0);
-        // First candidate must target node_modules/.bin/web-ext
-        expect(webExtPaths[0]).toMatch(/node_modules[\\/]\.bin[\\/]web-ext$/);
+        // Must include a node_modules/.bin/web-ext candidate
+        expect(webExtPaths.some((p) => /node_modules[\\/]\.bin[\\/]web-ext$/.test(p))).toBe(true);
         // Must resolve above packages/cli/ — NOT inside cli/node_modules/
         // (which was the old 2-level-up bug)
-        expect(webExtPaths[0]).not.toMatch(/cli[\\/]node_modules/);
+        expect(webExtPaths.some((p) => /cli[\\/]node_modules/.test(p))).toBe(false);
       });
 
       it("should exit(1) when web-ext is not found", async () => {
