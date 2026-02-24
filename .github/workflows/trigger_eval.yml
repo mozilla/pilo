@@ -57,7 +57,7 @@ jobs:
           # Create payload file with proper JSON escaping
           cat > payload.json <<EOF
           {
-            "event_type": "spark_eval",
+            "event_type": "pilo_eval",
             "client_payload": {
               "eval_name": "${{ steps.parse.outputs.eval_name }}",
               "git_sha": "${{ github.sha }}",
