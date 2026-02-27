@@ -7,6 +7,19 @@ import {
   BrowserDisconnectedError,
 } from "../src/errors.js";
 
+// Must be at the top level so Vitest hoists it before any imports resolve.
+// Only replaces connectOverCDP; all other playwright exports remain real.
+vi.mock("playwright", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("playwright")>();
+  return {
+    ...actual,
+    chromium: {
+      ...actual.chromium,
+      connectOverCDP: vi.fn(),
+    },
+  };
+});
+
 describe("PlaywrightBrowser", () => {
   describe("constructor and options", () => {
     it("should handle default options", () => {
@@ -801,18 +814,6 @@ describe("PlaywrightBrowser", () => {
   });
 
   describe("CDP endpoint failover", () => {
-    // Mock the playwright chromium module for connection tests
-    vi.mock("playwright", async (importOriginal) => {
-      const actual = await importOriginal<typeof import("playwright")>();
-      return {
-        ...actual,
-        chromium: {
-          ...actual.chromium,
-          connectOverCDP: vi.fn(),
-        },
-      };
-    });
-
     let mockChromium: { connectOverCDP: ReturnType<typeof vi.fn> };
 
     beforeEach(async () => {

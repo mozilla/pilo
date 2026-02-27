@@ -96,7 +96,7 @@ export interface CdpEndpointCycleEventData extends WebAgentEventData {
   attempt: number;
   /** Total number of configured CDP endpoints */
   total: number;
-  /** Error message from the failed connection attempt */
+  /** Sanitized error identifier from the failed connection attempt (error.name, not error.message — full messages may contain endpoint URLs) */
   error: string;
 }
 

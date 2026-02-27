@@ -1311,7 +1311,10 @@ export class WebAgent {
       guardrails: this.guardrails,
       data: this.data,
       pwEndpoint: (this.browser as any).pwEndpoint,
-      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
+      // pwCdpEndpoint getter returns undefined until after browser.start().
+      // Fall back to the first configured endpoint so consumers see a value.
+      pwCdpEndpoint:
+        (this.browser as any).pwCdpEndpoint ?? (this.browser as any).pwCdpEndpoints?.[0],
       pwCdpEndpoints: (this.browser as any).pwCdpEndpoints,
       pwCdpEndpointCount: (this.browser as any).pwCdpEndpoints?.length ?? 0,
       proxy: (this.browser as any).proxyServer,
