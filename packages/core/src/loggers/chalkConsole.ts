@@ -4,6 +4,9 @@ import type {
   ActionExecutionEventData,
   ActionResultEventData,
   AgentStepEventData,
+  BrowserReconnectedEventData,
+  CdpEndpointConnectedEventData,
+  CdpEndpointCycleEventData,
   CompressionDebugEventData,
   ExtractedDataEventData,
   MessagesDebugEventData,
@@ -81,6 +84,11 @@ export class ChalkConsoleLogger implements Logger {
 
     // AI events
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+
+    // CDP failover events
+    emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CONNECTED, this.handleCdpEndpointConnected);
+    emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
+    emitter.onEvent(WebAgentEventType.BROWSER_RECONNECTED, this.handleBrowserReconnected);
   }
 
   dispose(): void {
@@ -128,6 +136,14 @@ export class ChalkConsoleLogger implements Logger {
       // AI events
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
 
+      // CDP failover events
+      this.emitter.offEvent(
+        WebAgentEventType.CDP_ENDPOINT_CONNECTED,
+        this.handleCdpEndpointConnected,
+      );
+      this.emitter.offEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
+      this.emitter.offEvent(WebAgentEventType.BROWSER_RECONNECTED, this.handleBrowserReconnected);
+
       // Reset emitter reference
       this.emitter = null;
     }
@@ -141,6 +157,8 @@ export class ChalkConsoleLogger implements Logger {
     console.log(chalk.gray(`Browser: ${data.browserName}`));
     if (data.pwEndpoint) console.log(chalk.gray(`Remote endpoint: ${data.pwEndpoint}`));
     if (data.pwCdpEndpoint) console.log(chalk.gray(`CDP endpoint: ${data.pwCdpEndpoint}`));
+    else if (data.pwCdpEndpoints?.length)
+      console.log(chalk.gray(`CDP endpoint: ${data.pwCdpEndpoints[0]}`));
     if (data.proxy) console.log(chalk.gray(`Proxy: ${data.proxy}`));
     if (data.url) console.log(chalk.gray(`Starting URL: ${data.url}`));
     if (data.guardrails) console.log(chalk.gray(`Guardrails: ${data.guardrails}`));
@@ -294,6 +312,27 @@ export class ChalkConsoleLogger implements Logger {
     console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
   };
 
+  private handleCdpEndpointConnected = (data: CdpEndpointConnectedEventData): void => {
+    console.log(chalk.green(`🌐 Connected to CDP endpoint ${data.endpointIndex} of ${data.total}`));
+  };
+
+  private handleCdpEndpointCycle = (data: CdpEndpointCycleEventData): void => {
+    console.warn(
+      chalk.yellow(`⚠️ CDP endpoint ${data.attempt} of ${data.total} failed, trying next...`),
+      chalk.gray(`(${data.error})`),
+    );
+  };
+
+  private handleBrowserReconnected = (data: BrowserReconnectedEventData): void => {
+    const indexInfo =
+      data.total > 0 ? chalk.gray(` (endpoint ${data.endpointIndex} of ${data.total})`) : "";
+    console.warn(
+      chalk.yellow(`⚠️ Browser disconnected — reconnected and restarting task execution`),
+      indexInfo,
+      data.startingUrl ? chalk.gray(`from ${data.startingUrl}`) : "",
+    );
+  };
+
   private handleTaskMetrics = (data: TaskMetricsEventData): void => {
     console.log(chalk.cyan.bold("\n📊 Task Metrics Summary"));
     console.log(chalk.gray("━".repeat(60)));
@@ -332,7 +371,7 @@ export class ChalkConsoleLogger implements Logger {
       console.log(chalk.yellow.bold("\n📈 Top Events:"));
       eventEntries.forEach(([eventType, count]) => {
         // Shorten event type for display
-        const shortType = eventType.replace(/^(task|agent|browser|system|ai):/, "");
+        const shortType = eventType.replace(/^(task|agent|browser|system|ai|cdp):/, "");
         console.log(chalk.gray(`   ${shortType.padEnd(25)} ${chalk.whiteBright(count)}`));
       });
     }

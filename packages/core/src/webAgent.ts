@@ -10,11 +10,17 @@
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
 import { AriaBrowser } from "./browser/ariaBrowser.js";
-import { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
+import {
+  BrowserReconnectedEventData,
+  CdpEndpointConnectedEventData,
+  CdpEndpointCycleEventData,
+  WebAgentEventEmitter,
+  WebAgentEventType,
+} from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
-import { RecoverableError, ToolExecutionError } from "./errors.js";
+import { BrowserDisconnectedError, RecoverableError, ToolExecutionError } from "./errors.js";
 import { generateTextWithRetry } from "./utils/retry.js";
 import type { AwaitedProperties } from "./utils/types.js";
 import {
@@ -220,6 +226,31 @@ export class WebAgent {
 
     // Initialize logger with event emitter
     this.logger.initialize(this.eventEmitter);
+
+    // Wire up CDP endpoint cycle callback so browser failover events flow through the event system
+    const browserAny = this.browser as any;
+    if ("onCdpEndpointConnected" in browserAny) {
+      browserAny.onCdpEndpointConnected = (endpointIndex: number, total: number): void => {
+        const data: Omit<CdpEndpointConnectedEventData, "timestamp" | "iterationId"> = {
+          endpointIndex,
+          total,
+        };
+        this.emit(WebAgentEventType.CDP_ENDPOINT_CONNECTED, data);
+      };
+    }
+
+    if ("onCdpEndpointCycle" in browserAny) {
+      browserAny.onCdpEndpointCycle = (attempt: number, error: Error): void => {
+        const data: Omit<CdpEndpointCycleEventData, "timestamp" | "iterationId"> = {
+          attempt,
+          total: browserAny.pwCdpEndpoints?.length ?? 0,
+          // Use error.name, not error.message — connection errors typically
+          // include the endpoint URL in the message, which would leak secrets.
+          error: error.name,
+        };
+        this.emit(WebAgentEventType.CDP_ENDPOINT_CYCLE, data);
+      };
+    }
   }
 
   /**
@@ -373,6 +404,17 @@ export class WebAgent {
 
         needsPageSnapshot = result.pageChanged;
       } catch (error) {
+        // Browser disconnects are handled specially: restart on next CDP endpoint,
+        // reset execution state, and continue — not counted as an agent error.
+        if (error instanceof BrowserDisconnectedError) {
+          // May throw if all endpoints exhausted — propagates as hard error
+          await this.handleBrowserDisconnect(task, error, executionState);
+          consecutiveErrors = 0;
+          needsPageSnapshot = true;
+          executionState.currentIteration++;
+          continue;
+        }
+
         trackError();
 
         // Check if we should continue
@@ -1269,7 +1311,12 @@ export class WebAgent {
       guardrails: this.guardrails,
       data: this.data,
       pwEndpoint: (this.browser as any).pwEndpoint,
-      pwCdpEndpoint: (this.browser as any).pwCdpEndpoint,
+      // pwCdpEndpoint getter returns undefined until after browser.start().
+      // Fall back to the first configured endpoint so consumers see a value.
+      pwCdpEndpoint:
+        (this.browser as any).pwCdpEndpoint ?? (this.browser as any).pwCdpEndpoints?.[0],
+      pwCdpEndpoints: (this.browser as any).pwCdpEndpoints,
+      pwCdpEndpointCount: (this.browser as any).pwCdpEndpoints?.length ?? 0,
       proxy: (this.browser as any).proxyServer,
       vision: this.vision,
     });
@@ -1455,6 +1502,59 @@ export class WebAgent {
         durationMs: endTime - executionState.startTime,
       },
     };
+  }
+
+  /**
+   * Handle a mid-task browser disconnect by restarting on the next CDP endpoint
+   * (Phase 1's nextStartIndex advances automatically).
+   *
+   * Resets conversation messages and repetition-tracking state so the agent
+   * starts fresh on the new browser without stale DOM snapshots or false
+   * "stuck in loop" detection. Planning state (plan, successCriteria, url)
+   * is preserved.
+   *
+   * Throws if browser.start() fails (all endpoints exhausted).
+   */
+  private async handleBrowserDisconnect(
+    task: string,
+    error: BrowserDisconnectedError,
+    executionState: ExecutionState,
+  ): Promise<void> {
+    console.warn(`[WebAgent] Browser disconnected mid-task: ${error.message}`);
+    console.warn(`[WebAgent] Restarting on next CDP endpoint...`);
+
+    await this.browser.shutdown();
+
+    // Throws a hard (non-RecoverableError) if all endpoints are exhausted
+    await this.browser.start();
+
+    // Navigate to the original starting URL — not currentPage.url.
+    // The new browser has no prior session state; we need a coherent starting point.
+    if (this.url && this.url !== "about:blank") {
+      await this.browser.goto(this.url);
+    }
+
+    // Re-initialize messages: stale DOM snapshots from the old browser would
+    // confuse the agent and may trigger false repetition-abort logic.
+    this.initializeSystemPromptAndTask(task);
+
+    // Reset repetition tracking to avoid false "stuck in loop" detection.
+    executionState.actionRepeatCount = 0;
+    executionState.lastAction = undefined;
+
+    // Refresh page state from the newly navigated browser.
+    await this.updatePageState();
+
+    const browserAny = this.browser as any;
+    const endpointIndex: number = browserAny.nextStartIndex ?? 0;
+    const total: number = browserAny.pwCdpEndpoints?.length ?? 0;
+
+    const data: Omit<BrowserReconnectedEventData, "timestamp" | "iterationId"> = {
+      startingUrl: this.url ?? "",
+      endpointIndex,
+      total,
+    };
+    this.emit(WebAgentEventType.BROWSER_RECONNECTED, data);
   }
 
   private emit(type: WebAgentEventType, data: any): void {

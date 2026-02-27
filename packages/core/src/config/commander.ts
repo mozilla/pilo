@@ -47,6 +47,16 @@ export function addConfigOptions(command: Command, exclude: string[] = []): Comm
       option.argParser(parseFloat);
     }
 
+    // For string arrays, use argParser to split comma-separated values
+    if (field.type === "string[]") {
+      option.argParser((val: string) =>
+        val
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+    }
+
     // Don't set Commander defaults - our config system handles defaults via
     // DEFAULTS, and setting them here would override env vars and config file values
 
