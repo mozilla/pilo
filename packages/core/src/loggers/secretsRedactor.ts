@@ -11,7 +11,12 @@ export type WebAgentEventDataFields = {
 };
 
 export const SECRET_FIELDS_BY_EVENT_TYPE: WebAgentEventDataFields = {
-  [WebAgentEventType.TASK_SETUP]: ["pwEndpoint", "pwCdpEndpoint", "pwCdpEndpoints"],
+  [WebAgentEventType.TASK_SETUP]: [
+    "pwEndpoint",
+    "pwCdpEndpoint",
+    "pwCdpEndpoints",
+    "pwCdpEndpointCount",
+  ],
 } as const;
 
 export class SecretsRedactor extends LoggerFilter {
@@ -28,6 +33,8 @@ export class SecretsRedactor extends LoggerFilter {
       const value = redacted[field];
       if (typeof value === "string" && value !== "") {
         redacted[field] = "(redacted)";
+      } else if (typeof value === "number") {
+        redacted[field] = -1;
       } else if (Array.isArray(value) && value.length > 0) {
         // Collapse to a single-element array to hide both values and count
         redacted[field] = ["(redacted)"];

@@ -25,7 +25,7 @@ single endpoint causes the entire task to fail with no recourse.
 | 3   | Keep `--pw-cdp-endpoint` (singular, unchanged); add new `--pw-cdp-endpoints` (plural, comma-separated)                                |
 | 4   | Keep `pw_cdp_endpoint` config key (singular, unchanged); add `pw_cdp_endpoints` (plural)                                              |
 | 5   | No wraparound — exhausting the endpoint list is a hard, immediate fatal error                                                         |
-| 6   | CDP connection attempt timeout defaults to 10 seconds per endpoint                                                                    |
+| 6   | CDP connection attempt timeout defaults to 5 seconds (5,000 ms) per endpoint                                                          |
 
 ## Core Architecture: Endpoint Cycling in `PlaywrightBrowser.start()`
 
