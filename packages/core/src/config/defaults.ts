@@ -46,7 +46,8 @@ export type ConfigCategory =
   | "playwright"
   | "navigation"
   | "action"
-  | "search";
+  | "search"
+  | "tabstack";
 
 // =============================================================================
 // PiloConfig Interface (Manual for Readability)
@@ -115,6 +116,9 @@ export interface PiloConfig {
   // Search Configuration
   search_provider?: SearchProviderName;
   parallel_api_key?: string;
+
+  // Tabstack Configuration
+  tabstack_api_key?: string;
 }
 
 /** PiloConfigResolved type - output type (defaults applied) */
@@ -180,6 +184,9 @@ export interface PiloConfigResolved {
   // Search Configuration
   search_provider: SearchProviderName;
   parallel_api_key?: string;
+
+  // Tabstack Configuration
+  tabstack_api_key?: string;
 }
 
 export type ConfigKey = keyof PiloConfigResolved;
@@ -597,6 +604,16 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     env: ["PARALLEL_API_KEY"],
     description: "Parallel API key for search",
     category: "search",
+  },
+
+  // Tabstack Configuration
+  tabstack_api_key: {
+    type: "string",
+    cli: "--tabstack-api-key",
+    placeholder: "key",
+    env: ["TABSTACK_API_KEY"],
+    description: "Tabstack API key for cloud extraction tools",
+    category: "tabstack",
   },
 };
 

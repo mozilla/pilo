@@ -152,6 +152,7 @@ try {
 - 🌐 **Multi-Browser Support**: Works with Firefox, Chrome, Safari, and Edge
 - 🛡️ **Safety First**: Provide guardrails to prevent unintended actions
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
+- ☁️ **Tabstack API Integration**: Extract markdown, structured JSON, or AI-transformed data from any URL using [Tabstack](https://tabstack.ai) cloud tools — especially useful for PDFs which browsers cannot read directly
 
 ## Configuration
 
@@ -418,6 +419,7 @@ Results appear as commit status checks with links to detailed HTML reports. See 
 | `--pw-endpoint <url>`           | Playwright endpoint for remote browser                     | -                | `--pw-endpoint ws://localhost:9222`     |
 | `--pw-cdp-endpoint <url>`       | Chrome DevTools Protocol endpoint                          | -                | `--pw-cdp-endpoint ws://localhost:9222` |
 | `--bypass-csp`                  | Bypass Content Security Policy                             | false            | `--bypass-csp`                          |
+| `--tabstack-api-key <key>`      | Tabstack API key for cloud extraction tools                | -                | `--tabstack-api-key your-key`           |
 
 ### Environment Variables
 
@@ -463,6 +465,8 @@ All configuration options can be set via environment variables (dev mode only; n
 | `PILO_PW_ENDPOINT`                | Playwright endpoint URL                          | `--pw-endpoint`             |
 | `PILO_PW_CDP_ENDPOINT`            | CDP endpoint URL                                 | `--pw-cdp-endpoint`         |
 | `PILO_BYPASS_CSP`                 | Bypass CSP (true/false)                          | `--bypass-csp`              |
+| **Tabstack Configuration**        |                                                  |                             |
+| `TABSTACK_API_KEY`                | Tabstack API key for cloud extraction tools      | `--tabstack-api-key`        |
 
 ### Configuration Priority
 

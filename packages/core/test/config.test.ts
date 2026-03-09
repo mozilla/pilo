@@ -189,6 +189,7 @@ describe("ConfigManager", () => {
         "action_timeout_ms",
         "search_provider",
         "parallel_api_key",
+        "tabstack_api_key",
       ];
 
       // Check that schema has all PiloConfig keys

@@ -216,6 +216,7 @@ pilo.post("/run", async (c) => {
           guardrails: body.guardrails,
           searchProvider: body.searchProvider ?? serverConfig.search_provider,
           searchApiKey: serverConfig.parallel_api_key,
+          tabstackApiKey: serverConfig.tabstack_api_key,
         };
 
         // Create browser and agent instances

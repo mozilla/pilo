@@ -37,6 +37,8 @@ import { createSearchTools } from "./tools/searchTools.js";
 import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
+import { createTabstackTools } from "./tools/tabstackTools.js";
+import { createTabstackClient } from "./tabstack/client.js";
 import { nanoid } from "nanoid";
 import { getConfigDefaults, type SearchProviderName } from "./config/defaults.js";
 import {
@@ -76,6 +78,8 @@ export interface WebAgentOptions {
   searchProvider?: SearchProviderName;
   /** API key for search providers that require authentication (e.g., Parallel) */
   searchApiKey?: string;
+  /** Tabstack API key for cloud extraction tools (when set, Tabstack tools are available) */
+  tabstackApiKey?: string;
 }
 
 export interface ExecuteOptions {
@@ -194,6 +198,7 @@ export class WebAgent {
   private readonly guardrails: string | null;
   private readonly searchProvider: SearchProviderName;
   private readonly searchApiKey: string | undefined;
+  private readonly tabstackApiKey: string | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -214,6 +219,7 @@ export class WebAgent {
     this.guardrails = options.guardrails ?? null;
     this.searchProvider = options.searchProvider ?? defaults.search_provider;
     this.searchApiKey = options.searchApiKey;
+    this.tabstackApiKey = options.tabstackApiKey;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -337,8 +343,16 @@ export class WebAgent {
       ? createSearchTools({ searchService: this.searchService, eventEmitter: this.eventEmitter })
       : {};
 
+    // Only include Tabstack tools if an API key is configured
+    const tabstackTools = this.tabstackApiKey
+      ? createTabstackTools({
+          client: createTabstackClient(this.tabstackApiKey),
+          eventEmitter: this.eventEmitter,
+        })
+      : {};
+
     // Merge all tools
-    const allTools = { ...webActionTools, ...searchTools };
+    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools };
 
     // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
     // The empty page has no useful elements and the snapshot prompt causes the model
@@ -555,6 +569,7 @@ export class WebAgent {
       errorMessage,
       Boolean(this.guardrails),
       this.searchProvider !== "none",
+      Boolean(this.tabstackApiKey),
     );
     this.messages.push({ role: "user", content: errorFeedback });
   }
@@ -1389,6 +1404,8 @@ export class WebAgent {
   private initializeSystemPromptAndTask(task: string): void {
     const hasGuardrails = Boolean(this.guardrails);
     const hasWebSearch = this.searchProvider !== "none";
+    const hasTabstack = Boolean(this.tabstackApiKey);
+    const hasStartingUrl = Boolean(this.url && this.url !== "about:blank");
 
     const taskPromptContent = buildTaskAndPlanPrompt(
       task,
@@ -1401,7 +1418,12 @@ export class WebAgent {
     this.messages = [
       {
         role: "system",
-        content: buildActionLoopSystemPrompt(hasGuardrails, hasWebSearch),
+        content: buildActionLoopSystemPrompt(
+          hasGuardrails,
+          hasWebSearch,
+          hasTabstack,
+          hasStartingUrl,
+        ),
       },
       {
         role: "user",
