@@ -341,16 +341,16 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.9
-        version: 1.19.9(hono@4.11.10)
+        version: 1.19.9(hono@4.12.2)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.11.10)
+        version: 1.2.2(hono@4.12.2)
       dotenv:
         specifier: ^17.2.4
         version: 17.3.1
       hono:
-        specifier: ^4.11.10
-        version: 4.11.10
+        specifier: ^4.12.2
+        version: 4.12.2
       pilo-core:
         specifier: workspace:*
         version: link:../core
@@ -2701,8 +2701,8 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
-  hono@4.11.10:
-    resolution: {integrity: sha512-kyWP5PAiMooEvGrA9jcD3IXF7ATu8+o7B3KCbPXid5se52NPqnOpM/r9qeW2heMnOekF4kqR1fXJqCYeCLKrZg==}
+  hono@4.12.2:
+    resolution: {integrity: sha512-gJnaDHXKDayjt8ue0n8Gs0A007yKXj4Xzb8+cNjZeYsSzzwKc0Lr+OZgYwVfB0pHfUs17EPoLvrOsEaJ9mj+Tg==}
     engines: {node: '>=16.9.0'}
 
   hookable@6.0.1:
@@ -4807,13 +4807,13 @@ snapshots:
     dependencies:
       tldts-experimental: 7.0.19
 
-  '@hono/node-server@1.19.9(hono@4.11.10)':
+  '@hono/node-server@1.19.9(hono@4.12.2)':
     dependencies:
-      hono: 4.11.10
+      hono: 4.12.2
 
-  '@hono/sentry@1.2.2(hono@4.11.10)':
+  '@hono/sentry@1.2.2(hono@4.12.2)':
     dependencies:
-      hono: 4.11.10
+      hono: 4.12.2
       toucan-js: 4.1.1
 
   '@humanfs/core@0.19.1': {}
@@ -6595,7 +6595,7 @@ snapshots:
 
   has-flag@4.0.0: {}
 
-  hono@4.11.10: {}
+  hono@4.12.2: {}
 
   hookable@6.0.1: {}
 
