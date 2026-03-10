@@ -40,7 +40,7 @@
     "cross-fetch": "^4.1.0",
     "dotenv": "^17.2.4",
     "eventemitter3": "^5.0.4",
-    "liquidjs": "^10.24.0",
+    "liquidjs": "^10.25.0",
     "nanoid": "^5.1.6",
     "ollama-ai-provider-v2": "^3.0.3",
     "playwright": "1.58.2",

@@ -45,8 +45,8 @@ importers:
         specifier: ^5.0.4
         version: 5.0.4
       liquidjs:
-        specifier: ^10.24.0
-        version: 10.24.0
+        specifier: ^10.25.0
+        version: 10.25.0
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
@@ -167,8 +167,8 @@ importers:
         specifier: ^5.0.4
         version: 5.0.4
       liquidjs:
-        specifier: ^10.24.0
-        version: 10.24.0
+        specifier: ^10.25.0
+        version: 10.25.0
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
@@ -3107,8 +3107,8 @@ packages:
       canvas:
         optional: true
 
-  liquidjs@10.24.0:
-    resolution: {integrity: sha512-TAUNAdgwaAXjjcUFuYVJm9kOVH7zc0mTKxsG9t9Lu4qdWjB2BEblyVIYpjWcmJLMGgiYqnGNJjpNMHx0gp/46A==}
+  liquidjs@10.25.0:
+    resolution: {integrity: sha512-XpO7AiGULTG4xcTlwkcTI5JreFG7b6esLCLp+aUSh7YuQErJZEoUXre9u9rbdb0057pfWG4l0VursvLd5Q/eAw==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -6984,7 +6984,7 @@ snapshots:
       htmlparser2: 10.1.0
       uhyphen: 0.2.0
 
-  liquidjs@10.24.0:
+  liquidjs@10.25.0:
     dependencies:
       commander: 10.0.1
 
