@@ -1,11 +1,11 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,7 +31,7 @@ jobs:
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Setup pnpm cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -50,46 +50,7 @@ jobs:
           npm pack
           echo "filename=$(ls *.tgz)" >> $GITHUB_OUTPUT
 
-      - name: Get package info
-        id: package
-        run: |
-          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        run: |
-          gh release create "v${{ steps.package.outputs.version }}" \
-            --title "Release v${{ steps.package.outputs.version }}" \
-            --notes "## Installation
-
-          **Option 1: Install Latest (Auto-builds)**
-          \`\`\`bash
-          npm install https://github.com/${{ github.repository }}.git
-          npm install -g https://github.com/${{ github.repository }}.git  # global CLI
-          \`\`\`
-
-          **Option 2: Install This Specific Release (Pre-built)**
-          \`\`\`bash
-          npm install https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.tarball.outputs.filename }}
-          npm install -g https://github.com/${{ github.repository }}/releases/download/v${{ steps.package.outputs.version }}/${{ steps.tarball.outputs.filename }}  # global CLI
-          \`\`\`
-
-          ## What's New in v${{ steps.package.outputs.version }}
-
-          - Built and packaged release with TypeScript compiled to JavaScript
-          - Includes all dependencies and type definitions
-          - Ready for production use
-
-          ## Usage
-
-          **As a library:**
-          \`\`\`javascript
-          import { WebAgent, PlaywrightBrowser } from '@tabstack/pilo';
-          \`\`\`
-
-          **As CLI:**
-          \`\`\`bash
-          pilo \"your task here\"
-          \`\`\`" \
-            ./${{ steps.tarball.outputs.filename }}
+      - name: Upload tarball to release
+        run: gh release upload "${{ github.event.release.tag_name }}" ./${{ steps.tarball.outputs.filename }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

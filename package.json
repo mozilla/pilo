@@ -36,8 +36,7 @@
     "check": "pnpm run typecheck && pnpm run test",
     "pilo": "pnpm --filter pilo-cli run pilo",
     "dev:extension": "pnpm --filter pilo-extension run dev --",
-    "dev:server": "pnpm --filter pilo-server run dev",
-    "release": "./scripts/release.sh"
+    "dev:server": "pnpm --filter pilo-server run dev"
   },
   "keywords": [
     "ai",
