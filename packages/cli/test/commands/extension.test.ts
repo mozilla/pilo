@@ -389,6 +389,35 @@ describe("CLI Extension Command", () => {
         expect(args.some((a) => a.startsWith("--firefox="))).toBe(true);
       });
 
+      it("should resolve web-ext from 3 levels above __dirname (production layout)", async () => {
+        // Verify we're testing with the production flag set
+        const { isProduction } = await import("pilo-core");
+        expect(isProduction()).toBe(true);
+
+        const checkedPaths: string[] = [];
+        mockExistsSync.mockImplementation((p) => {
+          const path = String(p);
+          checkedPaths.push(path);
+          // Extension dir exists so runProduction doesn't bail before reaching launchFirefox
+          if (path.includes("extension") && !path.includes("web-ext")) return true;
+          // web-ext binary found so findWebExtBinary returns the first candidate (the one we assert on)
+          if (path.includes("web-ext")) return true;
+          return false;
+        });
+        makeSpawnResolve(0);
+
+        const cmd = getCommand();
+        await cmd.parseAsync(["install", "firefox"], { from: "user" });
+
+        const webExtPaths = checkedPaths.filter((p) => p.includes("web-ext"));
+        expect(webExtPaths.length).toBeGreaterThan(0);
+        // Must include a node_modules/.bin/web-ext candidate
+        expect(webExtPaths.some((p) => /node_modules[\\/]\.bin[\\/]web-ext$/.test(p))).toBe(true);
+        // Must resolve above packages/cli/ — NOT inside cli/node_modules/
+        // (which was the old 2-level-up bug)
+        expect(webExtPaths.some((p) => /cli[\\/]node_modules/.test(p))).toBe(false);
+      });
+
       it("should exit(1) when web-ext is not found", async () => {
         // Extension exists but web-ext binary does not
         mockExistsSync.mockImplementation((p) => {

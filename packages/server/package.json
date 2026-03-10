@@ -23,16 +23,16 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.2.0",
+    "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^1.19.10",
     "@hono/sentry": "^1.2.2",
-    "dotenv": "^17.2.3",
-    "hono": "^4.11.10",
+    "dotenv": "^17.2.4",
+    "hono": "^4.12.4",
     "pilo-core": "workspace:*"
   },
   "packageManager": "pnpm@9.0.0"

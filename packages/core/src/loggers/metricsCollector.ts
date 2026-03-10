@@ -5,7 +5,6 @@ import {
   WebAgentEventType,
   AIGenerationEventData,
   TaskCompleteEventData,
-  TaskAbortedEventData,
 } from "../events.js";
 
 export class MetricsCollector extends LoggerWrapper {
@@ -33,7 +32,6 @@ export class MetricsCollector extends LoggerWrapper {
     emitter.onEvent(WebAgentEventType.AI_GENERATION, this.handleAiGeneration);
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAiGenerationError);
     emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
-    emitter.onEvent(WebAgentEventType.TASK_ABORTED, this.handleTaskAborted);
 
     super.initialize(emitter);
   }
@@ -46,7 +44,6 @@ export class MetricsCollector extends LoggerWrapper {
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION, this.handleAiGeneration);
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAiGenerationError);
       this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
-      this.emitter.offEvent(WebAgentEventType.TASK_ABORTED, this.handleTaskAborted);
     }
     super.dispose();
   }
@@ -98,10 +95,6 @@ export class MetricsCollector extends LoggerWrapper {
   };
 
   private handleTaskComplete = (data: TaskCompleteEventData): void => {
-    this.emitTaskMetrics(data.iterationId);
-  };
-
-  private handleTaskAborted = (data: TaskAbortedEventData): void => {
     this.emitTaskMetrics(data.iterationId);
   };
 }

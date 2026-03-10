@@ -2,6 +2,9 @@
 
 # Pilo Release Script
 # Usage: ./scripts/release.sh [major|minor|patch]
+#
+# Follows the git-flow branching model using plain git commands
+# (no git-flow CLI dependency — avoids macOS BSD getopt issues).
 
 set -e
 
@@ -18,24 +21,10 @@ log_success() { echo -e "${GREEN}✓${NC} $1"; }
 log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 
-# Check if git flow is available
-if ! command -v git-flow &> /dev/null; then
-    log_error "git-flow is not installed. Please install it first:"
-    echo "  macOS: brew install git-flow"
-    echo "  Ubuntu: sudo apt install git-flow"
-    exit 1
-fi
-
 # Check if we're in a git repository
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
     log_error "Not in a git repository"
     exit 1
-fi
-
-# Check if git flow is initialized
-if ! git config --get gitflow.branch.master > /dev/null 2>&1; then
-    log_warning "Git flow not initialized. Initializing with defaults..."
-    git flow init -d
 fi
 
 # Validate arguments
@@ -44,7 +33,7 @@ if [ $# -ne 1 ]; then
     echo ""
     echo "Examples:"
     echo "  $0 patch   # 1.0.0 -> 1.0.1"
-    echo "  $0 minor   # 1.0.1 -> 1.1.0" 
+    echo "  $0 minor   # 1.0.1 -> 1.1.0"
     echo "  $0 major   # 1.1.0 -> 2.0.0"
     exit 1
 fi
@@ -105,10 +94,10 @@ log_info "New version will be: $NEW_VERSION"
 # Confirm with user
 echo ""
 log_warning "This will:"
-echo "  1. Start git flow release $NEW_VERSION"
+echo "  1. Create release/$NEW_VERSION branch from develop"
 echo "  2. Update package.json version to $NEW_VERSION"
-echo "  3. Commit the version change"
-echo "  4. Finish the release (merge to main and develop)"
+echo "  3. Merge release branch into main and tag v$NEW_VERSION"
+echo "  4. Merge release branch back into develop"
 echo "  5. Push all branches and tags"
 echo ""
 read -p "Continue? (y/N): " -n 1 -r
@@ -118,9 +107,9 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Start git flow release
-log_info "Starting git flow release $NEW_VERSION..."
-git flow release start "$NEW_VERSION"
+# Create release branch from develop
+log_info "Creating release branch release/$NEW_VERSION..."
+git checkout -b "release/$NEW_VERSION" develop
 
 # Update package.json version
 log_info "Updating package.json version to $NEW_VERSION..."
@@ -131,9 +120,23 @@ log_info "Committing version change..."
 git add package.json
 git commit -m "Bump version to $NEW_VERSION"
 
-# Finish git flow release
-log_info "Finishing git flow release..."
-git flow release finish "$NEW_VERSION" -m "Release $NEW_VERSION"
+# Merge release branch into main
+log_info "Merging release into main..."
+git checkout main
+git merge --no-ff "release/$NEW_VERSION" -m "Release $NEW_VERSION"
+
+# Tag the release on main
+log_info "Tagging v$NEW_VERSION..."
+git tag -a "v$NEW_VERSION" -m "Release $NEW_VERSION"
+
+# Merge release branch back into develop
+log_info "Merging release back into develop..."
+git checkout develop
+git merge --no-ff "release/$NEW_VERSION" -m "Merge release/$NEW_VERSION into develop"
+
+# Delete the release branch
+log_info "Cleaning up release branch..."
+git branch -d "release/$NEW_VERSION"
 
 # Push everything
 log_info "Pushing to remote..."

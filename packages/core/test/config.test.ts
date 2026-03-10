@@ -180,6 +180,7 @@ describe("ConfigManager", () => {
         "guardrails",
         "pw_endpoint",
         "pw_cdp_endpoint",
+        "pw_cdp_endpoints",
         "bypass_csp",
         "navigation_timeout_ms",
         "navigation_max_timeout_ms",

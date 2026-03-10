@@ -133,6 +133,18 @@ export class NavigationTimeoutException extends BrowserException {
 }
 
 /**
+ * Thrown when the browser connection is lost mid-task (CDP session closed).
+ * WebAgent catches this to trigger a browser restart and execution reset rather
+ * than treating it as an ordinary agent error.
+ */
+export class BrowserDisconnectedError extends RecoverableError {
+  constructor(message: string) {
+    super(`Browser connection lost: ${message}`);
+    this.name = "BrowserDisconnectedError";
+  }
+}
+
+/**
  * Thrown when navigation fails due to network errors after all retry attempts.
  * Covers errors like net::ERR_CONNECTION_REFUSED, net::ERR_NAME_NOT_RESOLVED, etc.
  *

@@ -11,7 +11,7 @@ function coerceValue(
   value: string,
   type: ConfigFieldType,
   envVar?: string,
-): string | number | boolean | undefined {
+): string | string[] | number | boolean | undefined {
   switch (type) {
     case "boolean": {
       const lower = value.toLowerCase();
@@ -36,6 +36,11 @@ function coerceValue(
       }
       return num;
     }
+    case "string[]":
+      return value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     case "string":
     case "enum":
       return value;

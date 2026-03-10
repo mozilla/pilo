@@ -18,6 +18,7 @@ import TurndownService from "turndown";
 import {
   InvalidRefException,
   BrowserActionException,
+  BrowserDisconnectedError,
   NavigationTimeoutException,
   NavigationNetworkException,
 } from "../errors.js";
@@ -49,6 +50,12 @@ export interface PlaywrightBrowserOptions {
   proxyPassword?: string;
   /** Chrome DevTools Protocol endpoint URL (chromium browsers only) */
   pwCdpEndpoint?: string;
+  /** Ordered list of CDP endpoint URLs to try in sequence (chromium only, takes precedence over pwCdpEndpoint) */
+  pwCdpEndpoints?: string[];
+  /** Called when a CDP endpoint fails and the next one is being tried */
+  onCdpEndpointCycle?: (attempt: number, error: Error) => void;
+  /** Called when a CDP endpoint is successfully connected to */
+  onCdpEndpointConnected?: (endpointIndex: number, total: number) => void;
   /** Playwright endpoint URL to connect to remote browser */
   pwEndpoint?: string;
   /** Navigation retry configuration */
@@ -69,6 +76,9 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
 /**
  * PlaywrightBrowser - Browser implementation using Playwright's accessibility features
  */
+/** Timeout per CDP endpoint connection attempt in milliseconds */
+const CDP_CONNECTION_TIMEOUT_MS = 5_000;
+
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
   public channel: string | undefined;
@@ -83,6 +93,15 @@ export class PlaywrightBrowser implements AriaBrowser {
   // Navigation retry configuration
   private readonly navigationConfig: NavigationRetryConfig;
 
+  // CDP endpoint failover state
+  private readonly cdpEndpoints: string[];
+  private nextStartIndex: number = 0;
+
+  /** Called when a CDP endpoint fails and the next one is being tried. Can be set after construction. */
+  public onCdpEndpointCycle: ((attempt: number, error: Error) => void) | undefined;
+  /** Called when a CDP endpoint is successfully connected to. Can be set after construction. */
+  public onCdpEndpointConnected: ((endpointIndex: number, total: number) => void) | undefined;
+
   constructor(private options: ExtendedPlaywrightBrowserOptions = {}) {
     this.browserName = `playwright:${this.options.browser ?? "firefox"}`;
     this.channel = this.options.channel ?? this.getDefaultChannel();
@@ -93,14 +112,32 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Initialize navigation retry config with defaults and overrides
     // Uses createNavigationRetryConfig which safely handles undefined values
     this.navigationConfig = createNavigationRetryConfig(options.navigationRetry);
+
+    // Normalize singular → plural for CDP endpoints
+    this.cdpEndpoints = options.pwCdpEndpoints?.length
+      ? options.pwCdpEndpoints
+      : options.pwCdpEndpoint
+        ? [options.pwCdpEndpoint]
+        : [];
+
+    // Initialize callbacks from options (can also be set directly after construction)
+    this.onCdpEndpointCycle = options.onCdpEndpointCycle;
+    this.onCdpEndpointConnected = options.onCdpEndpointConnected;
   }
 
   get pwEndpoint(): string | undefined {
     return this.options.pwEndpoint;
   }
 
+  /** Returns the currently active CDP endpoint (the last one successfully connected to) */
   get pwCdpEndpoint(): string | undefined {
-    return this.options.pwCdpEndpoint;
+    if (this.nextStartIndex === 0) return undefined;
+    return this.cdpEndpoints[this.nextStartIndex - 1];
+  }
+
+  /** Returns the full list of configured CDP endpoints */
+  get pwCdpEndpoints(): readonly string[] {
+    return this.cdpEndpoints;
   }
 
   get proxyServer(): string | undefined {
@@ -203,8 +240,8 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       case "chrome":
       case "chromium":
-        if (this.options.pwCdpEndpoint) {
-          this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
+        if (this.cdpEndpoints.length > 0) {
+          this.browser = await this.connectOverCDPWithFailover(connectOptions);
         } else if (this.options.pwEndpoint) {
           this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
         } else {
@@ -221,8 +258,8 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       case "edge":
         // Edge uses chromium with channel setting (defaults to "msedge")
-        if (this.options.pwCdpEndpoint) {
-          this.browser = await chromium.connectOverCDP(this.options.pwCdpEndpoint, connectOptions);
+        if (this.cdpEndpoints.length > 0) {
+          this.browser = await this.connectOverCDPWithFailover(connectOptions);
         } else if (this.options.pwEndpoint) {
           this.browser = await chromium.connect(this.options.pwEndpoint, connectOptions);
         } else {
@@ -373,6 +410,65 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
+   * Try each CDP endpoint in sequence starting from nextStartIndex.
+   * Advances nextStartIndex on success. Throws a hard error if all are exhausted.
+   */
+  private async connectOverCDPWithFailover(
+    connectOptions: ConnectOptions,
+  ): Promise<PlaywrightOriginalBrowser> {
+    for (let i = this.nextStartIndex; i < this.cdpEndpoints.length; i++) {
+      const endpoint = this.cdpEndpoints[i];
+      try {
+        const browser = await chromium.connectOverCDP(endpoint, {
+          ...connectOptions,
+          timeout: CDP_CONNECTION_TIMEOUT_MS,
+        });
+        this.nextStartIndex = i + 1;
+        this.onCdpEndpointConnected?.(i + 1, this.cdpEndpoints.length);
+        return browser;
+      } catch (err) {
+        if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
+          throw err;
+        }
+        const attemptNumber = i + 1;
+        const remaining = this.cdpEndpoints.length - i - 1;
+        if (remaining > 0) {
+          this.onCdpEndpointCycle?.(attemptNumber, err);
+        }
+      }
+    }
+    throw new Error(`All ${this.cdpEndpoints.length} CDP endpoint(s) failed. Giving up.`);
+  }
+
+  /**
+   * Returns true for connection-level errors that should trigger CDP endpoint cycling:
+   * timeouts and network-level failures. Auth errors, malformed URLs, etc. return false.
+   */
+  private isCdpConnectionError(error: Error): boolean {
+    if (error instanceof playwrightErrors.TimeoutError) return true;
+    const message = error.message;
+    return (
+      message.includes("ECONNREFUSED") ||
+      message.includes("ECONNRESET") ||
+      message.includes("ETIMEDOUT") ||
+      message.includes("net::ERR_") ||
+      message.includes("NS_ERROR_")
+    );
+  }
+
+  /**
+   * Returns true for errors that indicate the CDP browser session was closed
+   * while the agent was mid-task. Triggers browser restart rather than ordinary
+   * error handling.
+   */
+  private isBrowserDisconnectedError(error: Error): boolean {
+    return (
+      error.message.includes("Target page, context or browser has been closed") ||
+      error.constructor.name === "TargetClosedError"
+    );
+  }
+
+  /**
    * Check if an error is a retryable network error.
    * Covers Chromium (net::ERR_*) and Firefox (NS_ERROR_*, NS_BINDING_*) patterns.
    */
@@ -456,8 +552,19 @@ export class PlaywrightBrowser implements AriaBrowser {
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
 
+    try {
+      return await this.getTreeWithRefsImpl();
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private async getTreeWithRefsImpl(): Promise<string> {
     // Inject the ariaTree bundle and generate snapshot in the main frame
-    const mainResult = await this.page.evaluate(
+    const mainResult = await this.page!.evaluate(
       ({ script }) => {
         // Idempotent injection guard
         const win = window as any;
@@ -474,13 +581,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     );
 
     // Handle cross-origin iframes via Playwright's frame API
-    const frames = this.page.frames();
+    const frames = this.page!.frames();
     const childYamls: string[] = [];
     let counter = mainResult.counterValue;
 
     for (const frame of frames) {
       // Skip the main frame
-      if (frame === this.page.mainFrame()) continue;
+      if (frame === this.page!.mainFrame()) continue;
 
       try {
         const frameResult = await frame.evaluate(
@@ -583,6 +690,11 @@ export class PlaywrightBrowser implements AriaBrowser {
         quality: 80,
         scale: "css",
       });
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      throw error;
     } finally {
       if (options?.withMarks) {
         try {
@@ -748,6 +860,11 @@ export class PlaywrightBrowser implements AriaBrowser {
       // Re-throw browser exceptions as-is
       if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
         throw error;
+      }
+
+      // Surface browser disconnects distinctly so WebAgent can trigger a restart
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
       }
 
       // Wrap other errors
