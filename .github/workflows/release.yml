@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -54,3 +55,6 @@ jobs:
         run: gh release upload "${{ github.event.release.tag_name }}" ./${{ steps.tarball.outputs.filename }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to npm
+        run: npm publish ./${{ steps.tarball.outputs.filename }} --provenance --access public
