@@ -2,7 +2,7 @@ name: Dependency Version Check
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   check-deps:

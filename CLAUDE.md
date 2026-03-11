@@ -205,7 +205,6 @@ Internal workspace packages import `pilo-core` directly and do not use root-leve
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tsup.config.ts`                            | Root tsup build config: compiles core + CLI source into `dist/`, resolves `pilo-core` workspace imports, injects `__PILO_PRODUCTION__` via `define`, copies extension artifacts via `onSuccess` |
 | `scripts/check-dep-versions.mjs`            | CI: verifies shared dependency version alignment across packages                                                                                                                                |
-| `scripts/release.sh`                        | Release automation                                                                                                                                                                              |
 | `packages/core/scripts/bundle-aria-tree.ts` | Generates ariaTree bundle (auto-run during build, not committed)                                                                                                                                |
 | `packages/extension/scripts/dev.ts`         | Parses `--chrome`/`--firefox`/`--tmp` flags and runs `wxt dev -b <browser>` with appropriate env                                                                                                |
 
