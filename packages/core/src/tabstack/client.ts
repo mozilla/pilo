@@ -9,6 +9,6 @@ import Tabstack from "@tabstack/sdk";
 
 export type { default as Tabstack } from "@tabstack/sdk";
 
-export function createTabstackClient(apiKey: string): Tabstack {
-  return new Tabstack({ apiKey });
+export function createTabstackClient(apiKey: string, baseURL?: string): Tabstack {
+  return new Tabstack({ apiKey, baseURL: baseURL ?? null });
 }

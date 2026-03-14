@@ -119,6 +119,7 @@ export interface PiloConfig {
 
   // Tabstack Configuration
   tabstack_api_key?: string;
+  tabstack_api_url?: string;
 }
 
 /** PiloConfigResolved type - output type (defaults applied) */
@@ -187,6 +188,7 @@ export interface PiloConfigResolved {
 
   // Tabstack Configuration
   tabstack_api_key?: string;
+  tabstack_api_url?: string;
 }
 
 export type ConfigKey = keyof PiloConfigResolved;
@@ -613,6 +615,14 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "key",
     env: ["TABSTACK_API_KEY"],
     description: "Tabstack API key for cloud extraction tools",
+    category: "tabstack",
+  },
+  tabstack_api_url: {
+    type: "string",
+    cli: "--tabstack-api-url",
+    placeholder: "url",
+    env: ["TABSTACK_API_URL"],
+    description: "Tabstack API base URL (default: https://api.tabstack.ai)",
     category: "tabstack",
   },
 };
