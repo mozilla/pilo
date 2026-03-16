@@ -34,6 +34,8 @@ import {
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
+import { createInputTools } from "./tools/inputTools.js";
+import type { OnInputCallback } from "./tools/inputTools.js";
 import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
@@ -45,6 +47,7 @@ import {
   DEFAULT_GENERATION_MAX_TOKENS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
+  DEFAULT_INPUT_TIMEOUT_MS,
 } from "./constants.js";
 
 // === Type Definitions ===
@@ -82,6 +85,10 @@ export interface WebAgentOptions {
   tabstackApiKey?: string;
   /** Tabstack API base URL (default: https://api.tabstack.ai) */
   tabstackApiUrl?: string;
+  /** Callback invoked when the AI agent needs input from the caller (e.g., form data). If not provided, the requestFormData tool will return an error to the AI when invoked. */
+  onInput?: OnInputCallback;
+  /** Timeout in ms for waiting on input responses (default: DEFAULT_INPUT_TIMEOUT_MS) */
+  inputTimeoutMs?: number;
 }
 
 export interface ExecuteOptions {
@@ -202,6 +209,8 @@ export class WebAgent {
   private readonly searchApiKey: string | undefined;
   private readonly tabstackApiKey: string | undefined;
   private readonly tabstackApiUrl: string | undefined;
+  private readonly onInput: OnInputCallback | undefined;
+  private readonly inputTimeoutMs: number;
 
   constructor(
     private browser: AriaBrowser,
@@ -224,6 +233,8 @@ export class WebAgent {
     this.searchApiKey = options.searchApiKey;
     this.tabstackApiKey = options.tabstackApiKey;
     this.tabstackApiUrl = options.tabstackApiUrl;
+    this.onInput = options.onInput;
+    this.inputTimeoutMs = options.inputTimeoutMs ?? DEFAULT_INPUT_TIMEOUT_MS;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -355,8 +366,20 @@ export class WebAgent {
         })
       : {};
 
+    // Input tools (human-in-the-loop)
+    const inputTools = createInputTools({
+      eventEmitter: this.eventEmitter,
+      onInput: this.onInput,
+      inputTimeoutMs: this.inputTimeoutMs,
+      abortSignal: this.abortSignal,
+      getPageContext: () => ({
+        pageUrl: this.currentPage.url,
+        pageTitle: this.currentPage.title,
+      }),
+    });
+
     // Merge all tools
-    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools };
+    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...inputTools };
 
     // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
     // The empty page has no useful elements and the snapshot prompt causes the model
@@ -703,7 +726,7 @@ export class WebAgent {
    */
   private async generateAndProcessAction(
     task: string,
-    webActionTools: any,
+    tools: any,
     executionState: ExecutionState,
   ): Promise<{
     isTerminal: boolean;
@@ -728,7 +751,7 @@ export class WebAgent {
       const streamResult = streamText({
         ...this.providerConfig,
         messages: this.messages,
-        tools: webActionTools,
+        tools,
         toolChoice: "required",
         maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
         abortSignal: this.abortSignal,
@@ -854,8 +877,11 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract and webSearch)
-    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
+    // Determine if page changed (most actions change the page, except extract, webSearch, and requestFormData)
+    const pageChanged =
+      actionOutput.action !== "extract" &&
+      actionOutput.action !== "webSearch" &&
+      actionOutput.action !== "requestFormData";
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {

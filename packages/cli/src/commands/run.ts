@@ -13,10 +13,11 @@ import {
   MetricsCollector,
   SecretsRedactor,
 } from "pilo-core";
-import type { Logger } from "pilo-core";
+import type { Logger, InputRequest, InputResponse } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
+import * as readline from "readline";
 
 /**
  * Guard: verify that config exists before running a task.
@@ -207,6 +208,30 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       });
     }
 
+    // Input handler for human-in-the-loop (prompts user via stdio)
+    const onInput = async (request: InputRequest): Promise<InputResponse> => {
+      if (request.type === "form") {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const promptField = (text: string): Promise<string> =>
+          new Promise((resolve) => rl.question(text, resolve));
+
+        try {
+          console.log(chalk.yellow(`\n[Form input needed] ${request.question}`));
+          const fields: Record<string, string> = {};
+          for (const field of request.fields) {
+            fields[field.name] = await promptField(chalk.cyan(`  ${field.label}: `));
+          }
+          return { type: "form", fields };
+        } finally {
+          rl.close();
+          // readline puts stdin into flowing mode; pause it so the
+          // event loop can exit cleanly after the task completes.
+          process.stdin.pause();
+        }
+      }
+      return { type: "declined", reason: `Unsupported input type: ${(request as any).type}` };
+    };
+
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
@@ -225,6 +250,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       providerConfig,
       logger,
       eventEmitter,
+      onInput,
     });
 
     // Execute the task

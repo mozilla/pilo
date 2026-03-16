@@ -35,3 +35,10 @@ export const DEFAULT_RETRY_MAX_DELAY_MS = 10000;
 
 /** Backoff factor for exponential backoff */
 export const DEFAULT_RETRY_BACKOFF_FACTOR = 2;
+
+// ============================================================================
+// Human-in-the-Loop
+// ============================================================================
+
+/** Default timeout for waiting on input responses (2 minutes) */
+export const DEFAULT_INPUT_TIMEOUT_MS = 120_000;

@@ -32,6 +32,9 @@ vi.mock("../src/search/searchService.js", () => ({
 const mockStreamText = vi.mocked(streamText);
 const mockGenerateTextWithRetry = vi.mocked(generateTextWithRetry);
 
+/** No-op input handler for tests that don't exercise human-in-the-loop */
+const noopOnInput = vi.fn().mockRejectedValue(new Error("onInput not expected in this test"));
+
 // Helper to create a mock stream response that mimics AI SDK's streamText
 function createMockStreamResponse(response: any): any {
   // Create the fullStream async iterator that emits events in the correct order
@@ -265,6 +268,7 @@ describe("WebAgent", () => {
       guardrails: null,
       eventEmitter,
       logger: mockLogger,
+      onInput: noopOnInput,
     };
 
     webAgent = new WebAgent(mockBrowser, options);
@@ -801,6 +805,7 @@ describe("WebAgent", () => {
         eventEmitter,
         logger: mockLogger,
         searchProvider: "duckduckgo",
+        onInput: noopOnInput,
       });
 
       // Planner returns no URL (search-first flow)
@@ -1208,6 +1213,7 @@ describe("WebAgent", () => {
         maxTotalErrors: 10,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       };
 
       const limitedAgent = new WebAgent(mockBrowser, options);
@@ -1257,6 +1263,7 @@ describe("WebAgent", () => {
         maxTotalErrors: 3,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       };
 
       const limitedAgent = new WebAgent(mockBrowser, options);
@@ -1360,6 +1367,7 @@ describe("WebAgent", () => {
         maxIterations: 2,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       };
 
       const limitedAgent = new WebAgent(mockBrowser, options);
@@ -2020,6 +2028,7 @@ describe("WebAgent", () => {
         providerConfig: { model: mockProvider },
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Mock planning
@@ -2086,6 +2095,7 @@ describe("WebAgent", () => {
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 2,
+        onInput: noopOnInput,
       });
 
       // Mock planning
@@ -2187,6 +2197,7 @@ describe("WebAgent", () => {
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 2,
+        onInput: noopOnInput,
       });
 
       // Mock planning
@@ -2329,6 +2340,7 @@ describe("WebAgent", () => {
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 2,
+        onInput: noopOnInput,
       });
 
       // Mock planning
@@ -2459,6 +2471,7 @@ describe("WebAgent", () => {
         eventEmitter,
         logger: mockLogger,
         maxValidationAttempts: 1,
+        onInput: noopOnInput,
       });
 
       // Mock planning
@@ -2530,6 +2543,7 @@ describe("WebAgent", () => {
         guardrails,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Plan should include guardrails
@@ -2654,6 +2668,7 @@ describe("WebAgent", () => {
         vision: true,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Plan
@@ -2735,6 +2750,7 @@ describe("WebAgent", () => {
         vision: true,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Plan
@@ -2854,6 +2870,7 @@ describe("WebAgent", () => {
         vision: true,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Plan
@@ -3095,6 +3112,7 @@ describe("WebAgent", () => {
         vision: true,
         eventEmitter,
         logger: mockLogger,
+        onInput: noopOnInput,
       });
 
       // Plan

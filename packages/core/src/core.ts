@@ -26,7 +26,20 @@ export type {
   WaitingEventData,
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
+  InputFormEventData,
+  InputFormResponseEventData,
 } from "./events.js";
+
+// Input tools (human-in-the-loop)
+export type {
+  OnInputCallback,
+  InputRequest,
+  InputResponse,
+  InputFormRequest,
+  InputFormResponse,
+  InputDeclinedResponse,
+  InputFormField,
+} from "./tools/inputTools.js";
 export { GenericLogger } from "./loggers/generic.js";
 export { ConsoleLogger } from "./loggers/console.js";
 export { JSONConsoleLogger } from "./loggers/json.js";
@@ -55,6 +68,7 @@ export {
   DEFAULT_RETRY_INITIAL_DELAY_MS,
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
+  DEFAULT_INPUT_TIMEOUT_MS,
 } from "./constants.js";
 
 // Backward-compatible default exports (derived from schema)

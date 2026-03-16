@@ -138,6 +138,8 @@ describe("WebAgentEventEmitter", () => {
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
+        "input:form",
+        "input:form_response",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);

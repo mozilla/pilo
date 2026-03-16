@@ -80,6 +80,26 @@ export const TOOL_STRINGS = {
   },
 
   /**
+   * Input tools - human-in-the-loop data requests
+   */
+  input: {
+    requestFormData: {
+      description:
+        "Request form field values from the user when you encounter a form you cannot fill with available information. Specify each field with a human-readable label. Use this exclusively for form data, not for general questions.",
+      question: "Why you need this form data and what form you are trying to fill",
+      fields: "The form fields you need filled",
+      fieldName: "Field identifier used as key in response",
+      fieldLabel: "Human-readable label shown to the user",
+      fieldSensitive: "Whether to mask input (e.g., passwords)",
+    },
+    /** Prompt guidance for when the AI should use requestFormData */
+    coreRule:
+      "NEVER fill form fields with fake or placeholder data (e.g., user@example.com, John Doe, 555-1234). When a form requires personal information (email, name, phone, address, credentials, payment), you MUST call requestFormData() to get real values from the user.",
+    bestPractice:
+      "Before filling ANY form field that asks for personal data (email, name, phone, password, address), STOP and use requestFormData() first. Do not guess, do not use placeholder values, do not use example.com domains. The user has real data to provide.",
+  },
+
+  /**
    * Planning tools - task planning and optional URL determination
    */
   planning: {
@@ -184,6 +204,7 @@ function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false):
   }
 
   lines.push(
+    `- requestFormData({"question": "why you need data", "fields": [{"name": "field_id", "label": "Field Label"}]}) - ${TOOL_STRINGS.input.requestFormData.description}`,
     `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
     `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
   );
@@ -309,11 +330,13 @@ Analyze the current page state and determine your next action based on previous 
 4. done() provides your final answer to the user
 5. goto() only accepts URLs from earlier in conversation
 6. Use wait() for page loads, animations, or dynamic content
-{% if hasGuardrails %}7. ALL actions MUST comply with provided guardrails{% endif %}
+7. ${TOOL_STRINGS.input.coreRule}
+{% if hasGuardrails %}8. ALL actions MUST comply with provided guardrails{% endif %}
 
 **CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
 - done(result) if task is complete
-- abort(reason) if task cannot be completed due to site issues, blocking, or missing data
+- abort(reason) if task cannot be completed due to site issues or blocking
+- requestFormData() if a form needs personal information you don't have
 - Appropriate action tool if work remains
 - extract() if you need more information
 
@@ -322,6 +345,7 @@ Analyze the current page state and determine your next action based on previous 
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
 - Submit forms via enter() or submit button after filling
+- ${TOOL_STRINGS.input.bestPractice}
 - Find alternative elements if primary ones aren't available
 - When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays
 - For autocomplete/combobox search fields (e.g., flight origin/destination, location pickers): after fill(), use focus() on a visible suggestion in the dropdown followed by enter() to select it — click() on autocomplete suggestions often times out

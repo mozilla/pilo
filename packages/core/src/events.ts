@@ -46,6 +46,10 @@ export enum WebAgentEventType {
 
   // Browser reconnect after mid-task disconnect
   BROWSER_RECONNECTED = "browser:reconnected",
+
+  // Input events (human-in-the-loop)
+  INPUT_FORM = "input:form",
+  INPUT_FORM_RESPONSE = "input:form_response",
 }
 
 /**
@@ -299,6 +303,28 @@ export interface StatusMessageEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data when the agent requests form input from the caller
+ */
+export interface InputFormEventData extends WebAgentEventData {
+  questionId: string;
+  question: string;
+  fields: Array<{ name: string; label: string; sensitive?: boolean }>;
+  pageUrl?: string;
+  pageTitle?: string;
+}
+
+/**
+ * Event data when form input is received from the caller
+ */
+export interface InputFormResponseEventData extends WebAgentEventData {
+  questionId: string;
+  response:
+    | { type: "form"; fields: Record<string, string> }
+    | { type: "declined"; reason?: string };
+  responseTimeMs: number;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -331,7 +357,9 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
-  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData };
+  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
+  | { type: WebAgentEventType.INPUT_FORM; data: InputFormEventData }
+  | { type: WebAgentEventType.INPUT_FORM_RESPONSE; data: InputFormResponseEventData };
 
 /**
  * Event emitter for WebAgent events
