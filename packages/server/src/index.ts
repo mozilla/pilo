@@ -1,11 +1,16 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
 import piloRoutes from "./routes/pilo.js";
+import { createPiloWsRoute } from "./routes/piloWs.js";
 
 const app = new Hono();
+
+// Create WebSocket adapter
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 // Add Sentry middleware
 app.use(
@@ -46,14 +51,21 @@ app.get("/", (c) => {
   });
 });
 
-// Mount Pilo routes
+// Mount Pilo routes (SSE - existing)
 app.route("/pilo", piloRoutes);
+
+// Mount Pilo WebSocket route
+const piloWsRoute = createPiloWsRoute(upgradeWebSocket);
+app.route("/pilo", piloWsRoute);
 
 const port = Number(process.env.PORT) || 3000;
 
 console.log(`🚀 Pilo Server starting on port ${port}`);
 
-serve({
+const server = serve({
   fetch: app.fetch,
   port,
 });
+
+// Inject WebSocket handling into the Node.js HTTP server
+injectWebSocket(server);
