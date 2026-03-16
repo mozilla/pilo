@@ -30,9 +30,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.10",
+    "@hono/node-ws": "^1.3.0",
     "@hono/sentry": "^1.2.2",
     "dotenv": "^17.2.4",
     "hono": "^4.12.7",
+    "nanoid": "^5.1.6",
     "pilo-core": "workspace:*"
   },
   "packageManager": "pnpm@9.0.0"
