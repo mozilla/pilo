@@ -115,13 +115,22 @@ Two message types only:
 ```
 
 ```json
-{ "event": "input:form_response", "data": { "questionId": "abc123", "response": { "type": "form", "fields": { "email": "...", "password": "..." } } } }
+{
+  "event": "input:form_response",
+  "data": {
+    "questionId": "abc123",
+    "response": { "type": "form", "fields": { "email": "...", "password": "..." } }
+  }
+}
 ```
 
 Declined response:
 
 ```json
-{ "event": "input:form_response", "data": { "questionId": "abc123", "response": { "type": "declined", "reason": "..." } } }
+{
+  "event": "input:form_response",
+  "data": { "questionId": "abc123", "response": { "type": "declined", "reason": "..." } }
+}
 ```
 
 The `task:start` message may optionally include a `taskId` field for correlation/observability. If provided, pilo-server includes it in event messages. If omitted, pilo-server generates one. The `taskId` is a top-level field on every WebSocket message:

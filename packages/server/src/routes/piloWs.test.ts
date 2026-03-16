@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  parseClientMessage,
-  InputResponseRegistry,
-  serializeMessage,
-} from "./piloWs.js";
+import { parseClientMessage, InputResponseRegistry, serializeMessage } from "./piloWs.js";
 
 describe("parseClientMessage", () => {
   it("returns a TaskStartMessage for a valid task:start message", () => {

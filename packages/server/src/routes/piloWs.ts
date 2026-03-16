@@ -9,12 +9,7 @@ import {
   SEARCH_PROVIDERS,
   DEFAULT_INPUT_TIMEOUT_MS,
 } from "pilo-core";
-import type {
-  OnInputCallback,
-  InputRequest,
-  InputResponse,
-  TaskExecutionResult,
-} from "pilo-core";
+import type { OnInputCallback, InputRequest, InputResponse, TaskExecutionResult } from "pilo-core";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 import { errorToString } from "../shared.js";
@@ -77,10 +72,7 @@ export function serializeMessage(msg: OutboundMessage): string {
 // === Input Response Registry ===
 
 export class InputResponseRegistry {
-  private pending: Map<
-    string,
-    { resolve: (response: InputResponse) => void }
-  > = new Map();
+  private pending: Map<string, { resolve: (response: InputResponse) => void }> = new Map();
 
   waitForResponse(questionId: string): Promise<InputResponse> {
     return new Promise((resolve) => {
@@ -245,13 +237,10 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket) {
               actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
               navigationRetry: createNavigationRetryConfig({
                 baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
-                maxTimeoutMs:
-                  body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
-                maxAttempts:
-                  body.navigationMaxAttempts ?? serverConfig.navigation_max_attempts,
+                maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
+                maxAttempts: body.navigationMaxAttempts ?? serverConfig.navigation_max_attempts,
                 timeoutMultiplier:
-                  body.navigationTimeoutMultiplier ??
-                  serverConfig.navigation_timeout_multiplier,
+                  body.navigationTimeoutMultiplier ?? serverConfig.navigation_timeout_multiplier,
               }),
             };
 

@@ -14,15 +14,15 @@
 
 ## File Structure
 
-| File | Action | Responsibility |
-|------|--------|----------------|
-| `packages/server/package.json` | Modify | Add `@hono/node-ws` and `nanoid` dependencies |
-| `packages/server/src/index.ts` | Modify | Wire up `createNodeWebSocket` and `injectWebSocket` |
-| `packages/server/src/shared.ts` | Create | Shared types (`PiloTaskRequest`) and utilities (`errorToString`) used by both SSE and WS routes |
-| `packages/server/src/routes/pilo.ts` | Modify | Import `PiloTaskRequest` and `errorToString` from shared module |
-| `packages/server/src/routes/piloWs.ts` | Create | WebSocket route handler, task execution, `onInput` callback |
-| `packages/server/src/StreamLogger.ts` | No change | Reused as-is (sendEvent callback works for both SSE and WS) |
-| `packages/server/src/routes/piloWs.test.ts` | Create | Tests for WebSocket message handling, `onInput` flow |
+| File                                        | Action    | Responsibility                                                                                  |
+| ------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
+| `packages/server/package.json`              | Modify    | Add `@hono/node-ws` and `nanoid` dependencies                                                   |
+| `packages/server/src/index.ts`              | Modify    | Wire up `createNodeWebSocket` and `injectWebSocket`                                             |
+| `packages/server/src/shared.ts`             | Create    | Shared types (`PiloTaskRequest`) and utilities (`errorToString`) used by both SSE and WS routes |
+| `packages/server/src/routes/pilo.ts`        | Modify    | Import `PiloTaskRequest` and `errorToString` from shared module                                 |
+| `packages/server/src/routes/piloWs.ts`      | Create    | WebSocket route handler, task execution, `onInput` callback                                     |
+| `packages/server/src/StreamLogger.ts`       | No change | Reused as-is (sendEvent callback works for both SSE and WS)                                     |
+| `packages/server/src/routes/piloWs.test.ts` | Create    | Tests for WebSocket message handling, `onInput` flow                                            |
 
 ---
 
@@ -31,11 +31,13 @@
 ### Task 1: Add dependencies
 
 **Files:**
+
 - Modify: `packages/server/package.json`
 
 - [ ] **Step 1: Install the dependencies**
 
 Run:
+
 ```bash
 cd /Users/tbeauvais/workspace/spark && pnpm --filter pilo-server add @hono/node-ws nanoid
 ```
@@ -43,9 +45,11 @@ cd /Users/tbeauvais/workspace/spark && pnpm --filter pilo-server add @hono/node-
 - [ ] **Step 2: Verify installation**
 
 Run:
+
 ```bash
 cd /Users/tbeauvais/workspace/spark && pnpm --filter pilo-server list @hono/node-ws nanoid
 ```
+
 Expected: Shows both packages with version numbers.
 
 - [ ] **Step 3: Commit**
@@ -60,6 +64,7 @@ git commit -m "Add @hono/node-ws and nanoid dependencies"
 ### Task 2: Extract shared types and utilities
 
 **Files:**
+
 - Create: `packages/server/src/shared.ts`
 - Modify: `packages/server/src/routes/pilo.ts`
 
@@ -167,12 +172,14 @@ export const createErrorResponse = (message: string, code: string): ErrorRespons
 In `packages/server/src/routes/pilo.ts`, replace the local type/utility definitions with imports from shared:
 
 Remove the following from `pilo.ts`:
+
 - The `ErrorResponse` interface (lines 15-22)
 - The `errorToString` function (lines 26-27)
 - The `createErrorResponse` function (lines 29-36)
 - The `PiloTaskRequest` interface (lines 40-104)
 
 Add this import at the top:
+
 ```typescript
 import { PiloTaskRequest, errorToString, createErrorResponse } from "../shared.js";
 ```
@@ -201,6 +208,7 @@ git commit -m "Extract shared types and utilities from SSE route"
 ### Task 3: Wire WebSocket support into the server entry point
 
 **Files:**
+
 - Modify: `packages/server/src/index.ts`
 
 - [ ] **Step 1: Update `index.ts` to wire WebSocket support**
@@ -282,6 +290,7 @@ injectWebSocket(server);
 ```
 
 Key changes:
+
 - Import `createNodeWebSocket` from `@hono/node-ws`
 - Create the WebSocket adapter before defining routes
 - Pass `upgradeWebSocket` to the new route factory
@@ -305,10 +314,12 @@ git commit -m "Wire WebSocket support into server entry"
 ### Task 4: Create the WebSocket route handler
 
 **Files:**
+
 - Create: `packages/server/src/routes/piloWs.ts`
 - Create: `packages/server/src/routes/piloWs.test.ts`
 
 This is the core of the implementation. It handles:
+
 1. WebSocket connection lifecycle
 2. Parsing the `task:start` message
 3. Creating and running the WebAgent
@@ -413,12 +424,7 @@ import {
   SEARCH_PROVIDERS,
   DEFAULT_INPUT_TIMEOUT_MS,
 } from "pilo-core";
-import type {
-  OnInputCallback,
-  InputRequest,
-  InputResponse,
-  TaskExecutionResult,
-} from "pilo-core";
+import type { OnInputCallback, InputRequest, InputResponse, TaskExecutionResult } from "pilo-core";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 import { errorToString } from "../shared.js";
@@ -490,10 +496,7 @@ export function serializeMessage(msg: OutboundMessage): string {
  * at most one pending request exists at a time.
  */
 export class InputResponseRegistry {
-  private pending: Map<
-    string,
-    { resolve: (response: InputResponse) => void }
-  > = new Map();
+  private pending: Map<string, { resolve: (response: InputResponse) => void }> = new Map();
 
   /**
    * Register a pending input request. Returns a Promise that resolves
@@ -680,13 +683,10 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket) {
               actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
               navigationRetry: createNavigationRetryConfig({
                 baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
-                maxTimeoutMs:
-                  body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
-                maxAttempts:
-                  body.navigationMaxAttempts ?? serverConfig.navigation_max_attempts,
+                maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
+                maxAttempts: body.navigationMaxAttempts ?? serverConfig.navigation_max_attempts,
                 timeoutMultiplier:
-                  body.navigationTimeoutMultiplier ??
-                  serverConfig.navigation_timeout_multiplier,
+                  body.navigationTimeoutMultiplier ?? serverConfig.navigation_timeout_multiplier,
               }),
             };
 
@@ -830,6 +830,7 @@ git commit -m "Add WebSocket route handler for pilo task execution"
 ### Task 5: Test the InputResponseRegistry
 
 **Files:**
+
 - Modify: `packages/server/src/routes/piloWs.test.ts`
 
 The `InputResponseRegistry` is the core state management for the input flow. It needs thorough testing.
@@ -935,6 +936,7 @@ git commit -m "Add InputResponseRegistry tests"
 ### Task 6: Test the outbound message format
 
 **Files:**
+
 - Modify: `packages/server/src/routes/piloWs.test.ts`
 
 - [ ] **Step 1: Write tests for message serialization**
@@ -1015,6 +1017,7 @@ Expected: All tests pass across all packages.
 - [ ] **Step 4: Fix any issues found and commit**
 
 If formatting or type errors were found, fix and commit:
+
 ```bash
 git add -A
 git commit -m "Fix formatting and type errors"
