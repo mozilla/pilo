@@ -8,7 +8,7 @@ import {
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
 } from "pilo-core";
-import type { TaskExecutionResult } from "pilo-core";
+import type { TaskExecutionResult, OnInputCallback } from "pilo-core";
 import { StreamLogger } from "../StreamLogger.js";
 import { config } from "../config.js";
 import { PiloTaskRequest, errorToString, createErrorResponse } from "../shared.js";
@@ -158,10 +158,17 @@ pilo.post("/run", async (c) => {
           openai_compatible_name: body.openaiCompatibleName,
         });
 
+        // SSE is unidirectional: immediately decline any input requests
+        const onInput: OnInputCallback = async () => ({
+          type: "declined",
+          reason: "Input not supported over SSE. Use the WebSocket endpoint.",
+        });
+
         agent = new WebAgent(browser, {
           ...webAgentConfig,
           providerConfig,
           logger,
+          onInput,
         });
 
         // Execute the task with AbortSignal
