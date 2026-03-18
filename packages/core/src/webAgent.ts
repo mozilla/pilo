@@ -511,15 +511,7 @@ export class WebAgent {
 
           needsPageSnapshot = result.pageChanged;
         } catch (error) {
-          // Record error on stepSpan
-          stepSpan.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
-          });
-          stepSpan.recordException(error instanceof Error ? error : new Error(String(error)));
-
-          // Browser disconnects are handled specially: restart on next CDP endpoint,
-          // reset execution state, and continue — not counted as an agent error.
+          // Browser disconnects handled specially — don't mark span as error when recovery succeeds
           if (error instanceof BrowserDisconnectedError) {
             // May throw if all endpoints exhausted — propagates as hard error
             await this.handleBrowserDisconnect(task, error, executionState);
@@ -528,6 +520,13 @@ export class WebAgent {
             executionState.currentIteration++;
             continue;
           }
+
+          // Only mark non-disconnect errors as span failures
+          stepSpan.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          stepSpan.recordException(error instanceof Error ? error : new Error(String(error)));
 
           trackError();
 
@@ -1131,13 +1130,13 @@ export class WebAgent {
     executionState: ExecutionState,
   ): Promise<{ isAccepted: boolean }> {
     const tracer = await getTracer();
+    executionState.validationAttempts++;
+
     const span = tracer.startSpan("pilo.task.validate", {
-      attributes: { "pilo.validation.attempt": executionState.validationAttempts + 1 },
+      attributes: { "pilo.validation.attempt": executionState.validationAttempts },
     });
 
     try {
-      // Increment validation attempts
-      executionState.validationAttempts++;
 
       // Emit processing event with attempt number
       this.emit(WebAgentEventType.AGENT_PROCESSING, {
