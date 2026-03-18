@@ -81,9 +81,9 @@ describe("tracing helpers", () => {
   });
 
   describe("SpanStatusCode constants", () => {
-    it("exports SpanStatusCode with OK=0 and ERROR=2", async () => {
+    it("exports SpanStatusCode with OK=1 and ERROR=2", async () => {
       const { SpanStatusCode } = await import("../../src/telemetry/tracing.js");
-      expect(SpanStatusCode.OK).toBe(0);
+      expect(SpanStatusCode.OK).toBe(1);
       expect(SpanStatusCode.ERROR).toBe(2);
     });
 
@@ -92,7 +92,7 @@ describe("tracing helpers", () => {
         throw new Error("Cannot find module '@opentelemetry/api'");
       });
       const { SpanStatusCode } = await import("../../src/telemetry/tracing.js");
-      expect(SpanStatusCode.OK).toBe(0);
+      expect(SpanStatusCode.OK).toBe(1);
       expect(SpanStatusCode.ERROR).toBe(2);
     });
   });

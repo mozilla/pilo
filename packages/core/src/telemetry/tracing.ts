@@ -25,7 +25,7 @@ export const SpanStatusCode = {
   /** The default status. */
   UNSET: 0,
   /** The operation completed successfully. */
-  OK: 0,
+  OK: 1,
   /** The operation contains an error. */
   ERROR: 2,
 } as const;
@@ -35,8 +35,7 @@ export const SpanStatusCode = {
 type OTelApiModule = typeof import("@opentelemetry/api");
 
 let resolvedApi: OTelApiModule | null | undefined = undefined;
-let cachedTracer: Tracer | undefined = undefined;
-let cachedTracerKey: string | undefined = undefined;
+const cachedTracers = new Map<string, Tracer>();
 
 // --- No-op implementations ---
 
@@ -102,23 +101,13 @@ export async function getOTelApi(): Promise<OTelApiModule | undefined> {
  * If @opentelemetry/api is not installed, returns a no-op tracer.
  * The same tracer instance is returned on subsequent calls with the same arguments.
  */
-export async function getTracer(name?: string, version?: string): Promise<Tracer> {
-  const tracerKey = `${name ?? ""}:${version ?? ""}`;
-
-  if (cachedTracer !== undefined && cachedTracerKey === tracerKey) {
-    return cachedTracer;
-  }
+export async function getTracer(name = "pilo-core", version?: string): Promise<Tracer> {
+  const key = `${name}:${version ?? ""}`;
+  const existing = cachedTracers.get(key);
+  if (existing) return existing;
 
   const api = await resolveOTelApi();
-
-  let tracer: Tracer;
-  if (api) {
-    tracer = api.trace.getTracer(name ?? "pilo", version);
-  } else {
-    tracer = makeNoOpTracer();
-  }
-
-  cachedTracer = tracer;
-  cachedTracerKey = tracerKey;
+  const tracer = api ? api.trace.getTracer(name, version) : makeNoOpTracer();
+  cachedTracers.set(key, tracer);
   return tracer;
 }
