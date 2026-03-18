@@ -26,6 +26,7 @@ import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../config/defaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
+import { getTracer, SpanStatusCode } from "../telemetry/tracing.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -338,7 +339,19 @@ export class PlaywrightBrowser implements AriaBrowser {
    */
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    await this.executeNavigationWithRetry((timeoutMs) => this.performGoto(url, timeoutMs), url);
+    const tracer = await getTracer();
+    const span = tracer.startSpan("pilo.browser.navigate", {
+      attributes: { "pilo.browser.url": url },
+    });
+    try {
+      await this.executeNavigationWithRetry((timeoutMs) => this.performGoto(url, timeoutMs), url);
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      span.end();
+    }
   }
 
   /**
@@ -551,14 +564,23 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
+    const tracer = await getTracer();
+    const span = tracer.startSpan("pilo.browser.snapshot");
 
     try {
       return await this.getTreeWithRefsImpl();
     } catch (error) {
       if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
-        throw new BrowserDisconnectedError(error.message);
+        const disconnectError = new BrowserDisconnectedError(error.message);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        span.recordException(disconnectError);
+        throw disconnectError;
       }
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+      span.recordException(error instanceof Error ? error : new Error(String(error)));
       throw error;
+    } finally {
+      span.end();
     }
   }
 
@@ -669,43 +691,53 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     if (!this.page) throw new Error("Browser not started");
-
-    // Apply SoM overlay before screenshot if requested.
-    // Failures are non-fatal — a plain screenshot is still useful.
-    if (options?.withMarks) {
-      try {
-        await this.page.evaluate(() => {
-          const win = window as any;
-          win.__piloAriaTree?.applySetOfMarks?.();
-        });
-      } catch {
-        // Can fail if page navigated or ariaTree bundle wasn't injected yet
-      }
-    }
+    const tracer = await getTracer();
+    const span = tracer.startSpan("pilo.browser.screenshot");
 
     try {
-      return await this.page.screenshot({
-        fullPage: true,
-        type: "jpeg",
-        quality: 80,
-        scale: "css",
-      });
-    } catch (error) {
-      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
-        throw new BrowserDisconnectedError(error.message);
-      }
-      throw error;
-    } finally {
+      // Apply SoM overlay before screenshot if requested.
+      // Failures are non-fatal — a plain screenshot is still useful.
       if (options?.withMarks) {
         try {
           await this.page.evaluate(() => {
             const win = window as any;
-            win.__piloAriaTree?.removeSetOfMarks?.();
+            win.__piloAriaTree?.applySetOfMarks?.();
           });
         } catch {
-          // Page may have navigated between screenshot and cleanup
+          // Can fail if page navigated or ariaTree bundle wasn't injected yet
         }
       }
+
+      try {
+        return await this.page.screenshot({
+          fullPage: true,
+          type: "jpeg",
+          quality: 80,
+          scale: "css",
+        });
+      } catch (error) {
+        if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+          throw new BrowserDisconnectedError(error.message);
+        }
+        throw error;
+      } finally {
+        if (options?.withMarks) {
+          try {
+            await this.page.evaluate(() => {
+              const win = window as any;
+              win.__piloAriaTree?.removeSetOfMarks?.();
+            });
+          } catch {
+            // Page may have navigated between screenshot and cleanup
+          }
+        }
+      }
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      span.end();
     }
   }
 
@@ -747,8 +779,16 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
+    const tracer = await getTracer();
+    const span = tracer.startSpan("pilo.browser.perform", {
+      attributes: {
+        "pilo.browser.action_type": String(action),
+        ...(ref && { "pilo.browser.element_ref": ref }),
+      },
+    });
 
     try {
+      try {
       // Always validate ref for any action that uses it
       // This ensures consistent error messages and early validation
       let locator: Locator | null = null;
@@ -873,6 +913,13 @@ export class PlaywrightBrowser implements AriaBrowser {
         `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
         { originalError: error },
       );
+    }
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      span.end();
     }
   }
 
