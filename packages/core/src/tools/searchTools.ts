@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
+import { getTracer } from "../telemetry/tracing.js";
 
 interface SearchToolContext {
   searchService: SearchService;
@@ -24,6 +25,11 @@ export function createSearchTools(context: SearchToolContext) {
         query: z.string().describe(TOOL_STRINGS.webActions.webSearch.query),
       }),
       execute: async ({ query }) => {
+        const tracer = await getTracer();
+        const span = tracer.startSpan("pilo.search.execute", {
+          attributes: { "pilo.search.query": query },
+        });
+
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "webSearch",
           value: query,
@@ -37,6 +43,7 @@ export function createSearchTools(context: SearchToolContext) {
             action: "webSearch",
           });
 
+          span.setAttribute("pilo.search.success", true);
           return {
             success: true,
             action: "webSearch",
@@ -53,6 +60,7 @@ export function createSearchTools(context: SearchToolContext) {
             isRecoverable: true,
           });
 
+          span.setAttribute("pilo.search.success", false);
           return {
             success: false,
             action: "webSearch",
@@ -60,6 +68,8 @@ export function createSearchTools(context: SearchToolContext) {
             error: errorMessage,
             isRecoverable: true,
           };
+        } finally {
+          span.end();
         }
       },
     }),

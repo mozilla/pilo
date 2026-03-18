@@ -13,6 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import { getTracer, SpanStatusCode } from "../telemetry/tracing.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -53,6 +54,14 @@ async function performActionWithValidation(
   ref?: string,
   value?: string,
 ): Promise<ActionResult> {
+  const tracer = await getTracer();
+  const span = tracer.startSpan("pilo.browser.action", {
+    attributes: {
+      "pilo.browser.action_type": String(action),
+      ...(ref && { "pilo.browser.element_ref": ref }),
+    },
+  });
+
   try {
     // Emit action started events
     context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
@@ -76,6 +85,7 @@ async function performActionWithValidation(
       action,
     });
 
+    span.setAttribute("pilo.browser.success", true);
     return { success: true, action, ...(ref && { ref }), ...(value !== undefined && { value }) };
   } catch (error) {
     // For browser exceptions, emit failure with error details and return error info
@@ -87,6 +97,9 @@ async function performActionWithValidation(
         isRecoverable: true,
       });
 
+      span.setAttribute("pilo.browser.success", false);
+      span.setAttribute("pilo.browser.recoverable", true);
+      // Do NOT set span status ERROR for recoverable browser exceptions
       return {
         success: false,
         action,
@@ -103,7 +116,11 @@ async function performActionWithValidation(
       action,
     });
 
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+    span.recordException(error instanceof Error ? error : new Error(String(error)));
     throw error;
+  } finally {
+    span.end();
   }
 }
 
