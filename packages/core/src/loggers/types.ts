@@ -7,7 +7,7 @@ export interface Logger {
   /**
    * Initialize the logger with an event emitter
    */
-  initialize(emitter: WebAgentEventEmitter): void;
+  initialize(emitter: WebAgentEventEmitter): void | Promise<void>;
 
   /**
    * Clean up any resources used by the logger,

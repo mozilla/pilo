@@ -16,6 +16,7 @@ import {
   type CdpEndpointCycleEventData,
   type TaskValidationEventData,
 } from "../events.js";
+import type { Logger } from "./types.js";
 
 interface Counter {
   add(value: number, attributes?: Record<string, string | number | boolean>): void;
@@ -29,7 +30,7 @@ interface Histogram {
  * OTelMetricsLogger bridges WebAgent events into OpenTelemetry counters and histograms.
  * Becomes inert (no subscriptions, no overhead) when @opentelemetry/api is not available.
  */
-export class OTelMetricsLogger {
+export class OTelMetricsLogger implements Logger {
   private emitter: WebAgentEventEmitter | null = null;
 
   // Common attributes captured from TASK_SETUP
@@ -59,6 +60,9 @@ export class OTelMetricsLogger {
   private validationQuality: Counter | null = null;
 
   async initialize(emitter: WebAgentEventEmitter): Promise<void> {
+    if (this.emitter) {
+      this.dispose();
+    }
     this.emitter = emitter;
     this.commonAttrs = {};
     this.taskSetupTimestamp = null;
@@ -194,8 +198,8 @@ export class OTelMetricsLogger {
   private handleTaskSetup = (data: TaskSetupEventData): void => {
     this.taskSetupTimestamp = data.timestamp;
     this.commonAttrs = {};
-    if (data.provider) this.commonAttrs.provider = data.provider;
-    if (data.model) this.commonAttrs.model = data.model;
+    if (data.provider) this.commonAttrs["pilo.provider"] = data.provider;
+    if (data.model) this.commonAttrs["pilo.model"] = data.model;
   };
 
   private handleTaskCompleted = (data: TaskCompleteEventData): void => {
@@ -270,7 +274,7 @@ export class OTelMetricsLogger {
   private handleTaskValidated = (data: TaskValidationEventData): void => {
     this.validationQuality?.add(1, {
       ...this.commonAttrs,
-      quality: data.completionQuality,
+      "pilo.validation.quality": data.completionQuality,
     });
   };
 }

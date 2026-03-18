@@ -419,7 +419,7 @@ describe("OTelMetricsLogger (OTel available)", () => {
     const validationAdd = findCounterAdd(mockMeter, "pilo.validation.quality");
     expect(validationAdd).toHaveBeenCalled();
     const [, attrs] = validationAdd.mock.calls[0];
-    expect(attrs).toMatchObject({ quality: "complete" });
+    expect(attrs).toMatchObject({ "pilo.validation.quality": "complete" });
   });
 
   it("captures provider and model from TASK_SETUP as attributes on subsequent metrics", () => {
@@ -447,7 +447,7 @@ describe("OTelMetricsLogger (OTel available)", () => {
     const stepsAdd = findCounterAdd(mockMeter, "pilo.agent.steps");
     expect(stepsAdd).toHaveBeenCalled();
     const [, attrs] = stepsAdd.mock.calls[0];
-    expect(attrs).toMatchObject({ provider: "anthropic", model: "claude-3-sonnet" });
+    expect(attrs).toMatchObject({ "pilo.provider": "anthropic", "pilo.model": "claude-3-sonnet" });
   });
 
   it("cleans up listeners on dispose", () => {
