@@ -317,6 +317,7 @@ export class WebAgent {
       } catch (error) {
         // Check if aborted
         if (this.abortSignal?.aborted) {
+          span.setAttribute("pilo.task.success", false);
           return this.buildResult(
             {
               success: false,
@@ -334,6 +335,7 @@ export class WebAgent {
 
         // Convert runtime errors to results
         const message = `Task failed: ${this.extractErrorMessage(error)}`;
+        span.setAttribute("pilo.task.success", false);
         return this.buildResult(
           {
             success: false,
