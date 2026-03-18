@@ -191,6 +191,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.0
       '@types/jsdom':
         specifier: ^28.0.0
         version: 28.0.0
