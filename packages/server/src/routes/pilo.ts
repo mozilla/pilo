@@ -99,6 +99,9 @@ interface PiloTaskRequest {
   // Search configuration overrides
   searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
 
+  // Tabstack configuration overrides
+  tabstackApiKey?: string;
+
   // Enable full screenshot events (default: false)
   includeScreenshotImages?: boolean;
 }
@@ -216,6 +219,8 @@ pilo.post("/run", async (c) => {
           guardrails: body.guardrails,
           searchProvider: body.searchProvider ?? serverConfig.search_provider,
           searchApiKey: serverConfig.parallel_api_key,
+          tabstackApiKey: body.tabstackApiKey ?? serverConfig.tabstack_api_key,
+          tabstackApiUrl: serverConfig.tabstack_api_url,
         };
 
         // Create browser and agent instances

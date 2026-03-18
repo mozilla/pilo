@@ -153,6 +153,20 @@ describe("Pilo Routes", () => {
       expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     });
 
+    it("should accept tabstackApiKey override", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task: "test task",
+          tabstackApiKey: "user-tabstack-key-123",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+    });
+
     it("should handle malformed JSON", async () => {
       const res = await app.request("/pilo/run", {
         method: "POST",

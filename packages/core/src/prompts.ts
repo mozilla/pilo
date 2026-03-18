@@ -111,6 +111,31 @@ export const TOOL_STRINGS = {
       feedback: "Specific feedback on what needs improvement (if not complete/excellent)",
     },
   },
+  /**
+   * Tabstack tools - cloud-based extraction and generation via Tabstack API
+   */
+  tabstack: {
+    tabstack_extract_markdown: {
+      description:
+        "Extract clean markdown content from a URL (web page or PDF). Especially useful for PDFs, which browsers cannot read directly. Returns the page content as markdown with metadata (title, description, author, etc.).",
+      url: "The URL to extract content from (web page or PDF URL)",
+    },
+    tabstack_extract_json: {
+      description:
+        "Extract structured JSON data from a URL according to a JSON Schema you provide. The schema defines the exact shape of the data you want extracted from the page.",
+      url: "The URL to extract data from",
+      json_schema:
+        "A JSON Schema object defining the desired output structure. Must include type, properties, and optionally required fields. Use description fields on properties to guide extraction.",
+    },
+    tabstack_generate_json: {
+      description:
+        "Fetch a URL and transform its content into structured JSON using AI, guided by your natural language instructions and a JSON Schema for the output format.",
+      url: "The URL to process",
+      json_schema: "A JSON Schema object defining the desired output structure",
+      instructions:
+        "Natural language instructions describing how to transform or generate the data from the page content",
+    },
+  },
 } as const;
 
 /** Base AI persona for web automation tasks. */
@@ -127,7 +152,7 @@ IMPORTANT:
 `.trim();
 
 /** Build available browser action tools with JSON syntax examples. */
-function buildToolExamples(hasWebSearch: boolean): string {
+function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false): string {
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
     `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
@@ -147,6 +172,14 @@ function buildToolExamples(hasWebSearch: boolean): string {
   if (hasWebSearch) {
     lines.push(
       `- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}`,
+    );
+  }
+
+  if (hasTabstack) {
+    lines.push(
+      `- tabstack_extract_markdown({"url": "https://example.com"}) - ${TOOL_STRINGS.tabstack.tabstack_extract_markdown.description}`,
+      `- tabstack_extract_json({"url": "https://example.com", "json_schema": {"type": "object", "properties": {"field": {"type": "string"}}}}) - ${TOOL_STRINGS.tabstack.tabstack_extract_json.description}`,
+      `- tabstack_generate_json({"url": "https://example.com", "json_schema": {"type": "object", "properties": {"field": {"type": "string"}}}, "instructions": "..."}) - ${TOOL_STRINGS.tabstack.tabstack_generate_json.description}`,
     );
   }
 
@@ -298,8 +331,13 @@ Analyze the current page state and determine your next action based on previous 
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
 - If you have found the core information requested but cannot access supplementary details due to site limitations, use done() with what you have — only use abort() when the core task cannot be completed at all
 - For research: Use extract() immediately when finding relevant data
-- For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF
+- For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable{% if hasTabstack %} — use tabstack_extract_markdown to read PDF content directly{% endif %}{% if not hasTabstack %} — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF{% endif %}
 {% if hasWebSearch %}- If you need to search the web, use webSearch({query}) directly rather than filling in a browser search engine (DuckDuckGo, Google, Bing, etc.) — webSearch avoids CAPTCHA and bot detection that will block browser-based searches{% endif %}
+{% if hasTabstack %}- **Tabstack cloud tools are available — prefer them over manual browsing when they fit:**
+  - tabstack_extract_markdown: Use this for PDFs (browsers render PDFs in a viewer you cannot read) and whenever you need clean text from a page without navigating to it
+  - tabstack_extract_json: Use when you need structured data from a page and can define the desired shape as a JSON Schema
+  - tabstack_generate_json: Use when you need AI-transformed content (summaries, categorization, restructured data){% endif %}
+{% if hasStartingUrl and hasWebSearch %}- A starting URL was provided — **focus on that site first**. Use webSearch only if you need supplementary information beyond what the site provides{% endif %}
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
 
 **When using done():**
@@ -320,12 +358,19 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails and web search. */
-const buildActionLoopSystemPrompt = (hasGuardrails: boolean, hasWebSearch: boolean = false) =>
+/** Build action system prompt with optional guardrails, web search, and Tabstack tools. */
+const buildActionLoopSystemPrompt = (
+  hasGuardrails: boolean,
+  hasWebSearch: boolean = false,
+  hasTabstack: boolean = false,
+  hasStartingUrl: boolean = false,
+) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
     hasWebSearch,
-    toolExamples: buildToolExamples(hasWebSearch),
+    hasTabstack,
+    hasStartingUrl,
+    toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
     currentDate: getCurrentFormattedDate(),
   });
 
@@ -452,11 +497,12 @@ export const buildStepErrorFeedbackPrompt = (
   error: string,
   hasGuardrails: boolean = false,
   hasWebSearch: boolean = false,
+  hasTabstack: boolean = false,
 ) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
-    toolExamples: buildToolExamples(hasWebSearch),
+    toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
   });
 
 /**

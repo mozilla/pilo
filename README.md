@@ -152,6 +152,7 @@ try {
 - 🌐 **Multi-Browser Support**: Works with Firefox, Chrome, Safari, and Edge
 - 🛡️ **Safety First**: Provide guardrails to prevent unintended actions
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
+- ☁️ **Tabstack API Integration**: Extract markdown, structured JSON, or AI-transformed data from any URL using [Tabstack](https://tabstack.ai) cloud tools — especially useful for PDFs which browsers cannot read directly
 
 ## Configuration
 
@@ -390,34 +391,36 @@ Results appear as commit status checks with links to detailed HTML reports. See 
 
 ### Complete CLI Options
 
-| Option                          | Description                                                | Default          | Example                                 |
-| ------------------------------- | ---------------------------------------------------------- | ---------------- | --------------------------------------- |
-| `--url <url>`                   | Starting URL for the task                                  | -                | `--url https://example.com`             |
-| `--data <json>`                 | JSON data to provide context                               | -                | `--data '{"name":"John"}'`              |
-| `--guardrails <text>`           | Safety constraints for execution                           | -                | `--guardrails "browse only"`            |
-| `--provider <provider>`         | AI provider (openai, openrouter, vertex, ollama)           | openrouter       | `--provider openai`                     |
-| `--model <model>`               | AI model to use                                            | Provider default | `--model gpt-4o`                        |
-| `--openai-api-key <key>`        | OpenAI API key                                             | -                | `--openai-api-key sk-...`               |
-| `--openrouter-api-key <key>`    | OpenRouter API key                                         | -                | `--openrouter-api-key sk-or-...`        |
-| `--browser <browser>`           | Browser (firefox, chrome, chromium, safari, webkit, edge)  | firefox          | `--browser chrome`                      |
-| `--channel <channel>`           | Browser channel (chrome, msedge, chrome-beta, moz-firefox) | -                | `--channel chrome-beta`                 |
-| `--executable-path <path>`      | Path to browser executable                                 | -                | `--executable-path /usr/bin/firefox`    |
-| `--headless`                    | Run browser in headless mode                               | false            | `--headless`                            |
-| `--debug`                       | Enable debug mode with snapshots                           | false            | `--debug`                               |
-| `--vision`                      | Enable vision capabilities                                 | false            | `--vision`                              |
-| `--no-block-ads`                | Disable ad blocking                                        | false            | `--no-block-ads`                        |
-| `--block-resources <list>`      | Resources to block (comma-separated)                       | media,manifest   | `--block-resources image,font`          |
-| `--max-iterations <n>`          | Maximum task iterations                                    | 50               | `--max-iterations 100`                  |
-| `--max-validation-attempts <n>` | Maximum validation attempts                                | 3                | `--max-validation-attempts 5`           |
-| `--max-repeated-actions <n>`    | Maximum action repetitions before warning/aborting         | 2                | `--max-repeated-actions 3`              |
-| `--reasoning-effort <level>`    | Reasoning effort (none, low, medium, high)                 | none             | `--reasoning-effort high`               |
-| `--proxy <url>`                 | Proxy server URL                                           | -                | `--proxy http://proxy:8080`             |
-| `--proxy-username <user>`       | Proxy authentication username                              | -                | `--proxy-username myuser`               |
-| `--proxy-password <pass>`       | Proxy authentication password                              | -                | `--proxy-password mypass`               |
-| `--logger <type>`               | Logger type (console, json)                                | console          | `--logger json`                         |
-| `--pw-endpoint <url>`           | Playwright endpoint for remote browser                     | -                | `--pw-endpoint ws://localhost:9222`     |
-| `--pw-cdp-endpoint <url>`       | Chrome DevTools Protocol endpoint                          | -                | `--pw-cdp-endpoint ws://localhost:9222` |
-| `--bypass-csp`                  | Bypass Content Security Policy                             | false            | `--bypass-csp`                          |
+| Option                          | Description                                                | Default                 | Example                                    |
+| ------------------------------- | ---------------------------------------------------------- | ----------------------- | ------------------------------------------ |
+| `--url <url>`                   | Starting URL for the task                                  | -                       | `--url https://example.com`                |
+| `--data <json>`                 | JSON data to provide context                               | -                       | `--data '{"name":"John"}'`                 |
+| `--guardrails <text>`           | Safety constraints for execution                           | -                       | `--guardrails "browse only"`               |
+| `--provider <provider>`         | AI provider (openai, openrouter, vertex, ollama)           | openrouter              | `--provider openai`                        |
+| `--model <model>`               | AI model to use                                            | Provider default        | `--model gpt-4o`                           |
+| `--openai-api-key <key>`        | OpenAI API key                                             | -                       | `--openai-api-key sk-...`                  |
+| `--openrouter-api-key <key>`    | OpenRouter API key                                         | -                       | `--openrouter-api-key sk-or-...`           |
+| `--browser <browser>`           | Browser (firefox, chrome, chromium, safari, webkit, edge)  | firefox                 | `--browser chrome`                         |
+| `--channel <channel>`           | Browser channel (chrome, msedge, chrome-beta, moz-firefox) | -                       | `--channel chrome-beta`                    |
+| `--executable-path <path>`      | Path to browser executable                                 | -                       | `--executable-path /usr/bin/firefox`       |
+| `--headless`                    | Run browser in headless mode                               | false                   | `--headless`                               |
+| `--debug`                       | Enable debug mode with snapshots                           | false                   | `--debug`                                  |
+| `--vision`                      | Enable vision capabilities                                 | false                   | `--vision`                                 |
+| `--no-block-ads`                | Disable ad blocking                                        | false                   | `--no-block-ads`                           |
+| `--block-resources <list>`      | Resources to block (comma-separated)                       | media,manifest          | `--block-resources image,font`             |
+| `--max-iterations <n>`          | Maximum task iterations                                    | 50                      | `--max-iterations 100`                     |
+| `--max-validation-attempts <n>` | Maximum validation attempts                                | 3                       | `--max-validation-attempts 5`              |
+| `--max-repeated-actions <n>`    | Maximum action repetitions before warning/aborting         | 2                       | `--max-repeated-actions 3`                 |
+| `--reasoning-effort <level>`    | Reasoning effort (none, low, medium, high)                 | none                    | `--reasoning-effort high`                  |
+| `--proxy <url>`                 | Proxy server URL                                           | -                       | `--proxy http://proxy:8080`                |
+| `--proxy-username <user>`       | Proxy authentication username                              | -                       | `--proxy-username myuser`                  |
+| `--proxy-password <pass>`       | Proxy authentication password                              | -                       | `--proxy-password mypass`                  |
+| `--logger <type>`               | Logger type (console, json)                                | console                 | `--logger json`                            |
+| `--pw-endpoint <url>`           | Playwright endpoint for remote browser                     | -                       | `--pw-endpoint ws://localhost:9222`        |
+| `--pw-cdp-endpoint <url>`       | Chrome DevTools Protocol endpoint                          | -                       | `--pw-cdp-endpoint ws://localhost:9222`    |
+| `--bypass-csp`                  | Bypass Content Security Policy                             | false                   | `--bypass-csp`                             |
+| `--tabstack-api-key <key>`      | Tabstack API key for cloud extraction tools                | -                       | `--tabstack-api-key your-key`              |
+| `--tabstack-api-url <url>`      | Tabstack API base URL                                      | https://api.tabstack.ai | `--tabstack-api-url http://localhost:8080` |
 
 ### Environment Variables
 
@@ -463,6 +466,9 @@ All configuration options can be set via environment variables (dev mode only; n
 | `PILO_PW_ENDPOINT`                | Playwright endpoint URL                          | `--pw-endpoint`             |
 | `PILO_PW_CDP_ENDPOINT`            | CDP endpoint URL                                 | `--pw-cdp-endpoint`         |
 | `PILO_BYPASS_CSP`                 | Bypass CSP (true/false)                          | `--bypass-csp`              |
+| **Tabstack Configuration**        |                                                  |                             |
+| `TABSTACK_API_KEY`                | Tabstack API key for cloud extraction tools      | `--tabstack-api-key`        |
+| `TABSTACK_API_URL`                | Tabstack API base URL                            | `--tabstack-api-url`        |
 
 ### Configuration Priority
 

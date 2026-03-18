@@ -220,6 +220,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       maxTotalErrors: options.maxTotalErrors ?? cfg.max_total_errors,
       searchProvider: options.searchProvider ?? cfg.search_provider,
       searchApiKey: cfg.parallel_api_key,
+      tabstackApiKey: options.tabstackApiKey ?? cfg.tabstack_api_key,
+      tabstackApiUrl: options.tabstackApiUrl ?? cfg.tabstack_api_url,
       providerConfig,
       logger,
       eventEmitter,
