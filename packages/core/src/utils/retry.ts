@@ -12,6 +12,7 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
+import { getTracer, SpanStatusCode } from "../telemetry/tracing.js";
 
 /**
  * Check if an error is retryable
@@ -79,6 +80,9 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   params: Parameters<typeof generateText<TOOLS>>[0],
   retryOptions?: RetryOptions,
 ): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
+  const tracer = await getTracer();
+  const span = tracer.startSpan("pilo.ai.generate");
+
   const {
     maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
     initialDelay = DEFAULT_RETRY_INITIAL_DELAY_MS,
@@ -90,74 +94,77 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   let lastError: unknown;
   let delay = initialDelay;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      // Attempt the generateText call
-      const result = await generateText(params);
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await generateText(params);
 
-      // Simple validation: if toolChoice is "required", we must have tool results
-      if (params.toolChoice === "required" && !result.toolResults?.length) {
-        throw new Error("Tool call was required but model did not call any tools");
-      }
+        if (params.toolChoice === "required" && !result.toolResults?.length) {
+          throw new Error("Tool call was required but model did not call any tools");
+        }
 
-      return result;
-    } catch (error) {
-      lastError = error;
+        // Record success attributes
+        span.setAttribute("pilo.ai.attempts", attempt);
+        span.setAttribute("pilo.ai.finish_reason", String(result.finishReason));
+        return result;
+      } catch (error) {
+        lastError = error;
 
-      // Extract error details for logging
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorAny = error as any;
-      const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorAny = error as any;
+        const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
 
-      // Check if error is retryable
-      if (!isRetryableError(error)) {
-        console.error(`[Retry] Non-retryable error encountered:`, {
+        if (!isRetryableError(error)) {
+          console.error(`[Retry] Non-retryable error encountered:`, {
+            message: errorMessage,
+            statusCode,
+            attempt,
+          });
+          throw error;
+        }
+
+        if (attempt === maxAttempts) {
+          console.error(`[Retry] Max attempts (${maxAttempts}) reached`);
+          break;
+        }
+
+        console.warn(`⚠️ [Retry] AI call failed (attempt ${attempt}/${maxAttempts}):`, {
           message: errorMessage,
           statusCode,
-          attempt,
+          retrying: true,
         });
-        throw error;
+
+        if (onRetry) {
+          onRetry(attempt, error);
+        }
+
+        const waitTime = Math.min(addJitter(delay), maxDelay);
+        console.log(`[Retry] Waiting ${Math.round(waitTime)}ms before retry...`);
+        await sleep(waitTime);
+
+        delay = Math.min(delay * backoffFactor, maxDelay);
+        console.log(`[Retry] Retrying (attempt ${attempt + 1}/${maxAttempts})...`);
       }
-
-      // Check if we have more attempts
-      if (attempt === maxAttempts) {
-        console.error(`[Retry] Max attempts (${maxAttempts}) reached`);
-        break;
-      }
-
-      // Log the retry attempt
-      console.warn(`⚠️ [Retry] AI call failed (attempt ${attempt}/${maxAttempts}):`, {
-        message: errorMessage,
-        statusCode,
-        retrying: true,
-      });
-
-      // Call retry callback if provided
-      if (onRetry) {
-        onRetry(attempt, error);
-      }
-
-      // Wait with exponential backoff and jitter
-      const waitTime = Math.min(addJitter(delay), maxDelay);
-      console.log(`[Retry] Waiting ${Math.round(waitTime)}ms before retry...`);
-      await sleep(waitTime);
-
-      // Increase delay for next attempt
-      delay = Math.min(delay * backoffFactor, maxDelay);
-      console.log(`[Retry] Retrying (attempt ${attempt + 1}/${maxAttempts})...`);
     }
+
+    // All retries exhausted
+    const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+    const errorAny = lastError as any;
+    const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
+
+    console.error(`❌ [Retry] AI call failed after ${maxAttempts} attempts:`, {
+      message: errorMessage,
+      statusCode,
+      willThrow: true,
+    });
+
+    throw lastError;
+  } catch (error) {
+    span.setAttribute("pilo.ai.attempts", retryOptions?.maxAttempts || DEFAULT_RETRY_MAX_ATTEMPTS);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+    span.recordException(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  } finally {
+    span.end();
   }
-
-  // All retries exhausted
-  const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
-  const errorAny = lastError as any;
-  const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
-
-  console.error(`❌ [Retry] AI call failed after ${maxAttempts} attempts:`, {
-    message: errorMessage,
-    statusCode,
-    willThrow: true,
-  });
-
-  throw lastError;
 }
