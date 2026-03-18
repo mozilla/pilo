@@ -116,7 +116,10 @@ async function performActionWithValidation(
       action,
     });
 
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error instanceof Error ? error.message : String(error),
+    });
     span.recordException(error instanceof Error ? error : new Error(String(error)));
     throw error;
   } finally {

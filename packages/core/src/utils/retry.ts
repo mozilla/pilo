@@ -161,7 +161,10 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
     throw lastError;
   } catch (error) {
     span.setAttribute("pilo.ai.attempts", retryOptions?.maxAttempts || DEFAULT_RETRY_MAX_ATTEMPTS);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error instanceof Error ? error.message : String(error),
+    });
     span.recordException(error instanceof Error ? error : new Error(String(error)));
     throw error;
   } finally {

@@ -1137,7 +1137,6 @@ export class WebAgent {
     });
 
     try {
-
       // Emit processing event with attempt number
       this.emit(WebAgentEventType.AGENT_PROCESSING, {
         operation: `Validating task completion (attempt ${executionState.validationAttempts})`,
