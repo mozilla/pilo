@@ -18,6 +18,7 @@ export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 
 // Additional loggers (not in core.ts re-exports)
 export { MetricsCollector } from "./loggers/metricsCollector.js";
+export { OTelMetricsLogger } from "./loggers/otelMetrics.js";
 export { SecretsRedactor } from "./loggers/secretsRedactor.js";
 
 // Telemetry
