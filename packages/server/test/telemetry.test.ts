@@ -1,0 +1,33 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+describe("server telemetry setup", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("does nothing when OTEL_EXPORTER_OTLP_ENDPOINT is not set", async () => {
+    delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const { initTelemetry } = await import("../src/telemetry.js");
+    const shutdown = initTelemetry();
+    expect(shutdown).toBeUndefined();
+  });
+
+  it("returns a shutdown function when OTEL_EXPORTER_OTLP_ENDPOINT is set", async () => {
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318";
+    process.env.OTEL_SERVICE_NAME = "test-pilo";
+
+    const { initTelemetry } = await import("../src/telemetry.js");
+    const shutdown = initTelemetry();
+    expect(shutdown).toBeTypeOf("function");
+
+    // Clean up - shutdown the SDK
+    if (shutdown) await shutdown();
+  });
+});
