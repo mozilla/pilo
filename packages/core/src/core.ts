@@ -28,11 +28,13 @@ export type {
   ValidationErrorEventData,
   InputFormEventData,
   InputFormResponseEventData,
+  InputFormErrorEventData,
 } from "./events.js";
 
 // Input tools (human-in-the-loop)
 export type {
   OnInputCallback,
+  InputFieldType,
   InputRequest,
   InputResponse,
   InputFormRequest,

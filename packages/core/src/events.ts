@@ -50,6 +50,7 @@ export enum WebAgentEventType {
   // Input events (human-in-the-loop)
   INPUT_FORM = "input:form",
   INPUT_FORM_RESPONSE = "input:form_response",
+  INPUT_FORM_ERROR = "input:form:error",
 }
 
 /**
@@ -308,7 +309,20 @@ export interface StatusMessageEventData extends WebAgentEventData {
 export interface InputFormEventData extends WebAgentEventData {
   questionId: string;
   question: string;
-  fields: Array<{ name: string; label: string; sensitive?: boolean }>;
+  fields: Array<{ name: string; label: string; type?: string; options?: string[]; sensitive?: boolean }>;
+  pageUrl?: string;
+  pageTitle?: string;
+}
+
+/**
+ * Event data when a form input response fails validation.
+ * Includes the original form request info so the caller has full context to re-submit.
+ */
+export interface InputFormErrorEventData extends WebAgentEventData {
+  questionId: string;
+  question: string;
+  fields: Array<{ name: string; label: string; type?: string; options?: string[]; sensitive?: boolean }>;
+  errors: string[];
   pageUrl?: string;
   pageTitle?: string;
 }
@@ -359,7 +373,8 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
   | { type: WebAgentEventType.INPUT_FORM; data: InputFormEventData }
-  | { type: WebAgentEventType.INPUT_FORM_RESPONSE; data: InputFormResponseEventData };
+  | { type: WebAgentEventType.INPUT_FORM_RESPONSE; data: InputFormResponseEventData }
+  | { type: WebAgentEventType.INPUT_FORM_ERROR; data: InputFormErrorEventData };
 
 /**
  * Event emitter for WebAgent events

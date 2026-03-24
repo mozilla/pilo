@@ -140,6 +140,7 @@ describe("WebAgentEventEmitter", () => {
         "browser:reconnected",
         "input:form",
         "input:form_response",
+        "input:form:error",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);

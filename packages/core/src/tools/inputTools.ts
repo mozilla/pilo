@@ -16,12 +16,19 @@ import { nanoid } from "nanoid";
 
 // === Public Types (exported for consumers) ===
 
+/** Field input type */
+export type InputFieldType = "text" | "select";
+
 /** A form field the AI is requesting */
 export interface InputFormField {
   /** Identifier used as key in the response */
   name: string;
   /** Human-readable label shown to the user */
   label: string;
+  /** Input type: "text" for free text, "select" for choosing from options. Defaults to "text". */
+  type?: InputFieldType;
+  /** Valid options when type is "select" */
+  options?: string[];
   /** Whether input should be masked (e.g., passwords) */
   sensitive?: boolean;
 }
@@ -77,6 +84,14 @@ export function createInputTools(context: InputToolContext) {
             z.object({
               name: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldName),
               label: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldLabel),
+              type: z
+                .enum(["text", "select"])
+                .optional()
+                .describe(TOOL_STRINGS.input.requestFormData.fieldType),
+              options: z
+                .array(z.string())
+                .optional()
+                .describe(TOOL_STRINGS.input.requestFormData.fieldOptions),
               sensitive: z
                 .boolean()
                 .optional()
@@ -142,6 +157,25 @@ export function createInputTools(context: InputToolContext) {
             };
           }
 
+          // Validate the response against the field definitions
+          const validationErrors = validateFormResponse(fields, response.fields);
+          if (validationErrors.length > 0) {
+            // Emit error event with original form info + validation errors
+            context.eventEmitter.emit(WebAgentEventType.INPUT_FORM_ERROR, {
+              questionId,
+              question,
+              fields,
+              errors: validationErrors,
+              ...pageContext,
+            });
+
+            return {
+              success: false,
+              action: "requestFormData",
+              error: `Invalid form input: ${validationErrors.join("; ")}`,
+            };
+          }
+
           return {
             success: true,
             action: "requestFormData",
@@ -174,6 +208,40 @@ export function createInputTools(context: InputToolContext) {
       },
     }),
   };
+}
+
+// === Validation ===
+
+/**
+ * Validate a form response against the field definitions.
+ * Returns an array of error messages (empty if valid).
+ */
+function validateFormResponse(
+  fields: Array<{ name: string; label: string; type?: string; options?: string[] }>,
+  responseFields: Record<string, string>,
+): string[] {
+  const errors: string[] = [];
+
+  for (const field of fields) {
+    const value = responseFields[field.name];
+
+    // Check required field is present
+    if (value === undefined || value === "") {
+      errors.push(`Missing required field: ${field.name}`);
+      continue;
+    }
+
+    // Check select field value is in options
+    if (field.type === "select" && field.options && field.options.length > 0) {
+      if (!field.options.includes(value)) {
+        errors.push(
+          `Invalid value for ${field.name}: "${value}". Must be one of: ${field.options.join(", ")}`,
+        );
+      }
+    }
+  }
+
+  return errors;
 }
 
 // === Helpers ===
