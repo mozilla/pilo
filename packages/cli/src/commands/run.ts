@@ -17,7 +17,7 @@ import type { Logger, InputRequest, InputResponse } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
-import * as readline from "readline";
+import { input, password, select } from "@inquirer/prompts";
 
 /**
  * Guard: verify that config exists before running a task.
@@ -211,76 +211,26 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     // Input handler for human-in-the-loop (prompts user via stdio)
     const onInput = async (request: InputRequest): Promise<InputResponse> => {
       if (request.type === "form") {
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        const promptField = (text: string): Promise<string> =>
-          new Promise((resolve) => rl.question(text, resolve));
-
-        // Prompt for sensitive fields without echoing input
-        const promptSensitive = (text: string): Promise<string> =>
-          new Promise((resolve) => {
-            process.stdout.write(text);
-            const stdin = process.stdin;
-            const wasRaw = stdin.isRaw;
-            if (stdin.isTTY) stdin.setRawMode(true);
-
-            let input = "";
-            const onData = (ch: Buffer) => {
-              const char = ch.toString();
-              if (char === "\n" || char === "\r") {
-                if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
-                stdin.removeListener("data", onData);
-                process.stdout.write("\n");
-                resolve(input);
-              } else if (char === "\u007F" || char === "\b") {
-                // Backspace
-                if (input.length > 0) input = input.slice(0, -1);
-              } else if (char === "\u0003") {
-                // Ctrl+C
-                process.exit(1);
-              } else {
-                input += char;
-              }
-            };
-            stdin.on("data", onData);
-          });
-
-        try {
-          console.log(chalk.yellow(`\n[Input needed] ${request.question}`));
-          if (request.pageUrl) {
-            console.log(chalk.gray(`  Page: ${request.pageUrl}`));
-          }
-          console.log();
-
-          const fields: Record<string, string> = {};
-          for (const field of request.fields) {
-            if (field.type === "select" && field.options && field.options.length > 0) {
-              // Display options for select fields
-              console.log(chalk.cyan(`  ${field.label}:`));
-              field.options.forEach((option, i) => {
-                console.log(chalk.gray(`    ${i + 1}. ${option}`));
-              });
-              const choice = await promptField(chalk.cyan(`  Enter choice (1-${field.options.length}): `));
-              const index = parseInt(choice, 10) - 1;
-              if (index >= 0 && index < field.options.length) {
-                fields[field.name] = field.options[index];
-              } else {
-                // Treat as raw input if not a valid number
-                fields[field.name] = choice;
-              }
-            } else if (field.sensitive) {
-              // Mask input for sensitive fields
-              fields[field.name] = await promptSensitive(chalk.cyan(`  ${field.label}: `));
-            } else {
-              fields[field.name] = await promptField(chalk.cyan(`  ${field.label}: `));
-            }
-          }
-          return { type: "form", fields };
-        } finally {
-          rl.close();
-          // readline puts stdin into flowing mode; pause it so the
-          // event loop can exit cleanly after the task completes.
-          process.stdin.pause();
+        console.log(chalk.yellow(`\n[Input needed] ${request.question}`));
+        if (request.pageUrl) {
+          console.log(chalk.gray(`  Page: ${request.pageUrl}`));
         }
+        console.log();
+
+        const fields: Record<string, string> = {};
+        for (const field of request.fields) {
+          if (field.type === "select" && field.options && field.options.length > 0) {
+            fields[field.name] = await select({
+              message: field.label,
+              choices: field.options.map((o) => ({ name: o, value: o })),
+            });
+          } else if (field.sensitive) {
+            fields[field.name] = await password({ message: field.label, mask: "*" });
+          } else {
+            fields[field.name] = await input({ message: field.label });
+          }
+        }
+        return { type: "form", fields };
       }
       return { type: "declined", reason: `Unsupported input type: ${(request as any).type}` };
     };

@@ -309,7 +309,13 @@ export interface StatusMessageEventData extends WebAgentEventData {
 export interface InputFormEventData extends WebAgentEventData {
   questionId: string;
   question: string;
-  fields: Array<{ name: string; label: string; type?: string; options?: string[]; sensitive?: boolean }>;
+  fields: Array<{
+    name: string;
+    label: string;
+    type?: string;
+    options?: string[];
+    sensitive?: boolean;
+  }>;
   pageUrl?: string;
   pageTitle?: string;
 }
@@ -321,7 +327,13 @@ export interface InputFormEventData extends WebAgentEventData {
 export interface InputFormErrorEventData extends WebAgentEventData {
   questionId: string;
   question: string;
-  fields: Array<{ name: string; label: string; type?: string; options?: string[]; sensitive?: boolean }>;
+  fields: Array<{
+    name: string;
+    label: string;
+    type?: string;
+    options?: string[];
+    sensitive?: boolean;
+  }>;
   errors: string[];
   pageUrl?: string;
   pageTitle?: string;
