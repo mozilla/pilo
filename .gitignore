@@ -10,3 +10,4 @@ coverage
 
 # Auto-generated files
 packages/core/src/browser/ariaTree/bundle.ts
+docs/superpowers/
