@@ -105,9 +105,9 @@ export const TOOL_STRINGS = {
     },
     /** Prompt guidance for when the AI should use requestFormData */
     coreRule:
-      "When you encounter a form, ALWAYS call requestFormData() for any fields whose values were not explicitly provided in the task description. Only fill fields where the task gives you the exact value to use. For example, if the task says 'book a flight from SFO to JFK', you know the airports but must ask for passenger name, email, etc. NEVER guess, invent, or use placeholder data for any field.",
+      "NEVER fill form fields with fake, placeholder, or made-up data. When you encounter a form, you MUST call requestFormData() for any field whose value was not explicitly stated in the task. Only fill a field yourself if the task gives you the exact value.",
     bestPractice:
-      "Before filling ANY form field, check: did the task provide this exact value? If yes, use it. If no, use requestFormData(). This applies to ALL fields, not just personal data. Do not use placeholder values, example.com domains, or made-up data under any circumstances.",
+      "Before filling ANY form field: if the task provided the value, use it. If not, STOP and call requestFormData(). This applies to ALL fields (names, emails, phones, addresses, preferences, dates). Never guess or invent values.",
   },
 
   /**
