@@ -357,6 +357,7 @@ Analyze the current page state and determine your next action based on previous 
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
 - Submit forms via enter() or submit button after filling
+- After submitting a form, ALWAYS check the page for error messages, validation failures, or unchanged state. If the form did not submit successfully (error banners, field highlights, page stayed the same), call reportFormError() with the error details and the same fields so the user can correct their input.
 - ${TOOL_STRINGS.input.bestPractice}
 - Find alternative elements if primary ones aren't available
 - When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays
