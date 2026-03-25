@@ -91,9 +91,9 @@ export const TOOL_STRINGS = {
       fieldName: "Field identifier used as key in response",
       fieldLabel: "Human-readable label shown to the user",
       fieldType:
-        'Input type: "text" for free text (default), "select" for choosing from a list of options',
+        'Input type: "text" for free text (default), "select" for single choice from options, "checkbox" for multiple choices from options',
       fieldOptions:
-        "Valid options when type is select (e.g., country dropdown values, plan tier names)",
+        "Valid options when type is select or checkbox (e.g., country dropdown values, pizza toppings)",
       fieldSensitive: "Whether to mask input (e.g., passwords)",
     },
     /** Prompt guidance for when the AI should use requestFormData */

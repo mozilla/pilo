@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 // === Public Types (exported for consumers) ===
 
 /** Field input type */
-export type InputFieldType = "text" | "select";
+export type InputFieldType = "text" | "select" | "checkbox";
 
 /** A form field the AI is requesting */
 export interface InputFormField {
@@ -25,9 +25,9 @@ export interface InputFormField {
   name: string;
   /** Human-readable label shown to the user */
   label: string;
-  /** Input type: "text" for free text, "select" for choosing from options. Defaults to "text". */
+  /** Input type: "text" for free text, "select" for single choice, "checkbox" for multiple choices. Defaults to "text". */
   type?: InputFieldType;
-  /** Valid options when type is "select" */
+  /** Valid options when type is "select" or "checkbox" */
   options?: string[];
   /** Whether input should be masked (e.g., passwords) */
   sensitive?: boolean;
@@ -85,7 +85,7 @@ export function createInputTools(context: InputToolContext) {
               name: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldName),
               label: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldLabel),
               type: z
-                .enum(["text", "select"])
+                .enum(["text", "select", "checkbox"])
                 .optional()
                 .describe(TOOL_STRINGS.input.requestFormData.fieldType),
               options: z
@@ -224,6 +224,20 @@ function validateFormResponse(
 
   for (const field of fields) {
     const value = responseFields[field.name];
+
+    // Checkbox fields are optional (empty string means none selected)
+    if (field.type === "checkbox") {
+      if (value !== undefined && value !== "" && field.options && field.options.length > 0) {
+        const selected = value.split(",").map((v) => v.trim());
+        const invalid = selected.filter((v) => !field.options!.includes(v));
+        if (invalid.length > 0) {
+          errors.push(
+            `Invalid values for ${field.name}: "${invalid.join(", ")}". Must be from: ${field.options.join(", ")}`,
+          );
+        }
+      }
+      continue;
+    }
 
     // Check required field is present
     if (value === undefined || value === "") {

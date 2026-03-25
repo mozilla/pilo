@@ -17,7 +17,7 @@ import type { Logger, InputRequest, InputResponse } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
-import { input, password, select } from "@inquirer/prompts";
+import { input, password, select, checkbox } from "@inquirer/prompts";
 
 /**
  * Guard: verify that config exists before running a task.
@@ -219,7 +219,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
         const fields: Record<string, string> = {};
         for (const field of request.fields) {
-          if (field.type === "select" && field.options && field.options.length > 0) {
+          if (field.type === "checkbox" && field.options && field.options.length > 0) {
+            const selected = await checkbox({
+              message: field.label,
+              choices: field.options.map((o) => ({ name: o, value: o })),
+            });
+            fields[field.name] = selected.join(", ");
+          } else if (field.type === "select" && field.options && field.options.length > 0) {
             fields[field.name] = await select({
               message: field.label,
               choices: field.options.map((o) => ({ name: o, value: o })),
