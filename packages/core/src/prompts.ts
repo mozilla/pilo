@@ -96,6 +96,13 @@ export const TOOL_STRINGS = {
         "Valid options when type is select or checkbox (e.g., country dropdown values, pizza toppings)",
       fieldSensitive: "Whether to mask input (e.g., passwords)",
     },
+    reportFormError: {
+      description:
+        "Report that a form submission failed after filling it with user-provided data. This notifies the user of the error and automatically re-requests the form data so they can correct it. Use this when the website shows an error after form submission (e.g., 'email already in use', 'invalid phone format', 'card declined').",
+      error: "The error message shown by the website after form submission",
+      question: "Why the form needs to be resubmitted",
+      fields: "The same form fields, so the user can provide corrected values",
+    },
     /** Prompt guidance for when the AI should use requestFormData */
     coreRule:
       "When you encounter a form, ALWAYS call requestFormData() for any fields whose values were not explicitly provided in the task description. Only fill fields where the task gives you the exact value to use. For example, if the task says 'book a flight from SFO to JFK', you know the airports but must ask for passenger name, email, etc. NEVER guess, invent, or use placeholder data for any field.",
@@ -209,6 +216,7 @@ function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false):
 
   lines.push(
     `- requestFormData({"question": "why you need data", "fields": [{"name": "field_id", "label": "Field Label"}]}) - ${TOOL_STRINGS.input.requestFormData.description}`,
+    `- reportFormError({"error": "website error message", "question": "why resubmission is needed", "fields": [...]}) - ${TOOL_STRINGS.input.reportFormError.description}`,
     `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
     `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
   );
