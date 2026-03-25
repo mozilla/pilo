@@ -216,7 +216,6 @@ function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false):
 
   lines.push(
     `- requestFormData({"question": "why you need data", "fields": [{"name": "field_id", "label": "Field Label"}]}) - ${TOOL_STRINGS.input.requestFormData.description}`,
-    `- reportFormError({"error": "website error message", "question": "why resubmission is needed", "fields": [...]}) - ${TOOL_STRINGS.input.reportFormError.description}`,
     `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
     `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
   );
@@ -356,8 +355,7 @@ Analyze the current page state and determine your next action based on previous 
 - The accessibility tree shows currently loaded elements; dynamic pages may load more content on scroll
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
-- Submit forms via enter() or submit button after filling
-- After submitting a form, ALWAYS check the page for error messages, validation failures, or unchanged state. If the form did not submit successfully (error banners, field highlights, page stayed the same), call reportFormError() with the error details and the same fields so the user can correct their input.
+- Submit forms via enter() or submit button after filling. After submission, check the page for errors. If the form failed, call reportFormError() with the error and same fields.
 - ${TOOL_STRINGS.input.bestPractice}
 - Find alternative elements if primary ones aren't available
 - When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays
