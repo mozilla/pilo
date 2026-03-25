@@ -105,9 +105,9 @@ export const TOOL_STRINGS = {
     },
     /** Prompt guidance for when the AI should use requestFormData */
     coreRule:
-      "NEVER fill form fields with fake, placeholder, or made-up data. When you encounter a form, you MUST call requestFormData() for any field whose value was not explicitly stated in the task. Only fill a field yourself if the task gives you the exact value.",
+      "NEVER fill form fields with fake or placeholder data (e.g., user@example.com, John Doe, 555-1234). When a form requires personal information (email, name, phone, address, credentials, payment), you MUST call requestFormData() to get real values from the user.",
     bestPractice:
-      "Before filling ANY form field: if the task provided the value, use it. If not, STOP and call requestFormData(). This applies to ALL fields (names, emails, phones, addresses, preferences, dates). Never guess or invent values.",
+      "Before filling ANY form field that asks for personal data (email, name, phone, password, address), STOP and use requestFormData() first. Do not guess, do not use placeholder values, do not use example.com domains. The user has real data to provide.",
   },
 
   /**
