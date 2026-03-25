@@ -877,12 +877,11 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract, webSearch, requestFormData, and reportFormError)
+    // Determine if page changed (most actions change the page, except extract, webSearch, and requestFormData)
     const pageChanged =
       actionOutput.action !== "extract" &&
       actionOutput.action !== "webSearch" &&
-      actionOutput.action !== "requestFormData" &&
-      actionOutput.action !== "reportFormError";
+      actionOutput.action !== "requestFormData";
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {

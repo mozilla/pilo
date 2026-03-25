@@ -96,18 +96,11 @@ export const TOOL_STRINGS = {
         "Valid options when type is select or checkbox (e.g., country dropdown values, pizza toppings)",
       fieldSensitive: "Whether to mask input (e.g., passwords)",
     },
-    reportFormError: {
-      description:
-        "Report that a form submission failed after filling it with user-provided data. This notifies the user of the error and automatically re-requests the form data so they can correct it. Use this when the website shows an error after form submission (e.g., 'email already in use', 'invalid phone format', 'card declined').",
-      error: "The error message shown by the website after form submission",
-      question: "Why the form needs to be resubmitted",
-      fields: "The same form fields, so the user can provide corrected values",
-    },
     /** Prompt guidance for when the AI should use requestFormData */
     coreRule:
-      "NEVER fill form fields with fake or placeholder data (e.g., user@example.com, John Doe, 555-1234). When a form requires personal information (email, name, phone, address, credentials, payment), you MUST call requestFormData() to get real values from the user.",
+      "When you encounter a form, ALWAYS call requestFormData() for any fields whose values were not explicitly provided in the task description. Only fill fields where the task gives you the exact value to use. For example, if the task says 'book a flight from SFO to JFK', you know the airports but must ask for passenger name, email, etc. NEVER guess, invent, or use placeholder data for any field.",
     bestPractice:
-      "Before filling ANY form field that asks for personal data (email, name, phone, password, address), STOP and use requestFormData() first. Do not guess, do not use placeholder values, do not use example.com domains. The user has real data to provide.",
+      "Before filling ANY form field, check: did the task provide this exact value? If yes, use it. If no, use requestFormData(). This applies to ALL fields, not just personal data. Do not use placeholder values, example.com domains, or made-up data under any circumstances.",
   },
 
   /**
@@ -355,7 +348,7 @@ Analyze the current page state and determine your next action based on previous 
 - The accessibility tree shows currently loaded elements; dynamic pages may load more content on scroll
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
-- Submit forms via enter() or submit button after filling. After submission, check the page for errors. If the form failed, call reportFormError() with the error and same fields.
+- Submit forms via enter() or submit button after filling
 - ${TOOL_STRINGS.input.bestPractice}
 - Find alternative elements if primary ones aren't available
 - When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays

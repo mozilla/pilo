@@ -4,7 +4,8 @@
  * Human-in-the-loop tools that allow the AI agent to request information
  * from the caller when it encounters data it cannot determine on its own.
  *
- * Currently supports: form data requests (requestFormData), form error reporting (reportFormError)
+ * Currently supports: form data requests (requestFormData)
+ * Future: general questions (ask), confirmations (confirm)
  */
 
 import { tool } from "ai";
@@ -70,194 +71,140 @@ export interface InputToolContext {
   getPageContext: () => { pageUrl?: string; pageTitle?: string };
 }
 
-// === Constants ===
-
-const MAX_FORM_ATTEMPTS = 3;
-
 // === Tool Creation ===
 
-const fieldSchema = z.object({
-  name: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldName),
-  label: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldLabel),
-  type: z
-    .enum(["text", "select", "checkbox"])
-    .optional()
-    .describe(TOOL_STRINGS.input.requestFormData.fieldType),
-  options: z
-    .array(z.string())
-    .optional()
-    .describe(TOOL_STRINGS.input.requestFormData.fieldOptions),
-  sensitive: z
-    .boolean()
-    .optional()
-    .describe(TOOL_STRINGS.input.requestFormData.fieldSensitive),
-});
-
 export function createInputTools(context: InputToolContext) {
-  // Track attempts per form (keyed by a hash of field names)
-  const attemptCounts = new Map<string, number>();
-
-  function getFormKey(fields: Array<{ name: string }>): string {
-    return fields.map((f) => f.name).sort().join(",");
-  }
-
-  /** Shared logic for requesting form data from the caller */
-  async function requestInput(
-    question: string,
-    fields: InputFormField[],
-    errors?: string[],
-  ): Promise<{
-    success: boolean;
-    action: string;
-    fields?: Record<string, string>;
-    error?: string;
-  }> {
-    if (!context.onInput) {
-      return {
-        success: false,
-        action: "requestFormData",
-        error: "No input handler configured. Proceed with available information or abort.",
-      };
-    }
-
-    // Check attempt count
-    const formKey = getFormKey(fields);
-    const attempts = (attemptCounts.get(formKey) ?? 0) + 1;
-    attemptCounts.set(formKey, attempts);
-
-    if (attempts > MAX_FORM_ATTEMPTS) {
-      return {
-        success: false,
-        action: "requestFormData",
-        error: `Maximum form attempts (${MAX_FORM_ATTEMPTS}) reached. Abort or try a different approach.`,
-      };
-    }
-
-    const questionId = nanoid(12);
-    const pageContext = context.getPageContext();
-
-    const request: InputFormRequest = {
-      type: "form",
-      questionId,
-      question,
-      fields,
-      ...pageContext,
-    };
-
-    // Emit the appropriate event
-    if (errors && errors.length > 0) {
-      context.eventEmitter.emit(WebAgentEventType.INPUT_FORM_ERROR, {
-        questionId,
-        question,
-        fields,
-        errors,
-        ...pageContext,
-      });
-    } else {
-      context.eventEmitter.emit(WebAgentEventType.INPUT_FORM, {
-        questionId,
-        question,
-        fields,
-        ...pageContext,
-      });
-    }
-
-    const startTime = Date.now();
-
-    try {
-      const response = await raceWithCancellation(
-        context.onInput(request),
-        context.inputTimeoutMs,
-        context.abortSignal,
-      );
-
-      const responseTimeMs = Date.now() - startTime;
-
-      context.eventEmitter.emit(WebAgentEventType.INPUT_FORM_RESPONSE, {
-        questionId,
-        response,
-        responseTimeMs,
-      });
-
-      if (response.type === "declined") {
-        return {
-          success: false,
-          action: "requestFormData",
-          error: response.reason
-            ? `User declined to provide form data: ${response.reason}`
-            : "User declined to provide form data",
-        };
-      }
-
-      // Validate the response against the field definitions
-      const validationErrors = validateFormResponse(fields, response.fields);
-      if (validationErrors.length > 0) {
-        // Recurse to re-request with validation errors
-        return requestInput(
-          `${question} (Previous response had errors: ${validationErrors.join("; ")})`,
-          fields,
-          validationErrors,
-        );
-      }
-
-      return {
-        success: true,
-        action: "requestFormData",
-        fields: response.fields,
-      };
-    } catch (error) {
-      if (error instanceof TimeoutError) {
-        return {
-          success: false,
-          action: "requestFormData",
-          error: "Timed out waiting for form input. Proceed with available information or abort.",
-        };
-      }
-
-      if (error instanceof AbortError) {
-        return {
-          success: false,
-          action: "requestFormData",
-          error: "Request was cancelled.",
-        };
-      }
-
-      return {
-        success: false,
-        action: "requestFormData",
-        error: `Failed to get form input: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-  }
-
   return {
     requestFormData: tool({
       description: TOOL_STRINGS.input.requestFormData.description,
       inputSchema: z.object({
         question: z.string().describe(TOOL_STRINGS.input.requestFormData.question),
-        fields: z.array(fieldSchema).describe(TOOL_STRINGS.input.requestFormData.fields),
+        fields: z
+          .array(
+            z.object({
+              name: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldName),
+              label: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldLabel),
+              type: z
+                .enum(["text", "select", "checkbox"])
+                .optional()
+                .describe(TOOL_STRINGS.input.requestFormData.fieldType),
+              options: z
+                .array(z.string())
+                .optional()
+                .describe(TOOL_STRINGS.input.requestFormData.fieldOptions),
+              sensitive: z
+                .boolean()
+                .optional()
+                .describe(TOOL_STRINGS.input.requestFormData.fieldSensitive),
+            }),
+          )
+          .describe(TOOL_STRINGS.input.requestFormData.fields),
       }),
       execute: async ({ question, fields }) => {
-        // Reset attempt count for a new form request
-        const formKey = getFormKey(fields);
-        attemptCounts.set(formKey, 0);
-        return requestInput(question, fields);
-      },
-    }),
+        if (!context.onInput) {
+          return {
+            success: false,
+            action: "requestFormData",
+            error: "No input handler configured. Proceed with available information or abort.",
+          };
+        }
 
-    reportFormError: tool({
-      description: TOOL_STRINGS.input.reportFormError.description,
-      inputSchema: z.object({
-        error: z.string().describe(TOOL_STRINGS.input.reportFormError.error),
-        question: z.string().describe(TOOL_STRINGS.input.reportFormError.question),
-        fields: z.array(fieldSchema).describe(TOOL_STRINGS.input.reportFormError.fields),
-      }),
-      execute: async ({ error, question, fields }) => {
-        return requestInput(
-          `${question} (Form submission error: ${error})`,
+        const questionId = nanoid(12);
+        const pageContext = context.getPageContext();
+
+        const request: InputFormRequest = {
+          type: "form",
+          questionId,
+          question,
           fields,
-          [error],
-        );
+          ...pageContext,
+        };
+
+        // Emit input:form event for observability
+        context.eventEmitter.emit(WebAgentEventType.INPUT_FORM, {
+          questionId,
+          question,
+          fields,
+          ...pageContext,
+        });
+
+        const startTime = Date.now();
+
+        try {
+          // Race the callback against timeout and abort signal
+          const response = await raceWithCancellation(
+            context.onInput(request),
+            context.inputTimeoutMs,
+            context.abortSignal,
+          );
+
+          const responseTimeMs = Date.now() - startTime;
+
+          // Emit response event
+          context.eventEmitter.emit(WebAgentEventType.INPUT_FORM_RESPONSE, {
+            questionId,
+            response,
+            responseTimeMs,
+          });
+
+          if (response.type === "declined") {
+            return {
+              success: false,
+              action: "requestFormData",
+              error: response.reason
+                ? `User declined to provide form data: ${response.reason}`
+                : "User declined to provide form data",
+            };
+          }
+
+          // Validate the response against the field definitions
+          const validationErrors = validateFormResponse(fields, response.fields);
+          if (validationErrors.length > 0) {
+            // Emit error event with original form info + validation errors
+            context.eventEmitter.emit(WebAgentEventType.INPUT_FORM_ERROR, {
+              questionId,
+              question,
+              fields,
+              errors: validationErrors,
+              ...pageContext,
+            });
+
+            return {
+              success: false,
+              action: "requestFormData",
+              error: `Invalid form input: ${validationErrors.join("; ")}`,
+            };
+          }
+
+          return {
+            success: true,
+            action: "requestFormData",
+            fields: response.fields,
+          };
+        } catch (error) {
+          if (error instanceof TimeoutError) {
+            return {
+              success: false,
+              action: "requestFormData",
+              error:
+                "Timed out waiting for form input. Proceed with available information or abort.",
+            };
+          }
+
+          if (error instanceof AbortError) {
+            return {
+              success: false,
+              action: "requestFormData",
+              error: "Request was cancelled.",
+            };
+          }
+
+          return {
+            success: false,
+            action: "requestFormData",
+            error: `Failed to get form input: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
       },
     }),
   };
