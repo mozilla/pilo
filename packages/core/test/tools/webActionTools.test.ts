@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createWebActionTools } from "../../src/tools/webActionTools.js";
 import { AriaBrowser, PageAction } from "../../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
+import { FormDataTracker } from "../../src/tools/formDataTracker.js";
 import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
@@ -722,6 +723,102 @@ describe("Web Action Tools", () => {
 
       expect(performActionSpy).toHaveBeenCalledWith("input1", PageAction.Fill, longText);
       expect(result.value).toBe(longText);
+    });
+  });
+
+  describe("Fill Guard (FormDataTracker)", () => {
+    let tracker: FormDataTracker;
+    let guardedTools: any;
+
+    beforeEach(() => {
+      tracker = new FormDataTracker();
+      guardedTools = createWebActionTools({
+        ...context,
+        formDataTracker: tracker,
+      });
+    });
+
+    it("should reject fill when ref is not sourced", async () => {
+      const result = await guardedTools.fill.execute({ ref: "E42", value: "fake@test.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("requestFormData()");
+      expect(result.error).toContain("E42");
+    });
+
+    it("should allow fill when ref is sourced", async () => {
+      tracker.sourceField("E42", "user@real.com");
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await guardedTools.fill.execute({ ref: "E42", value: "user@real.com" });
+
+      expect(result.success).toBe(true);
+      expect(performActionSpy).toHaveBeenCalledWith("E42", PageAction.Fill, "user@real.com");
+    });
+
+    it("should reject select when ref is not sourced", async () => {
+      const result = await guardedTools.select.execute({ ref: "E50", value: "Option A" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("requestFormData()");
+    });
+
+    it("should allow select when ref is sourced", async () => {
+      tracker.sourceField("E50", "Option A");
+
+      const result = await guardedTools.select.execute({ ref: "E50", value: "Option A" });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject check when ref is not sourced", async () => {
+      const result = await guardedTools.check.execute({ ref: "E60" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("requestFormData()");
+    });
+
+    it("should allow check when ref is sourced", async () => {
+      tracker.sourceField("E60", "on");
+
+      const result = await guardedTools.check.execute({ ref: "E60" });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject uncheck when ref is not sourced", async () => {
+      const result = await guardedTools.uncheck.execute({ ref: "E70" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("requestFormData()");
+    });
+
+    it("should allow uncheck when ref is sourced", async () => {
+      tracker.sourceField("E70", "off");
+
+      const result = await guardedTools.uncheck.execute({ ref: "E70" });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should not guard when no formDataTracker is provided", async () => {
+      // Tools without tracker (original context) should not guard
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.fill.execute({ ref: "E42", value: "anything" });
+
+      expect(result.success).toBe(true);
+      expect(performActionSpy).toHaveBeenCalled();
+    });
+
+    it("should reject fill after tracker is cleared", async () => {
+      tracker.sourceField("E42", "user@real.com");
+      tracker.clear();
+
+      const result = await guardedTools.fill.execute({ ref: "E42", value: "user@real.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("requestFormData()");
     });
   });
 });

@@ -90,6 +90,7 @@ export const TOOL_STRINGS = {
       fields: "The form fields you need filled",
       fieldName: "Field identifier used as key in response",
       fieldLabel: "Human-readable label shown to the user",
+      fieldRef: "Element reference from page snapshot (e.g., E42) for the form field",
       fieldType:
         'Input type: "text" for free text (default), "select" for single choice from options, "checkbox" for multiple choices from options',
       fieldOptions:
@@ -98,9 +99,9 @@ export const TOOL_STRINGS = {
     },
     /** Prompt guidance for when the AI should use requestFormData */
     coreRule:
-      "NEVER fill form fields with fake or placeholder data (e.g., user@example.com, John Doe, 555-1234). When a form requires personal information (email, name, phone, address, credentials, payment), you MUST call requestFormData() to get real values from the user.",
+      "Before filling any form field, you MUST call requestFormData() first with the element refs for each field you need to fill. The fill/select/check/uncheck tools will reject calls for fields that have not been sourced through requestFormData().",
     bestPractice:
-      "Before filling ANY form field that asks for personal data (email, name, phone, password, address), STOP and use requestFormData() first. Do not guess, do not use placeholder values, do not use example.com domains. The user has real data to provide.",
+      "When you encounter form fields to fill, call requestFormData() with all the fields and their refs from the page snapshot. Only after receiving the user's data can you use fill/select/check/uncheck on those refs.",
   },
 
   /**
@@ -208,7 +209,7 @@ function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false):
   }
 
   lines.push(
-    `- requestFormData({"question": "why you need data", "fields": [{"name": "field_id", "label": "Field Label"}]}) - ${TOOL_STRINGS.input.requestFormData.description}`,
+    `- requestFormData({"question": "why you need data", "fields": [{"name": "field_id", "label": "Field Label", "ref": "E###"}]}) - ${TOOL_STRINGS.input.requestFormData.description}`,
     `- done({"result": "your final answer"}) - ${TOOL_STRINGS.webActions.done.description}`,
     `- abort({"reason": "what was tried and why it failed"}) - ${TOOL_STRINGS.webActions.abort.description}`,
   );

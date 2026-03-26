@@ -36,6 +36,7 @@ import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
 import { createInputTools } from "./tools/inputTools.js";
 import type { OnInputCallback } from "./tools/inputTools.js";
+import { FormDataTracker } from "./tools/formDataTracker.js";
 import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
@@ -345,12 +346,16 @@ export class WebAgent {
     task: string,
     executionState: ExecutionState,
   ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+    // Form data source tracker - enforces requestFormData before fill/select/check/uncheck
+    const formDataTracker = new FormDataTracker();
+
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
       eventEmitter: this.eventEmitter,
       providerConfig: this.providerConfig,
       abortSignal: this.abortSignal,
+      formDataTracker,
     });
 
     // Only include search tools if a search service was created
@@ -376,6 +381,7 @@ export class WebAgent {
         pageUrl: this.currentPage.url,
         pageTitle: this.currentPage.title,
       }),
+      formDataTracker,
     });
 
     // Merge all tools
@@ -420,6 +426,8 @@ export class WebAgent {
 
       // Add page snapshot if needed
       if (needsPageSnapshot) {
+        // Clear sourced form data since refs are per-page and become stale on navigation
+        formDataTracker.clear();
         await this.addPageSnapshot();
       }
 

@@ -13,6 +13,7 @@ import { z } from "zod";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
 import { nanoid } from "nanoid";
+import { FormDataTracker } from "./formDataTracker.js";
 
 // === Public Types (exported for consumers) ===
 
@@ -25,6 +26,8 @@ export interface InputFormField {
   name: string;
   /** Human-readable label shown to the user */
   label: string;
+  /** Element reference from page snapshot (e.g., E42) for the form field */
+  ref?: string;
   /** Input type: "text" for free text, "select" for single choice, "checkbox" for multiple choices. Defaults to "text". */
   type?: InputFieldType;
   /** Valid options when type is "select" or "checkbox" */
@@ -69,6 +72,7 @@ export interface InputToolContext {
   inputTimeoutMs: number;
   abortSignal?: AbortSignal;
   getPageContext: () => { pageUrl?: string; pageTitle?: string };
+  formDataTracker?: FormDataTracker;
 }
 
 // === Tool Creation ===
@@ -84,6 +88,7 @@ export function createInputTools(context: InputToolContext) {
             z.object({
               name: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldName),
               label: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldLabel),
+              ref: z.string().describe(TOOL_STRINGS.input.requestFormData.fieldRef),
               type: z
                 .enum(["text", "select", "checkbox"])
                 .optional()
@@ -174,6 +179,16 @@ export function createInputTools(context: InputToolContext) {
               action: "requestFormData",
               error: `Invalid form input: ${validationErrors.join("; ")}`,
             };
+          }
+
+          // Track sourced fields by ref for fill guard enforcement
+          if (context.formDataTracker) {
+            for (const field of fields) {
+              const value = response.fields[field.name];
+              if (value !== undefined && field.ref) {
+                context.formDataTracker.sourceField(field.ref, value);
+              }
+            }
           }
 
           return {

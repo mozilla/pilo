@@ -13,12 +13,14 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import { FormDataTracker } from "./formDataTracker.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
   eventEmitter: WebAgentEventEmitter;
   providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
+  formDataTracker?: FormDataTracker;
 }
 
 /**
@@ -126,6 +128,14 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
+        if (context.formDataTracker && !context.formDataTracker.isFieldSourced(ref)) {
+          return {
+            success: false,
+            action: "fill",
+            ref,
+            error: `Cannot fill field ${ref} without sourcing data first. Call requestFormData() with ref ${ref} to get the value from the user.`,
+          };
+        }
         return await performActionWithValidation(PageAction.Fill, context, ref, value);
       },
     }),
@@ -137,6 +147,14 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe(TOOL_STRINGS.webActions.select.value),
       }),
       execute: async ({ ref, value }) => {
+        if (context.formDataTracker && !context.formDataTracker.isFieldSourced(ref)) {
+          return {
+            success: false,
+            action: "select",
+            ref,
+            error: `Cannot select option for field ${ref} without sourcing data first. Call requestFormData() with ref ${ref} to get the value from the user.`,
+          };
+        }
         return await performActionWithValidation(PageAction.Select, context, ref, value);
       },
     }),
@@ -157,6 +175,14 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        if (context.formDataTracker && !context.formDataTracker.isFieldSourced(ref)) {
+          return {
+            success: false,
+            action: "check",
+            ref,
+            error: `Cannot check field ${ref} without sourcing data first. Call requestFormData() with ref ${ref} to get the value from the user.`,
+          };
+        }
         return await performActionWithValidation(PageAction.Check, context, ref);
       },
     }),
@@ -167,6 +193,14 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        if (context.formDataTracker && !context.formDataTracker.isFieldSourced(ref)) {
+          return {
+            success: false,
+            action: "uncheck",
+            ref,
+            error: `Cannot uncheck field ${ref} without sourcing data first. Call requestFormData() with ref ${ref} to get the value from the user.`,
+          };
+        }
         return await performActionWithValidation(PageAction.Uncheck, context, ref);
       },
     }),
