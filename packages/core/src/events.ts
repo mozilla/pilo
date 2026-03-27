@@ -48,8 +48,8 @@ export enum WebAgentEventType {
   BROWSER_RECONNECTED = "browser:reconnected",
 
   // Interactive mode events
-  INTERACTIVE_DATA_REQUESTED = "interactive:data_requested",
-  INTERACTIVE_DATA_RECEIVED = "interactive:data_received",
+  INTERACTIVE_FORM_DATA_REQUEST = "interactive:form_data:request",
+  INTERACTIVE_FORM_DATA_ERROR = "interactive:form_data:error",
 }
 
 /**
@@ -305,7 +305,7 @@ export interface StatusMessageEventData extends WebAgentEventData {
 /**
  * Event data when the agent requests user data for form fields
  */
-export interface InteractiveDataRequestedEventData extends WebAgentEventData {
+export interface InteractiveFormDataRequestEventData extends WebAgentEventData {
   requestId: string;
   pageUrl: string;
   pageTitle: string;
@@ -315,12 +315,11 @@ export interface InteractiveDataRequestedEventData extends WebAgentEventData {
 }
 
 /**
- * Event data when the caller responds to a user data request
+ * Event data when an interactive form data request fails
  */
-export interface InteractiveDataReceivedEventData extends WebAgentEventData {
+export interface InteractiveFormDataErrorEventData extends WebAgentEventData {
   requestId: string;
-  fieldCount: number;
-  cancelled: boolean;
+  error: string;
 }
 
 /**
@@ -358,12 +357,12 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
   | {
-      type: WebAgentEventType.INTERACTIVE_DATA_REQUESTED;
-      data: InteractiveDataRequestedEventData;
+      type: WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST;
+      data: InteractiveFormDataRequestEventData;
     }
   | {
-      type: WebAgentEventType.INTERACTIVE_DATA_RECEIVED;
-      data: InteractiveDataReceivedEventData;
+      type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR;
+      data: InteractiveFormDataErrorEventData;
     };
 
 /**

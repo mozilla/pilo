@@ -157,7 +157,7 @@ export function createInteractiveTools(context: InteractiveToolContext) {
         };
 
         // Emit request event
-        context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_DATA_REQUESTED, {
+        context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST, {
           requestId: request.requestId,
           pageUrl,
           pageTitle,
@@ -167,14 +167,17 @@ export function createInteractiveTools(context: InteractiveToolContext) {
         });
 
         // Block until the caller responds
-        const response = await context.callback(request);
-
-        // Emit response event (field count only, not values, to avoid logging sensitive data)
-        context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_DATA_RECEIVED, {
-          requestId: request.requestId,
-          fieldCount: response.fields.length,
-          cancelled: response.cancelled ?? false,
-        });
+        let response;
+        try {
+          response = await context.callback(request);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR, {
+            requestId: request.requestId,
+            error: errorMsg,
+          });
+          throw error;
+        }
 
         if (response.cancelled) {
           return {

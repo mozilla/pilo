@@ -319,14 +319,14 @@ describe("InteractiveTools", () => {
       expect(approvedRefs.has("E42")).toBe(false);
     });
 
-    it("should emit INTERACTIVE_DATA_REQUESTED event", async () => {
+    it("should emit INTERACTIVE_FORM_DATA_REQUEST event", async () => {
       mockCallback.mockResolvedValue({
         requestId: "any",
         fields: [{ ref: "E42", value: "test@example.com" }],
       });
 
       const eventSpy = vi.fn();
-      eventEmitter.on(WebAgentEventType.INTERACTIVE_DATA_REQUESTED, eventSpy);
+      eventEmitter.on(WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST, eventSpy);
 
       const { tools } = createInteractiveTools({
         callback: mockCallback,
@@ -351,14 +351,11 @@ describe("InteractiveTools", () => {
       expect(eventData.fieldCount).toBe(1);
     });
 
-    it("should emit INTERACTIVE_DATA_RECEIVED event", async () => {
-      mockCallback.mockResolvedValue({
-        requestId: "any",
-        fields: [{ ref: "E42", value: "test@example.com" }],
-      });
+    it("should emit INTERACTIVE_FORM_DATA_ERROR when callback throws", async () => {
+      mockCallback.mockRejectedValue(new Error("Connection lost"));
 
       const eventSpy = vi.fn();
-      eventEmitter.on(WebAgentEventType.INTERACTIVE_DATA_RECEIVED, eventSpy);
+      eventEmitter.on(WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR, eventSpy);
 
       const { tools } = createInteractiveTools({
         callback: mockCallback,
@@ -366,48 +363,20 @@ describe("InteractiveTools", () => {
         eventEmitter,
       });
 
-      await tools.request_user_data.execute!(
-        {
-          reason: "initial",
-          formDescription: "Signup form",
-          fields: [{ ref: "E42", label: "Email", fieldType: "email", required: true }],
-        },
-        toolCallOptions,
-      );
+      await expect(
+        tools.request_user_data.execute!(
+          {
+            reason: "initial",
+            formDescription: "Signup form",
+            fields: [{ ref: "E42", label: "Email", fieldType: "email", required: true }],
+          },
+          toolCallOptions,
+        ),
+      ).rejects.toThrow("Connection lost");
 
       expect(eventSpy).toHaveBeenCalledOnce();
       const eventData = eventSpy.mock.calls[0][0];
-      expect(eventData.fieldCount).toBe(1);
-      expect(eventData.cancelled).toBe(false);
-    });
-
-    it("should emit cancelled=true in received event when cancelled", async () => {
-      mockCallback.mockResolvedValue({
-        requestId: "any",
-        fields: [],
-        cancelled: true,
-      });
-
-      const eventSpy = vi.fn();
-      eventEmitter.on(WebAgentEventType.INTERACTIVE_DATA_RECEIVED, eventSpy);
-
-      const { tools } = createInteractiveTools({
-        callback: mockCallback,
-        browser: mockBrowser,
-        eventEmitter,
-      });
-
-      await tools.request_user_data.execute!(
-        {
-          reason: "initial",
-          formDescription: "Signup form",
-          fields: [{ ref: "E42", label: "Email", fieldType: "email", required: true }],
-        },
-        toolCallOptions,
-      );
-
-      const eventData = eventSpy.mock.calls[0][0];
-      expect(eventData.cancelled).toBe(true);
+      expect(eventData.error).toBe("Connection lost");
     });
   });
 });

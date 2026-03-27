@@ -33,8 +33,8 @@ export type {
   WaitingEventData,
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
-  InteractiveDataRequestedEventData,
-  InteractiveDataReceivedEventData,
+  InteractiveFormDataRequestEventData,
+  InteractiveFormDataErrorEventData,
 } from "./events.js";
 export { GenericLogger } from "./loggers/generic.js";
 export { ConsoleLogger } from "./loggers/console.js";

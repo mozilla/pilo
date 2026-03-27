@@ -138,8 +138,8 @@ describe("WebAgentEventEmitter", () => {
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
-        "interactive:data_requested",
-        "interactive:data_received",
+        "interactive:form_data:request",
+        "interactive:form_data:error",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);
@@ -259,7 +259,7 @@ describe("WebAgentEventEmitter", () => {
           },
         },
         {
-          type: WebAgentEventType.INTERACTIVE_DATA_REQUESTED,
+          type: WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST,
           data: {
             timestamp: Date.now(),
             iterationId: "test-1",
@@ -272,13 +272,12 @@ describe("WebAgentEventEmitter", () => {
           },
         },
         {
-          type: WebAgentEventType.INTERACTIVE_DATA_RECEIVED,
+          type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR,
           data: {
             timestamp: Date.now(),
             iterationId: "test-1",
             requestId: "req-1",
-            fieldCount: 2,
-            cancelled: false,
+            error: "User data request timed out",
           },
         },
       ];
