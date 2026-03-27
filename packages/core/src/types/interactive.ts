@@ -45,8 +45,6 @@ export interface UserDataRequest {
   pageTitle: string;
   /** Human-readable description of the form's purpose */
   formDescription: string;
-  /** Why data is being requested */
-  reason: "initial" | "validation_error";
   /** The fields the agent needs data for */
   fields: FormFieldRequest[];
 }

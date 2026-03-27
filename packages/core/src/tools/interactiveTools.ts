@@ -152,19 +152,35 @@ export function createInteractiveTools(context: InteractiveToolContext) {
           pageUrl,
           pageTitle,
           formDescription,
-          reason,
           fields,
         };
 
-        // Emit request event
-        context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST, {
-          requestId: request.requestId,
-          pageUrl,
-          pageTitle,
-          formDescription,
-          reason,
-          fieldCount: fields.length,
-        });
+        // Emit the appropriate event based on reason
+        if (reason === "validation_error") {
+          // Build field error map from field descriptions (which contain validation error messages)
+          const fieldErrors: Record<string, string> = {};
+          for (const field of fields) {
+            if (field.description) {
+              fieldErrors[field.ref] = field.description;
+            }
+          }
+          context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR, {
+            requestId: request.requestId,
+            pageUrl,
+            pageTitle,
+            formDescription,
+            fieldCount: fields.length,
+            fieldErrors,
+          });
+        } else {
+          context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST, {
+            requestId: request.requestId,
+            pageUrl,
+            pageTitle,
+            formDescription,
+            fieldCount: fields.length,
+          });
+        }
 
         // Block until the caller responds
         let response;
@@ -172,9 +188,14 @@ export function createInteractiveTools(context: InteractiveToolContext) {
           response = await context.callback(request);
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
+          // Emit error event for callback failures too (timeout, disconnect)
           context.eventEmitter.emit(WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR, {
             requestId: request.requestId,
-            error: errorMsg,
+            pageUrl,
+            pageTitle,
+            formDescription,
+            fieldCount: fields.length,
+            fieldErrors: { _callback: errorMsg },
           });
           throw error;
         }

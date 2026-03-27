@@ -310,16 +310,22 @@ export interface InteractiveFormDataRequestEventData extends WebAgentEventData {
   pageUrl: string;
   pageTitle: string;
   formDescription: string;
-  reason: "initial" | "validation_error";
   fieldCount: number;
 }
 
 /**
- * Event data when an interactive form data request fails
+ * Event data when form validation fails and the agent re-requests data.
+ * Carries both the error context and the fields that need new values.
+ * Callers respond to this the same way as a request event.
  */
 export interface InteractiveFormDataErrorEventData extends WebAgentEventData {
   requestId: string;
-  error: string;
+  pageUrl: string;
+  pageTitle: string;
+  formDescription: string;
+  fieldCount: number;
+  /** Per-field error messages from validation (field ref -> error text) */
+  fieldErrors: Record<string, string>;
 }
 
 /**

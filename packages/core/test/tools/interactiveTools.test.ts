@@ -96,7 +96,7 @@ describe("InteractiveTools", () => {
       expect(request.pageUrl).toBe("https://example.com/signup");
       expect(request.pageTitle).toBe("Sign Up - Example");
       expect(request.formDescription).toBe("Signup form");
-      expect(request.reason).toBe("initial");
+      // reason is not on the request payload (it drives event selection instead)
       expect(request.fields).toHaveLength(1);
       expect(request.fields[0].ref).toBe("E42");
       expect(request.requestId).toBeTruthy();
@@ -132,7 +132,7 @@ describe("InteractiveTools", () => {
       );
 
       const request = mockCallback.mock.calls[0][0];
-      expect(request.reason).toBe("validation_error");
+      // reason is not on the request payload
       expect(request.fields[0].description).toBe("Invalid email address");
     });
 
@@ -347,7 +347,6 @@ describe("InteractiveTools", () => {
       const eventData = eventSpy.mock.calls[0][0];
       expect(eventData.pageUrl).toBe("https://example.com/signup");
       expect(eventData.formDescription).toBe("Signup form");
-      expect(eventData.reason).toBe("initial");
       expect(eventData.fieldCount).toBe(1);
     });
 
@@ -376,7 +375,46 @@ describe("InteractiveTools", () => {
 
       expect(eventSpy).toHaveBeenCalledOnce();
       const eventData = eventSpy.mock.calls[0][0];
-      expect(eventData.error).toBe("Connection lost");
+      expect(eventData.fieldErrors._callback).toBe("Connection lost");
+      expect(eventData.formDescription).toBe("Signup form");
+    });
+
+    it("should emit INTERACTIVE_FORM_DATA_ERROR for validation_error reason", async () => {
+      mockCallback.mockResolvedValue({
+        requestId: "any",
+        fields: [{ ref: "E42", value: "valid@example.com" }],
+      });
+
+      const eventSpy = vi.fn();
+      eventEmitter.on(WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR, eventSpy);
+
+      const { tools } = createInteractiveTools({
+        callback: mockCallback,
+        browser: mockBrowser,
+        eventEmitter,
+      });
+
+      await tools.request_user_data.execute!(
+        {
+          reason: "validation_error",
+          formDescription: "Signup form",
+          fields: [
+            {
+              ref: "E42",
+              label: "Email",
+              fieldType: "email",
+              required: true,
+              description: "Invalid email address",
+            },
+          ],
+        },
+        toolCallOptions,
+      );
+
+      expect(eventSpy).toHaveBeenCalledOnce();
+      const eventData = eventSpy.mock.calls[0][0];
+      expect(eventData.fieldErrors).toEqual({ E42: "Invalid email address" });
+      expect(eventData.fieldCount).toBe(1);
     });
   });
 });

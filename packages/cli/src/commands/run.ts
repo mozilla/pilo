@@ -94,13 +94,11 @@ async function promptForField(field: UserDataRequest["fields"][number]): Promise
  */
 function createTerminalPromptCallback(): UserDataCallback {
   return async (request: UserDataRequest): Promise<UserDataResponse> => {
-    // Header
-    const reasonLabel =
-      request.reason === "validation_error"
-        ? chalk.red.bold(" (validation error, please correct)")
-        : "";
+    // Detect validation errors by checking if any field has a description (error message)
+    const hasErrors = request.fields.some((f) => f.description);
+    const errorLabel = hasErrors ? chalk.red.bold(" (validation error, please correct)") : "";
     console.error(
-      chalk.cyan.bold(`\n📋 Form data requested: ${request.formDescription}${reasonLabel}`),
+      chalk.cyan.bold(`\n📋 Form data requested: ${request.formDescription}${errorLabel}`),
     );
     console.error(chalk.gray(`   Page: ${request.pageTitle} (${request.pageUrl})`));
     console.error();
