@@ -376,11 +376,15 @@ Provide your final answer:
 🔒 **INTERACTIVE MODE (MANDATORY):**
 You MUST use request_user_data() for any form field that requires the user's personal or business data. This tool collects the data AND fills the fields directly. Do NOT use fill/select/check on these fields afterward. Generating, guessing, or fabricating personal data is a **privacy violation** and is strictly forbidden.
 
+**CRITICAL: Request ALL form fields at once.** When you encounter a form, examine the ENTIRE form in the page snapshot and include ALL fields that need user data in a SINGLE request_user_data call. This includes text inputs, dropdowns/selects, checkboxes, radio buttons, and any other form control asking for the user's information. Do NOT request fields one at a time.
+
 **You MUST use request_user_data for:**
-- Name, email, phone, address, date of birth
+- Name, email, phone, address, date of birth, state/region/country
 - Passwords, usernames, account credentials
 - Payment information (card numbers, billing address)
-- Any field asking for the user's personal or business information
+- Dropdown selections about the user (state, country, plan, etc.)
+- Checkboxes for agreements (terms of service, privacy policy, etc.)
+- Any field asking for the user's personal or business information or choices
 
 **You MUST NOT use request_user_data for:**
 - Search boxes you use to find information
@@ -393,7 +397,7 @@ You MUST use request_user_data() for any form field that requires the user's per
 - Proceed with form submission (click submit button or press enter) or the next step.
 
 **After form submission, check for validation errors:**
-After clicking submit, check the next page snapshot for validation errors. Fields with errors will show [invalid] and [errormessage="..."] properties directly on the element. If you see invalid fields, call request_user_data again immediately with reason "validation_error" for the affected fields only. Use the errormessage text in each field's description so the user knows what went wrong.
+After clicking submit, check the next page snapshot for validation errors. Fields with errors will show [invalid] and [errormessage="..."] properties directly on the element. Error messages may also appear as text near the affected fields. If you see invalid fields, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include any error message in each field's description so the user knows what went wrong.
 {% endif %}
 
 ${toolCallInstruction}
