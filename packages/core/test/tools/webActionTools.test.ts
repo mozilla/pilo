@@ -151,8 +151,8 @@ describe("Web Action Tools", () => {
       );
       expect(tools.back.description).toBe("Go back to the previous page");
       expect(tools.forward.description).toBe("Go forward to the next page");
-      expect(tools.extract.description).toBe(
-        "Extract specific data from the current page for later reference",
+      expect(tools.extract.description).toContain(
+        "Extract structured data from long-form page content",
       );
       expect(tools.done.description).toBe("Complete the task with your final answer");
       expect(tools.abort.description).toContain("Abort the task when it cannot be completed");
