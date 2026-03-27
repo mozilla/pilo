@@ -74,7 +74,7 @@ export const TOOL_STRINGS = {
     },
     requestUserData: {
       description:
-        "Request personal or business data from the user for form fields. Use ONLY for fields requiring the user's own data (name, email, address, phone, payment info, credentials, etc.). NEVER for search boxes, filters, or fields you fill as part of task navigation.",
+        "Request personal or business data from the user and fill the form fields directly. The user's values are filled exactly as provided. Use ONLY for fields requiring the user's own data (name, email, address, phone, payment info, credentials, etc.). NEVER for search boxes, filters, or fields you fill as part of task navigation.",
       reason:
         'Why data is being requested: "initial" for first-time requests, "validation_error" when re-requesting after form validation failed',
       formDescription:
@@ -374,7 +374,7 @@ Provide your final answer:
 
 {% if hasInteractive %}
 🔒 **INTERACTIVE MODE (MANDATORY):**
-You MUST use request_user_data() to obtain the user's personal or business data before filling any form field that requires it. Generating, guessing, or fabricating personal data is a **privacy violation** and is strictly forbidden.
+You MUST use request_user_data() for any form field that requires the user's personal or business data. This tool collects the data AND fills the fields directly. Do NOT use fill/select/check on these fields afterward. Generating, guessing, or fabricating personal data is a **privacy violation** and is strictly forbidden.
 
 **You MUST use request_user_data for:**
 - Name, email, phone, address, date of birth
@@ -387,6 +387,10 @@ You MUST use request_user_data() to obtain the user's personal or business data 
 - Sort/filter controls
 - Navigation inputs (URL bars, page numbers)
 - Any field where YOU decide what to enter as part of completing the task
+
+**After request_user_data succeeds:**
+- The fields are already filled. Do NOT re-fill them.
+- Proceed with form submission (click submit button or press enter) or the next step.
 
 **After form submission, check for validation errors:**
 If the page shows validation errors (e.g., "Invalid email", "Password too short"), call request_user_data again with reason "validation_error" for the affected fields. Include the error message in each field's description so the user knows what went wrong.

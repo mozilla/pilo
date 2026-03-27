@@ -29,6 +29,7 @@ function createMockBrowser(): AriaBrowser {
   return {
     getUrl: vi.fn().mockResolvedValue("https://example.com/signup"),
     getTitle: vi.fn().mockResolvedValue("Sign Up - Example"),
+    performAction: vi.fn().mockResolvedValue(undefined),
   } as unknown as AriaBrowser;
 }
 
@@ -135,7 +136,7 @@ describe("InteractiveTools", () => {
       expect(request.fields[0].description).toBe("Invalid email address");
     });
 
-    it("should return field values on success", async () => {
+    it("should fill fields directly via browser on success", async () => {
       mockCallback.mockResolvedValue({
         requestId: "any",
         fields: [
@@ -163,9 +164,73 @@ describe("InteractiveTools", () => {
       )) as any;
 
       expect(result.success).toBe(true);
-      expect(result.fieldValues).toHaveLength(2);
-      expect(result.fieldValues[0].ref).toBe("E42");
-      expect(result.fieldValues[0].value).toBe("test@example.com");
+      expect(result.filledCount).toBe(2);
+      // Values should NOT be in the result (privacy)
+      expect(result.fieldValues).toBeUndefined();
+
+      // Browser should have been called directly
+      const performAction = vi.mocked(mockBrowser.performAction!);
+      expect(performAction).toHaveBeenCalledTimes(2);
+      expect(performAction).toHaveBeenCalledWith("E42", "fill", "test@example.com");
+      expect(performAction).toHaveBeenCalledWith("E43", "fill", "John");
+    });
+
+    it("should use correct action for select fields", async () => {
+      mockCallback.mockResolvedValue({
+        requestId: "any",
+        fields: [{ ref: "E50", value: "premium" }],
+      });
+
+      const { tools } = createInteractiveTools({
+        callback: mockCallback,
+        browser: mockBrowser,
+        eventEmitter,
+      });
+
+      await tools.request_user_data.execute!(
+        {
+          reason: "initial",
+          formDescription: "Plan selection",
+          fields: [
+            {
+              ref: "E50",
+              label: "Plan",
+              fieldType: "select",
+              required: true,
+              options: ["free", "premium"],
+            },
+          ],
+        },
+        toolCallOptions,
+      );
+
+      const performAction = vi.mocked(mockBrowser.performAction!);
+      expect(performAction).toHaveBeenCalledWith("E50", "select", "premium");
+    });
+
+    it("should use check action for checkbox fields", async () => {
+      mockCallback.mockResolvedValue({
+        requestId: "any",
+        fields: [{ ref: "E55", value: "true" }],
+      });
+
+      const { tools } = createInteractiveTools({
+        callback: mockCallback,
+        browser: mockBrowser,
+        eventEmitter,
+      });
+
+      await tools.request_user_data.execute!(
+        {
+          reason: "initial",
+          formDescription: "Terms agreement",
+          fields: [{ ref: "E55", label: "I agree", fieldType: "checkbox", required: true }],
+        },
+        toolCallOptions,
+      );
+
+      const performAction = vi.mocked(mockBrowser.performAction!);
+      expect(performAction).toHaveBeenCalledWith("E55", "check", "true");
     });
 
     it("should return cancellation result when cancelled", async () => {

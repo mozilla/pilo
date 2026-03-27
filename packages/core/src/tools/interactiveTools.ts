@@ -9,10 +9,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import type { AriaBrowser } from "../browser/ariaBrowser.js";
+import { type AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
+import { BrowserException } from "../errors.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
-import type { UserDataCallback, UserDataRequest } from "../types/interactive.js";
+import type { UserDataCallback, UserDataRequest, FormFieldResponse } from "../types/interactive.js";
 
 interface InteractiveToolContext {
   callback: UserDataCallback;
@@ -39,6 +40,55 @@ export class ApprovedRefs {
   clear(): void {
     this.refs.clear();
   }
+}
+
+/**
+ * Maps field types from the request schema to the appropriate browser action.
+ */
+function getActionForFieldType(
+  fieldType: string,
+): PageAction.Fill | PageAction.Select | PageAction.Check {
+  switch (fieldType) {
+    case "select":
+      return PageAction.Select;
+    case "checkbox":
+    case "radio":
+      return PageAction.Check;
+    default:
+      return PageAction.Fill;
+  }
+}
+
+/**
+ * Fill form fields directly via the browser, bypassing the LLM.
+ * Returns a summary of what was filled and any errors encountered.
+ */
+async function fillFieldsDirectly(
+  browser: AriaBrowser,
+  responseFields: FormFieldResponse[],
+  requestFields: Array<{ ref: string; fieldType: string }>,
+): Promise<{ filled: number; errors: string[] }> {
+  const fieldTypeMap = new Map(requestFields.map((f) => [f.ref, f.fieldType]));
+  let filled = 0;
+  const errors: string[] = [];
+
+  for (const field of responseFields) {
+    const fieldType = fieldTypeMap.get(field.ref) ?? "text";
+    const action = getActionForFieldType(fieldType);
+
+    try {
+      await browser.performAction(field.ref, action, field.value);
+      filled++;
+    } catch (error) {
+      if (error instanceof BrowserException) {
+        errors.push(`${field.ref}: ${error.message}`);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  return { filled, errors };
 }
 
 export function createInteractiveTools(context: InteractiveToolContext) {
@@ -135,7 +185,12 @@ export function createInteractiveTools(context: InteractiveToolContext) {
           };
         }
 
-        // Record approved refs so the fill gate allows these fields
+        // Fill fields directly via the browser so the LLM never sees
+        // (and cannot modify) the user's values.
+        const fillResults = await fillFieldsDirectly(context.browser, response.fields, fields);
+
+        // Record approved refs so the fill gate allows subsequent
+        // interactions (e.g., check/uncheck) on these fields.
         for (const field of response.fields) {
           approvedRefs.add(field.ref);
         }
@@ -144,9 +199,13 @@ export function createInteractiveTools(context: InteractiveToolContext) {
           success: true,
           action: "request_user_data",
           formDescription,
-          fieldValues: response.fields,
+          filledCount: fillResults.filled,
+          errorCount: fillResults.errors.length,
+          errors: fillResults.errors.length > 0 ? fillResults.errors : undefined,
           message:
-            "User provided the requested data. Use the fill/select/check tools to enter each value into the corresponding form field using the ref provided.",
+            fillResults.errors.length > 0
+              ? `Filled ${fillResults.filled} of ${response.fields.length} fields. Some fields had errors: ${fillResults.errors.join("; ")}. Check the page state and decide how to proceed.`
+              : `All ${fillResults.filled} fields were filled with the user's data. Do NOT re-fill these fields. Proceed with form submission or the next step.`,
         };
       },
     }),
