@@ -169,7 +169,7 @@ export function createInteractiveTools(context: InteractiveToolContext) {
             pageUrl,
             pageTitle,
             formDescription,
-            fieldCount: fields.length,
+            fields,
             fieldErrors,
           });
         } else {
@@ -178,7 +178,7 @@ export function createInteractiveTools(context: InteractiveToolContext) {
             pageUrl,
             pageTitle,
             formDescription,
-            fieldCount: fields.length,
+            fields,
           });
         }
 
@@ -194,7 +194,7 @@ export function createInteractiveTools(context: InteractiveToolContext) {
             pageUrl,
             pageTitle,
             formDescription,
-            fieldCount: fields.length,
+            fields,
             fieldErrors: { _callback: errorMsg },
           });
           throw error;

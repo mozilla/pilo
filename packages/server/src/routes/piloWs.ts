@@ -9,14 +9,16 @@
  *
  * Server -> Client:
  *   { "type": "event", "event": "<eventType>", "data": {...} }
- *   { "type": "user_data_request", "payload": UserDataRequest }
+ *     All agent events stream through, including:
+ *     - "interactive:form_data:request" (client must respond with user_data_response)
+ *     - "interactive:form_data:error" (validation failed, client must respond with corrected data)
  *   { "type": "complete", "data": TaskExecutionResult }
  *   { "type": "error", "data": ErrorResponse }
  */
 
 import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
-import type { UserDataCallback, UserDataRequest, UserDataResponse } from "pilo-core";
+import type { UserDataCallback, UserDataResponse } from "pilo-core";
 import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
@@ -85,10 +87,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
 
             taskRunning = true;
 
-            // Create interactive callback that bridges WS messages
-            const onUserDataRequired: UserDataCallback = (
-              request: UserDataRequest,
-            ): Promise<UserDataResponse> => {
+            // The callback just blocks until the client responds.
+            // The event (interactive:form_data:request or interactive:form_data:error)
+            // flows to the client through the normal event stream via sendEvent.
+            // The client sees the event, collects data, and sends user_data_response.
+            const onUserDataRequired: UserDataCallback = (request) => {
               return new Promise<UserDataResponse>((resolve, reject) => {
                 const timer = setTimeout(() => {
                   pendingRequests.delete(request.requestId);
@@ -96,8 +99,6 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 }, USER_DATA_TIMEOUT_MS);
 
                 pendingRequests.set(request.requestId, { resolve, reject, timer });
-
-                send(ws, { type: "user_data_request", payload: request });
               });
             };
 
@@ -123,7 +124,6 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 }
               } finally {
                 taskRunning = false;
-                // Clean up any pending requests
                 for (const [id, pending] of pendingRequests) {
                   clearTimeout(pending.timer);
                   pending.reject(new Error("Task ended"));

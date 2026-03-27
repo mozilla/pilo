@@ -347,7 +347,8 @@ describe("InteractiveTools", () => {
       const eventData = eventSpy.mock.calls[0][0];
       expect(eventData.pageUrl).toBe("https://example.com/signup");
       expect(eventData.formDescription).toBe("Signup form");
-      expect(eventData.fieldCount).toBe(1);
+      expect(eventData.fields).toHaveLength(1);
+      expect(eventData.fields[0].ref).toBe("E42");
     });
 
     it("should emit INTERACTIVE_FORM_DATA_ERROR when callback throws", async () => {
@@ -414,7 +415,8 @@ describe("InteractiveTools", () => {
       expect(eventSpy).toHaveBeenCalledOnce();
       const eventData = eventSpy.mock.calls[0][0];
       expect(eventData.fieldErrors).toEqual({ E42: "Invalid email address" });
-      expect(eventData.fieldCount).toBe(1);
+      expect(eventData.fields).toHaveLength(1);
+      expect(eventData.fields[0].ref).toBe("E42");
     });
   });
 });

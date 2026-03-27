@@ -1,6 +1,7 @@
 import { ModelMessage, StreamTextResult } from "ai";
 import { EventEmitter } from "eventemitter3";
 import type { AwaitedProperties } from "./utils/types.js";
+import type { FormFieldRequest } from "./types/interactive.js";
 
 /**
  * Enum of all possible event types in the web agent
@@ -310,7 +311,7 @@ export interface InteractiveFormDataRequestEventData extends WebAgentEventData {
   pageUrl: string;
   pageTitle: string;
   formDescription: string;
-  fieldCount: number;
+  fields: FormFieldRequest[];
 }
 
 /**
@@ -323,7 +324,7 @@ export interface InteractiveFormDataErrorEventData extends WebAgentEventData {
   pageUrl: string;
   pageTitle: string;
   formDescription: string;
-  fieldCount: number;
+  fields: FormFieldRequest[];
   /** Per-field error messages from validation (field ref -> error text) */
   fieldErrors: Record<string, string>;
 }

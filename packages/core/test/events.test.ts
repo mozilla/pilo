@@ -267,7 +267,10 @@ describe("WebAgentEventEmitter", () => {
             pageUrl: "https://example.com",
             pageTitle: "Test Page",
             formDescription: "Test form",
-            fieldCount: 2,
+            fields: [
+              { ref: "E1", label: "Name", fieldType: "text", required: true },
+              { ref: "E2", label: "Email", fieldType: "email", required: true },
+            ],
           },
         },
         {
@@ -279,8 +282,16 @@ describe("WebAgentEventEmitter", () => {
             pageUrl: "https://example.com",
             pageTitle: "Test Page",
             formDescription: "Test form",
-            fieldCount: 1,
-            fieldErrors: { E42: "Invalid email address" },
+            fields: [
+              {
+                ref: "E2",
+                label: "Email",
+                fieldType: "email",
+                required: true,
+                description: "Invalid email",
+              },
+            ],
+            fieldErrors: { E2: "Invalid email" },
           },
         },
       ];
