@@ -160,4 +160,4 @@ export function createInteractiveTools(context: InteractiveToolContext) {
  * without first requesting data via request_user_data.
  */
 export const FILL_GATE_ERROR =
-  "Interactive mode is enabled. You must use request_user_data to request the user's data before filling form fields. If this is a navigation/search field you control (not a form requiring user data), retry the action.";
+  "Interactive mode is enabled. You must use request_user_data to request the user's data before filling form fields with personal data. If this is a navigation/search field you control (not a form requiring user data), retry the same action and it will be allowed through.";

@@ -374,8 +374,12 @@ export class WebAgent {
       approvedRefs = result.approvedRefs;
     }
 
-    // When interactive mode is on, gate fill/select/check to require approved refs
+    // When interactive mode is on, gate fill/select/check to require approved refs.
+    // On first unapproved attempt, return an error. If the agent retries the same ref
+    // (indicating it's a navigation/search field, not a user-data form field), allow it
+    // through on the second attempt to avoid a deadlock.
     if (approvedRefs) {
+      const warnedRefs = new Set<string>();
       const gatedActions = ["fill", "select", "check"] as const;
       for (const actionName of gatedActions) {
         const originalTool = webActionTools[actionName];
@@ -383,13 +387,18 @@ export class WebAgent {
           const originalExecute = originalTool.execute!;
           (originalTool as any).execute = async (args: any, options: any) => {
             if (args.ref && !approvedRefs!.has(args.ref)) {
-              return {
-                success: false,
-                action: actionName,
-                ref: args.ref,
-                error: FILL_GATE_ERROR,
-                isRecoverable: true,
-              };
+              if (!warnedRefs.has(args.ref)) {
+                // First attempt: warn and block
+                warnedRefs.add(args.ref);
+                return {
+                  success: false,
+                  action: actionName,
+                  ref: args.ref,
+                  error: FILL_GATE_ERROR,
+                  isRecoverable: true,
+                };
+              }
+              // Second attempt: agent confirmed this is a navigation/search field, allow it
             }
             return originalExecute(args, options);
           };
@@ -439,6 +448,11 @@ export class WebAgent {
 
       // Add page snapshot if needed
       if (needsPageSnapshot) {
+        // Clear approved refs when page changes: ARIA refs reset on each snapshot,
+        // so old ref strings may now point to different DOM elements.
+        if (approvedRefs) {
+          approvedRefs.clear();
+        }
         await this.addPageSnapshot();
       }
 
