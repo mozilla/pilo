@@ -1100,6 +1100,80 @@ function hasExplicitAriaDisabled(element: Element | undefined, isAncestor = fals
   return false;
 }
 
+// Roles that support aria-required per WAI-ARIA spec
+export const kAriaRequiredRoles = [
+  "checkbox",
+  "combobox",
+  "gridcell",
+  "listbox",
+  "radiogroup",
+  "searchbox",
+  "select",
+  "spinbutton",
+  "textbox",
+  "tree",
+  "treegrid",
+];
+export function getAriaRequired(element: Element): boolean {
+  const ariaAttr = element.getAttribute("aria-required");
+  if (ariaAttr !== null) return ariaAttr.toLowerCase() === "true";
+  // Fall back to native required attribute for form elements
+  return element.hasAttribute("required");
+}
+
+// Roles that support aria-invalid per WAI-ARIA spec
+export const kAriaInvalidRoles = [
+  "checkbox",
+  "columnheader",
+  "combobox",
+  "gridcell",
+  "listbox",
+  "radiogroup",
+  "rowheader",
+  "searchbox",
+  "select",
+  "spinbutton",
+  "textbox",
+  "tree",
+  "treegrid",
+];
+export function getAriaInvalid(element: Element): boolean | "grammar" | "spelling" {
+  const attr = (element.getAttribute("aria-invalid") || "").toLowerCase();
+  if (attr === "true") return true;
+  if (attr === "grammar") return "grammar";
+  if (attr === "spelling") return "spelling";
+  return false;
+}
+
+/**
+ * Resolve the text content of the element referenced by aria-errormessage.
+ * Per WAI-ARIA spec, only meaningful when aria-invalid is truthy.
+ */
+export function getAriaErrorMessage(element: Element): string | undefined {
+  const ref = element.getAttribute("aria-errormessage");
+  const targets = getIdRefs(element, ref);
+  if (!targets.length) return undefined;
+  const text = targets
+    .map((el) => (el.textContent || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return text || undefined;
+}
+
+/**
+ * Resolve the text content of elements referenced by aria-describedby.
+ */
+export function getAriaDescription(element: Element): string | undefined {
+  const ref = element.getAttribute("aria-describedby");
+  const targets = getIdRefs(element, ref);
+  if (!targets.length) return undefined;
+  const text = targets
+    .map((el) => (el.textContent || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return text || undefined;
+}
+
 function getAccessibleNameFromAssociatedLabels(
   labels: Iterable<HTMLLabelElement>,
   options: AccessibleNameOptions,
