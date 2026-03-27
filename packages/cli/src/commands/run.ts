@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import * as readline from "readline";
+import { input, password, select, confirm } from "@inquirer/prompts";
 import {
   WebAgent,
   PlaywrightBrowser,
@@ -53,82 +53,72 @@ function assertConfigExists(): boolean {
 }
 
 /**
- * Prompt for a single line of input from the terminal.
+ * Prompt for a single field value using the appropriate inquirer prompt
+ * based on the field type.
  */
-function prompt(rl: readline.Interface, question: string): Promise<string> {
-  return new Promise((resolve) => rl.question(question, resolve));
+async function promptForField(field: UserDataRequest["fields"][number]): Promise<string> {
+  const hint = field.description ? chalk.yellow(field.description) : undefined;
+  const requiredTag = field.required ? chalk.red(" *") : "";
+  const message = `${field.label}${requiredTag}`;
+
+  switch (field.fieldType) {
+    case "password":
+      return password({ message, mask: "*" });
+
+    case "select":
+      if (field.options?.length) {
+        return select({
+          message,
+          choices: field.options.map((opt) => ({ name: opt, value: opt })),
+          default: field.currentValue,
+        });
+      }
+      return input({ message, default: field.currentValue });
+
+    case "checkbox":
+      return (await confirm({ message, default: field.currentValue === "true" }))
+        ? "true"
+        : "false";
+
+    default:
+      return input({
+        message: hint ? `${message} ${hint}` : message,
+        default: field.currentValue,
+      });
+  }
 }
 
 /**
  * Creates a UserDataCallback that prompts the user in the terminal
- * for form field values using readline.
+ * for form field values using @inquirer/prompts.
  */
 function createTerminalPromptCallback(): UserDataCallback {
   return async (request: UserDataRequest): Promise<UserDataResponse> => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stderr,
-    });
+    // Header
+    const reasonLabel =
+      request.reason === "validation_error"
+        ? chalk.red.bold(" (validation error, please correct)")
+        : "";
+    console.error(
+      chalk.cyan.bold(`\n📋 Form data requested: ${request.formDescription}${reasonLabel}`),
+    );
+    console.error(chalk.gray(`   Page: ${request.pageTitle} (${request.pageUrl})`));
+    console.error();
 
-    try {
-      // Header
-      const reasonLabel =
-        request.reason === "validation_error"
-          ? chalk.red.bold(" (validation error, please correct)")
-          : "";
-      console.error(
-        chalk.cyan.bold(`\n📋 Form data requested: ${request.formDescription}${reasonLabel}`),
-      );
-      console.error(chalk.gray(`   Page: ${request.pageTitle} (${request.pageUrl})`));
-      console.error(chalk.gray(`   Fields: ${request.fields.length}`));
-      console.error();
+    const fields: UserDataResponse["fields"] = [];
 
-      const fields: UserDataResponse["fields"] = [];
-
-      for (const field of request.fields) {
-        const requiredTag = field.required ? chalk.red("*") : "";
-        const typeTag = chalk.gray(`[${field.fieldType}]`);
-        const currentTag = field.currentValue
-          ? chalk.gray(` (current: ${field.currentValue})`)
-          : "";
-        const descTag = field.description ? chalk.yellow(`  ${field.description}`) : "";
-
-        // For select/radio fields, show available options
-        if (field.options?.length) {
-          console.error(chalk.gray(`   Options: ${field.options.join(", ")}`));
-        }
-
-        if (descTag) {
-          console.error(descTag);
-        }
-
-        const label = `   ${field.label} ${typeTag}${requiredTag}${currentTag}: `;
-
-        if (field.fieldType === "checkbox") {
-          const answer = await prompt(rl, `   ${field.label} ${typeTag}${requiredTag} (y/n): `);
-          const trimmed = answer.trim().toLowerCase();
-          if (trimmed === "q" || trimmed === "quit") {
-            return { requestId: request.requestId, fields: [], cancelled: true };
-          }
-          fields.push({
-            ref: field.ref,
-            value: trimmed === "y" || trimmed === "yes" ? "true" : "false",
-          });
-        } else {
-          const answer = await prompt(rl, label);
-          const trimmed = answer.trim();
-          if (trimmed === "q" || trimmed === "quit") {
-            return { requestId: request.requestId, fields: [], cancelled: true };
-          }
-          fields.push({ ref: field.ref, value: trimmed });
-        }
+    for (const field of request.fields) {
+      try {
+        const value = await promptForField(field);
+        fields.push({ ref: field.ref, value });
+      } catch {
+        // User pressed Ctrl+C during a prompt, treat as cancellation
+        return { requestId: request.requestId, fields: [], cancelled: true };
       }
-
-      console.error();
-      return { requestId: request.requestId, fields };
-    } finally {
-      rl.close();
     }
+
+    console.error();
+    return { requestId: request.requestId, fields };
   };
 }
 
