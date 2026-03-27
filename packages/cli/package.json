@@ -18,11 +18,11 @@
     "web-ext": "^9.3.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.34",
-    "@ai-sdk/google-vertex": "^4.0.68",
-    "@ai-sdk/openai": "^3.0.37",
-    "@ai-sdk/openai-compatible": "^2.0.31",
-    "@openrouter/ai-sdk-provider": "^2.1.1",
+    "@ai-sdk/google": "^3.0.46",
+    "@ai-sdk/google-vertex": "^4.0.83",
+    "@ai-sdk/openai": "^3.0.44",
+    "@ai-sdk/openai-compatible": "^2.0.36",
+    "@openrouter/ai-sdk-provider": "^2.2.5",
     "@types/node": "^25.3.0",
     "ollama-ai-provider-v2": "^3.0.3",
     "tsx": "^4.21.0",
