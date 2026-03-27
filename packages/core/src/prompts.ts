@@ -57,8 +57,7 @@ export const TOOL_STRINGS = {
       description: "Go forward to the next page",
     },
     extract: {
-      description:
-        "Extract structured data from long-form page content (articles, tables, product details) that is hard to parse from the accessibility tree alone. Do NOT use to check page state, find errors, or read information already visible in the page snapshot.",
+      description: "Extract specific data from the current page for later reference",
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
     },
@@ -334,7 +333,7 @@ Analyze the current page state and determine your next action based on previous 
 - done(result) if task is complete
 - abort(reason) if task cannot be completed due to site issues, blocking, or missing data
 - Appropriate action tool if work remains
-- extract() if you need to pull structured data from long-form page content
+- extract() if you need more information
 
 **Best Practices:**
 - The accessibility tree shows currently loaded elements; dynamic pages may load more content on scroll
@@ -349,7 +348,7 @@ Analyze the current page state and determine your next action based on previous 
 - Adapt your approach based on what's actually available
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
 - If you have found the core information requested but cannot access supplementary details due to site limitations, use done() with what you have — only use abort() when the core task cannot be completed at all
-- For research: Use extract() when you find a page with relevant long-form content (articles, data tables) that you need to structure
+- For research: Use extract() immediately when finding relevant data
 - For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable{% if hasTabstack %} — use tabstack_extract_markdown to read PDF content directly{% endif %}{% if not hasTabstack %} — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF{% endif %}
 {% if hasWebSearch %}- If you need to search the web, use webSearch({query}) directly rather than filling in a browser search engine (DuckDuckGo, Google, Bing, etc.) — webSearch avoids CAPTCHA and bot detection that will block browser-based searches{% endif %}
 {% if hasTabstack %}- **Tabstack cloud tools are available — prefer them over manual browsing when they fit:**
@@ -394,7 +393,7 @@ You MUST use request_user_data() for any form field that requires the user's per
 - Proceed with form submission (click submit button or press enter) or the next step.
 
 **After form submission, check for validation errors:**
-After clicking submit, validation errors will appear in the next page snapshot as text near the affected fields. If you see them, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include the error message in each field's description so the user knows what went wrong.
+After clicking submit, look at the NEXT PAGE SNAPSHOT (accessibility tree) for validation errors. Do NOT use extract() to look for errors. Validation errors will appear directly in the accessibility tree as text elements near the affected fields. If you see validation errors, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include the error message in each field's description so the user knows what went wrong.
 {% endif %}
 
 ${toolCallInstruction}
@@ -528,7 +527,7 @@ CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 
 **Recovery guidance:**
 - If the error mentions "Invalid element reference" or "does not exist on the current page": the page DOM has changed and your cached ref IDs are stale. Do NOT retry the same ref. Wait for the next page snapshot (it will arrive automatically) and use only the new ref IDs shown there.
-- If an action keeps failing after 2 attempts, try a different approach: use a different element, navigate differently, or use wait() to let the page settle.
+- If an action keeps failing after 2 attempts, try a different approach: use a different element, navigate differently, or use extract() to re-read the current state.
 - Do NOT repeat the same action with the same arguments.
 
 **Available Tools:**
