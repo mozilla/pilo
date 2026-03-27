@@ -38,7 +38,9 @@ import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { createTabstackTools } from "./tools/tabstackTools.js";
+import { createInteractiveTools, ApprovedRefs, FILL_GATE_ERROR } from "./tools/interactiveTools.js";
 import { createTabstackClient } from "./tabstack/client.js";
+import type { UserDataCallback } from "./types/interactive.js";
 import { nanoid } from "nanoid";
 import { getConfigDefaults, type SearchProviderName } from "./config/defaults.js";
 import {
@@ -82,6 +84,8 @@ export interface WebAgentOptions {
   tabstackApiKey?: string;
   /** Tabstack API base URL (default: https://api.tabstack.ai) */
   tabstackApiUrl?: string;
+  /** Callback for interactive mode: called when the agent needs user data for form fields. Presence enables interactive mode. */
+  onUserDataRequired?: UserDataCallback;
 }
 
 export interface ExecuteOptions {
@@ -202,6 +206,7 @@ export class WebAgent {
   private readonly searchApiKey: string | undefined;
   private readonly tabstackApiKey: string | undefined;
   private readonly tabstackApiUrl: string | undefined;
+  private readonly onUserDataRequired: UserDataCallback | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -224,6 +229,7 @@ export class WebAgent {
     this.searchApiKey = options.searchApiKey;
     this.tabstackApiKey = options.tabstackApiKey;
     this.tabstackApiUrl = options.tabstackApiUrl;
+    this.onUserDataRequired = options.onUserDataRequired;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -355,8 +361,44 @@ export class WebAgent {
         })
       : {};
 
+    // Only include interactive tools if a callback is provided
+    let interactiveToolSet: Record<string, any> = {};
+    let approvedRefs: ApprovedRefs | null = null;
+    if (this.onUserDataRequired) {
+      const result = createInteractiveTools({
+        callback: this.onUserDataRequired,
+        browser: this.browser,
+        eventEmitter: this.eventEmitter,
+      });
+      interactiveToolSet = result.tools;
+      approvedRefs = result.approvedRefs;
+    }
+
+    // When interactive mode is on, gate fill/select/check to require approved refs
+    if (approvedRefs) {
+      const gatedActions = ["fill", "select", "check"] as const;
+      for (const actionName of gatedActions) {
+        const originalTool = webActionTools[actionName];
+        if (originalTool) {
+          const originalExecute = originalTool.execute!;
+          (originalTool as any).execute = async (args: any, options: any) => {
+            if (args.ref && !approvedRefs!.has(args.ref)) {
+              return {
+                success: false,
+                action: actionName,
+                ref: args.ref,
+                error: FILL_GATE_ERROR,
+                isRecoverable: true,
+              };
+            }
+            return originalExecute(args, options);
+          };
+        }
+      }
+    }
+
     // Merge all tools
-    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools };
+    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...interactiveToolSet };
 
     // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
     // The empty page has no useful elements and the snapshot prompt causes the model
@@ -1410,6 +1452,7 @@ export class WebAgent {
     const hasWebSearch = this.searchProvider !== "none";
     const hasTabstack = Boolean(this.tabstackApiKey);
     const hasStartingUrl = Boolean(this.url && this.url !== "about:blank");
+    const hasInteractive = Boolean(this.onUserDataRequired);
 
     const taskPromptContent = buildTaskAndPlanPrompt(
       task,
@@ -1427,6 +1470,7 @@ export class WebAgent {
           hasWebSearch,
           hasTabstack,
           hasStartingUrl,
+          hasInteractive,
         ),
       },
       {

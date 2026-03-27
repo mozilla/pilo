@@ -9,6 +9,13 @@ export type { AriaBrowser } from "./browser/ariaBrowser.js";
 export { PageAction, LoadState } from "./browser/ariaBrowser.js";
 export type { TaskExecutionResult, TaskError, WebAgentOptions } from "./webAgent.js";
 export { TaskErrorCode } from "./webAgent.js";
+export type {
+  FormFieldRequest,
+  UserDataRequest,
+  FormFieldResponse,
+  UserDataResponse,
+  UserDataCallback,
+} from "./types/interactive.js";
 export { WebAgentEventEmitter, WebAgentEventType } from "./events.js";
 export type {
   WebAgentEvent,
@@ -26,6 +33,8 @@ export type {
   WaitingEventData,
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
+  InteractiveDataRequestedEventData,
+  InteractiveDataReceivedEventData,
 } from "./events.js";
 export { GenericLogger } from "./loggers/generic.js";
 export { ConsoleLogger } from "./loggers/console.js";

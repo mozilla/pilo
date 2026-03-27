@@ -72,6 +72,14 @@ export const TOOL_STRINGS = {
       reason:
         "A description of what has been attempted so far and why the task cannot be completed (e.g., site is down, access blocked, required data unavailable)",
     },
+    requestUserData: {
+      description:
+        "Request personal or business data from the user for form fields. Use ONLY for fields requiring the user's own data (name, email, address, phone, payment info, credentials, etc.). NEVER for search boxes, filters, or fields you fill as part of task navigation.",
+      reason:
+        'Why data is being requested: "initial" for first-time requests, "validation_error" when re-requesting after form validation failed',
+      formDescription:
+        "Brief description of the form and its purpose (e.g., 'Shipping address form', 'Account registration')",
+    },
     webSearch: {
       description:
         "Search the web for information. Returns the search results page as markdown. Use when you need to find websites or information but don't know the URL.",
@@ -152,7 +160,11 @@ IMPORTANT:
 `.trim();
 
 /** Build available browser action tools with JSON syntax examples. */
-function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false): string {
+function buildToolExamples(
+  hasWebSearch: boolean,
+  hasTabstack: boolean = false,
+  hasInteractive: boolean = false,
+): string {
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
     `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
@@ -180,6 +192,12 @@ function buildToolExamples(hasWebSearch: boolean, hasTabstack: boolean = false):
       `- tabstack_extract_markdown({"url": "https://example.com"}) - ${TOOL_STRINGS.tabstack.tabstack_extract_markdown.description}`,
       `- tabstack_extract_json({"url": "https://example.com", "json_schema": {"type": "object", "properties": {"field": {"type": "string"}}}}) - ${TOOL_STRINGS.tabstack.tabstack_extract_json.description}`,
       `- tabstack_generate_json({"url": "https://example.com", "json_schema": {"type": "object", "properties": {"field": {"type": "string"}}}, "instructions": "..."}) - ${TOOL_STRINGS.tabstack.tabstack_generate_json.description}`,
+    );
+  }
+
+  if (hasInteractive) {
+    lines.push(
+      `- request_user_data({"reason": "initial", "formDescription": "Account signup form", "fields": [{"ref": "E42", "label": "Email", "fieldType": "email", "required": true}]}) - ${TOOL_STRINGS.webActions.requestUserData.description}`,
     );
   }
 
@@ -354,23 +372,45 @@ Provide your final answer:
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
 {% endif %}
 
+{% if hasInteractive %}
+🔒 **INTERACTIVE MODE (MANDATORY):**
+You MUST use request_user_data() to obtain the user's personal or business data before filling any form field that requires it. Generating, guessing, or fabricating personal data is a **privacy violation** and is strictly forbidden.
+
+**You MUST use request_user_data for:**
+- Name, email, phone, address, date of birth
+- Passwords, usernames, account credentials
+- Payment information (card numbers, billing address)
+- Any field asking for the user's personal or business information
+
+**You MUST NOT use request_user_data for:**
+- Search boxes you use to find information
+- Sort/filter controls
+- Navigation inputs (URL bars, page numbers)
+- Any field where YOU decide what to enter as part of completing the task
+
+**After form submission, check for validation errors:**
+If the page shows validation errors (e.g., "Invalid email", "Password too short"), call request_user_data again with reason "validation_error" for the affected fields. Include the error message in each field's description so the user knows what went wrong.
+{% endif %}
+
 ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails, web search, and Tabstack tools. */
+/** Build action system prompt with optional guardrails, web search, Tabstack, and interactive tools. */
 const buildActionLoopSystemPrompt = (
   hasGuardrails: boolean,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
   hasStartingUrl: boolean = false,
+  hasInteractive: boolean = false,
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
     hasWebSearch,
     hasTabstack,
     hasStartingUrl,
-    toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
+    hasInteractive,
+    toolExamples: buildToolExamples(hasWebSearch, hasTabstack, hasInteractive),
     currentDate: getCurrentFormattedDate(),
   });
 

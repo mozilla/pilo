@@ -46,6 +46,10 @@ export enum WebAgentEventType {
 
   // Browser reconnect after mid-task disconnect
   BROWSER_RECONNECTED = "browser:reconnected",
+
+  // Interactive mode events
+  INTERACTIVE_DATA_REQUESTED = "interactive:data_requested",
+  INTERACTIVE_DATA_RECEIVED = "interactive:data_received",
 }
 
 /**
@@ -299,6 +303,27 @@ export interface StatusMessageEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data when the agent requests user data for form fields
+ */
+export interface InteractiveDataRequestedEventData extends WebAgentEventData {
+  requestId: string;
+  pageUrl: string;
+  pageTitle: string;
+  formDescription: string;
+  reason: "initial" | "validation_error";
+  fieldCount: number;
+}
+
+/**
+ * Event data when the caller responds to a user data request
+ */
+export interface InteractiveDataReceivedEventData extends WebAgentEventData {
+  requestId: string;
+  fieldCount: number;
+  cancelled: boolean;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -331,7 +356,15 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
-  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData };
+  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
+  | {
+      type: WebAgentEventType.INTERACTIVE_DATA_REQUESTED;
+      data: InteractiveDataRequestedEventData;
+    }
+  | {
+      type: WebAgentEventType.INTERACTIVE_DATA_RECEIVED;
+      data: InteractiveDataReceivedEventData;
+    };
 
 /**
  * Event emitter for WebAgent events

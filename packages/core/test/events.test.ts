@@ -138,6 +138,8 @@ describe("WebAgentEventEmitter", () => {
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
+        "interactive:data_requested",
+        "interactive:data_received",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);
@@ -254,6 +256,29 @@ describe("WebAgentEventEmitter", () => {
             iterationId: "test-1",
             operation: "test operation",
             hasScreenshot: false,
+          },
+        },
+        {
+          type: WebAgentEventType.INTERACTIVE_DATA_REQUESTED,
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            requestId: "req-1",
+            pageUrl: "https://example.com",
+            pageTitle: "Test Page",
+            formDescription: "Test form",
+            reason: "initial" as const,
+            fieldCount: 2,
+          },
+        },
+        {
+          type: WebAgentEventType.INTERACTIVE_DATA_RECEIVED,
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            requestId: "req-1",
+            fieldCount: 2,
+            cancelled: false,
           },
         },
       ];
