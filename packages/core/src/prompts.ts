@@ -393,7 +393,7 @@ You MUST use request_user_data() for any form field that requires the user's per
 - Proceed with form submission (click submit button or press enter) or the next step.
 
 **After form submission, check for validation errors:**
-If the page shows validation errors (e.g., "Invalid email", "Password too short"), call request_user_data again with reason "validation_error" for the affected fields. Include the error message in each field's description so the user knows what went wrong.
+After clicking submit, look at the NEXT PAGE SNAPSHOT (accessibility tree) for validation errors. Do NOT use extract() to look for errors. Validation errors will appear directly in the accessibility tree as text elements near the affected fields. If you see validation errors, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include the error message in each field's description so the user knows what went wrong.
 {% endif %}
 
 ${toolCallInstruction}
