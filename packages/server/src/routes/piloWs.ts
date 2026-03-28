@@ -1,19 +1,19 @@
 /**
  * WebSocket endpoint for interactive Pilo task execution.
  *
- * Protocol (JSON messages):
+ * All messages use flat { event, data } format (mirrors SSE structure).
  *
  * Client -> Server:
- *   { "type": "task", "payload": PiloTaskRequest }
- *   { "type": "user_data_response", "payload": UserDataResponse }
+ *   { "event": "task:start", "data": PiloTaskRequest }
+ *   { "event": "user_data_response", "data": UserDataResponse }
  *
  * Server -> Client:
- *   { "type": "event", "event": "<eventType>", "data": {...} }
+ *   { "event": "<eventType>", "data": {...} }
  *     All agent events stream through, including:
  *     - "interactive:form_data:request" (client must respond with user_data_response)
  *     - "interactive:form_data:error" (validation failed, client must respond with corrected data)
- *   { "type": "complete", "data": TaskExecutionResult }
- *   { "type": "error", "data": ErrorResponse }
+ *   { "event": "complete", "data": TaskExecutionResult }
+ *   { "event": "error", "data": ErrorResponse }
  */
 
 import { Hono } from "hono";
@@ -31,8 +31,8 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-function send(ws: WSContext, message: Record<string, any>): void {
-  ws.send(JSON.stringify(message));
+function send(ws: WSContext, event: string, data: any): void {
+  ws.send(JSON.stringify({ event, data }));
 }
 
 export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
@@ -51,37 +51,32 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           try {
             msg = JSON.parse(typeof evt.data === "string" ? evt.data : String(evt.data));
           } catch {
-            send(ws, {
-              type: "error",
-              data: createErrorResponse("Invalid JSON message", "INVALID_MESSAGE"),
-            });
+            send(ws, "error", createErrorResponse("Invalid JSON message", "INVALID_MESSAGE"));
             return;
           }
 
-          if (msg.type === "task") {
+          if (msg.event === "task:start") {
             if (taskRunning) {
-              send(ws, {
-                type: "error",
-                data: createErrorResponse(
+              send(
+                ws,
+                "error",
+                createErrorResponse(
                   "A task is already running on this connection",
                   "TASK_ALREADY_RUNNING",
                 ),
-              });
+              );
               return;
             }
 
-            const body = msg.payload as PiloTaskRequest;
+            const body = msg.data as PiloTaskRequest;
             if (!body) {
-              send(ws, {
-                type: "error",
-                data: createErrorResponse("Missing payload", "MISSING_PAYLOAD"),
-              });
+              send(ws, "error", createErrorResponse("Missing data", "MISSING_DATA"));
               return;
             }
 
             const validationError = validateTaskRequest(body);
             if (validationError) {
-              send(ws, { type: "error", data: validationError.response });
+              send(ws, "error", validationError.response);
               return;
             }
 
@@ -108,19 +103,20 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 const result = await runTask({
                   body,
                   sendEvent: async (event, data) => {
-                    send(ws, { type: "event", event, data });
+                    send(ws, event, data);
                   },
                   abortSignal: abortController.signal,
                   onUserDataRequired,
                 });
 
-                send(ws, { type: "complete", data: result });
+                send(ws, "complete", result);
               } catch (error) {
                 if (!abortController.signal.aborted) {
-                  send(ws, {
-                    type: "error",
-                    data: createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
-                  });
+                  send(
+                    ws,
+                    "error",
+                    createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
+                  );
                 }
               } finally {
                 taskRunning = false;
@@ -131,25 +127,27 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 }
               }
             })();
-          } else if (msg.type === "user_data_response") {
-            const response = msg.payload as UserDataResponse;
+          } else if (msg.event === "user_data_response") {
+            const response = msg.data as UserDataResponse;
             if (!response?.requestId) {
-              send(ws, {
-                type: "error",
-                data: createErrorResponse("Missing requestId in response", "INVALID_RESPONSE"),
-              });
+              send(
+                ws,
+                "error",
+                createErrorResponse("Missing requestId in response", "INVALID_RESPONSE"),
+              );
               return;
             }
 
             const pending = pendingRequests.get(response.requestId);
             if (!pending) {
-              send(ws, {
-                type: "error",
-                data: createErrorResponse(
+              send(
+                ws,
+                "error",
+                createErrorResponse(
                   `No pending request for id: ${response.requestId}`,
                   "UNKNOWN_REQUEST_ID",
                 ),
-              });
+              );
               return;
             }
 
@@ -157,13 +155,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
             pendingRequests.delete(response.requestId);
             pending.resolve(response);
           } else {
-            send(ws, {
-              type: "error",
-              data: createErrorResponse(
-                `Unknown message type: ${msg.type}`,
-                "UNKNOWN_MESSAGE_TYPE",
-              ),
-            });
+            send(ws, "error", createErrorResponse(`Unknown event: ${msg.event}`, "UNKNOWN_EVENT"));
           }
         },
 
