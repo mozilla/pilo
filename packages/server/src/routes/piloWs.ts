@@ -39,7 +39,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
   const piloWs = new Hono();
 
   piloWs.get(
-    "/run/ws",
+    "/run",
     upgradeWebSocket((_c) => {
       const abortController = new AbortController();
       const pendingRequests = new Map<string, PendingRequest>();
