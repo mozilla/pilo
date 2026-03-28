@@ -4,7 +4,7 @@
  * All messages use flat { event, data } format (mirrors SSE structure).
  *
  * Client -> Server:
- *   { "event": "task:start", "data": PiloTaskRequest }
+ *   { "event": "task:details", "data": PiloTaskRequest }
  *   { "event": "user_data_response", "data": UserDataResponse }
  *
  * Server -> Client:
@@ -55,7 +55,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
             return;
           }
 
-          if (msg.event === "task:start") {
+          if (msg.event === "task:details") {
             if (taskRunning) {
               send(
                 ws,
