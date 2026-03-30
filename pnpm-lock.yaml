@@ -149,8 +149,8 @@ importers:
         specifier: ^2.2.5
         version: 2.2.5(ai@6.0.121(zod@4.3.6))(zod@4.3.6)
       '@tabstack/sdk':
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: ^2.3.0
+        version: 2.3.0
       ai:
         specifier: ^6.0.121
         version: 6.0.121(zod@4.3.6)
@@ -1585,8 +1585,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tabstack/sdk@2.2.0':
-    resolution: {integrity: sha512-/0YCjfou0Qtd8hAXQUzlBWPZEeqpo3Ngv4RBJhJPBYmr8PJy31gFWUc1Ly/WsHoFSw6U7GrsSUHC90HWXoJCTg==}
+  '@tabstack/sdk@2.3.0':
+    resolution: {integrity: sha512-OdG/l+5lQ1QMzyzuwXFwatrGjnvS6bDOvnRsSzgc8t+8Dxb7jTbDuQtFP8F+eLG3qF4Ts+CKeIzWlX+3ujMd2Q==}
 
   '@tailwindcss/node@4.2.1':
     resolution: {integrity: sha512-jlx6sLk4EOwO6hHe1oCGm1Q4AN/s0rSrTTPBGPM0/RQ6Uylwq17FuU8IeJJKEjtc6K6O07zsvP+gDO6MMWo7pg==}
@@ -5398,7 +5398,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tabstack/sdk@2.2.0': {}
+  '@tabstack/sdk@2.3.0': {}
 
   '@tailwindcss/node@4.2.1':
     dependencies:
