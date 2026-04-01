@@ -105,11 +105,11 @@ function createTestHarness() {
   }
 
   function triggerClose() {
-    handlers.onClose(new CloseEvent("close"), mockWs);
+    handlers.onClose({ type: "close" } as any, mockWs);
   }
 
   function triggerError() {
-    handlers.onError(new Event("error"), mockWs);
+    handlers.onError({ type: "error" } as any, mockWs);
   }
 
   return {
