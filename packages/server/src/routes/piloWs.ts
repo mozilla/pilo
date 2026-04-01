@@ -31,8 +31,14 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-function send(ws: WSContext, event: string, data: any): void {
-  ws.send(JSON.stringify({ event, data }));
+function send(ws: WSContext, event: string, data: any): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const raw = ws.raw as { send(data: string, cb?: (err?: Error) => void): void };
+    raw.send(JSON.stringify({ event, data }), (err?: Error) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 }
 
 export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
@@ -109,10 +115,10 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                   onUserDataRequired,
                 });
 
-                send(ws, "complete", result);
+                await send(ws, "complete", result);
               } catch (error) {
                 if (!abortController.signal.aborted) {
-                  send(
+                  await send(
                     ws,
                     "error",
                     createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
@@ -125,6 +131,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                   pending.reject(new Error("Task ended"));
                   pendingRequests.delete(id);
                 }
+                ws.close(1000, "Task finished");
               }
             })();
           } else if (msg.event === "user_data_response") {
