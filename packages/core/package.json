@@ -34,7 +34,7 @@
     "@ai-sdk/openai-compatible": "^2.0.36",
     "@ghostery/adblocker-playwright": "^2.14.1",
     "@openrouter/ai-sdk-provider": "^2.2.5",
-    "@tabstack/sdk": "^2.2.0",
+    "@tabstack/sdk": "^2.3.0",
     "ai": "^6.0.121",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
