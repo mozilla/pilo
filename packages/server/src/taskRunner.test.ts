@@ -20,43 +20,38 @@ vi.mock("pilo-core", () => {
   class MockPlaywrightBrowser {}
 
   return {
-  WebAgent: MockWebAgent,
-  PlaywrightBrowser: MockPlaywrightBrowser,
-  config: {
-    getConfig: vi.fn(() => ({
+    WebAgent: MockWebAgent,
+    PlaywrightBrowser: MockPlaywrightBrowser,
+    config: {
+      getConfig: vi.fn(() => ({
+        provider: "openai",
+        openai_api_key: "sk-test123",
+        browser: "firefox",
+        headless: true,
+      })),
+    },
+    createAIProvider: vi.fn(() => ({})),
+    getAIProviderInfo: vi.fn(() => ({
       provider: "openai",
-      openai_api_key: "sk-test123",
-      browser: "firefox",
-      headless: true,
+      model: "gpt-4.1",
+      hasApiKey: true,
+      keySource: "env",
     })),
-  },
-  createAIProvider: vi.fn(() => ({})),
-  getAIProviderInfo: vi.fn(() => ({
-    provider: "openai",
-    model: "gpt-4.1",
-    hasApiKey: true,
-    keySource: "env",
-  })),
-  createNavigationRetryConfig: vi.fn((overrides) => ({
-    baseTimeoutMs: overrides?.baseTimeoutMs ?? 30000,
-    maxTimeoutMs: overrides?.maxTimeoutMs ?? 120000,
-    maxAttempts: overrides?.maxAttempts ?? 3,
-    timeoutMultiplier: overrides?.timeoutMultiplier ?? 2,
-  })),
-  SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
-};
+    createNavigationRetryConfig: vi.fn((overrides) => ({
+      baseTimeoutMs: overrides?.baseTimeoutMs ?? 30000,
+      maxTimeoutMs: overrides?.maxTimeoutMs ?? 120000,
+      maxAttempts: overrides?.maxAttempts ?? 3,
+      timeoutMultiplier: overrides?.timeoutMultiplier ?? 2,
+    })),
+    SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
+  };
 });
 
 vi.mock("./StreamLogger.js", () => ({
   StreamLogger: class MockStreamLogger {},
 }));
 
-import {
-  validateTaskRequest,
-  createErrorResponse,
-  errorToString,
-  runTask,
-} from "./taskRunner.js";
+import { validateTaskRequest, createErrorResponse, errorToString, runTask } from "./taskRunner.js";
 
 describe("taskRunner", () => {
   describe("errorToString", () => {

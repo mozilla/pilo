@@ -42,8 +42,7 @@ vi.mock("../taskRunner.js", () => ({
     success: false,
     error: { message, code, timestamp: new Date().toISOString() },
   }),
-  errorToString: (error: unknown) =>
-    error instanceof Error ? error.name : "Unknown error",
+  errorToString: (error: unknown) => (error instanceof Error ? error.name : "Unknown error"),
 }));
 
 import { createPiloWsRoute } from "./piloWs.js";
@@ -73,12 +72,10 @@ function createTestHarness() {
   let closeCode: number | undefined;
   let closeReason: string | undefined;
 
-  const mockRawSend = vi.fn(
-    (data: string, cb?: (err?: Error) => void) => {
-      sentMessages.push(JSON.parse(data));
-      cb?.();
-    },
-  );
+  const mockRawSend = vi.fn((data: string, cb?: (err?: Error) => void) => {
+    sentMessages.push(JSON.parse(data));
+    cb?.();
+  });
 
   const mockWs: WSContext = {
     send: vi.fn(),
@@ -123,9 +120,15 @@ function createTestHarness() {
     sentMessages,
     mockWs,
     mockRawSend,
-    get closeCalled() { return closeCalled; },
-    get closeCode() { return closeCode; },
-    get closeReason() { return closeReason; },
+    get closeCalled() {
+      return closeCalled;
+    },
+    get closeCode() {
+      return closeCode;
+    },
+    get closeReason() {
+      return closeReason;
+    },
   };
 }
 
@@ -246,9 +249,7 @@ describe("piloWs", () => {
       h.sendMessage({ event: "task:details", data: { task: "first" } });
       h.sendMessage({ event: "task:details", data: { task: "second" } });
 
-      const errorMsg = h.sentMessages.find(
-        (m) => m.data?.error?.code === "TASK_ALREADY_RUNNING",
-      );
+      const errorMsg = h.sentMessages.find((m) => m.data?.error?.code === "TASK_ALREADY_RUNNING");
       expect(errorMsg).toBeDefined();
     });
 
@@ -272,9 +273,7 @@ describe("piloWs", () => {
       await vi.runAllTimersAsync();
 
       // Should NOT have a TASK_EXECUTION_FAILED error (abort is expected)
-      const errorMsg = h.sentMessages.find(
-        (m) => m.data?.error?.code === "TASK_EXECUTION_FAILED",
-      );
+      const errorMsg = h.sentMessages.find((m) => m.data?.error?.code === "TASK_EXECUTION_FAILED");
       expect(errorMsg).toBeUndefined();
     });
 
@@ -371,9 +370,7 @@ describe("piloWs", () => {
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 100);
       await vi.runAllTimersAsync();
 
-      const errorMsg = h.sentMessages.find(
-        (m) => m.data?.error?.code === "TASK_EXECUTION_FAILED",
-      );
+      const errorMsg = h.sentMessages.find((m) => m.data?.error?.code === "TASK_EXECUTION_FAILED");
       expect(errorMsg).toBeDefined();
     });
   });
