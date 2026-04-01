@@ -28,14 +28,14 @@
     "test:only": "pnpm run bundle:aria && pnpm run test"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.46",
-    "@ai-sdk/google-vertex": "^4.0.83",
-    "@ai-sdk/openai": "^3.0.44",
+    "@ai-sdk/google": "^3.0.51",
+    "@ai-sdk/google-vertex": "^4.0.92",
+    "@ai-sdk/openai": "^3.0.46",
     "@ai-sdk/openai-compatible": "^2.0.36",
     "@ghostery/adblocker-playwright": "^2.14.1",
-    "@openrouter/ai-sdk-provider": "^2.2.5",
+    "@openrouter/ai-sdk-provider": "^2.3.3",
     "@tabstack/sdk": "^2.3.0",
-    "ai": "^6.0.121",
+    "ai": "^6.0.129",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "cross-fetch": "^4.1.0",
@@ -43,7 +43,7 @@
     "eventemitter3": "^5.0.4",
     "liquidjs": "^10.25.0",
     "nanoid": "^5.1.7",
-    "ollama-ai-provider-v2": "^3.0.3",
+    "ollama-ai-provider-v2": "^3.5.0",
     "playwright": "1.58.2",
     "turndown": "^7.2.2",
     "zod": "^4.3.6"
