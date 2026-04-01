@@ -62,7 +62,7 @@
     "dotenv": "^17.2.4",
     "eventemitter3": "^5.0.4",
     "liquidjs": "^10.25.0",
-    "nanoid": "^5.1.6",
+    "nanoid": "^5.1.7",
     "ollama-ai-provider-v2": "^3.0.3",
     "playwright": "1.58.2",
     "turndown": "^7.2.2",
