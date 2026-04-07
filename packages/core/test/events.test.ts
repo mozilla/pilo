@@ -138,6 +138,8 @@ describe("WebAgentEventEmitter", () => {
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
+        "interactive:form_data:request",
+        "interactive:form_data:error",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);
@@ -254,6 +256,42 @@ describe("WebAgentEventEmitter", () => {
             iterationId: "test-1",
             operation: "test operation",
             hasScreenshot: false,
+          },
+        },
+        {
+          type: WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST,
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            requestId: "req-1",
+            pageUrl: "https://example.com",
+            pageTitle: "Test Page",
+            formDescription: "Test form",
+            fields: [
+              { ref: "E1", label: "Name", fieldType: "text", required: true },
+              { ref: "E2", label: "Email", fieldType: "email", required: true },
+            ],
+          },
+        },
+        {
+          type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR,
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            requestId: "req-1",
+            pageUrl: "https://example.com",
+            pageTitle: "Test Page",
+            formDescription: "Test form",
+            fields: [
+              {
+                ref: "E2",
+                label: "Email",
+                fieldType: "email",
+                required: true,
+                description: "Invalid email",
+              },
+            ],
+            fieldErrors: { E2: "Invalid email" },
           },
         },
       ];

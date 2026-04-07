@@ -107,6 +107,10 @@ export type AriaProps = {
   level?: number;
   pressed?: boolean | "mixed";
   selected?: boolean;
+  required?: boolean;
+  invalid?: boolean | "grammar" | "spelling";
+  errormessage?: string;
+  description?: string;
 };
 
 export type AriaNode = AriaProps & {

@@ -1,6 +1,7 @@
 import { ModelMessage, StreamTextResult } from "ai";
 import { EventEmitter } from "eventemitter3";
 import type { AwaitedProperties } from "./utils/types.js";
+import type { FormFieldRequest } from "./types/interactive.js";
 
 /**
  * Enum of all possible event types in the web agent
@@ -46,6 +47,10 @@ export enum WebAgentEventType {
 
   // Browser reconnect after mid-task disconnect
   BROWSER_RECONNECTED = "browser:reconnected",
+
+  // Interactive mode events
+  INTERACTIVE_FORM_DATA_REQUEST = "interactive:form_data:request",
+  INTERACTIVE_FORM_DATA_ERROR = "interactive:form_data:error",
 }
 
 /**
@@ -299,6 +304,32 @@ export interface StatusMessageEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data when the agent requests user data for form fields
+ */
+export interface InteractiveFormDataRequestEventData extends WebAgentEventData {
+  requestId: string;
+  pageUrl: string;
+  pageTitle: string;
+  formDescription: string;
+  fields: FormFieldRequest[];
+}
+
+/**
+ * Event data when form validation fails and the agent re-requests data.
+ * Carries both the error context and the fields that need new values.
+ * Callers respond to this the same way as a request event.
+ */
+export interface InteractiveFormDataErrorEventData extends WebAgentEventData {
+  requestId: string;
+  pageUrl: string;
+  pageTitle: string;
+  formDescription: string;
+  fields: FormFieldRequest[];
+  /** Per-field error messages from validation (field ref -> error text) */
+  fieldErrors: Record<string, string>;
+}
+
+/**
  * Union type of all event data types
  */
 export type WebAgentEvent =
@@ -331,7 +362,15 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
-  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData };
+  | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
+  | {
+      type: WebAgentEventType.INTERACTIVE_FORM_DATA_REQUEST;
+      data: InteractiveFormDataRequestEventData;
+    }
+  | {
+      type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR;
+      data: InteractiveFormDataErrorEventData;
+    };
 
 /**
  * Event emitter for WebAgent events

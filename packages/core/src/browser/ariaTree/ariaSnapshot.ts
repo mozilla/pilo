@@ -211,6 +211,22 @@ function toAriaNode(element: Element): AriaNode | null {
   if (roleUtils.kAriaSelectedRoles.includes(role))
     result.selected = roleUtils.getAriaSelected(element);
 
+  if (roleUtils.kAriaRequiredRoles.includes(role))
+    result.required = roleUtils.getAriaRequired(element);
+
+  if (roleUtils.kAriaInvalidRoles.includes(role)) {
+    const invalid = roleUtils.getAriaInvalid(element);
+    if (invalid) {
+      result.invalid = invalid;
+      // Only resolve error message when field is actually invalid
+      const errMsg = roleUtils.getAriaErrorMessage(element);
+      if (errMsg) result.errormessage = errMsg;
+    }
+  }
+
+  const ariaDesc = roleUtils.getAriaDescription(element);
+  if (ariaDesc) result.description = ariaDesc;
+
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     // Types whose .value shouldn't be exposed as text children:
     // password: sensitive credential; checkbox/radio: state shown via [checked]; file: just filename
@@ -452,6 +468,12 @@ function renderAriaTree(root: AriaNode, counter: RefCounter): string {
     if (ariaNode.pressed === "mixed") key += ` [pressed=mixed]`;
     if (ariaNode.pressed === true) key += ` [pressed]`;
     if (ariaNode.selected === true) key += ` [selected]`;
+    if (ariaNode.required) key += ` [required]`;
+    if (ariaNode.invalid === true) key += ` [invalid]`;
+    if (ariaNode.invalid === "grammar") key += ` [invalid=grammar]`;
+    if (ariaNode.invalid === "spelling") key += ` [invalid=spelling]`;
+    if (ariaNode.errormessage) key += ` [errormessage=${JSON.stringify(ariaNode.errormessage)}]`;
+    if (ariaNode.description) key += ` [description=${JSON.stringify(ariaNode.description)}]`;
 
     // Assign ref only for visible, interactable elements.
     // SECURITY: Refs are counter-generated ("E1", "E2", ...) — never from external input,

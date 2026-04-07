@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
+import { input, password, select, confirm } from "@inquirer/prompts";
 import {
   WebAgent,
   PlaywrightBrowser,
@@ -13,7 +14,7 @@ import {
   MetricsCollector,
   SecretsRedactor,
 } from "pilo-core";
-import type { Logger } from "pilo-core";
+import type { Logger, UserDataCallback, UserDataRequest, UserDataResponse } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -52,6 +53,74 @@ function assertConfigExists(): boolean {
 }
 
 /**
+ * Prompt for a single field value using the appropriate inquirer prompt
+ * based on the field type.
+ */
+async function promptForField(field: UserDataRequest["fields"][number]): Promise<string> {
+  const hint = field.description ? chalk.yellow(field.description) : undefined;
+  const requiredTag = field.required ? chalk.red(" *") : "";
+  const message = `${field.label}${requiredTag}`;
+
+  switch (field.fieldType) {
+    case "password":
+      return password({ message, mask: "*" });
+
+    case "select":
+      if (field.options?.length) {
+        return select({
+          message,
+          choices: field.options.map((opt) => ({ name: opt, value: opt })),
+          default: field.currentValue,
+        });
+      }
+      return input({ message, default: field.currentValue });
+
+    case "checkbox":
+      return (await confirm({ message, default: field.currentValue === "true" }))
+        ? "true"
+        : "false";
+
+    default:
+      return input({
+        message: hint ? `${message} ${hint}` : message,
+        default: field.currentValue,
+      });
+  }
+}
+
+/**
+ * Creates a UserDataCallback that prompts the user in the terminal
+ * for form field values using @inquirer/prompts.
+ */
+function createTerminalPromptCallback(): UserDataCallback {
+  return async (request: UserDataRequest): Promise<UserDataResponse> => {
+    // Detect validation errors by checking if any field has a description (error message)
+    const hasErrors = request.fields.some((f) => f.description);
+    const errorLabel = hasErrors ? chalk.red.bold(" (validation error, please correct)") : "";
+    console.error(
+      chalk.cyan.bold(`\n📋 Form data requested: ${request.formDescription}${errorLabel}`),
+    );
+    console.error(chalk.gray(`   Page: ${request.pageTitle} (${request.pageUrl})`));
+    console.error();
+
+    const fields: UserDataResponse["fields"] = [];
+
+    for (const field of request.fields) {
+      try {
+        const value = await promptForField(field);
+        fields.push({ ref: field.ref, value });
+      } catch {
+        // User pressed Ctrl+C during a prompt, treat as cancellation
+        return { requestId: request.requestId, fields: [], cancelled: true };
+      }
+    }
+
+    console.error();
+    return { requestId: request.requestId, fields };
+  };
+}
+
+/**
  * Creates the 'run' command for executing web automation tasks.
  * Options are generated from CONFIG_SCHEMA via addSchemaOptions().
  */
@@ -63,6 +132,9 @@ export function createRunCommand(): Command {
 
   // Add all CLI options from schema
   addConfigOptions(command);
+
+  // Add interactive mode flag (CLI-only, not in config schema)
+  command.option("-i, --interactive", "Enable interactive mode: agent will prompt for form data");
 
   // Set action handler
   command.action(executeRunCommand);
@@ -225,6 +297,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       providerConfig,
       logger,
       eventEmitter,
+      onUserDataRequired: options.interactive ? createTerminalPromptCallback() : undefined,
     });
 
     // Execute the task
