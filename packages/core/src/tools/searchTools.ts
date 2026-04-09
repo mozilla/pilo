@@ -61,6 +61,11 @@ export function createSearchTools(context: SearchToolContext) {
           });
 
           span.setAttribute("pilo.search.success", false);
+          // Record the exception for observability even though search errors are
+          // recoverable (the LLM sees the error and can retry or move on).
+          // We do NOT set span status to ERROR — matching the webActionTools
+          // pattern for recoverable failures.
+          span.recordException(error instanceof Error ? error : new Error(errorMessage));
           return {
             success: false,
             action: "webSearch",
