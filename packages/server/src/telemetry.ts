@@ -10,7 +10,7 @@ export function initTelemetry(): (() => Promise<void>) | undefined {
     return undefined;
   }
 
-  const serviceName = process.env.OTEL_SERVICE_NAME || "tabstack-pilo";
+  const serviceName = process.env.OTEL_SERVICE_NAME || "pilo";
   const metricIntervalMs = Number(process.env.OTEL_METRIC_EXPORT_INTERVAL) || 30_000;
 
   const sdk = new NodeSDK({

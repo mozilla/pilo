@@ -20,7 +20,7 @@ npm install @opentelemetry/api @opentelemetry/sdk-node \
 | Variable                      | Required          | Default         | Description                                            |
 | ----------------------------- | ----------------- | --------------- | ------------------------------------------------------ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes (to activate) | —               | OTLP collector endpoint (e.g. `http://localhost:4318`) |
-| `OTEL_SERVICE_NAME`           | No                | `tabstack-pilo` | Service name in traces and metrics                     |
+| `OTEL_SERVICE_NAME`           | No                | `pilo`          | Service name in traces and metrics                     |
 | `OTEL_METRIC_EXPORT_INTERVAL` | No                | `30000`         | Metric export interval in milliseconds                 |
 
 If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, telemetry is completely disabled.
