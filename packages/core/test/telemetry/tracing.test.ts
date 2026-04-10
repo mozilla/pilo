@@ -128,4 +128,105 @@ describe("tracing helpers", () => {
       expect(callCount).toBeLessThanOrEqual(1);
     });
   });
+
+  describe("withSpan", () => {
+    describe("when @opentelemetry/api is NOT installed", () => {
+      beforeEach(() => {
+        vi.doMock("@opentelemetry/api", () => {
+          throw new Error("Cannot find module '@opentelemetry/api'");
+        });
+      });
+
+      it("runs the callback with a no-op span", async () => {
+        const { withSpan } = await import("../../src/telemetry/tracing.js");
+        const result = await withSpan("test.span", {}, async (span) => {
+          span.setAttribute("key", "value"); // should not throw
+          return 42;
+        });
+        expect(result).toBe(42);
+      });
+
+      it("propagates errors from the callback", async () => {
+        const { withSpan } = await import("../../src/telemetry/tracing.js");
+        await expect(
+          withSpan("test.span", {}, async () => {
+            throw new Error("callback error");
+          }),
+        ).rejects.toThrow("callback error");
+      });
+    });
+
+    describe("when @opentelemetry/api IS installed", () => {
+      it("creates a span and ends it after callback completes", async () => {
+        const mockEnd = vi.fn();
+        const mockStartSpan = vi.fn(() => ({
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: vi.fn(),
+          end: mockEnd,
+        }));
+
+        const mockContext = {};
+        const mockWithContext = vi.fn((_ctx: any, fn: any) => fn());
+
+        vi.doMock("@opentelemetry/api", () => ({
+          trace: {
+            getTracer: () => ({ startSpan: mockStartSpan }),
+            setSpan: vi.fn(() => mockContext),
+          },
+          context: {
+            active: vi.fn(() => ({})),
+            with: mockWithContext,
+          },
+        }));
+
+        const { withSpan } = await import("../../src/telemetry/tracing.js");
+        const result = await withSpan(
+          "test.span",
+          { attributes: { "test.key": "val" } },
+          async (span) => {
+            span.setAttribute("extra", "attr");
+            return "done";
+          },
+        );
+
+        expect(result).toBe("done");
+        expect(mockStartSpan).toHaveBeenCalledWith("test.span", {
+          attributes: { "test.key": "val" },
+        });
+        expect(mockEnd).toHaveBeenCalled();
+        expect(mockWithContext).toHaveBeenCalled();
+      });
+
+      it("ends span even when callback throws", async () => {
+        const mockEnd = vi.fn();
+        const mockStartSpan = vi.fn(() => ({
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: vi.fn(),
+          end: mockEnd,
+        }));
+
+        vi.doMock("@opentelemetry/api", () => ({
+          trace: {
+            getTracer: () => ({ startSpan: mockStartSpan }),
+            setSpan: vi.fn(() => ({})),
+          },
+          context: {
+            active: vi.fn(() => ({})),
+            with: vi.fn((_ctx: any, fn: any) => fn()),
+          },
+        }));
+
+        const { withSpan } = await import("../../src/telemetry/tracing.js");
+        await expect(
+          withSpan("test.span", {}, async () => {
+            throw new Error("boom");
+          }),
+        ).rejects.toThrow("boom");
+
+        expect(mockEnd).toHaveBeenCalled();
+      });
+    });
+  });
 });
