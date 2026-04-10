@@ -48,7 +48,7 @@ import {
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
 } from "./constants.js";
-import { getTracer, SpanStatusCode } from "./telemetry/tracing.js";
+import { withSpan, SpanStatusCode } from "./telemetry/tracing.js";
 
 // === Type Definitions ===
 
@@ -162,6 +162,12 @@ interface PlanningResponse {
   toolResults: PlanningToolResult[];
 }
 
+type StepOutcome =
+  | { flow: "break" }
+  | { flow: "continue" }
+  | { flow: "return"; value: { success: boolean; finalAnswer: string; error?: TaskError } }
+  | { flow: "next"; needsPageSnapshot: boolean };
+
 type StreamTextResultGeneric = StreamTextResult<any, never>;
 // HACK: cobble together a type from StreamTextResult with promises resolved
 type ProcessedAIResponse = AwaitedProperties<
@@ -274,87 +280,88 @@ export class WebAgent {
    * Main entry point - keep this simple and clear
    */
   async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.task.execute", {
-      attributes: {
-        "pilo.task": task,
-        ...(options.startingUrl && { "pilo.url": options.startingUrl }),
+    return withSpan(
+      "pilo.task.execute",
+      {
+        attributes: {
+          "pilo.task": task,
+          ...(options.startingUrl && { "pilo.url": options.startingUrl }),
+        },
       },
-    });
+      async (span) => {
+        try {
+          // 1. Validate input parameters (let validation errors throw)
+          this.validateTaskAndOptions(task, options);
 
-    try {
-      // 1. Validate input parameters (let validation errors throw)
-      this.validateTaskAndOptions(task, options);
+          // 2. Initialize browser and internal state
+          await this.initializeBrowserAndState(task, options);
 
-      // 2. Initialize browser and internal state
-      await this.initializeBrowserAndState(task, options);
+          // 3. Eagerly create search service so provider errors surface before the main loop
+          if (this.searchProvider !== "none") {
+            this.searchService = await SearchService.create(this.searchProvider, this.browser, {
+              apiKey: this.searchApiKey,
+            });
+          }
 
-      // 3. Eagerly create search service so provider errors surface before the main loop
-      if (this.searchProvider !== "none") {
-        this.searchService = await SearchService.create(this.searchProvider, this.browser, {
-          apiKey: this.searchApiKey,
-        });
-      }
+          const executionState = this.initializeExecutionState();
 
-      const executionState = this.initializeExecutionState();
+          try {
+            // 4. Planning phase
+            await this.planTask(task, options.startingUrl);
 
-      try {
-        // 4. Planning phase
-        await this.planTask(task, options.startingUrl);
+            // 5. Navigation phase (with retry on recoverable errors)
+            await this.navigateToStartWithRetry(task);
 
-        // 5. Navigation phase (with retry on recoverable errors)
-        await this.navigateToStartWithRetry(task);
+            this.initializeSystemPromptAndTask(task);
 
-        this.initializeSystemPromptAndTask(task);
+            // 6. Main execution loop
+            const loopOutcome = await this.runMainLoop(task, executionState);
 
-        // 6. Main execution loop
-        const loopOutcome = await this.runMainLoop(task, executionState);
+            // 7. Return results
+            const result = this.buildResult(loopOutcome, executionState);
+            span.setAttribute("pilo.task.success", result.success);
+            return result;
+          } catch (error) {
+            // Check if aborted
+            if (this.abortSignal?.aborted) {
+              span.setAttribute("pilo.task.success", false);
+              return this.buildResult(
+                {
+                  success: false,
+                  finalAnswer: "Task aborted by user",
+                  error: { code: TaskErrorCode.TASK_ABORTED, message: "Task aborted by user" },
+                },
+                executionState,
+              );
+            }
 
-        // 7. Return results
-        const result = this.buildResult(loopOutcome, executionState);
-        span.setAttribute("pilo.task.success", result.success);
-        return result;
-      } catch (error) {
-        // Check if aborted
-        if (this.abortSignal?.aborted) {
-          span.setAttribute("pilo.task.success", false);
-          return this.buildResult(
-            {
-              success: false,
-              finalAnswer: "Task aborted by user",
-              error: { code: TaskErrorCode.TASK_ABORTED, message: "Task aborted by user" },
-            },
-            executionState,
-          );
-        }
+            // Re-throw setup/planning errors (they indicate configuration issues)
+            if (this.isSetupError(error)) {
+              throw error;
+            }
 
-        // Re-throw setup/planning errors (they indicate configuration issues)
-        if (this.isSetupError(error)) {
+            // Convert runtime errors to results
+            const message = `Task failed: ${this.extractErrorMessage(error)}`;
+            span.setAttribute("pilo.task.success", false);
+            return this.buildResult(
+              {
+                success: false,
+                finalAnswer: message,
+                error: { code: TaskErrorCode.TASK_FAILED, message },
+              },
+              executionState,
+            );
+          }
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
           throw error;
         }
-
-        // Convert runtime errors to results
-        const message = `Task failed: ${this.extractErrorMessage(error)}`;
-        span.setAttribute("pilo.task.success", false);
-        return this.buildResult(
-          {
-            success: false,
-            finalAnswer: message,
-            error: { code: TaskErrorCode.TASK_FAILED, message },
-          },
-          executionState,
-        );
-      }
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+      },
+    );
   }
 
   /**
@@ -464,106 +471,116 @@ export class WebAgent {
       // Generate unique iteration ID
       this.currentIterationId = nanoid(8);
 
-      const stepTracer = await getTracer();
-      const stepSpan = stepTracer.startSpan("pilo.agent.step", {
-        attributes: {
-          "pilo.step.number": executionState.currentIteration,
-          "pilo.step.iteration_id": this.currentIterationId,
+      const outcome: StepOutcome = await withSpan(
+        "pilo.agent.step",
+        {
+          attributes: {
+            "pilo.step.number": executionState.currentIteration,
+            "pilo.step.iteration_id": this.currentIterationId,
+          },
         },
-      });
-
-      try {
-        // Emit step event for this iteration
-        this.emit(WebAgentEventType.AGENT_STEP, {
-          iterationId: this.currentIterationId,
-          currentIteration: executionState.currentIteration,
-        });
-
-        // Add page snapshot if needed
-        if (needsPageSnapshot) {
-          // Clear approved refs when page changes: ARIA refs reset on each snapshot,
-          // so old ref strings may now point to different DOM elements.
-          if (approvedRefs) {
-            approvedRefs.clear();
-          }
-          await this.addPageSnapshot();
-        }
-
-        // Single try-catch for ALL iteration logic
-        try {
-          const result = await this.generateAndProcessAction(task, allTools, executionState);
-
-          // Reset error counter on success
-          consecutiveErrors = 0;
-
-          // Handle terminal actions
-          if (result.isTerminal) {
-            executionState.success = result.success;
-            executionState.finalAnswer = result.finalAnswer;
-            executionState.error = result.error;
-            break;
-          }
-
-          // Update state for successful action
-          if (result.actionExecuted) {
-            executionState.actionCount++;
-          }
-
-          needsPageSnapshot = result.pageChanged;
-        } catch (error) {
-          // Browser disconnects handled specially — don't mark span as error when recovery succeeds
-          if (error instanceof BrowserDisconnectedError) {
-            // May throw if all endpoints exhausted — propagates as hard error
-            await this.handleBrowserDisconnect(task, error, executionState);
-            consecutiveErrors = 0;
-            needsPageSnapshot = true;
-            executionState.currentIteration++;
-            continue;
-          }
-
-          // Only mark non-disconnect errors as span failures
-          stepSpan.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+        async (stepSpan) => {
+          // Emit step event for this iteration
+          this.emit(WebAgentEventType.AGENT_STEP, {
+            iterationId: this.currentIterationId,
+            currentIteration: executionState.currentIteration,
           });
-          stepSpan.recordException(error instanceof Error ? error : new Error(String(error)));
 
-          trackError();
+          // Add page snapshot if needed
+          if (needsPageSnapshot) {
+            // Clear approved refs when page changes: ARIA refs reset on each snapshot,
+            // so old ref strings may now point to different DOM elements.
+            if (approvedRefs) {
+              approvedRefs.clear();
+            }
+            await this.addPageSnapshot();
+          }
 
-          // Check if we should continue
-          if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors, error)) {
-            const isNonRecoverable = this.isNonRecoverableError(error);
-            const errorMessage = this.extractErrorMessage(error);
+          // Single try-catch for ALL iteration logic
+          try {
+            const result = await this.generateAndProcessAction(task, allTools, executionState);
 
-            if (isNonRecoverable) {
-              console.error(`[WebAgent] Non-recoverable error, stopping execution:`, errorMessage);
-            } else {
-              console.error(
-                `[WebAgent] Too many errors (${consecutiveErrors} consecutive, ${totalErrors} total), stopping:`,
-                errorMessage,
-              );
+            // Reset error counter on success
+            consecutiveErrors = 0;
+
+            // Handle terminal actions
+            if (result.isTerminal) {
+              executionState.success = result.success;
+              executionState.finalAnswer = result.finalAnswer;
+              executionState.error = result.error;
+              return { flow: "break" as const };
             }
 
-            const message = isNonRecoverable
-              ? `Task failed: ${errorMessage}`
-              : `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`;
-            return {
-              success: false,
-              finalAnswer: message,
-              error: {
-                code: isNonRecoverable ? TaskErrorCode.TASK_FAILED : TaskErrorCode.MAX_ERRORS,
-                message,
-              },
-            };
-          }
+            // Update state for successful action
+            if (result.actionExecuted) {
+              executionState.actionCount++;
+            }
 
-          // Add error feedback and retry
-          this.addErrorFeedback(error);
-          needsPageSnapshot = false; // Nothing changed, don't snapshot
-        }
-      } finally {
-        stepSpan.end();
-      }
+            return { flow: "next" as const, needsPageSnapshot: result.pageChanged };
+          } catch (error) {
+            // Browser disconnects handled specially — don't mark span as error when recovery succeeds
+            if (error instanceof BrowserDisconnectedError) {
+              // May throw if all endpoints exhausted — propagates as hard error
+              await this.handleBrowserDisconnect(task, error, executionState);
+              consecutiveErrors = 0;
+              executionState.currentIteration++;
+              return { flow: "continue" as const };
+            }
+
+            // Only mark non-disconnect errors as span failures
+            stepSpan.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error instanceof Error ? error.message : String(error),
+            });
+            stepSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+
+            trackError();
+
+            // Check if we should continue
+            if (!this.shouldContinueAfterError(consecutiveErrors, totalErrors, error)) {
+              const isNonRecoverable = this.isNonRecoverableError(error);
+              const errorMessage = this.extractErrorMessage(error);
+
+              if (isNonRecoverable) {
+                console.error(
+                  `[WebAgent] Non-recoverable error, stopping execution:`,
+                  errorMessage,
+                );
+              } else {
+                console.error(
+                  `[WebAgent] Too many errors (${consecutiveErrors} consecutive, ${totalErrors} total), stopping:`,
+                  errorMessage,
+                );
+              }
+
+              const message = isNonRecoverable
+                ? `Task failed: ${errorMessage}`
+                : `Task failed after ${consecutiveErrors} consecutive errors (${totalErrors} total): ${errorMessage}`;
+              return {
+                flow: "return" as const,
+                value: {
+                  success: false,
+                  finalAnswer: message,
+                  error: {
+                    code: isNonRecoverable ? TaskErrorCode.TASK_FAILED : TaskErrorCode.MAX_ERRORS,
+                    message,
+                  },
+                },
+              };
+            }
+
+            // Add error feedback and retry
+            this.addErrorFeedback(error);
+            return { flow: "next" as const, needsPageSnapshot: false };
+          }
+        },
+      );
+
+      // Handle control flow after withSpan
+      if (outcome.flow === "break") break;
+      if (outcome.flow === "continue") continue;
+      if (outcome.flow === "return") return outcome.value;
+      needsPageSnapshot = outcome.needsPageSnapshot;
 
       executionState.currentIteration++;
     }
@@ -818,90 +835,93 @@ export class WebAgent {
       iterationId: this.currentIterationId,
     });
 
-    const aiTracer = await getTracer();
-    const aiSpan = aiTracer.startSpan("pilo.ai.generate");
-
-    let aiResponse: ProcessedAIResponse | null = null;
     let generationError: Error | null = null;
 
-    try {
-      // Generate AI response using streamText
-      const streamResult = streamText({
-        ...this.providerConfig,
-        messages: this.messages,
-        tools: webActionTools,
-        toolChoice: "required",
-        maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
-        abortSignal: this.abortSignal,
-      });
+    const aiResponse: ProcessedAIResponse | null = await withSpan(
+      "pilo.ai.generate",
+      {},
+      async (aiSpan) => {
+        try {
+          // Generate AI response using streamText
+          const streamResult = streamText({
+            ...this.providerConfig,
+            messages: this.messages,
+            tools: webActionTools,
+            toolChoice: "required",
+            maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
+            abortSignal: this.abortSignal,
+          });
 
-      // Process the full stream to capture reasoning before tool execution
-      let reasoningText = "";
-      let reasoningEmitted = false;
+          // Process the full stream to capture reasoning before tool execution
+          let reasoningText = "";
+          let reasoningEmitted = false;
 
-      for await (const part of streamResult.fullStream) {
-        switch (part.type) {
-          case "reasoning-start":
-            // Start accumulating reasoning
-            reasoningText = "";
-            reasoningEmitted = false;
-            break;
+          for await (const part of streamResult.fullStream) {
+            switch (part.type) {
+              case "reasoning-start":
+                // Start accumulating reasoning
+                reasoningText = "";
+                reasoningEmitted = false;
+                break;
 
-          case "reasoning-delta":
-            // Accumulate reasoning text
-            if ("text" in part) {
-              reasoningText += part.text;
+              case "reasoning-delta":
+                // Accumulate reasoning text
+                if ("text" in part) {
+                  reasoningText += part.text;
+                }
+                break;
+
+              case "tool-input-start":
+              case "tool-call":
+              case "reasoning-end":
+                // Emit reasoning when we're about to execute a tool or when reasoning ends
+                if (reasoningText && !reasoningEmitted) {
+                  this.emit(WebAgentEventType.AGENT_REASONED, {
+                    reasoning: reasoningText.trim(),
+                    iterationId: this.currentIterationId,
+                  });
+                  reasoningEmitted = true;
+                }
+                break;
             }
-            break;
+          }
 
-          case "tool-input-start":
-          case "tool-call":
-          case "reasoning-end":
-            // Emit reasoning when we're about to execute a tool or when reasoning ends
-            if (reasoningText && !reasoningEmitted) {
-              this.emit(WebAgentEventType.AGENT_REASONED, {
-                reasoning: reasoningText.trim(),
-                iterationId: this.currentIterationId,
-              });
-              reasoningEmitted = true;
-            }
-            break;
+          // Await only the properties we actually need
+          const [toolResults, response, finishReason, usage, warnings, providerMetadata] =
+            await Promise.all([
+              streamResult.toolResults,
+              streamResult.response,
+              streamResult.finishReason,
+              streamResult.usage,
+              streamResult.warnings,
+              streamResult.providerMetadata,
+            ]);
+
+          const result: ProcessedAIResponse = {
+            toolResults,
+            response,
+            finishReason,
+            usage,
+            warnings,
+            providerMetadata,
+          };
+
+          aiSpan.setAttribute("pilo.ai.finish_reason", String(finishReason));
+          if (usage) {
+            aiSpan.setAttribute("pilo.ai.input_tokens", usage.inputTokens || 0);
+            aiSpan.setAttribute("pilo.ai.output_tokens", usage.outputTokens || 0);
+          }
+
+          return result;
+        } catch (error) {
+          // Preserve original error
+          generationError = error instanceof Error ? error : new Error(String(error));
+          aiSpan.setStatus({ code: SpanStatusCode.ERROR, message: generationError.message });
+          aiSpan.recordException(generationError);
+          return null;
         }
-      }
-
-      // Await only the properties we actually need
-      const [toolResults, response, finishReason, usage, warnings, providerMetadata] =
-        await Promise.all([
-          streamResult.toolResults,
-          streamResult.response,
-          streamResult.finishReason,
-          streamResult.usage,
-          streamResult.warnings,
-          streamResult.providerMetadata,
-        ]);
-
-      aiResponse = {
-        toolResults,
-        response,
-        finishReason,
-        usage,
-        warnings,
-        providerMetadata,
-      };
-
-      aiSpan.setAttribute("pilo.ai.finish_reason", String(finishReason));
-      if (usage) {
-        aiSpan.setAttribute("pilo.ai.input_tokens", usage.inputTokens || 0);
-        aiSpan.setAttribute("pilo.ai.output_tokens", usage.outputTokens || 0);
-      }
-    } catch (error) {
-      // Preserve original error
-      generationError = error instanceof Error ? error : new Error(String(error));
-      aiSpan.setStatus({ code: SpanStatusCode.ERROR, message: generationError.message });
-      aiSpan.recordException(generationError);
-    } finally {
-      aiSpan.end();
-    }
+      },
+    );
 
     // Always append messages if they exist (even on error)
     if (aiResponse?.response?.messages) {
@@ -1129,137 +1149,136 @@ export class WebAgent {
     finalAnswer: string,
     executionState: ExecutionState,
   ): Promise<{ isAccepted: boolean }> {
-    const tracer = await getTracer();
     executionState.validationAttempts++;
 
-    const span = tracer.startSpan("pilo.task.validate", {
-      attributes: { "pilo.validation.attempt": executionState.validationAttempts },
-    });
-
-    try {
-      // Emit processing event with attempt number
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        operation: `Validating task completion (attempt ${executionState.validationAttempts})`,
-        hasScreenshot: false,
-        iterationId: this.currentIterationId,
-      });
-
-      try {
-        // Format conversation history for validation context
-        const conversationHistory = this.formatConversationHistory();
-
-        // Build validation prompt
-        const validationPrompt = buildTaskValidationPrompt(
-          task,
-          this.successCriteria,
-          finalAnswer,
-          conversationHistory,
-        );
-
-        // Call validation tool
-        const validationTools = createValidationTools();
-        const validationResponse = await generateTextWithRetry(
-          {
-            ...this.providerConfig,
-            prompt: validationPrompt,
-            tools: validationTools,
-            toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
-            maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
-            abortSignal: this.abortSignal,
-          },
-          {
-            maxAttempts: 2,
-            onRetry: (attempt, error) => {
-              this.emit(WebAgentEventType.AGENT_STATUS, {
-                message: `Validation retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
-                iterationId: this.currentIterationId,
-              });
-            },
-          },
-        );
-
-        if (!validationResponse.toolResults?.[0]) {
-          throw new Error("Failed to validate task completion");
-        }
-
-        const validationResult = validationResponse.toolResults[0].output as any;
-        const { taskAssessment, completionQuality, feedback } = validationResult;
-
-        // Emit validation event
-        this.emit(WebAgentEventType.TASK_VALIDATED, {
-          observation: taskAssessment,
-          completionQuality,
-          feedback,
-          finalAnswer,
+    return withSpan(
+      "pilo.task.validate",
+      {
+        attributes: { "pilo.validation.attempt": executionState.validationAttempts },
+      },
+      async (span) => {
+        // Emit processing event with attempt number
+        this.emit(WebAgentEventType.AGENT_PROCESSING, {
+          operation: `Validating task completion (attempt ${executionState.validationAttempts})`,
+          hasScreenshot: false,
           iterationId: this.currentIterationId,
         });
 
-        span.setAttribute("pilo.validation.quality", completionQuality);
+        try {
+          // Format conversation history for validation context
+          const conversationHistory = this.formatConversationHistory();
 
-        // Check if quality is acceptable
-        const isAccepted = completionQuality === "complete" || completionQuality === "excellent";
-
-        // If not accepted and we haven't hit max attempts, add feedback to conversation
-        if (!isAccepted && executionState.validationAttempts < this.maxValidationAttempts) {
-          // Build feedback message using the prompt function
-          const feedbackMessage = buildValidationFeedbackPrompt(
-            executionState.validationAttempts,
-            taskAssessment,
-            feedback,
+          // Build validation prompt
+          const validationPrompt = buildTaskValidationPrompt(
+            task,
+            this.successCriteria,
+            finalAnswer,
+            conversationHistory,
           );
 
-          this.messages.push({ role: "user", content: feedbackMessage });
+          // Call validation tool
+          const validationTools = createValidationTools();
+          const validationResponse = await generateTextWithRetry(
+            {
+              ...this.providerConfig,
+              prompt: validationPrompt,
+              tools: validationTools,
+              toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
+              maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
+              abortSignal: this.abortSignal,
+            },
+            {
+              maxAttempts: 2,
+              onRetry: (attempt, error) => {
+                this.emit(WebAgentEventType.AGENT_STATUS, {
+                  message: `Validation retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
+                  iterationId: this.currentIterationId,
+                });
+              },
+            },
+          );
 
-          // Emit event for debugging
-          this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
-            errors: [`Validation failed: ${completionQuality}`],
-            retryCount: executionState.validationAttempts,
-            feedback: feedbackMessage,
-            iterationId: this.currentIterationId,
-          });
-        }
+          if (!validationResponse.toolResults?.[0]) {
+            throw new Error("Failed to validate task completion");
+          }
 
-        // Accept if quality is good OR we've hit max validation attempts
-        const forceAccept = executionState.validationAttempts >= this.maxValidationAttempts;
-        if (forceAccept && !isAccepted) {
-          // Log warning that we're accepting due to max attempts
-          this.emit(WebAgentEventType.AGENT_STATUS, {
-            message: `Accepting answer after ${executionState.validationAttempts} validation attempts`,
+          const validationResult = validationResponse.toolResults[0].output as any;
+          const { taskAssessment, completionQuality, feedback } = validationResult;
+
+          // Emit validation event
+          this.emit(WebAgentEventType.TASK_VALIDATED, {
+            observation: taskAssessment,
+            completionQuality,
+            feedback,
             finalAnswer,
             iterationId: this.currentIterationId,
           });
+
+          span.setAttribute("pilo.validation.quality", completionQuality);
+
+          // Check if quality is acceptable
+          const isAccepted = completionQuality === "complete" || completionQuality === "excellent";
+
+          // If not accepted and we haven't hit max attempts, add feedback to conversation
+          if (!isAccepted && executionState.validationAttempts < this.maxValidationAttempts) {
+            // Build feedback message using the prompt function
+            const feedbackMessage = buildValidationFeedbackPrompt(
+              executionState.validationAttempts,
+              taskAssessment,
+              feedback,
+            );
+
+            this.messages.push({ role: "user", content: feedbackMessage });
+
+            // Emit event for debugging
+            this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+              errors: [`Validation failed: ${completionQuality}`],
+              retryCount: executionState.validationAttempts,
+              feedback: feedbackMessage,
+              iterationId: this.currentIterationId,
+            });
+          }
+
+          // Accept if quality is good OR we've hit max validation attempts
+          const forceAccept = executionState.validationAttempts >= this.maxValidationAttempts;
+          if (forceAccept && !isAccepted) {
+            // Log warning that we're accepting due to max attempts
+            this.emit(WebAgentEventType.AGENT_STATUS, {
+              message: `Accepting answer after ${executionState.validationAttempts} validation attempts`,
+              finalAnswer,
+              iterationId: this.currentIterationId,
+            });
+          }
+
+          span.setAttribute("pilo.validation.accepted", isAccepted || forceAccept);
+
+          return {
+            isAccepted: isAccepted || forceAccept,
+          };
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+
+          // On validation error, accept the result if we've hit max attempts
+          if (executionState.validationAttempts >= this.maxValidationAttempts) {
+            return { isAccepted: true };
+          }
+
+          // Otherwise, continue execution
+          this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
+            errors: [this.extractErrorMessage(error)],
+            retryCount: executionState.validationAttempts,
+            rawResponse: null,
+            iterationId: this.currentIterationId,
+          });
+
+          return { isAccepted: false };
         }
-
-        span.setAttribute("pilo.validation.accepted", isAccepted || forceAccept);
-
-        return {
-          isAccepted: isAccepted || forceAccept,
-        };
-      } catch (error) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
-        span.recordException(error instanceof Error ? error : new Error(String(error)));
-
-        // On validation error, accept the result if we've hit max attempts
-        if (executionState.validationAttempts >= this.maxValidationAttempts) {
-          return { isAccepted: true };
-        }
-
-        // Otherwise, continue execution
-        this.emit(WebAgentEventType.TASK_VALIDATION_ERROR, {
-          errors: [this.extractErrorMessage(error)],
-          retryCount: executionState.validationAttempts,
-          rawResponse: null,
-          iterationId: this.currentIterationId,
-        });
-
-        return { isAccepted: false };
-      }
-    } finally {
-      span.end();
-    }
+      },
+    );
   }
 
   /**
@@ -1298,99 +1317,105 @@ export class WebAgent {
    * When no startingUrl, the prompt instructs the planner to determine a url.
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.task.plan", {
-      attributes: {
-        "pilo.task": task,
-        ...(startingUrl && { "pilo.url": startingUrl }),
+    return withSpan(
+      "pilo.task.plan",
+      {
+        attributes: {
+          "pilo.task": task,
+          ...(startingUrl && { "pilo.url": startingUrl }),
+        },
       },
-    });
-
-    try {
-      const webSearchEnabled = this.searchProvider !== "none";
-      const planningPrompt = buildPlanPrompt(task, startingUrl, this.guardrails, webSearchEnabled);
-      const planningTools = createPlanningTools();
-
-      // Emit processing event before planning - planning doesn't use screenshots
-      this.emit(WebAgentEventType.AGENT_PROCESSING, {
-        operation: "Creating task plan",
-        hasScreenshot: false,
-        iterationId: this.currentIterationId || "planning",
-      });
-
-      // Also emit as status so extension ChatView shows it to user
-      this.emit(WebAgentEventType.AGENT_STATUS, {
-        message: "Creating task plan",
-        iterationId: this.currentIterationId || "planning",
-      });
-
-      try {
-        const planningResponse = await generateTextWithRetry(
-          {
-            ...this.providerConfig,
-            prompt: planningPrompt,
-            tools: planningTools,
-            toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
-            maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
-          },
-          {
-            maxAttempts: 3,
-            onRetry: (attempt, error) => {
-              const errorMsg = this.extractErrorMessage(error);
-              console.warn(`[WebAgent] Planning retry attempt ${attempt}/3 after error:`, errorMsg);
-              this.emit(WebAgentEventType.AGENT_STATUS, {
-                message: `Planning retry attempt ${attempt} after error: ${errorMsg}`,
-                iterationId: this.currentIterationId || "planning",
-              });
-            },
-          },
+      async (span) => {
+        const webSearchEnabled = this.searchProvider !== "none";
+        const planningPrompt = buildPlanPrompt(
+          task,
+          startingUrl,
+          this.guardrails,
+          webSearchEnabled,
         );
+        const planningTools = createPlanningTools();
 
-        if (!planningResponse.toolResults?.[0]) {
-          throw new Error("No tool results returned from planning");
-        }
-
-        // Cast to PlanningResponse - we've validated toolResults[0] exists above
-        const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(
-          planningResponse as unknown as PlanningResponse,
-        );
-
-        this.plan = plan;
-        this.successCriteria = successCriteria;
-        this.actionItems = actionItems;
-
-        // Determine starting point: user-provided URL > planner URL > blank
-        this.url = startingUrl || url || "about:blank";
-
-        this.emit(WebAgentEventType.AGENT_STATUS, {
-          message: "Task plan created",
-          plan: this.plan,
-          successCriteria: this.successCriteria,
-          url: this.url,
+        // Emit processing event before planning - planning doesn't use screenshots
+        this.emit(WebAgentEventType.AGENT_PROCESSING, {
+          operation: "Creating task plan",
+          hasScreenshot: false,
+          iterationId: this.currentIterationId || "planning",
         });
 
-        span.setAttribute("pilo.plan.has_url", !!this.url && this.url !== "about:blank");
-      } catch (error) {
-        const errorMsg = this.extractErrorMessage(error);
-        console.error(`[WebAgent] Failed to generate plan:`, errorMsg);
+        // Also emit as status so extension ChatView shows it to user
+        this.emit(WebAgentEventType.AGENT_STATUS, {
+          message: "Creating task plan",
+          iterationId: this.currentIterationId || "planning",
+        });
 
-        // Check if the error message already contains "Failed to generate plan" to avoid double-wrapping
-        if (errorMsg.includes("Failed to generate plan")) {
-          throw new Error(errorMsg);
-        } else {
-          throw new Error(`Failed to generate plan: ${errorMsg}`);
+        try {
+          const planningResponse = await generateTextWithRetry(
+            {
+              ...this.providerConfig,
+              prompt: planningPrompt,
+              tools: planningTools,
+              toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
+              maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
+            },
+            {
+              maxAttempts: 3,
+              onRetry: (attempt, error) => {
+                const errorMsg = this.extractErrorMessage(error);
+                console.warn(
+                  `[WebAgent] Planning retry attempt ${attempt}/3 after error:`,
+                  errorMsg,
+                );
+                this.emit(WebAgentEventType.AGENT_STATUS, {
+                  message: `Planning retry attempt ${attempt} after error: ${errorMsg}`,
+                  iterationId: this.currentIterationId || "planning",
+                });
+              },
+            },
+          );
+
+          if (!planningResponse.toolResults?.[0]) {
+            throw new Error("No tool results returned from planning");
+          }
+
+          // Cast to PlanningResponse - we've validated toolResults[0] exists above
+          const { plan, successCriteria, url, actionItems } = this.extractPlanOutput(
+            planningResponse as unknown as PlanningResponse,
+          );
+
+          this.plan = plan;
+          this.successCriteria = successCriteria;
+          this.actionItems = actionItems;
+
+          // Determine starting point: user-provided URL > planner URL > blank
+          this.url = startingUrl || url || "about:blank";
+
+          this.emit(WebAgentEventType.AGENT_STATUS, {
+            message: "Task plan created",
+            plan: this.plan,
+            successCriteria: this.successCriteria,
+            url: this.url,
+          });
+
+          span.setAttribute("pilo.plan.has_url", !!this.url && this.url !== "about:blank");
+        } catch (error) {
+          const errorMsg = this.extractErrorMessage(error);
+          console.error(`[WebAgent] Failed to generate plan:`, errorMsg);
+
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+
+          // Check if the error message already contains "Failed to generate plan" to avoid double-wrapping
+          if (errorMsg.includes("Failed to generate plan")) {
+            throw new Error(errorMsg);
+          } else {
+            throw new Error(`Failed to generate plan: ${errorMsg}`);
+          }
         }
-      }
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+      },
+    );
   }
 
   // === Helper Methods ===
@@ -1698,60 +1723,58 @@ export class WebAgent {
     error: BrowserDisconnectedError,
     executionState: ExecutionState,
   ): Promise<void> {
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.browser.reconnect");
+    return withSpan("pilo.browser.reconnect", {}, async (span) => {
+      try {
+        console.warn(`[WebAgent] Browser disconnected mid-task: ${error.message}`);
+        console.warn(`[WebAgent] Restarting on next CDP endpoint...`);
 
-    try {
-      console.warn(`[WebAgent] Browser disconnected mid-task: ${error.message}`);
-      console.warn(`[WebAgent] Restarting on next CDP endpoint...`);
+        await this.browser.shutdown();
 
-      await this.browser.shutdown();
+        // Throws a hard (non-RecoverableError) if all endpoints are exhausted
+        await this.browser.start();
 
-      // Throws a hard (non-RecoverableError) if all endpoints are exhausted
-      await this.browser.start();
+        // Navigate to the original starting URL — not currentPage.url.
+        // The new browser has no prior session state; we need a coherent starting point.
+        if (this.url && this.url !== "about:blank") {
+          await this.browser.goto(this.url);
+        }
 
-      // Navigate to the original starting URL — not currentPage.url.
-      // The new browser has no prior session state; we need a coherent starting point.
-      if (this.url && this.url !== "about:blank") {
-        await this.browser.goto(this.url);
+        // Re-initialize messages: stale DOM snapshots from the old browser would
+        // confuse the agent and may trigger false repetition-abort logic.
+        this.initializeSystemPromptAndTask(task);
+
+        // Reset repetition tracking to avoid false "stuck in loop" detection.
+        executionState.actionRepeatCount = 0;
+        executionState.lastAction = undefined;
+
+        // Refresh page state from the newly navigated browser.
+        await this.updatePageState();
+
+        const browserAny = this.browser as any;
+        const endpointIndex: number = browserAny.nextStartIndex ?? 0;
+        const total: number = browserAny.pwCdpEndpoints?.length ?? 0;
+
+        span.setAttribute("pilo.cdp.endpoint_index", endpointIndex);
+        span.setAttribute("pilo.cdp.total", total);
+
+        const data: Omit<BrowserReconnectedEventData, "timestamp" | "iterationId"> = {
+          startingUrl: this.url ?? "",
+          endpointIndex,
+          total,
+        };
+        this.emit(WebAgentEventType.BROWSER_RECONNECTED, data);
+      } catch (reconnectError) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message:
+            reconnectError instanceof Error ? reconnectError.message : String(reconnectError),
+        });
+        span.recordException(
+          reconnectError instanceof Error ? reconnectError : new Error(String(reconnectError)),
+        );
+        throw reconnectError;
       }
-
-      // Re-initialize messages: stale DOM snapshots from the old browser would
-      // confuse the agent and may trigger false repetition-abort logic.
-      this.initializeSystemPromptAndTask(task);
-
-      // Reset repetition tracking to avoid false "stuck in loop" detection.
-      executionState.actionRepeatCount = 0;
-      executionState.lastAction = undefined;
-
-      // Refresh page state from the newly navigated browser.
-      await this.updatePageState();
-
-      const browserAny = this.browser as any;
-      const endpointIndex: number = browserAny.nextStartIndex ?? 0;
-      const total: number = browserAny.pwCdpEndpoints?.length ?? 0;
-
-      span.setAttribute("pilo.cdp.endpoint_index", endpointIndex);
-      span.setAttribute("pilo.cdp.total", total);
-
-      const data: Omit<BrowserReconnectedEventData, "timestamp" | "iterationId"> = {
-        startingUrl: this.url ?? "",
-        endpointIndex,
-        total,
-      };
-      this.emit(WebAgentEventType.BROWSER_RECONNECTED, data);
-    } catch (reconnectError) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: reconnectError instanceof Error ? reconnectError.message : String(reconnectError),
-      });
-      span.recordException(
-        reconnectError instanceof Error ? reconnectError : new Error(String(reconnectError)),
-      );
-      throw reconnectError;
-    } finally {
-      span.end();
-    }
+    });
   }
 
   private emit(type: WebAgentEventType, data: any): void {
