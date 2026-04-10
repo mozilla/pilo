@@ -12,7 +12,7 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
-import { getTracer, SpanStatusCode } from "../telemetry/tracing.js";
+import { withSpan, SpanStatusCode } from "../telemetry/tracing.js";
 
 /**
  * Check if an error is retryable
@@ -80,21 +80,18 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   params: Parameters<typeof generateText<TOOLS>>[0],
   retryOptions?: RetryOptions,
 ): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
-  const tracer = await getTracer();
-  const span = tracer.startSpan("pilo.ai.generate");
+  return withSpan("pilo.ai.generate", {}, async (span) => {
+    const {
+      maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
+      initialDelay = DEFAULT_RETRY_INITIAL_DELAY_MS,
+      maxDelay = DEFAULT_RETRY_MAX_DELAY_MS,
+      backoffFactor = DEFAULT_RETRY_BACKOFF_FACTOR,
+      onRetry,
+    } = retryOptions || {};
 
-  const {
-    maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
-    initialDelay = DEFAULT_RETRY_INITIAL_DELAY_MS,
-    maxDelay = DEFAULT_RETRY_MAX_DELAY_MS,
-    backoffFactor = DEFAULT_RETRY_BACKOFF_FACTOR,
-    onRetry,
-  } = retryOptions || {};
+    let lastError: unknown;
+    let delay = initialDelay;
 
-  let lastError: unknown;
-  let delay = initialDelay;
-
-  try {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const result = await generateText(params);
@@ -120,6 +117,12 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
             statusCode,
             attempt,
           });
+          span.setAttribute("pilo.ai.attempts", attempt);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: errorMessage,
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
           throw error;
         }
 
@@ -158,16 +161,12 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
       willThrow: true,
     });
 
-    throw lastError;
-  } catch (error) {
-    span.setAttribute("pilo.ai.attempts", retryOptions?.maxAttempts || DEFAULT_RETRY_MAX_ATTEMPTS);
+    span.setAttribute("pilo.ai.attempts", maxAttempts);
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
     });
-    span.recordException(error instanceof Error ? error : new Error(String(error)));
-    throw error;
-  } finally {
-    span.end();
-  }
+    span.recordException(lastError instanceof Error ? lastError : new Error(String(lastError)));
+    throw lastError;
+  });
 }
