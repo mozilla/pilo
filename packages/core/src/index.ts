@@ -22,7 +22,7 @@ export { OTelMetricsLogger } from "./loggers/otelMetrics.js";
 export { SecretsRedactor } from "./loggers/secretsRedactor.js";
 
 // Telemetry
-export { getTracer, getOTelApi, SpanStatusCode } from "./telemetry/tracing.js";
+export { getTracer, getOTelApi, SpanStatusCode, withSpan } from "./telemetry/tracing.js";
 
 // Configuration and Provider System
 export {

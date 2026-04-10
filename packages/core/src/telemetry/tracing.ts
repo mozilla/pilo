@@ -111,3 +111,46 @@ export async function getTracer(name = "pilo-core", version?: string): Promise<T
   cachedTracers.set(key, tracer);
   return tracer;
 }
+
+/**
+ * Execute a function within a traced span. The span is automatically:
+ * - Created as a child of the currently active span (if any)
+ * - Set as the active span so nested withSpan calls become children
+ * - Ended when the function completes (success or error)
+ *
+ * The callback receives the span for setting attributes or recording errors.
+ * withSpan does NOT automatically record errors — the callback manages that.
+ */
+export async function withSpan<T>(
+  name: string,
+  options: { attributes?: Record<string, string | number | boolean> },
+  fn: (span: Span) => Promise<T>,
+): Promise<T> {
+  const api = await resolveOTelApi();
+
+  if (!api) {
+    // No OTel — run callback with no-op span, zero overhead
+    const span = makeNoOpSpan();
+    try {
+      return await fn(span);
+    } finally {
+      span.end();
+    }
+  }
+
+  const tracer = await getTracer();
+  // startSpan automatically uses context.active() to find the parent
+  const span = tracer.startSpan(name, options);
+  // Set this span as active so children created inside fn() become our children.
+  // Cast: tracer.startSpan() returns a full OTel Span at runtime; the local
+  // Span interface is an intentionally narrow subset.
+  const ctx = api.trace.setSpan(api.context.active(), span as any);
+
+  return api.context.with(ctx, async () => {
+    try {
+      return await fn(span);
+    } finally {
+      span.end();
+    }
+  });
+}
