@@ -7,6 +7,11 @@ vi.mock("../src/telemetry/tracing.js", () => ({
 
 import { getOTelApi } from "../src/telemetry/tracing.js";
 import { OTelMetricsLogger } from "../src/loggers/otelMetrics.js";
+import type { Logger } from "../src/loggers/types.js";
+
+function makeMockLogger(): Logger {
+  return { initialize: vi.fn(), dispose: vi.fn() };
+}
 
 function makeMockMeter() {
   const counters = new Map<string, { add: ReturnType<typeof vi.fn> }>();
@@ -53,7 +58,7 @@ describe("OTelMetricsLogger integration: full task lifecycle", () => {
       metrics: { getMeter: vi.fn(() => meter) },
     } as any);
 
-    logger = new OTelMetricsLogger();
+    logger = new OTelMetricsLogger(makeMockLogger());
     emitter = new WebAgentEventEmitter();
     await logger.initialize(emitter);
   });

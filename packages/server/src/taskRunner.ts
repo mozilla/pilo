@@ -9,6 +9,7 @@ import {
   getAIProviderInfo,
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
+  OTelMetricsLogger,
 } from "pilo-core";
 import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
 import { StreamLogger } from "./StreamLogger.js";
@@ -215,10 +216,12 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
 
   const browser = new PlaywrightBrowser(browserConfig);
 
-  const logger = new StreamLogger({
-    sendEvent,
-    includeScreenshotImages: body.includeScreenshotImages ?? false,
-  });
+  const logger = new OTelMetricsLogger(
+    new StreamLogger({
+      sendEvent,
+      includeScreenshotImages: body.includeScreenshotImages ?? false,
+    }),
+  );
 
   const providerConfig = createAIProvider({
     provider: body.provider,

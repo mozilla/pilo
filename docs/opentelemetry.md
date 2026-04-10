@@ -57,10 +57,10 @@ import { WebAgent, PlaywrightBrowser } from "@tabstack/pilo";
 
 ## Using OTelMetricsLogger
 
-Pilo's `OTelMetricsLogger` bridges WebAgent lifecycle events into OTel counters and histograms. Pass it as the `logger` option when creating a `WebAgent`:
+Pilo's `OTelMetricsLogger` bridges WebAgent lifecycle events into OTel counters and histograms. It wraps any existing logger so metrics collection runs alongside normal logging:
 
 ```typescript
-import { WebAgent, PlaywrightBrowser, OTelMetricsLogger } from "@tabstack/pilo";
+import { WebAgent, PlaywrightBrowser, OTelMetricsLogger, ConsoleLogger } from "@tabstack/pilo";
 
 const browser = new PlaywrightBrowser({
   /* ... */
@@ -72,13 +72,13 @@ const agent = new WebAgent({
   provider: "openrouter",
   model: "anthropic/claude-sonnet-4-20250514",
   apiKey: process.env.OPENROUTER_API_KEY!,
-  logger: new OTelMetricsLogger(),
+  logger: new OTelMetricsLogger(new ConsoleLogger()),
 });
 
 const result = await agent.execute("Search for Pilo on npm");
 ```
 
-When `@opentelemetry/api` is not installed, `OTelMetricsLogger` becomes inert — no listeners are registered and no overhead is incurred.
+When `@opentelemetry/api` is not installed, `OTelMetricsLogger` becomes inert — no OTel instruments are created, no event listeners are subscribed — but the wrapped logger continues to work normally.
 
 ## What Gets Instrumented
 

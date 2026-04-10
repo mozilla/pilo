@@ -16,6 +16,7 @@ import {
   type CdpEndpointCycleEventData,
   type TaskValidationEventData,
 } from "../events.js";
+import { LoggerWrapper } from "./wrapper.js";
 import type { Logger } from "./types.js";
 
 interface Counter {
@@ -28,11 +29,11 @@ interface Histogram {
 
 /**
  * OTelMetricsLogger bridges WebAgent events into OpenTelemetry counters and histograms.
+ * Wraps another logger (e.g. StreamLogger, ConsoleLogger) so metrics collection
+ * runs alongside normal logging without replacing it.
  * Becomes inert (no subscriptions, no overhead) when @opentelemetry/api is not available.
  */
-export class OTelMetricsLogger implements Logger {
-  private emitter: WebAgentEventEmitter | null = null;
-
+export class OTelMetricsLogger extends LoggerWrapper {
   // Common attributes captured from TASK_SETUP
   private commonAttrs: Record<string, string> = {};
 
@@ -59,14 +60,17 @@ export class OTelMetricsLogger implements Logger {
   private cdpEndpointCycles: Counter | null = null;
   private validationQuality: Counter | null = null;
 
+  constructor(wrappedLogger: Logger) {
+    super(wrappedLogger);
+  }
+
   async initialize(emitter: WebAgentEventEmitter): Promise<void> {
-    if (this.emitter) {
-      this.dispose();
-    }
-    this.emitter = emitter;
     this.commonAttrs = {};
     this.taskSetupTimestamp = null;
     this.actionStartTimestamps.clear();
+
+    // Always initialize the wrapped logger, even if OTel is unavailable
+    super.initialize(emitter);
 
     const api = await getOTelApi();
     if (!api) {
@@ -189,10 +193,10 @@ export class OTelMetricsLogger implements Logger {
       this.emitter.offEvent(WebAgentEventType.TASK_VALIDATED, this.handleTaskValidated);
     }
 
-    this.emitter = null;
     this.commonAttrs = {};
     this.taskSetupTimestamp = null;
     this.actionStartTimestamps.clear();
+    super.dispose();
   }
 
   private handleTaskSetup = (data: TaskSetupEventData): void => {

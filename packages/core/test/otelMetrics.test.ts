@@ -8,6 +8,11 @@ vi.mock("../src/telemetry/tracing.js", () => ({
 
 import { getOTelApi } from "../src/telemetry/tracing.js";
 import { OTelMetricsLogger } from "../src/loggers/otelMetrics.js";
+import type { Logger } from "../src/loggers/types.js";
+
+function makeMockLogger(): Logger {
+  return { initialize: vi.fn(), dispose: vi.fn() };
+}
 
 function makeMockMeter() {
   const counters = new Map<string, { add: ReturnType<typeof vi.fn> }>();
@@ -49,7 +54,7 @@ describe("OTelMetricsLogger (OTel available)", () => {
     const mockApi = makeMockApi(mockMeter);
     vi.mocked(getOTelApi).mockResolvedValue(mockApi as any);
 
-    logger = new OTelMetricsLogger();
+    logger = new OTelMetricsLogger(makeMockLogger());
     emitter = new WebAgentEventEmitter();
     await logger.initialize(emitter);
   });
@@ -58,7 +63,7 @@ describe("OTelMetricsLogger (OTel available)", () => {
     const freshMeter = makeMockMeter();
     const mockApi = makeMockApi(freshMeter);
     vi.mocked(getOTelApi).mockResolvedValue(mockApi as any);
-    const freshLogger = new OTelMetricsLogger();
+    const freshLogger = new OTelMetricsLogger(makeMockLogger());
     const freshEmitter = new WebAgentEventEmitter();
     await freshLogger.initialize(freshEmitter);
     expect(mockApi.metrics.getMeter).toHaveBeenCalledWith("pilo-core");
@@ -488,7 +493,7 @@ describe("OTelMetricsLogger (OTel available)", () => {
   });
 
   it("is safe to call dispose without initializing", () => {
-    const uninitializedLogger = new OTelMetricsLogger();
+    const uninitializedLogger = new OTelMetricsLogger(makeMockLogger());
     expect(() => uninitializedLogger.dispose()).not.toThrow();
   });
 });
@@ -499,7 +504,7 @@ describe("OTelMetricsLogger (OTel unavailable)", () => {
   });
 
   it("becomes inert when getOTelApi returns undefined", async () => {
-    const logger = new OTelMetricsLogger();
+    const logger = new OTelMetricsLogger(makeMockLogger());
     const emitter = new WebAgentEventEmitter();
 
     await logger.initialize(emitter);
@@ -532,11 +537,42 @@ describe("OTelMetricsLogger (OTel unavailable)", () => {
   });
 
   it("dispose is safe when inert", async () => {
-    const logger = new OTelMetricsLogger();
+    const logger = new OTelMetricsLogger(makeMockLogger());
     const emitter = new WebAgentEventEmitter();
     await logger.initialize(emitter);
 
     expect(() => logger.dispose()).not.toThrow();
+  });
+});
+
+describe("OTelMetricsLogger (wrapped logger delegation)", () => {
+  it("initializes and disposes the wrapped logger", async () => {
+    const wrappedLogger = makeMockLogger();
+    vi.mocked(getOTelApi).mockResolvedValue(undefined);
+
+    const logger = new OTelMetricsLogger(wrappedLogger);
+    const emitter = new WebAgentEventEmitter();
+    await logger.initialize(emitter);
+
+    expect(wrappedLogger.initialize).toHaveBeenCalledWith(emitter);
+
+    logger.dispose();
+    expect(wrappedLogger.dispose).toHaveBeenCalled();
+  });
+
+  it("delegates to wrapped logger even when OTel is available", async () => {
+    const wrappedLogger = makeMockLogger();
+    const mockMeter = makeMockMeter();
+    vi.mocked(getOTelApi).mockResolvedValue(makeMockApi(mockMeter) as any);
+
+    const logger = new OTelMetricsLogger(wrappedLogger);
+    const emitter = new WebAgentEventEmitter();
+    await logger.initialize(emitter);
+
+    expect(wrappedLogger.initialize).toHaveBeenCalledWith(emitter);
+
+    logger.dispose();
+    expect(wrappedLogger.dispose).toHaveBeenCalled();
   });
 });
 
