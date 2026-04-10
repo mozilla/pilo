@@ -26,7 +26,7 @@ import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../config/defaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
-import { getTracer, SpanStatusCode } from "../telemetry/tracing.js";
+import { withSpan, SpanStatusCode } from "../telemetry/tracing.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -339,22 +339,25 @@ export class PlaywrightBrowser implements AriaBrowser {
    */
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.browser.navigate", {
-      attributes: { "pilo.browser.url": url },
-    });
-    try {
-      await this.executeNavigationWithRetry((timeoutMs) => this.performGoto(url, timeoutMs), url);
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+    return withSpan(
+      "pilo.browser.navigate",
+      { attributes: { "pilo.browser.url": url } },
+      async (span) => {
+        try {
+          await this.executeNavigationWithRetry(
+            (timeoutMs) => this.performGoto(url, timeoutMs),
+            url,
+          );
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          throw error;
+        }
+      },
+    );
   }
 
   /**
@@ -567,27 +570,24 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.browser.snapshot");
-
-    try {
-      return await this.getTreeWithRefsImpl();
-    } catch (error) {
-      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
-        const disconnectError = new BrowserDisconnectedError(error.message);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-        span.recordException(disconnectError);
-        throw disconnectError;
+    return withSpan("pilo.browser.snapshot", {}, async (span) => {
+      try {
+        return await this.getTreeWithRefsImpl();
+      } catch (error) {
+        if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+          const disconnectError = new BrowserDisconnectedError(error.message);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          span.recordException(disconnectError);
+          throw disconnectError;
+        }
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        throw error;
       }
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+    });
   }
 
   private async getTreeWithRefsImpl(): Promise<string> {
@@ -697,57 +697,54 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     if (!this.page) throw new Error("Browser not started");
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.browser.screenshot");
-
-    try {
-      // Apply SoM overlay before screenshot if requested.
-      // Failures are non-fatal — a plain screenshot is still useful.
-      if (options?.withMarks) {
-        try {
-          await this.page.evaluate(() => {
-            const win = window as any;
-            win.__piloAriaTree?.applySetOfMarks?.();
-          });
-        } catch {
-          // Can fail if page navigated or ariaTree bundle wasn't injected yet
-        }
-      }
-
+    return withSpan("pilo.browser.screenshot", {}, async (span) => {
       try {
-        return await this.page.screenshot({
-          fullPage: true,
-          type: "jpeg",
-          quality: 80,
-          scale: "css",
-        });
-      } catch (error) {
-        if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
-          throw new BrowserDisconnectedError(error.message);
-        }
-        throw error;
-      } finally {
+        // Apply SoM overlay before screenshot if requested.
+        // Failures are non-fatal — a plain screenshot is still useful.
         if (options?.withMarks) {
           try {
-            await this.page.evaluate(() => {
+            await this.page!.evaluate(() => {
               const win = window as any;
-              win.__piloAriaTree?.removeSetOfMarks?.();
+              win.__piloAriaTree?.applySetOfMarks?.();
             });
           } catch {
-            // Page may have navigated between screenshot and cleanup
+            // Can fail if page navigated or ariaTree bundle wasn't injected yet
           }
         }
+
+        try {
+          return await this.page!.screenshot({
+            fullPage: true,
+            type: "jpeg",
+            quality: 80,
+            scale: "css",
+          });
+        } catch (error) {
+          if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+            throw new BrowserDisconnectedError(error.message);
+          }
+          throw error;
+        } finally {
+          if (options?.withMarks) {
+            try {
+              await this.page!.evaluate(() => {
+                const win = window as any;
+                win.__piloAriaTree?.removeSetOfMarks?.();
+              });
+            } catch {
+              // Page may have navigated between screenshot and cleanup
+            }
+          }
+        }
+      } catch (error) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        throw error;
       }
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+    });
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {
@@ -788,151 +785,155 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
-    const tracer = await getTracer();
-    const span = tracer.startSpan("pilo.browser.perform", {
-      attributes: {
-        "pilo.browser.action_type": String(action),
-        ...(ref && { "pilo.browser.element_ref": ref }),
+    return withSpan(
+      "pilo.browser.perform",
+      {
+        attributes: {
+          "pilo.browser.action_type": String(action),
+          ...(ref && { "pilo.browser.element_ref": ref }),
+        },
       },
-    });
+      async (span) => {
+        try {
+          try {
+            // Always validate ref for any action that uses it
+            // This ensures consistent error messages and early validation
+            let locator: Locator | null = null;
 
-    try {
-      try {
-        // Always validate ref for any action that uses it
-        // This ensures consistent error messages and early validation
-        let locator: Locator | null = null;
+            // Check if this action requires an element ref
+            const requiresElement = this.actionRequiresElement(action);
 
-        // Check if this action requires an element ref
-        const requiresElement = this.actionRequiresElement(action);
-
-        if (requiresElement) {
-          // Validate and get the locator
-          locator = await this.validateElementRef(ref);
-          // Scroll element into view so developers can follow along in headed mode
-          await locator.scrollIntoViewIfNeeded({ timeout: this.actionTimeoutMs });
-        }
-
-        switch (action) {
-          // Element interactions
-          case PageAction.Click:
-            await locator!.click({ timeout: this.actionTimeoutMs });
-            // Ensure page is usable after click that may cause navigation
-            await this.ensureOptimizedPageLoad();
-            break;
-
-          case PageAction.Hover:
-            await locator!.hover({ timeout: this.actionTimeoutMs });
-            break;
-
-          case PageAction.Fill:
-            if (!value) throw new BrowserActionException("fill", "Value required for fill action");
-            await locator!.fill(value, { timeout: this.actionTimeoutMs });
-            break;
-
-          case PageAction.Focus:
-            await locator!.focus({ timeout: this.actionTimeoutMs });
-            break;
-
-          case PageAction.Check:
-            await locator!.check({ timeout: this.actionTimeoutMs });
-            break;
-
-          case PageAction.Uncheck:
-            await locator!.uncheck({ timeout: this.actionTimeoutMs });
-            break;
-
-          case PageAction.Select:
-            if (!value)
-              throw new BrowserActionException("select", "Value required for select action");
-            await locator!.selectOption(value, {
-              timeout: this.actionTimeoutMs,
-            });
-            // Forms might trigger page reloads on select
-            await this.ensureOptimizedPageLoad();
-            break;
-
-          case PageAction.Enter:
-            await locator!.press("Enter", { timeout: this.actionTimeoutMs });
-            // Forms might trigger page reloads on enter
-            await this.ensureOptimizedPageLoad();
-            break;
-
-          // Navigation and workflow (these don't need element refs)
-          case PageAction.Wait:
-            if (!value) throw new BrowserActionException("wait", "Value required for wait action");
-            const seconds = parseInt(value, 10);
-            if (isNaN(seconds) || seconds < 0) {
-              throw new BrowserActionException(
-                "wait",
-                `Invalid wait time: ${value}. Must be a positive number.`,
-              );
+            if (requiresElement) {
+              // Validate and get the locator
+              locator = await this.validateElementRef(ref);
+              // Scroll element into view so developers can follow along in headed mode
+              await locator.scrollIntoViewIfNeeded({ timeout: this.actionTimeoutMs });
             }
-            await this.page.waitForTimeout(seconds * 1000);
-            break;
 
-          case PageAction.Goto:
-            if (!value) throw new BrowserActionException("goto", "URL required for goto action");
-            if (!value.trim()) throw new BrowserActionException("goto", "URL cannot be empty");
-            await this.goto(value.trim());
-            // Note: goto already calls ensureOptimizedPageLoad internally
-            break;
+            switch (action) {
+              // Element interactions
+              case PageAction.Click:
+                await locator!.click({ timeout: this.actionTimeoutMs });
+                // Ensure page is usable after click that may cause navigation
+                await this.ensureOptimizedPageLoad();
+                break;
 
-          case PageAction.Back:
-            await this.goBack();
-            // Note: goBack already calls ensureOptimizedPageLoad internally
-            break;
+              case PageAction.Hover:
+                await locator!.hover({ timeout: this.actionTimeoutMs });
+                break;
 
-          case PageAction.Forward:
-            await this.goForward();
-            // Note: goForward already calls ensureOptimizedPageLoad internally
-            break;
+              case PageAction.Fill:
+                if (!value)
+                  throw new BrowserActionException("fill", "Value required for fill action");
+                await locator!.fill(value, { timeout: this.actionTimeoutMs });
+                break;
 
-          case PageAction.Extract:
-            // Extract is handled at a higher level in the automation flow
-            // The browser implementation doesn't need to do anything
-            break;
+              case PageAction.Focus:
+                await locator!.focus({ timeout: this.actionTimeoutMs });
+                break;
 
-          case PageAction.Abort:
-            // Abort is handled at a higher level in the automation flow
-            // The browser implementation doesn't need to do anything
-            break;
+              case PageAction.Check:
+                await locator!.check({ timeout: this.actionTimeoutMs });
+                break;
 
-          case PageAction.Done:
-            // This is a no-op in the browser implementation
-            // It's handled at a higher level in the automation flow
-            break;
+              case PageAction.Uncheck:
+                await locator!.uncheck({ timeout: this.actionTimeoutMs });
+                break;
 
-          default:
-            throw new BrowserActionException(String(action), `Unsupported action: ${action}`);
-        }
-      } catch (error) {
-        // Re-throw browser exceptions as-is
-        if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+              case PageAction.Select:
+                if (!value)
+                  throw new BrowserActionException("select", "Value required for select action");
+                await locator!.selectOption(value, {
+                  timeout: this.actionTimeoutMs,
+                });
+                // Forms might trigger page reloads on select
+                await this.ensureOptimizedPageLoad();
+                break;
+
+              case PageAction.Enter:
+                await locator!.press("Enter", { timeout: this.actionTimeoutMs });
+                // Forms might trigger page reloads on enter
+                await this.ensureOptimizedPageLoad();
+                break;
+
+              // Navigation and workflow (these don't need element refs)
+              case PageAction.Wait:
+                if (!value)
+                  throw new BrowserActionException("wait", "Value required for wait action");
+                const seconds = parseInt(value, 10);
+                if (isNaN(seconds) || seconds < 0) {
+                  throw new BrowserActionException(
+                    "wait",
+                    `Invalid wait time: ${value}. Must be a positive number.`,
+                  );
+                }
+                await this.page!.waitForTimeout(seconds * 1000);
+                break;
+
+              case PageAction.Goto:
+                if (!value)
+                  throw new BrowserActionException("goto", "URL required for goto action");
+                if (!value.trim()) throw new BrowserActionException("goto", "URL cannot be empty");
+                await this.goto(value.trim());
+                // Note: goto already calls ensureOptimizedPageLoad internally
+                break;
+
+              case PageAction.Back:
+                await this.goBack();
+                // Note: goBack already calls ensureOptimizedPageLoad internally
+                break;
+
+              case PageAction.Forward:
+                await this.goForward();
+                // Note: goForward already calls ensureOptimizedPageLoad internally
+                break;
+
+              case PageAction.Extract:
+                // Extract is handled at a higher level in the automation flow
+                // The browser implementation doesn't need to do anything
+                break;
+
+              case PageAction.Abort:
+                // Abort is handled at a higher level in the automation flow
+                // The browser implementation doesn't need to do anything
+                break;
+
+              case PageAction.Done:
+                // This is a no-op in the browser implementation
+                // It's handled at a higher level in the automation flow
+                break;
+
+              default:
+                throw new BrowserActionException(String(action), `Unsupported action: ${action}`);
+            }
+          } catch (error) {
+            // Re-throw browser exceptions as-is
+            if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+              throw error;
+            }
+
+            // Surface browser disconnects distinctly so WebAgent can trigger a restart
+            if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+              throw new BrowserDisconnectedError(error.message);
+            }
+
+            // Wrap other errors
+            throw new BrowserActionException(
+              String(action),
+              `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
+              { originalError: error },
+            );
+          }
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
           throw error;
         }
-
-        // Surface browser disconnects distinctly so WebAgent can trigger a restart
-        if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
-          throw new BrowserDisconnectedError(error.message);
-        }
-
-        // Wrap other errors
-        throw new BrowserActionException(
-          String(action),
-          `Failed to perform action: ${error instanceof Error ? error.message : String(error)}`,
-          { originalError: error },
-        );
-      }
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    } finally {
-      span.end();
-    }
+      },
+    );
   }
 
   /**
