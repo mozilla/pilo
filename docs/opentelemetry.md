@@ -19,13 +19,21 @@ npm install @opentelemetry/api @opentelemetry/sdk-node \
 | Variable                      | Required          | Default | Description                                            |
 | ----------------------------- | ----------------- | ------- | ------------------------------------------------------ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes (to activate) | —       | OTLP collector endpoint (e.g. `http://localhost:4318`) |
-| `OTEL_SERVICE_NAME`           | No                | `pilo`  | Service name in traces                                 |
+| `OTEL_SERVICE_NAME`           | No                | `pilo` / `pilo-cli` | Service name in traces (default depends on entry point) |
 
 If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, telemetry is completely disabled.
 
-### 3. Initialize the SDK (server usage)
+### 3. Initialize the SDK (server and CLI usage)
 
-If you are using `pilo-server`, telemetry is initialized automatically at startup — no code changes needed. Just set the environment variables above.
+Both `pilo-server` and `pilo-cli` initialize telemetry automatically at startup — no code changes needed. Just set the environment variables above.
+
+```bash
+# Server
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 pnpm run dev:server
+
+# CLI
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 pnpm pilo run "your task"
+```
 
 For custom Node.js applications, initialize the SDK **before** importing Pilo:
 
@@ -116,7 +124,11 @@ docker compose up -d
 Then run Pilo with:
 
 ```bash
+# Server
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 pnpm run dev:server
+
+# CLI
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 pnpm pilo run "your task"
 ```
 
 Open http://localhost:16686 to view traces in the Jaeger UI.
@@ -140,12 +152,23 @@ Open http://localhost:16686 to view traces in the Jaeger UI.
 │  pilo-server                                        │
 │                                                     │
 │  initTelemetry()                                    │
-│    └── NodeSDK + OTLP trace exporter                │
+│    └── NodeSDK + OTLP trace + metrics exporters     │
 │         (activates only if OTEL_EXPORTER_OTLP_      │
 │          ENDPOINT is set)                           │
 │                                                     │
 │  withRemoteContext()                                │
 │    └── Extracts W3C traceparent from incoming       │
 │         requests for distributed tracing            │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  pilo-cli                                           │
+│                                                     │
+│  initTelemetry()                                    │
+│    └── NodeSDK + OTLP trace exporter                │
+│         (activates only if OTEL_EXPORTER_OTLP_      │
+│          ENDPOINT is set)                           │
+│                                                     │
+│  Flushes spans on exit (await sdk.shutdown())       │
 └─────────────────────────────────────────────────────┘
 ```

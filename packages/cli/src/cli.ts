@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { initTelemetry } from "./telemetry.js";
 import { Command } from "commander";
 import { createRunCommand } from "./commands/run.js";
 import { createConfigCommand } from "./commands/config.js";
@@ -7,12 +8,8 @@ import { createExamplesCommand } from "./commands/examples.js";
 import { createExtensionCommand } from "./commands/extension.js";
 import { getPackageInfo } from "./utils.js";
 
-/**
- * Pilo CLI - AI-powered web automation tool
- *
- * This is the main entry point for the Pilo command-line interface.
- * It sets up the commander.js program and registers all available commands.
- */
+// Initialize OTel SDK before any pilo-core usage
+const shutdownTelemetry = initTelemetry();
 
 // Get package information
 const packageInfo = getPackageInfo();
@@ -36,5 +33,8 @@ program.addCommand(createConfigCommand());
 program.addCommand(createExamplesCommand());
 program.addCommand(createExtensionCommand());
 
-// Parse command line arguments
-program.parse();
+// Parse command line arguments and flush telemetry on exit
+await program.parseAsync();
+if (shutdownTelemetry) {
+  await shutdownTelemetry();
+}
