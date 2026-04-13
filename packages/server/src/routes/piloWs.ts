@@ -19,6 +19,7 @@
 import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
+import { withRemoteContext } from "pilo-core";
 import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
@@ -46,7 +47,14 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
 
   piloWs.get(
     "/run",
-    upgradeWebSocket((_c) => {
+    upgradeWebSocket((c) => {
+      // Capture W3C trace context headers from the WebSocket upgrade request
+      // so that task execution joins the caller's distributed trace.
+      const traceHeaders = {
+        traceparent: c.req.header("traceparent"),
+        tracestate: c.req.header("tracestate"),
+      };
+
       const abortController = new AbortController();
       const pendingRequests = new Map<string, PendingRequest>();
       let taskRunning = false;
@@ -103,17 +111,19 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               });
             };
 
-            // Run task asynchronously
+            // Run task asynchronously within the caller's trace context (if any).
             (async () => {
               try {
-                const result = await runTask({
-                  body,
-                  sendEvent: async (event, data) => {
-                    send(ws, event, data);
-                  },
-                  abortSignal: abortController.signal,
-                  onUserDataRequired,
-                });
+                const result = await withRemoteContext(traceHeaders, () =>
+                  runTask({
+                    body,
+                    sendEvent: async (event, data) => {
+                      send(ws, event, data);
+                    },
+                    abortSignal: abortController.signal,
+                    onUserDataRequired,
+                  }),
+                );
 
                 await send(ws, "complete", result);
               } catch (error) {
