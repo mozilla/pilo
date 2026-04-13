@@ -113,6 +113,31 @@ export async function getTracer(name = "pilo-core", version?: string): Promise<T
 }
 
 /**
+ * Run a function within a trace context extracted from incoming HTTP headers
+ * (e.g. a WebSocket upgrade request). Any spans created inside `fn` via
+ * `withSpan` will automatically become children of the remote parent.
+ *
+ * When @opentelemetry/api is not installed or the headers are empty,
+ * the function runs directly with zero overhead.
+ */
+export async function withRemoteContext<T>(
+  headers: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const api = await resolveOTelApi();
+  if (!api) return fn();
+
+  // Build a carrier with only defined values for the propagator.
+  const carrier: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (v) carrier[k] = v;
+  }
+
+  const ctx = api.propagation.extract(api.context.active(), carrier);
+  return api.context.with(ctx, fn);
+}
+
+/**
  * Execute a function within a traced span. The span is automatically:
  * - Created as a child of the currently active span (if any)
  * - Set as the active span so nested withSpan calls become children
