@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
-import { withSpan } from "../telemetry/tracing.js";
+import { withSpan, SpanName } from "../telemetry/tracing.js";
 
 interface SearchToolContext {
   searchService: SearchService;
@@ -26,7 +26,7 @@ export function createSearchTools(context: SearchToolContext) {
       }),
       execute: async ({ query }) => {
         return withSpan(
-          "pilo.search.execute",
+          SpanName.SEARCH_EXECUTE,
           { attributes: { "pilo.search.query": query } },
           async (span) => {
             context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {

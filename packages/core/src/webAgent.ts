@@ -48,7 +48,7 @@ import {
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
 } from "./constants.js";
-import { withSpan, SpanStatusCode } from "./telemetry/tracing.js";
+import { withSpan, SpanStatusCode, SpanName } from "./telemetry/tracing.js";
 
 // === Type Definitions ===
 
@@ -281,7 +281,7 @@ export class WebAgent {
    */
   async execute(task: string, options: ExecuteOptions = {}): Promise<TaskExecutionResult> {
     return withSpan(
-      "pilo.task.execute",
+      SpanName.TASK_EXECUTE,
       {
         attributes: {
           "pilo.task": task,
@@ -472,7 +472,7 @@ export class WebAgent {
       this.currentIterationId = nanoid(8);
 
       const outcome: StepOutcome = await withSpan(
-        "pilo.agent.step",
+        SpanName.AGENT_STEP,
         {
           attributes: {
             "pilo.step.number": executionState.currentIteration,
@@ -838,7 +838,7 @@ export class WebAgent {
     let generationError: Error | null = null;
 
     const aiResponse: ProcessedAIResponse | null = await withSpan(
-      "pilo.ai.generate",
+      SpanName.AI_GENERATE,
       {},
       async (aiSpan) => {
         try {
@@ -1152,7 +1152,7 @@ export class WebAgent {
     executionState.validationAttempts++;
 
     return withSpan(
-      "pilo.task.validate",
+      SpanName.TASK_VALIDATE,
       {
         attributes: { "pilo.validation.attempt": executionState.validationAttempts },
       },
@@ -1318,7 +1318,7 @@ export class WebAgent {
    */
   private async planTask(task: string, startingUrl?: string): Promise<void> {
     return withSpan(
-      "pilo.task.plan",
+      SpanName.TASK_PLAN,
       {
         attributes: {
           "pilo.task": task,
@@ -1723,7 +1723,7 @@ export class WebAgent {
     error: BrowserDisconnectedError,
     executionState: ExecutionState,
   ): Promise<void> {
-    return withSpan("pilo.browser.reconnect", {}, async (span) => {
+    return withSpan(SpanName.BROWSER_RECONNECT, {}, async (span) => {
       try {
         console.warn(`[WebAgent] Browser disconnected mid-task: ${error.message}`);
         console.warn(`[WebAgent] Restarting on next CDP endpoint...`);

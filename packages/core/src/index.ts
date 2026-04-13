@@ -25,6 +25,7 @@ export {
   getTracer,
   getOTelApi,
   SpanStatusCode,
+  SpanName,
   withSpan,
   withRemoteContext,
 } from "./telemetry/tracing.js";

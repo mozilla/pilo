@@ -26,7 +26,7 @@ import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../config/defaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
-import { withSpan, SpanStatusCode } from "../telemetry/tracing.js";
+import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -340,7 +340,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   async goto(url: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     return withSpan(
-      "pilo.browser.navigate",
+      SpanName.BROWSER_NAVIGATE,
       { attributes: { "pilo.browser.url": url } },
       async (span) => {
         try {
@@ -570,7 +570,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getTreeWithRefs(): Promise<string> {
     if (!this.page) throw new Error("Browser not started");
-    return withSpan("pilo.browser.snapshot", {}, async (span) => {
+    return withSpan(SpanName.BROWSER_SNAPSHOT, {}, async (span) => {
       try {
         return await this.getTreeWithRefsImpl();
       } catch (error) {
@@ -697,7 +697,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   async getScreenshot(options?: { withMarks?: boolean }): Promise<Buffer> {
     if (!this.page) throw new Error("Browser not started");
-    return withSpan("pilo.browser.screenshot", {}, async (span) => {
+    return withSpan(SpanName.BROWSER_SCREENSHOT, {}, async (span) => {
       try {
         // Apply SoM overlay before screenshot if requested.
         // Failures are non-fatal — a plain screenshot is still useful.
@@ -786,7 +786,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     return withSpan(
-      "pilo.browser.perform",
+      SpanName.BROWSER_PERFORM,
       {
         attributes: {
           "pilo.browser.action_type": String(action),

@@ -13,7 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
-import { withSpan, SpanStatusCode } from "../telemetry/tracing.js";
+import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -55,7 +55,7 @@ async function performActionWithValidation(
   value?: string,
 ): Promise<ActionResult> {
   return withSpan(
-    "pilo.browser.action",
+    SpanName.BROWSER_ACTION,
     {
       attributes: {
         "pilo.browser.action_type": String(action),

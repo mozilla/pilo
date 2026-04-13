@@ -30,6 +30,25 @@ export const SpanStatusCode = {
   ERROR: 2,
 } as const;
 
+/**
+ * Span name constants for all instrumented operations.
+ * Use these with `withSpan` to ensure consistent, typo-free span names.
+ */
+export const SpanName = {
+  TASK_EXECUTE: "pilo.task.execute",
+  TASK_PLAN: "pilo.task.plan",
+  TASK_VALIDATE: "pilo.task.validate",
+  AGENT_STEP: "pilo.agent.step",
+  AI_GENERATE: "pilo.ai.generate",
+  BROWSER_NAVIGATE: "pilo.browser.navigate",
+  BROWSER_SNAPSHOT: "pilo.browser.snapshot",
+  BROWSER_SCREENSHOT: "pilo.browser.screenshot",
+  BROWSER_PERFORM: "pilo.browser.perform",
+  BROWSER_ACTION: "pilo.browser.action",
+  BROWSER_RECONNECT: "pilo.browser.reconnect",
+  SEARCH_EXECUTE: "pilo.search.execute",
+} as const;
+
 // --- Internal cache ---
 
 type OTelApiModule = typeof import("@opentelemetry/api");

@@ -12,7 +12,7 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
-import { withSpan, SpanStatusCode } from "../telemetry/tracing.js";
+import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 /**
  * Check if an error is retryable
@@ -80,7 +80,7 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
   params: Parameters<typeof generateText<TOOLS>>[0],
   retryOptions?: RetryOptions,
 ): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
-  return withSpan("pilo.ai.generate", {}, async (span) => {
+  return withSpan(SpanName.AI_GENERATE, {}, async (span) => {
     const {
       maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
       initialDelay = DEFAULT_RETRY_INITIAL_DELAY_MS,
