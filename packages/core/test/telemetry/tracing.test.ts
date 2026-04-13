@@ -301,7 +301,7 @@ describe("tracing helpers", () => {
         );
 
         // Only defined values in the carrier
-        const carrier = mockExtract.mock.calls[0][1];
+        const carrier = (mockExtract.mock.calls[0] as any[])[1];
         expect(carrier).toEqual({ traceparent: "00-abc-def-01" });
         expect(carrier).not.toHaveProperty("tracestate");
       });

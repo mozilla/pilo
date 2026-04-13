@@ -120,7 +120,16 @@ export async function getTracer(name = "pilo-core", version?: string): Promise<T
  * When @opentelemetry/api is not installed or the headers are empty,
  * the function runs directly with zero overhead.
  */
-export async function withRemoteContext<T>(
+export function withRemoteContext<T>(
+  headers: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  // Synchronous fast-path: if already resolved to null, skip async entirely
+  if (resolvedApi === null) return fn();
+  return withRemoteContextAsync(headers, fn);
+}
+
+async function withRemoteContextAsync<T>(
   headers: Record<string, string | undefined>,
   fn: () => Promise<T>,
 ): Promise<T> {
@@ -146,7 +155,22 @@ export async function withRemoteContext<T>(
  * The callback receives the span for setting attributes or recording errors.
  * withSpan does NOT automatically record errors — the callback manages that.
  */
-export async function withSpan<T>(
+export function withSpan<T>(
+  name: string,
+  options: { attributes?: Record<string, string | number | boolean> },
+  fn: (span: Span) => Promise<T>,
+): Promise<T> {
+  // Synchronous fast-path: if already resolved to null, skip async entirely.
+  // After the first call, this avoids a microtask tick on every withSpan
+  // invocation in the common case where OTel is not installed.
+  if (resolvedApi === null) {
+    const span = makeNoOpSpan();
+    return fn(span).finally(() => span.end());
+  }
+  return withSpanAsync(name, options, fn);
+}
+
+async function withSpanAsync<T>(
   name: string,
   options: { attributes?: Record<string, string | number | boolean> },
   fn: (span: Span) => Promise<T>,
