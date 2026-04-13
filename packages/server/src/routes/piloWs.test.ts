@@ -26,6 +26,7 @@ vi.mock("pilo-core", () => ({
   })),
   createNavigationRetryConfig: vi.fn(() => ({})),
   SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
+  withRemoteContext: vi.fn((_headers: any, fn: any) => fn()),
 }));
 
 vi.mock("../../StreamLogger.js", () => ({
@@ -92,7 +93,9 @@ function createTestHarness() {
   } as unknown as WSContext;
 
   // Get the handlers for a new connection
-  const handlers = handlerFactory!(/* context */ {});
+  const handlers = handlerFactory!({
+    req: { header: () => undefined },
+  });
 
   function sendMessage(obj: any) {
     const evt = { data: JSON.stringify(obj) } as MessageEvent;

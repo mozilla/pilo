@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
+import { withSpan } from "../telemetry/tracing.js";
 
 interface SearchToolContext {
   searchService: SearchService;
@@ -24,43 +25,56 @@ export function createSearchTools(context: SearchToolContext) {
         query: z.string().describe(TOOL_STRINGS.webActions.webSearch.query),
       }),
       execute: async ({ query }) => {
-        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
-          action: "webSearch",
-          value: query,
-        });
+        return withSpan(
+          "pilo.search.execute",
+          { attributes: { "pilo.search.query": query } },
+          async (span) => {
+            context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+              action: "webSearch",
+              value: query,
+            });
 
-        try {
-          const markdown = await context.searchService.search(query);
+            try {
+              const markdown = await context.searchService.search(query);
 
-          context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-            success: true,
-            action: "webSearch",
-          });
+              context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+                success: true,
+                action: "webSearch",
+              });
 
-          return {
-            success: true,
-            action: "webSearch",
-            query,
-            markdown,
-          };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+              span.setAttribute("pilo.search.success", true);
+              return {
+                success: true,
+                action: "webSearch",
+                query,
+                markdown,
+              };
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
 
-          context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-            success: false,
-            action: "webSearch",
-            error: errorMessage,
-            isRecoverable: true,
-          });
+              context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+                success: false,
+                action: "webSearch",
+                error: errorMessage,
+                isRecoverable: true,
+              });
 
-          return {
-            success: false,
-            action: "webSearch",
-            query,
-            error: errorMessage,
-            isRecoverable: true,
-          };
-        }
+              span.setAttribute("pilo.search.success", false);
+              // Record the exception for observability even though search errors are
+              // recoverable (the LLM sees the error and can retry or move on).
+              // We do NOT set span status to ERROR — matching the webActionTools
+              // pattern for recoverable failures.
+              span.recordException(error instanceof Error ? error : new Error(errorMessage));
+              return {
+                success: false,
+                action: "webSearch",
+                query,
+                error: errorMessage,
+                isRecoverable: true,
+              };
+            }
+          },
+        );
       },
     }),
   };

@@ -1,4 +1,9 @@
 import "dotenv/config";
+import { initTelemetry } from "./telemetry.js";
+
+// Initialize OTel SDK before app creation
+initTelemetry();
+
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
