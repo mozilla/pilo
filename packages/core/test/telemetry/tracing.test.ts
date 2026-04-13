@@ -229,4 +229,82 @@ describe("tracing helpers", () => {
       });
     });
   });
+
+  describe("withRemoteContext", () => {
+    describe("when @opentelemetry/api is NOT installed", () => {
+      beforeEach(() => {
+        vi.doMock("@opentelemetry/api", () => {
+          throw new Error("Cannot find module '@opentelemetry/api'");
+        });
+      });
+
+      it("runs the callback directly", async () => {
+        const { withRemoteContext } = await import("../../src/telemetry/tracing.js");
+        const result = await withRemoteContext({ traceparent: "00-abc-def-01" }, async () => 99);
+        expect(result).toBe(99);
+      });
+    });
+
+    describe("when @opentelemetry/api IS installed", () => {
+      it("extracts context from headers and runs callback within it", async () => {
+        const mockExtractedCtx = { extracted: true };
+        const mockExtract = vi.fn(() => mockExtractedCtx);
+        const mockWithContext = vi.fn((_ctx: any, fn: any) => fn());
+
+        vi.doMock("@opentelemetry/api", () => ({
+          trace: {
+            getTracer: () => ({ startSpan: vi.fn() }),
+          },
+          context: {
+            active: vi.fn(() => ({})),
+            with: mockWithContext,
+          },
+          propagation: {
+            extract: mockExtract,
+          },
+        }));
+
+        const { withRemoteContext } = await import("../../src/telemetry/tracing.js");
+        const result = await withRemoteContext(
+          { traceparent: "00-abc-def-01", tracestate: "vendor=value" },
+          async () => "traced",
+        );
+
+        expect(result).toBe("traced");
+        expect(mockExtract).toHaveBeenCalledWith(expect.anything(), {
+          traceparent: "00-abc-def-01",
+          tracestate: "vendor=value",
+        });
+        expect(mockWithContext).toHaveBeenCalledWith(mockExtractedCtx, expect.any(Function));
+      });
+
+      it("filters out undefined header values", async () => {
+        const mockExtract = vi.fn(() => ({}));
+
+        vi.doMock("@opentelemetry/api", () => ({
+          trace: {
+            getTracer: () => ({ startSpan: vi.fn() }),
+          },
+          context: {
+            active: vi.fn(() => ({})),
+            with: vi.fn((_ctx: any, fn: any) => fn()),
+          },
+          propagation: {
+            extract: mockExtract,
+          },
+        }));
+
+        const { withRemoteContext } = await import("../../src/telemetry/tracing.js");
+        await withRemoteContext(
+          { traceparent: "00-abc-def-01", tracestate: undefined },
+          async () => {},
+        );
+
+        // Only defined values in the carrier
+        const carrier = mockExtract.mock.calls[0][1];
+        expect(carrier).toEqual({ traceparent: "00-abc-def-01" });
+        expect(carrier).not.toHaveProperty("tracestate");
+      });
+    });
+  });
 });
