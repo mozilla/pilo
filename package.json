@@ -47,7 +47,7 @@
     "cli"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/google-vertex": "^4.0.92",
