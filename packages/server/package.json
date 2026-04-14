@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/server/src/index.js",
     "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.check.json",
     "clean": "rm -rf dist",
     "test": "vitest run"
   },
