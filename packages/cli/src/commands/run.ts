@@ -199,37 +199,64 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
 
     // Create browser instance with navigation retry config
     // CLI options take precedence over config values
-    const browser = new PlaywrightBrowser({
-      browser: browserOption,
-      bypassCSP: options.bypassCsp ?? cfg.bypass_csp,
-      channel: options.channel ?? cfg.channel,
-      executablePath: options.executablePath ?? cfg.executable_path,
-      blockAds: options.blockAds ?? cfg.block_ads,
-      blockResources,
-      headless: options.headless ?? cfg.headless,
-      proxyServer: options.proxy ?? cfg.proxy,
-      proxyUsername: options.proxyUsername ?? cfg.proxy_username,
-      proxyPassword: options.proxyPassword ?? cfg.proxy_password,
-      pwEndpoint: options.pwEndpoint ?? cfg.pw_endpoint,
-      pwCdpEndpoint: options.pwCdpEndpoint ?? cfg.pw_cdp_endpoint,
-      pwCdpEndpoints:
-        (options.pwCdpEndpoints as string[] | undefined) ??
-        cfg.pw_cdp_endpoints ??
-        (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
-      actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
-      navigationRetry: {
-        baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,
-        maxTimeoutMs: options.navigationMaxTimeoutMs ?? cfg.navigation_max_timeout_ms,
-        maxAttempts: options.navigationMaxAttempts ?? cfg.navigation_max_attempts,
-        timeoutMultiplier: options.navigationTimeoutMultiplier ?? cfg.navigation_timeout_multiplier,
-        onRetry: (attempt: number, error: Error, nextTimeout: number) => {
-          console.log(
-            chalk.yellow(`⚠️ Navigation retry ${attempt}: ${error.message}`),
-            chalk.gray(`(next timeout: ${Math.round(nextTimeout / 1000)}s)`),
-          );
+    let browser;
+    if (browserOption === "bidi") {
+      const { BiDiBrowser } = await import("pilo-core");
+      const bidiUrl = options.bidiUrl ?? cfg.bidi_url;
+      if (!bidiUrl) {
+        throw new Error("--bidi-url or PILO_BIDI_URL is required when using --browser bidi");
+      }
+      browser = new BiDiBrowser({
+        bidiUrl,
+        actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+      });
+    } else if (browserOption === "foxcloud") {
+      const { FoxcloudBrowser } = await import("pilo-core");
+      const foxcloudUrl = options.foxcloudUrl ?? cfg.foxcloud_url;
+      if (!foxcloudUrl) {
+        throw new Error(
+          "--foxcloud-url or PILO_FOXCLOUD_URL is required when using --browser foxcloud",
+        );
+      }
+      browser = new FoxcloudBrowser({
+        brokerUrl: foxcloudUrl,
+        proxyUrl: options.foxcloudProxyUrl ?? cfg.foxcloud_proxy_url,
+        actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+      });
+    } else {
+      browser = new PlaywrightBrowser({
+        browser: browserOption,
+        bypassCSP: options.bypassCsp ?? cfg.bypass_csp,
+        channel: options.channel ?? cfg.channel,
+        executablePath: options.executablePath ?? cfg.executable_path,
+        blockAds: options.blockAds ?? cfg.block_ads,
+        blockResources,
+        headless: options.headless ?? cfg.headless,
+        proxyServer: options.proxy ?? cfg.proxy,
+        proxyUsername: options.proxyUsername ?? cfg.proxy_username,
+        proxyPassword: options.proxyPassword ?? cfg.proxy_password,
+        pwEndpoint: options.pwEndpoint ?? cfg.pw_endpoint,
+        pwCdpEndpoint: options.pwCdpEndpoint ?? cfg.pw_cdp_endpoint,
+        pwCdpEndpoints:
+          (options.pwCdpEndpoints as string[] | undefined) ??
+          cfg.pw_cdp_endpoints ??
+          (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
+        actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        navigationRetry: {
+          baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,
+          maxTimeoutMs: options.navigationMaxTimeoutMs ?? cfg.navigation_max_timeout_ms,
+          maxAttempts: options.navigationMaxAttempts ?? cfg.navigation_max_attempts,
+          timeoutMultiplier:
+            options.navigationTimeoutMultiplier ?? cfg.navigation_timeout_multiplier,
+          onRetry: (attempt: number, error: Error, nextTimeout: number) => {
+            console.log(
+              chalk.yellow(`⚠️ Navigation retry ${attempt}: ${error.message}`),
+              chalk.gray(`(next timeout: ${Math.round(nextTimeout / 1000)}s)`),
+            );
+          },
         },
-      },
-    });
+      });
+    }
 
     // Create AI provider with CLI overrides (only pass if explicitly set on CLI)
     // Unlike other options, we use explicit undefined checks here because

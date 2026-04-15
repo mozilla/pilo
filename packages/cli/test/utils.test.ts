@@ -28,8 +28,17 @@ describe("CLI Utils", () => {
   describe("getValidBrowsers", () => {
     it("should return array of valid browsers", () => {
       const browsers = getValidBrowsers();
-      expect(browsers).toEqual(["firefox", "chrome", "chromium", "safari", "webkit", "edge"]);
-      expect(browsers.length).toBe(6);
+      expect(browsers).toEqual([
+        "firefox",
+        "chrome",
+        "chromium",
+        "safari",
+        "webkit",
+        "edge",
+        "bidi",
+        "foxcloud",
+      ]);
+      expect(browsers.length).toBe(8);
     });
   });
 

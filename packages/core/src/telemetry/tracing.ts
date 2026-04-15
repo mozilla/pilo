@@ -46,6 +46,8 @@ export const SpanName = {
   BROWSER_PERFORM: "pilo.browser.perform",
   BROWSER_ACTION: "pilo.browser.action",
   BROWSER_RECONNECT: "pilo.browser.reconnect",
+  BIDI_CONNECT: "pilo.bidi.connect",
+  FOXCLOUD_START: "pilo.foxcloud.start",
   SEARCH_EXECUTE: "pilo.search.execute",
 } as const;
 

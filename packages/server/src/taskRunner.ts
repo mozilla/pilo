@@ -9,6 +9,7 @@ import {
   getAIProviderInfo,
   createNavigationRetryConfig,
   SEARCH_PROVIDERS,
+  PLAYWRIGHT_BROWSERS,
 } from "pilo-core";
 import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
 import { StreamLogger } from "./StreamLogger.js";
@@ -171,8 +172,15 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
   const { body, sendEvent, abortSignal, onUserDataRequired } = options;
   const serverConfig = config.getConfig();
 
+  const browserName = body.browser ?? serverConfig.browser;
+  if (!(PLAYWRIGHT_BROWSERS as readonly string[]).includes(browserName)) {
+    throw new Error(
+      `Server only supports Playwright browsers (${PLAYWRIGHT_BROWSERS.join(", ")}), got "${browserName}"`,
+    );
+  }
+
   const browserConfig = {
-    browser: body.browser ?? serverConfig.browser,
+    browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
     channel: body.channel ?? serverConfig.channel,
     executablePath: body.executablePath ?? serverConfig.executable_path,
     headless: body.headless ?? serverConfig.headless,
