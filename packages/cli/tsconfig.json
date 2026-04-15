@@ -11,8 +11,9 @@
     "esModuleInterop": true,
 
     // Output
-    // rootDir is intentionally omitted: the pilo-core paths alias pulls in source files from
-    // ../core/src/, which would conflict with a rootDir of "./src". outDir is sufficient.
+    // rootDir must be ".." because the pilo-core paths alias pulls in source files from
+    // ../core/src/. TS6 requires this to be explicit (TS5 inferred it automatically).
+    "rootDir": "..",
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
@@ -32,7 +33,6 @@
     // Path aliases: resolve pilo-core to source so tsc can type-check without a prior build.
     // Both entries are required: the bare specifier resolves "pilo-core" → index.ts,
     // and the wildcard resolves subpaths like "pilo-core/core" → core.ts.
-    "baseUrl": ".",
     "paths": {
       "pilo-core": ["../core/src/index.ts"],
       "pilo-core/*": ["../core/src/*"]

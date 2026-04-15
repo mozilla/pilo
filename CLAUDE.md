@@ -174,7 +174,7 @@ All other commands (`config`, `extension`, `examples`) work without a config fil
 - **Dependency version alignment**: All packages must use the same version of any shared dependency. A CI workflow enforces this via `scripts/check-dep-versions.mjs`.
 - **Cross-package references** use `workspace:*` protocol, not relative `file:` paths.
 - **Vite aliases for pilo-core subpaths**: The extension's `wxt.config.ts` must define Vite `resolve.alias` entries for `pilo-core/core` and `pilo-core/ariaTree`, pointing to the core package source files. Vite cannot resolve `workspace:*` subpath exports on its own.
-- **tsconfig paths for dev resolution**: The CLI and server `tsconfig.json` files define `paths` entries for `pilo-core` (bare + wildcard) so `tsc` and `tsx` can resolve the workspace package to source without a prior build. Do not add `rootDir` to these tsconfigs (the paths alias pulls in files from `../core/src/`, which conflicts with a `rootDir` of `./src`).
+- **tsconfig paths for dev resolution**: The CLI and server `tsconfig.json` files define `paths` entries for `pilo-core` (bare + wildcard) so `tsc` and `tsx` can resolve the workspace package to source without a prior build. `rootDir` is set to `".."` because the paths alias pulls in files from `../core/src/` (TS6 requires this to be explicit; TS5 inferred it). The CLI and server also have `tsconfig.check.json` files for typecheck-only (with `noEmit`).
 
 ## npm Publishing
 
