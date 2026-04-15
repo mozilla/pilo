@@ -23,7 +23,15 @@ export const PROVIDERS = [
 ] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
-export const BROWSERS = ["firefox", "chrome", "chromium", "safari", "webkit", "edge"] as const;
+export const BROWSERS = [
+  "firefox",
+  "chrome",
+  "chromium",
+  "safari",
+  "webkit",
+  "edge",
+  "lightpanda",
+] as const;
 export type Browser = (typeof BROWSERS)[number];
 
 export const REASONING_LEVELS = ["none", "low", "medium", "high"] as const;

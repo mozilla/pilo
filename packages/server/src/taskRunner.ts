@@ -39,7 +39,7 @@ export interface PiloTaskRequest {
   openaiCompatibleName?: string;
 
   // Browser configuration overrides
-  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge" | "lightpanda";
   channel?: string;
   executablePath?: string;
   headless?: boolean;

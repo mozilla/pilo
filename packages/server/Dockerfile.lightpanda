@@ -1,0 +1,75 @@
+# Dockerfile for pilo-server + Lightpanda (experimental)
+#
+# Bundles pilo-server with Lightpanda as the browser backend.
+# No Playwright browsers are installed — Lightpanda provides the browser.
+#
+# Build:
+#   docker build -f packages/server/Dockerfile.lightpanda -t mozilla/pilo:lightpanda .
+#
+# Run:
+#   docker run -e OPENROUTER_API_KEY=sk-... -p 3000:3000 mozilla/pilo:lightpanda
+
+FROM node:22-slim
+
+# Install system dependencies:
+# - ca-certificates: required for Lightpanda to make HTTPS requests
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Skip Playwright browser downloads — Lightpanda is the browser
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+WORKDIR /app
+
+# Copy workspace manifests so pnpm can resolve the workspace graph
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy all package manifests before installing so pnpm can link the workspace
+COPY packages/core/package.json ./packages/core/package.json
+COPY packages/cli/package.json ./packages/cli/package.json
+COPY packages/server/package.json ./packages/server/package.json
+COPY packages/extension/package.json ./packages/extension/package.json
+
+# Install all workspace dependencies (ignore scripts to avoid premature core build)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Manually run @lightpanda/browser postinstall to download the binary,
+# then move it to a shared location accessible by the non-root user
+RUN node $(find node_modules/.pnpm -path '*/@lightpanda/browser/dist/scripts/postinstall.js' -print -quit) \
+    && cp /root/.cache/lightpanda-node/lightpanda /usr/local/bin/lightpanda \
+    && chmod 755 /usr/local/bin/lightpanda
+
+# Copy core source and build it (server depends on pilo-core)
+COPY packages/core/ ./packages/core/
+RUN pnpm --filter pilo-core run build
+
+# Copy server source and build
+COPY packages/server/ ./packages/server/
+RUN pnpm --filter pilo-server run build
+
+# Expose the server port
+EXPOSE 3000
+
+# Default to Lightpanda browser
+ENV NODE_ENV=production
+ENV PILO_BROWSER=lightpanda
+ENV PILO_HEADLESS=true
+ENV LIGHTPANDA_EXECUTABLE_PATH=/usr/local/bin/lightpanda
+
+# Create stub config files so the config system loads env vars in dev mode
+RUN mkdir -p /root/.config/pilo && echo '{}' > /root/.config/pilo/config.json
+
+# Ensure node user owns the app files
+RUN chown -R node:node /app
+
+# Switch to non-root user
+USER node
+
+# Create stub config for node user
+RUN mkdir -p /home/node/.config/pilo && echo '{}' > /home/node/.config/pilo/config.json
+
+# Start the server
+WORKDIR /app/packages/server
+CMD ["pnpm", "start"]

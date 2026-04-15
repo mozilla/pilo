@@ -15,6 +15,7 @@ import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import {
   InvalidRefException,
   BrowserActionException,
@@ -30,7 +31,7 @@ import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
-  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge";
+  browser?: "firefox" | "chrome" | "chromium" | "safari" | "webkit" | "edge" | "lightpanda";
   /** Enable ad blocking using Ghostery's adblocker */
   blockAds?: boolean;
   /** Block specific resource types to improve performance */
@@ -87,6 +88,7 @@ export class PlaywrightBrowser implements AriaBrowser {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private blocker: PlaywrightBlocker | null = null;
+  private lightpandaProcess: ChildProcessWithoutNullStreams | null = null;
 
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
@@ -268,12 +270,51 @@ export class PlaywrightBrowser implements AriaBrowser {
         }
         break;
 
+      case "lightpanda": {
+        const { lightpanda } = await import("@lightpanda/browser");
+        const host = "127.0.0.1";
+        const port = 9222;
+        this.lightpandaProcess = await lightpanda.serve({
+          host,
+          port,
+          ...(this.options.proxyServer && { httpProxy: this.options.proxyServer }),
+        });
+
+        // Poll until the CDP server is accepting connections
+        const maxWaitMs = 5_000;
+        const pollIntervalMs = 100;
+        const deadline = Date.now() + maxWaitMs;
+        let connected = false;
+        while (Date.now() < deadline) {
+          try {
+            this.browser = await chromium.connectOverCDP(`ws://${host}:${port}`, {
+              timeout: 1_000,
+            });
+            connected = true;
+            break;
+          } catch {
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
+          }
+        }
+        if (!connected) {
+          throw new Error(`Lightpanda CDP server did not become ready within ${maxWaitMs}ms`);
+        }
+        break;
+      }
+
       default:
         throw new Error(`Unsupported browser: ${browserType}`);
     }
 
-    // Setup context
-    this.context = await this.browser.newContext(contextOptions);
+    // For Lightpanda, set a Chrome-like User-Agent so sites don't reject
+    // it as an unsupported browser (unless the caller already set one)
+    if (browserType === "lightpanda" && !contextOptions.userAgent) {
+      contextOptions.userAgent =
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+    }
+
+    // Setup context (browser is guaranteed non-null — all switch branches either assign it or throw)
+    this.context = await this.browser!.newContext(contextOptions);
 
     this.page = await this.context.newPage();
 
@@ -281,11 +322,14 @@ export class PlaywrightBrowser implements AriaBrowser {
     this.page.setDefaultTimeout(this.actionTimeoutMs);
 
     // Initialize ad blocker once (reused for temporary tabs)
-    if (this.options.blockAds) {
+    // Skip for Lightpanda — it doesn't support page.route()
+    if (this.options.blockAds && browserType !== "lightpanda") {
       this.blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
     }
 
-    await this.setupPageBlocking(this.page);
+    if (browserType !== "lightpanda") {
+      await this.setupPageBlocking(this.page);
+    }
   }
 
   /**
@@ -331,6 +375,14 @@ export class PlaywrightBrowser implements AriaBrowser {
       this.context = null;
       this.page = null;
       this.blocker = null;
+    }
+
+    // Clean up Lightpanda child process
+    if (this.lightpandaProcess) {
+      this.lightpandaProcess.stdout.destroy();
+      this.lightpandaProcess.stderr.destroy();
+      this.lightpandaProcess.kill();
+      this.lightpandaProcess = null;
     }
   }
 
@@ -572,7 +624,24 @@ export class PlaywrightBrowser implements AriaBrowser {
     if (!this.page) throw new Error("Browser not started");
     return withSpan(SpanName.BROWSER_SNAPSHOT, {}, async (span) => {
       try {
-        return await this.getTreeWithRefsImpl();
+        // Guard the aria tree snapshot with a timeout. The evaluate() call
+        // can hang indefinitely if the browser lacks Web API support for the
+        // page (e.g. Lightpanda on complex SPAs) or the DOM is extremely large.
+        const timeoutMs = this.actionTimeoutMs;
+        return await Promise.race([
+          this.getTreeWithRefsImpl(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `Aria tree snapshot timed out after ${timeoutMs}ms — the browser may lack Web API support for this page`,
+                  ),
+                ),
+              timeoutMs,
+            ),
+          ),
+        ]);
       } catch (error) {
         if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
           const disconnectError = new BrowserDisconnectedError(error.message);
