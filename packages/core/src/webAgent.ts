@@ -527,6 +527,20 @@ export class WebAgent {
               return { flow: "continue" as const };
             }
 
+            // AI SDK detectMediaType crash on image data — strip the offending image
+            // and retry this iteration rather than counting it as an agent error.
+            if (
+              error instanceof TypeError &&
+              String((error as Error).message).includes("substring")
+            ) {
+              console.warn(
+                "[WebAgent] AI SDK image processing failed, stripping images and retrying",
+              );
+              this.stripImagesFromLastMessage();
+              executionState.currentIteration++;
+              return { flow: "continue" as const };
+            }
+
             // Only mark non-disconnect errors as span failures
             stepSpan.setStatus({
               code: SpanStatusCode.ERROR,
@@ -693,6 +707,24 @@ export class WebAgent {
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
+  /** Remove image parts from the most recent user message (fallback for AI SDK image crashes). */
+  private stripImagesFromLastMessage(): void {
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const msg = this.messages[i];
+      if (msg.role === "user" && Array.isArray(msg.content)) {
+        this.messages[i] = {
+          ...msg,
+          content: (msg.content as any[])
+            .filter((part: any) => part.type !== "image")
+            .map((part: any) =>
+              part.type === "text" ? part : { type: "text" as const, text: "[image removed]" },
+            ),
+        };
+        return;
+      }
+    }
+  }
+
   /**
    * Truncate old external content in messages to keep context size down.
    * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
@@ -774,6 +806,11 @@ export class WebAgent {
       try {
         const screenshot = await this.browser.getScreenshot({ withMarks: true });
 
+        // Guard: skip empty/invalid screenshots to prevent AI SDK detectMediaType crash
+        if (!screenshot || screenshot.length === 0) {
+          throw new Error("Screenshot returned empty buffer");
+        }
+
         // Emit screenshot captured event
         this.emit(WebAgentEventType.BROWSER_SCREENSHOT_CAPTURED, {
           size: screenshot.length,
@@ -786,7 +823,15 @@ export class WebAgent {
           mediaType: "image/jpeg" as const,
         });
 
-        // Add multimodal message with text and image
+        // Add multimodal message with text and image.
+        // Pass as Uint8Array (not Buffer) to avoid edge cases in AI SDK's
+        // detectMediaType which can crash on certain Buffer states.
+        const imageData = new Uint8Array(
+          screenshot.buffer,
+          screenshot.byteOffset,
+          screenshot.byteLength,
+        );
+
         this.messages.push({
           role: "user",
           content: [
@@ -796,7 +841,7 @@ export class WebAgent {
             },
             {
               type: "image",
-              image: screenshot,
+              image: imageData,
               mediaType: "image/jpeg",
             },
           ],
