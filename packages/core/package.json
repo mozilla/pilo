@@ -59,7 +59,7 @@
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@types/jsdom": "^28.0.1",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.1.1",
     "esbuild": "^0.27.4",
