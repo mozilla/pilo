@@ -39,16 +39,40 @@ const mockValidateTaskRequest = vi.fn().mockReturnValue(null);
 vi.mock("../taskRunner.js", () => ({
   runTask: (...args: any[]) => mockRunTask(...args),
   validateTaskRequest: (...args: any[]) => mockValidateTaskRequest(...args),
-  createErrorResponse: (message: string, code: string, taskId?: string) => ({
+  createErrorResponse: (params: {
+    class?: string;
+    code: string;
+    reason: string;
+    recoverable?: boolean;
+    phase?: string;
+    taskId?: string;
+  }) => ({
     success: false,
     error: {
-      message,
-      code,
-      timestamp: new Date().toISOString(),
-      ...(taskId !== undefined && { taskId }),
+      class: params.class ?? "Error",
+      code: params.code,
+      reason: params.reason,
+      recoverable: params.recoverable ?? false,
+      ...(params.phase && { phase: params.phase }),
+      at: new Date().toISOString(),
+      ...(params.taskId && { taskId: params.taskId }),
     },
   }),
-  errorToString: (error: unknown) => (error instanceof Error ? error.name : "Unknown error"),
+  errorResponseFromError: (
+    error: unknown,
+    opts: { code: string; phase: string; taskId?: string },
+  ) => ({
+    success: false,
+    error: {
+      class: error instanceof Error ? error.constructor.name : "Unknown",
+      code: opts.code,
+      reason: "INTERNAL_ERROR",
+      recoverable: false,
+      phase: opts.phase,
+      at: new Date().toISOString(),
+      ...(opts.taskId && { taskId: opts.taskId }),
+    },
+  }),
 }));
 
 import { createPiloWsRoute } from "./piloWs.js";
@@ -171,7 +195,7 @@ describe("piloWs", () => {
       expect(h.sentMessages).toHaveLength(1);
       expect(h.sentMessages[0].event).toBe("error");
       expect(h.sentMessages[0].data.error.code).toBe("UNKNOWN_EVENT");
-      expect(h.sentMessages[0].data.error.message).toContain("unknown_event");
+      expect(h.sentMessages[0].data.error.reason).toBe("INVALID_REQUEST");
     });
   });
 
@@ -227,7 +251,7 @@ describe("piloWs", () => {
       expect(h.closeReason).toBe("Task finished");
     });
 
-    it("should send error event when task throws", async () => {
+    it("should send error event with new shape when task throws", async () => {
       mockRunTask.mockRejectedValue(new TypeError("something broke"));
 
       const h = createTestHarness();
@@ -237,7 +261,22 @@ describe("piloWs", () => {
       const errorMsg = h.sentMessages.find((m) => m.event === "error");
       expect(errorMsg).toBeDefined();
       expect(errorMsg!.data.error.code).toBe("TASK_EXECUTION_FAILED");
-      expect(errorMsg!.data.error.message).toBe("TypeError");
+      expect(errorMsg!.data.error.class).toBe("TypeError");
+      expect(errorMsg!.data.error.phase).toBe("execution");
+      expect(errorMsg!.data.error.message).toBeUndefined();
+    });
+
+    it("should never leak error.message into WS error event", async () => {
+      mockRunTask.mockRejectedValue(new Error("SENSITIVE: task data was fill-form-with-ssn"));
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      const json = JSON.stringify(errorMsg);
+      expect(json).not.toContain("SENSITIVE");
+      expect(json).not.toContain("fill-form-with-ssn");
     });
 
     it("should close WebSocket after task error", async () => {
@@ -371,7 +410,7 @@ describe("piloWs", () => {
 
       expect(h.sentMessages).toHaveLength(1);
       expect(h.sentMessages[0].data.error.code).toBe("UNKNOWN_REQUEST_ID");
-      expect(h.sentMessages[0].data.error.message).toContain("nonexistent");
+      expect(h.sentMessages[0].data.error.reason).toBe("INVALID_REQUEST");
     });
 
     it("should resolve a pending request when matched", async () => {

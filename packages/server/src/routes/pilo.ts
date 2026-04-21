@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
+import {
+  runTask,
+  validateTaskRequest,
+  createErrorResponse,
+  errorResponseFromError,
+} from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
 const pilo = new Hono();
@@ -66,7 +71,11 @@ pilo.post("/run", async (c) => {
           await stream.writeSSE({
             event: "error",
             data: JSON.stringify(
-              createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED", taskId),
+              errorResponseFromError(error, {
+                code: "TASK_EXECUTION_FAILED",
+                phase: "execution",
+                taskId,
+              }),
             ),
           });
         }
@@ -74,7 +83,16 @@ pilo.post("/run", async (c) => {
     });
   } catch (error) {
     console.error("Pilo task setup failed:", error);
-    return c.json(createErrorResponse(errorToString(error), "TASK_SETUP_FAILED", taskId), 500);
+    return c.json(
+      createErrorResponse({
+        class: error instanceof Error ? error.constructor.name : "Unknown",
+        code: "TASK_SETUP_FAILED",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+        taskId,
+      }),
+      500,
+    );
   }
 });
 
