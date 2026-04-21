@@ -19,9 +19,12 @@ vi.mock("pilo-core", () => {
   }
   class MockPlaywrightBrowser {}
 
+  class RecoverableError extends Error {}
+
   return {
     WebAgent: MockWebAgent,
     PlaywrightBrowser: MockPlaywrightBrowser,
+    RecoverableError,
     config: {
       getConfig: vi.fn(() => ({
         provider: "openai",
@@ -51,49 +54,134 @@ vi.mock("./StreamLogger.js", () => ({
   StreamLogger: class MockStreamLogger {},
 }));
 
-import { validateTaskRequest, createErrorResponse, errorToString, runTask } from "./taskRunner.js";
+import {
+  validateTaskRequest,
+  createErrorResponse,
+  errorResponseFromError,
+  runTask,
+} from "./taskRunner.js";
 
 describe("taskRunner", () => {
-  describe("errorToString", () => {
-    it("should return error name for Error instances", () => {
-      expect(errorToString(new Error("something broke"))).toBe("Error");
-    });
-
-    it("should return error name for typed errors", () => {
-      expect(errorToString(new TypeError("bad type"))).toBe("TypeError");
-    });
-
-    it("should return 'Unknown error' for non-Error values", () => {
-      expect(errorToString("a string")).toBe("Unknown error");
-      expect(errorToString(null)).toBe("Unknown error");
-      expect(errorToString(undefined)).toBe("Unknown error");
-      expect(errorToString(42)).toBe("Unknown error");
-    });
-  });
-
   describe("createErrorResponse", () => {
-    it("should create a properly shaped error response", () => {
-      const res = createErrorResponse("something failed", "SOME_CODE");
+    it("should build the structured error shape from explicit fields", () => {
+      const res = createErrorResponse({
+        class: "CustomError",
+        code: "SOME_CODE",
+        reason: "INVALID_REQUEST",
+        recoverable: false,
+        phase: "setup",
+        taskId: "task-abc-123",
+      });
       expect(res.success).toBe(false);
-      expect(res.error.message).toBe("something failed");
+      expect(res.error.class).toBe("CustomError");
       expect(res.error.code).toBe("SOME_CODE");
-      expect(res.error.timestamp).toBeDefined();
+      expect(res.error.reason).toBe("INVALID_REQUEST");
+      expect(res.error.recoverable).toBe(false);
+      expect(res.error.phase).toBe("setup");
+      expect(res.error.taskId).toBe("task-abc-123");
+      expect(res.error.at).toBeDefined();
     });
 
-    it("should have a valid ISO timestamp", () => {
-      const res = createErrorResponse("msg", "CODE");
-      const parsed = new Date(res.error.timestamp);
+    it("should never include a message field", () => {
+      const res = createErrorResponse({
+        code: "SOME_CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect((res.error as Record<string, unknown>).message).toBeUndefined();
+    });
+
+    it("should never include a timestamp field (renamed to 'at')", () => {
+      const res = createErrorResponse({
+        code: "SOME_CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect((res.error as Record<string, unknown>).timestamp).toBeUndefined();
+      expect(res.error.at).toBeDefined();
+    });
+
+    it("should produce a valid ISO timestamp in 'at'", () => {
+      const res = createErrorResponse({
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      const parsed = new Date(res.error.at);
       expect(parsed.getTime()).not.toBeNaN();
     });
 
-    it("should include taskId when provided", () => {
-      const res = createErrorResponse("msg", "CODE", "task-abc-123");
-      expect(res.error.taskId).toBe("task-abc-123");
+    it("should default class to 'Error' when not provided", () => {
+      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      expect(res.error.class).toBe("Error");
+    });
+
+    it("should default recoverable to false when not provided", () => {
+      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      expect(res.error.recoverable).toBe(false);
     });
 
     it("should omit taskId when not provided", () => {
-      const res = createErrorResponse("msg", "CODE");
+      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
       expect(res.error.taskId).toBeUndefined();
+    });
+
+    it("should omit phase when not provided", () => {
+      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      expect(res.error.phase).toBeUndefined();
+    });
+  });
+
+  describe("errorResponseFromError", () => {
+    it("should derive class from error constructor name", () => {
+      const res = errorResponseFromError(new TypeError("bad"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.class).toBe("TypeError");
+    });
+
+    it("should never forward error.message to the response", () => {
+      const res = errorResponseFromError(new Error("DO NOT LOG THIS SENTINEL"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      const json = JSON.stringify(res);
+      expect(json).not.toContain("DO NOT LOG THIS SENTINEL");
+      expect((res.error as Record<string, unknown>).message).toBeUndefined();
+    });
+
+    it("should classify unknown errors as INTERNAL_ERROR, not recoverable", () => {
+      const res = errorResponseFromError(new Error("boom"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.reason).toBe("INTERNAL_ERROR");
+      expect(res.error.recoverable).toBe(false);
+    });
+
+    it("should classify non-Error throws as INTERNAL_ERROR with class Unknown", () => {
+      const res = errorResponseFromError("a string", {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.class).toBe("Unknown");
+      expect(res.error.reason).toBe("INTERNAL_ERROR");
+      expect(res.error.recoverable).toBe(false);
+    });
+
+    it("should include the phase passed in opts", () => {
+      const res = errorResponseFromError(new Error(), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.phase).toBe("execution");
+    });
+
+    it("should include taskId when provided", () => {
+      const res = errorResponseFromError(new Error(), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+        taskId: "task-abc-123",
+      });
+      expect(res.error.taskId).toBe("task-abc-123");
     });
   });
 
@@ -113,11 +201,13 @@ describe("taskRunner", () => {
       delete process.env.OPENAI_API_KEY;
     });
 
-    it("should return error when task is missing", () => {
+    it("should return INVALID_REQUEST when task is missing", () => {
       const result = validateTaskRequest({ task: "" });
       expect(result).not.toBeNull();
       expect(result!.status).toBe(400);
       expect(result!.response.error.code).toBe("MISSING_TASK");
+      expect(result!.response.error.reason).toBe("INVALID_REQUEST");
+      expect(result!.response.error.phase).toBe("setup");
     });
 
     it("should return null for a valid request", () => {
@@ -125,7 +215,7 @@ describe("taskRunner", () => {
       expect(result).toBeNull();
     });
 
-    it("should return error for invalid search provider", () => {
+    it("should return INVALID_REQUEST for invalid search provider", () => {
       const result = validateTaskRequest({
         task: "test",
         searchProvider: "invalid-provider" as any,
@@ -133,7 +223,7 @@ describe("taskRunner", () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(400);
       expect(result!.response.error.code).toBe("INVALID_SEARCH_PROVIDER");
-      expect(result!.response.error.message).toContain("invalid-provider");
+      expect(result!.response.error.reason).toBe("INVALID_REQUEST");
     });
 
     it("should accept valid search providers", () => {
@@ -143,7 +233,7 @@ describe("taskRunner", () => {
       }
     });
 
-    it("should return error when AI provider is not configured", async () => {
+    it("should return PROVIDER_UNAUTHORIZED when AI provider is not configured", async () => {
       const { getAIProviderInfo } = await import("pilo-core");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error("No API key found");
@@ -153,6 +243,21 @@ describe("taskRunner", () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(500);
       expect(result!.response.error.code).toBe("MISSING_API_KEY");
+      expect(result!.response.error.reason).toBe("PROVIDER_UNAUTHORIZED");
+      expect(result!.response.error.phase).toBe("setup");
+    });
+
+    it("should never leak error.message from getAIProviderInfo into validation response", async () => {
+      const { getAIProviderInfo } = await import("pilo-core");
+      vi.mocked(getAIProviderInfo).mockImplementation(() => {
+        throw new Error("SENSITIVE: key sk-abc123 not found in env");
+      });
+
+      const result = validateTaskRequest({ task: "test" });
+      const json = JSON.stringify(result!.response);
+      expect(json).not.toContain("SENSITIVE");
+      expect(json).not.toContain("sk-abc123");
+      expect((result!.response.error as Record<string, unknown>).message).toBeUndefined();
     });
   });
 

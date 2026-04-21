@@ -8,6 +8,7 @@ import {
   createAIProvider,
   getAIProviderInfo,
   createNavigationRetryConfig,
+  RecoverableError,
   SEARCH_PROVIDERS,
 } from "pilo-core";
 import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
@@ -83,33 +84,110 @@ export interface PiloTaskRequest {
   includeScreenshotImages?: boolean;
 }
 
+/**
+ * Coarse-grained error categories. Bounded cardinality so they're safe to use
+ * as metric labels and dashboard filters. Never derived from user input or page
+ * content. Refine over time; always extend via enum, never open-ended.
+ */
+export type ErrorReason =
+  | "INVALID_REQUEST"
+  | "PROVIDER_UNAUTHORIZED"
+  | "NAVIGATION_TIMEOUT"
+  | "BROWSER_DISCONNECTED"
+  | "MAX_ITERATIONS"
+  | "MAX_ERRORS"
+  | "TIMEOUT"
+  | "INTERNAL_ERROR";
+
+/** Which phase of the request pipeline produced the error. */
+export type ErrorPhase = "setup" | "execution";
+
 export interface ErrorResponse {
   success: false;
   error: {
-    message: string;
+    /** Error constructor name (e.g. "TypeError", "NavigationTimeoutException"). */
+    class: string;
+    /** Fine-grained semantic code for programmatic handling (e.g. "MISSING_TASK"). */
     code: string;
-    timestamp: string;
+    /** Coarse-grained category, safe for metric labels. */
+    reason: ErrorReason;
+    /** True if the underlying error is a RecoverableError; hint for callers. */
+    recoverable: boolean;
+    /** Which pipeline phase the error occurred in. */
+    phase?: ErrorPhase;
+    /** ISO timestamp when the response was generated. */
+    at: string;
+    /** Server-generated correlation ID for this task, if available. */
     taskId?: string;
   };
 }
 
-// Use error.name rather than error.message to avoid leaking sensitive data
-export const errorToString = (error: unknown): string =>
-  error instanceof Error ? error.name : "Unknown error";
+export interface CreateErrorResponseParams {
+  class?: string;
+  code: string;
+  reason: ErrorReason;
+  recoverable?: boolean;
+  phase?: ErrorPhase;
+  taskId?: string;
+}
 
-export const createErrorResponse = (
-  message: string,
-  code: string,
-  taskId?: string,
-): ErrorResponse => ({
+export const createErrorResponse = (params: CreateErrorResponseParams): ErrorResponse => ({
   success: false,
   error: {
-    message,
-    code,
-    timestamp: new Date().toISOString(),
-    ...(taskId !== undefined && { taskId }),
+    class: params.class ?? "Error",
+    code: params.code,
+    reason: params.reason,
+    recoverable: params.recoverable ?? false,
+    ...(params.phase && { phase: params.phase }),
+    at: new Date().toISOString(),
+    ...(params.taskId && { taskId: params.taskId }),
   },
 });
+
+/**
+ * Map an unknown thrown value to a safe (reason, recoverable) pair.
+ *
+ * Uses `instanceof RecoverableError` for the recoverable flag and
+ * `error.constructor.name` string matching for the specific reason. The string
+ * matching is intentionally temporary — stack D2 replaces Playwright/AI SDK
+ * error wrapping so we can use instanceof checks for specific classes too.
+ */
+function classifyError(error: unknown): { reason: ErrorReason; recoverable: boolean } {
+  const recoverable = error instanceof RecoverableError;
+  if (!(error instanceof Error)) {
+    return { reason: "INTERNAL_ERROR", recoverable: false };
+  }
+  switch (error.constructor.name) {
+    case "NavigationTimeoutException":
+    case "NavigationNetworkException":
+      return { reason: "NAVIGATION_TIMEOUT", recoverable: true };
+    case "BrowserDisconnectedError":
+      return { reason: "BROWSER_DISCONNECTED", recoverable: true };
+    default:
+      return { reason: "INTERNAL_ERROR", recoverable };
+  }
+}
+
+/**
+ * Build an ErrorResponse from an unknown thrown value. Extracts the error's
+ * class name and classifies into a reason + recoverable flag. Never forwards
+ * error.message — agent/browser errors can embed user input or page content.
+ */
+export const errorResponseFromError = (
+  error: unknown,
+  opts: { code: string; phase: ErrorPhase; taskId?: string },
+): ErrorResponse => {
+  const errorClass = error instanceof Error ? error.constructor.name : "Unknown";
+  const { reason, recoverable } = classifyError(error);
+  return createErrorResponse({
+    class: errorClass,
+    code: opts.code,
+    reason,
+    recoverable,
+    phase: opts.phase,
+    taskId: opts.taskId,
+  });
+};
 
 /**
  * Validate a task request and return an error response if invalid, or null if valid.
@@ -118,7 +196,14 @@ export function validateTaskRequest(
   body: PiloTaskRequest,
 ): { status: number; response: ErrorResponse } | null {
   if (!body.task) {
-    return { status: 400, response: createErrorResponse("Task is required", "MISSING_TASK") };
+    return {
+      status: 400,
+      response: createErrorResponse({
+        code: "MISSING_TASK",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+      }),
+    };
   }
 
   if (
@@ -127,10 +212,11 @@ export function validateTaskRequest(
   ) {
     return {
       status: 400,
-      response: createErrorResponse(
-        `Invalid search provider: ${body.searchProvider}. Must be one of: ${SEARCH_PROVIDERS.join(", ")}`,
-        "INVALID_SEARCH_PROVIDER",
-      ),
+      response: createErrorResponse({
+        code: "INVALID_SEARCH_PROVIDER",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+      }),
     };
   }
 
@@ -139,22 +225,24 @@ export function validateTaskRequest(
   if (effectiveSearchProvider === "parallel-api" && !serverConfig.parallel_api_key) {
     return {
       status: 400,
-      response: createErrorResponse(
-        "parallel-api search provider requires PARALLEL_API_KEY to be configured on the server",
-        "MISSING_SEARCH_API_KEY",
-      ),
+      response: createErrorResponse({
+        code: "MISSING_SEARCH_API_KEY",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+      }),
     };
   }
 
   try {
     getAIProviderInfo();
-  } catch (error) {
+  } catch {
     return {
       status: 500,
-      response: createErrorResponse(
-        `AI provider not configured: ${errorToString(error)}`,
-        "MISSING_API_KEY",
-      ),
+      response: createErrorResponse({
+        code: "MISSING_API_KEY",
+        reason: "PROVIDER_UNAUTHORIZED",
+        phase: "setup",
+      }),
     };
   }
 

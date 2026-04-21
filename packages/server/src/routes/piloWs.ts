@@ -21,7 +21,12 @@ import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
 import { withRemoteContext } from "pilo-core";
-import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
+import {
+  runTask,
+  validateTaskRequest,
+  createErrorResponse,
+  errorResponseFromError,
+} from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
 /** Default timeout for waiting on a user data response (5 minutes). */
@@ -66,7 +71,15 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           try {
             msg = JSON.parse(typeof evt.data === "string" ? evt.data : String(evt.data));
           } catch {
-            send(ws, "error", createErrorResponse("Invalid JSON message", "INVALID_MESSAGE"));
+            send(
+              ws,
+              "error",
+              createErrorResponse({
+                code: "INVALID_MESSAGE",
+                reason: "INVALID_REQUEST",
+                phase: "setup",
+              }),
+            );
             return;
           }
 
@@ -75,10 +88,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               send(
                 ws,
                 "error",
-                createErrorResponse(
-                  "A task is already running on this connection",
-                  "TASK_ALREADY_RUNNING",
-                ),
+                createErrorResponse({
+                  code: "TASK_ALREADY_RUNNING",
+                  reason: "INVALID_REQUEST",
+                  phase: "setup",
+                }),
               );
               return;
             }
@@ -86,7 +100,16 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
             const body = msg.data as PiloTaskRequest;
             const taskId = randomUUID();
             if (!body) {
-              send(ws, "error", createErrorResponse("Missing data", "MISSING_DATA", taskId));
+              send(
+                ws,
+                "error",
+                createErrorResponse({
+                  code: "MISSING_DATA",
+                  reason: "INVALID_REQUEST",
+                  phase: "setup",
+                  taskId,
+                }),
+              );
               return;
             }
 
@@ -138,7 +161,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                   await send(
                     ws,
                     "error",
-                    createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED", taskId),
+                    errorResponseFromError(error, {
+                      code: "TASK_EXECUTION_FAILED",
+                      phase: "execution",
+                      taskId,
+                    }),
                   );
                 }
               } finally {
@@ -157,7 +184,10 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               send(
                 ws,
                 "error",
-                createErrorResponse("Missing requestId in response", "INVALID_RESPONSE"),
+                createErrorResponse({
+                  code: "INVALID_RESPONSE",
+                  reason: "INVALID_REQUEST",
+                }),
               );
               return;
             }
@@ -167,10 +197,10 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               send(
                 ws,
                 "error",
-                createErrorResponse(
-                  `No pending request for id: ${response.requestId}`,
-                  "UNKNOWN_REQUEST_ID",
-                ),
+                createErrorResponse({
+                  code: "UNKNOWN_REQUEST_ID",
+                  reason: "INVALID_REQUEST",
+                }),
               );
               return;
             }
@@ -179,7 +209,14 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
             pendingRequests.delete(response.requestId);
             pending.resolve(response);
           } else {
-            send(ws, "error", createErrorResponse(`Unknown event: ${msg.event}`, "UNKNOWN_EVENT"));
+            send(
+              ws,
+              "error",
+              createErrorResponse({
+                code: "UNKNOWN_EVENT",
+                reason: "INVALID_REQUEST",
+              }),
+            );
           }
         },
 
