@@ -222,6 +222,50 @@ describe("Pilo Routes", () => {
       expect(data.error.taskId).toMatch(UUID_RE);
     });
 
+    it("should return x-pilo-task-id header on successful request", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should return x-pilo-task-id header on validation error", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should return x-pilo-task-id header on setup error", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "invalid json",
+      });
+
+      expect(res.status).toBe(500);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should use the same taskId in header and body", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+      expect(res.headers.get("x-pilo-task-id")).toBe(data.error.taskId);
+    });
+
     it("should include taskId in SSE start event", async () => {
       const res = await app.request("/pilo/run", {
         method: "POST",

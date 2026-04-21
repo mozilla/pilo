@@ -9,6 +9,7 @@ const pilo = new Hono();
 // POST /pilo/run - Execute a Pilo task with real-time SSE streaming (non-interactive)
 pilo.post("/run", async (c) => {
   const taskId = randomUUID();
+  c.header("x-pilo-task-id", taskId);
   try {
     const body = (await c.req.json()) as PiloTaskRequest;
 
