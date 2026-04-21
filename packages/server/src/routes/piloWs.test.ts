@@ -40,6 +40,7 @@ vi.mock("../taskRunner.js", () => ({
   runTask: (...args: any[]) => mockRunTask(...args),
   validateTaskRequest: (...args: any[]) => mockValidateTaskRequest(...args),
   createErrorResponse: (params: {
+    message: string;
     class?: string;
     code: string;
     reason: string;
@@ -49,12 +50,13 @@ vi.mock("../taskRunner.js", () => ({
   }) => ({
     success: false,
     error: {
-      class: params.class ?? "Error",
+      message: params.message,
       code: params.code,
+      timestamp: new Date().toISOString(),
+      class: params.class ?? "Error",
       reason: params.reason,
       recoverable: params.recoverable ?? false,
       ...(params.phase && { phase: params.phase }),
-      at: new Date().toISOString(),
       ...(params.taskId && { taskId: params.taskId }),
     },
   }),
@@ -64,12 +66,13 @@ vi.mock("../taskRunner.js", () => ({
   ) => ({
     success: false,
     error: {
-      class: error instanceof Error ? error.constructor.name : "Unknown",
+      message: "The task failed due to an internal error.",
       code: opts.code,
+      timestamp: new Date().toISOString(),
+      class: error instanceof Error ? error.constructor.name : "Unknown",
       reason: "INTERNAL_ERROR",
       recoverable: false,
       phase: opts.phase,
-      at: new Date().toISOString(),
       ...(opts.taskId && { taskId: opts.taskId }),
     },
   }),
@@ -263,7 +266,9 @@ describe("piloWs", () => {
       expect(errorMsg!.data.error.code).toBe("TASK_EXECUTION_FAILED");
       expect(errorMsg!.data.error.class).toBe("TypeError");
       expect(errorMsg!.data.error.phase).toBe("execution");
-      expect(errorMsg!.data.error.message).toBeUndefined();
+      expect(errorMsg!.data.error.message).toBeDefined();
+      // Message is server-controlled, never forwards the thrown value's message
+      expect(errorMsg!.data.error.message).not.toContain("something broke");
     });
 
     it("should never leak error.message into WS error event", async () => {

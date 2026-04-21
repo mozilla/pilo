@@ -99,12 +99,11 @@ describe("Pilo Routes", () => {
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.success).toBe(false);
+      expect(data.error.message).toBe("Task is required");
       expect(data.error.code).toBe("MISSING_TASK");
       expect(data.error.reason).toBe("INVALID_REQUEST");
       expect(data.error.phase).toBe("setup");
-      expect(data.error.at).toBeDefined();
-      expect(data.error.message).toBeUndefined();
-      expect(data.error.timestamp).toBeUndefined();
+      expect(data.error.timestamp).toBeDefined();
     });
 
     it("should reject requests without OpenAI API key with new error shape", async () => {
@@ -124,10 +123,12 @@ describe("Pilo Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
+      expect(data.error.message).toBe("AI provider is not configured.");
       expect(data.error.code).toBe("MISSING_API_KEY");
       expect(data.error.reason).toBe("PROVIDER_UNAUTHORIZED");
       expect(data.error.phase).toBe("setup");
-      expect(data.error.message).toBeUndefined();
+      // Must not leak the original dynamic message from pilo-core
+      expect(data.error.message).not.toContain("OPENAI_API_KEY");
     });
 
     it("should return SSE headers for valid request", async () => {
@@ -183,33 +184,12 @@ describe("Pilo Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
+      expect(data.error.message).toBe("Failed to parse request body.");
       expect(data.error.class).toBe("SyntaxError");
       expect(data.error.code).toBe("TASK_SETUP_FAILED");
       expect(data.error.reason).toBe("INVALID_REQUEST");
       expect(data.error.phase).toBe("setup");
-      expect(data.error.at).toBeDefined();
-      expect(data.error.message).toBeUndefined();
-      expect(data.error.timestamp).toBeUndefined();
-    });
-
-    it("should never include error.message in any response body", async () => {
-      // Hit several error paths and confirm 'message' is never present
-      const responses = await Promise.all([
-        app.request("/pilo/run", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        }),
-        app.request("/pilo/run", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "invalid json",
-        }),
-      ]);
-      for (const res of responses) {
-        const data = await res.json();
-        expect(data.error.message).toBeUndefined();
-      }
+      expect(data.error.timestamp).toBeDefined();
     });
 
     it("should return readable stream for SSE", async () => {
