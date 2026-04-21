@@ -85,6 +85,16 @@ describe("taskRunner", () => {
       const parsed = new Date(res.error.timestamp);
       expect(parsed.getTime()).not.toBeNaN();
     });
+
+    it("should include taskId when provided", () => {
+      const res = createErrorResponse("msg", "CODE", "task-abc-123");
+      expect(res.error.taskId).toBe("task-abc-123");
+    });
+
+    it("should omit taskId when not provided", () => {
+      const res = createErrorResponse("msg", "CODE");
+      expect(res.error.taskId).toBeUndefined();
+    });
   });
 
   describe("validateTaskRequest", () => {
@@ -212,6 +222,19 @@ describe("taskRunner", () => {
       ).rejects.toThrow("task failed");
 
       expect(mockClose).toHaveBeenCalled();
+    });
+
+    it("should pass taskId to WebAgent constructor when provided", async () => {
+      await runTask({
+        body: { task: "test" },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+        taskId: "task-abc-123",
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: "task-abc-123" }),
+      );
     });
 
     it("should not throw when agent.close fails", async () => {

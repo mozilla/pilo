@@ -39,15 +39,22 @@ const mockValidateTaskRequest = vi.fn().mockReturnValue(null);
 vi.mock("../taskRunner.js", () => ({
   runTask: (...args: any[]) => mockRunTask(...args),
   validateTaskRequest: (...args: any[]) => mockValidateTaskRequest(...args),
-  createErrorResponse: (message: string, code: string) => ({
+  createErrorResponse: (message: string, code: string, taskId?: string) => ({
     success: false,
-    error: { message, code, timestamp: new Date().toISOString() },
+    error: {
+      message,
+      code,
+      timestamp: new Date().toISOString(),
+      ...(taskId !== undefined && { taskId }),
+    },
   }),
   errorToString: (error: unknown) => (error instanceof Error ? error.name : "Unknown error"),
 }));
 
 import { createPiloWsRoute } from "./piloWs.js";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Helper to extract the WebSocket event handlers from createPiloWsRoute.
@@ -293,6 +300,56 @@ describe("piloWs", () => {
       const actionMsg = h.sentMessages.find((m) => m.event === "agent:action");
       expect(actionMsg).toBeDefined();
       expect(actionMsg!.data).toEqual({ action: "click" });
+    });
+  });
+
+  describe("taskId", () => {
+    it("should emit task:accepted event with taskId after validation passes", async () => {
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const accepted = h.sentMessages.find((m) => m.event === "task:accepted");
+      expect(accepted).toBeDefined();
+      expect(accepted!.data.taskId).toMatch(UUID_RE);
+    });
+
+    it("should pass taskId to runTask", async () => {
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      expect(mockRunTask).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: expect.stringMatching(UUID_RE) }),
+      );
+    });
+
+    it("should include taskId in validation-error response", () => {
+      mockValidateTaskRequest.mockReturnValue({
+        status: 400,
+        response: {
+          success: false,
+          error: { message: "Task is required", code: "MISSING_TASK", timestamp: "" },
+        },
+      });
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "" } });
+
+      expect(h.sentMessages[0].event).toBe("error");
+      expect(h.sentMessages[0].data.error.taskId).toMatch(UUID_RE);
+    });
+
+    it("should include taskId in task-execution error response", async () => {
+      mockRunTask.mockRejectedValue(new TypeError("something broke"));
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg!.data.error.taskId).toMatch(UUID_RE);
     });
   });
 

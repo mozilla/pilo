@@ -16,6 +16,7 @@
  *   { "event": "error", "data": ErrorResponse }
  */
 
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
@@ -83,18 +84,23 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
             }
 
             const body = msg.data as PiloTaskRequest;
+            const taskId = randomUUID();
             if (!body) {
-              send(ws, "error", createErrorResponse("Missing data", "MISSING_DATA"));
+              send(ws, "error", createErrorResponse("Missing data", "MISSING_DATA", taskId));
               return;
             }
 
             const validationError = validateTaskRequest(body);
             if (validationError) {
-              send(ws, "error", validationError.response);
+              send(ws, "error", {
+                ...validationError.response,
+                error: { ...validationError.response.error, taskId },
+              });
               return;
             }
 
             taskRunning = true;
+            send(ws, "task:accepted", { taskId });
 
             // The callback just blocks until the client responds.
             // The event (interactive:form_data:request or interactive:form_data:error)
@@ -117,6 +123,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 const result = await withRemoteContext(traceHeaders, () =>
                   runTask({
                     body,
+                    taskId,
                     sendEvent: async (event, data) => {
                       send(ws, event, data);
                     },
@@ -131,7 +138,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                   await send(
                     ws,
                     "error",
-                    createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
+                    createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED", taskId),
                   );
                 }
               } finally {
