@@ -65,6 +65,7 @@ describe("taskRunner", () => {
   describe("createErrorResponse", () => {
     it("should build the structured error shape from explicit fields", () => {
       const res = createErrorResponse({
+        message: "something failed",
         class: "CustomError",
         code: "SOME_CODE",
         reason: "INVALID_REQUEST",
@@ -73,58 +74,59 @@ describe("taskRunner", () => {
         taskId: "task-abc-123",
       });
       expect(res.success).toBe(false);
+      expect(res.error.message).toBe("something failed");
       expect(res.error.class).toBe("CustomError");
       expect(res.error.code).toBe("SOME_CODE");
       expect(res.error.reason).toBe("INVALID_REQUEST");
       expect(res.error.recoverable).toBe(false);
       expect(res.error.phase).toBe("setup");
       expect(res.error.taskId).toBe("task-abc-123");
-      expect(res.error.at).toBeDefined();
+      expect(res.error.timestamp).toBeDefined();
     });
 
-    it("should never include a message field", () => {
+    it("should produce a valid ISO timestamp", () => {
       const res = createErrorResponse({
-        code: "SOME_CODE",
-        reason: "INTERNAL_ERROR",
-      });
-      expect((res.error as Record<string, unknown>).message).toBeUndefined();
-    });
-
-    it("should never include a timestamp field (renamed to 'at')", () => {
-      const res = createErrorResponse({
-        code: "SOME_CODE",
-        reason: "INTERNAL_ERROR",
-      });
-      expect((res.error as Record<string, unknown>).timestamp).toBeUndefined();
-      expect(res.error.at).toBeDefined();
-    });
-
-    it("should produce a valid ISO timestamp in 'at'", () => {
-      const res = createErrorResponse({
+        message: "msg",
         code: "CODE",
         reason: "INTERNAL_ERROR",
       });
-      const parsed = new Date(res.error.at);
+      const parsed = new Date(res.error.timestamp);
       expect(parsed.getTime()).not.toBeNaN();
     });
 
     it("should default class to 'Error' when not provided", () => {
-      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
       expect(res.error.class).toBe("Error");
     });
 
     it("should default recoverable to false when not provided", () => {
-      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
       expect(res.error.recoverable).toBe(false);
     });
 
     it("should omit taskId when not provided", () => {
-      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
       expect(res.error.taskId).toBeUndefined();
     });
 
     it("should omit phase when not provided", () => {
-      const res = createErrorResponse({ code: "CODE", reason: "INTERNAL_ERROR" });
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
       expect(res.error.phase).toBeUndefined();
     });
   });
@@ -145,7 +147,15 @@ describe("taskRunner", () => {
       });
       const json = JSON.stringify(res);
       expect(json).not.toContain("DO NOT LOG THIS SENTINEL");
-      expect((res.error as Record<string, unknown>).message).toBeUndefined();
+    });
+
+    it("should set message from the reason hint map (not error.message)", () => {
+      const res = errorResponseFromError(new Error("ignored dynamic detail"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      // INTERNAL_ERROR hint
+      expect(res.error.message).toBe("The task failed due to an internal error.");
     });
 
     it("should classify unknown errors as INTERNAL_ERROR, not recoverable", () => {
@@ -205,6 +215,7 @@ describe("taskRunner", () => {
       const result = validateTaskRequest({ task: "" });
       expect(result).not.toBeNull();
       expect(result!.status).toBe(400);
+      expect(result!.response.error.message).toBe("Task is required");
       expect(result!.response.error.code).toBe("MISSING_TASK");
       expect(result!.response.error.reason).toBe("INVALID_REQUEST");
       expect(result!.response.error.phase).toBe("setup");
@@ -224,6 +235,9 @@ describe("taskRunner", () => {
       expect(result!.status).toBe(400);
       expect(result!.response.error.code).toBe("INVALID_SEARCH_PROVIDER");
       expect(result!.response.error.reason).toBe("INVALID_REQUEST");
+      expect(result!.response.error.message).toContain("Must be one of");
+      // Must not echo the user-provided value back
+      expect(result!.response.error.message).not.toContain("invalid-provider");
     });
 
     it("should accept valid search providers", () => {
@@ -242,6 +256,7 @@ describe("taskRunner", () => {
       const result = validateTaskRequest({ task: "test" });
       expect(result).not.toBeNull();
       expect(result!.status).toBe(500);
+      expect(result!.response.error.message).toBe("AI provider is not configured.");
       expect(result!.response.error.code).toBe("MISSING_API_KEY");
       expect(result!.response.error.reason).toBe("PROVIDER_UNAUTHORIZED");
       expect(result!.response.error.phase).toBe("setup");
@@ -257,7 +272,6 @@ describe("taskRunner", () => {
       const json = JSON.stringify(result!.response);
       expect(json).not.toContain("SENSITIVE");
       expect(json).not.toContain("sk-abc123");
-      expect((result!.response.error as Record<string, unknown>).message).toBeUndefined();
     });
   });
 

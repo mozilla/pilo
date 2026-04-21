@@ -85,6 +85,7 @@ pilo.post("/run", async (c) => {
     console.error("Pilo task setup failed:", error);
     return c.json(
       createErrorResponse({
+        message: "Failed to parse request body.",
         class: error instanceof Error ? error.constructor.name : "Unknown",
         code: "TASK_SETUP_FAILED",
         reason: "INVALID_REQUEST",

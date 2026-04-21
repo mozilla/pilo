@@ -105,24 +105,32 @@ export type ErrorPhase = "setup" | "execution";
 export interface ErrorResponse {
   success: false;
   error: {
-    /** Error constructor name (e.g. "TypeError", "NavigationTimeoutException"). */
-    class: string;
+    /**
+     * Human-readable description of the error. Definitionally safe: always
+     * populated from a server-controlled source (a hardcoded literal at the
+     * callsite or the REASON_HINTS map). Never derived from `error.message`
+     * of a thrown value, which could embed user input or page content.
+     */
+    message: string;
     /** Fine-grained semantic code for programmatic handling (e.g. "MISSING_TASK"). */
     code: string;
+    /** ISO timestamp when the response was generated. */
+    timestamp: string;
+    /** Error constructor name (e.g. "TypeError", "NavigationTimeoutException"). */
+    class: string;
     /** Coarse-grained category, safe for metric labels. */
     reason: ErrorReason;
     /** True if the underlying error is a RecoverableError; hint for callers. */
     recoverable: boolean;
     /** Which pipeline phase the error occurred in. */
     phase?: ErrorPhase;
-    /** ISO timestamp when the response was generated. */
-    at: string;
     /** Server-generated correlation ID for this task, if available. */
     taskId?: string;
   };
 }
 
 export interface CreateErrorResponseParams {
+  message: string;
   class?: string;
   code: string;
   reason: ErrorReason;
@@ -134,15 +142,33 @@ export interface CreateErrorResponseParams {
 export const createErrorResponse = (params: CreateErrorResponseParams): ErrorResponse => ({
   success: false,
   error: {
-    class: params.class ?? "Error",
+    message: params.message,
     code: params.code,
+    timestamp: new Date().toISOString(),
+    class: params.class ?? "Error",
     reason: params.reason,
     recoverable: params.recoverable ?? false,
     ...(params.phase && { phase: params.phase }),
-    at: new Date().toISOString(),
     ...(params.taskId && { taskId: params.taskId }),
   },
 });
+
+/**
+ * Server-controlled human-readable hint per reason. Used as the `message`
+ * for task-execution errors where the callsite has no better hardcoded
+ * string. NEVER merges `error.message` of the thrown value.
+ */
+const REASON_HINTS: Record<ErrorReason, string> = {
+  INVALID_REQUEST: "The request is invalid.",
+  PROVIDER_UNAUTHORIZED: "The AI provider is not configured or the key is invalid.",
+  NAVIGATION_TIMEOUT: "The target page did not finish loading in time.",
+  BROWSER_DISCONNECTED: "The browser disconnected during task execution.",
+  MAX_ITERATIONS:
+    "The agent exceeded the maximum number of iterations without completing the task.",
+  MAX_ERRORS: "The agent hit the error threshold and aborted.",
+  TIMEOUT: "The task exceeded its time budget.",
+  INTERNAL_ERROR: "The task failed due to an internal error.",
+};
 
 /**
  * Map an unknown thrown value to a safe (reason, recoverable) pair.
@@ -170,8 +196,10 @@ function classifyError(error: unknown): { reason: ErrorReason; recoverable: bool
 
 /**
  * Build an ErrorResponse from an unknown thrown value. Extracts the error's
- * class name and classifies into a reason + recoverable flag. Never forwards
- * error.message — agent/browser errors can embed user input or page content.
+ * class name, classifies into a reason + recoverable flag, and picks a
+ * human-readable message from REASON_HINTS. Never forwards error.message
+ * from the thrown value — agent/browser errors can embed user input or page
+ * content.
  */
 export const errorResponseFromError = (
   error: unknown,
@@ -180,6 +208,7 @@ export const errorResponseFromError = (
   const errorClass = error instanceof Error ? error.constructor.name : "Unknown";
   const { reason, recoverable } = classifyError(error);
   return createErrorResponse({
+    message: REASON_HINTS[reason],
     class: errorClass,
     code: opts.code,
     reason,
@@ -199,6 +228,7 @@ export function validateTaskRequest(
     return {
       status: 400,
       response: createErrorResponse({
+        message: "Task is required",
         code: "MISSING_TASK",
         reason: "INVALID_REQUEST",
         phase: "setup",
@@ -213,6 +243,7 @@ export function validateTaskRequest(
     return {
       status: 400,
       response: createErrorResponse({
+        message: `Invalid search provider. Must be one of: ${SEARCH_PROVIDERS.join(", ")}`,
         code: "INVALID_SEARCH_PROVIDER",
         reason: "INVALID_REQUEST",
         phase: "setup",
@@ -226,6 +257,8 @@ export function validateTaskRequest(
     return {
       status: 400,
       response: createErrorResponse({
+        message:
+          "parallel-api search provider requires PARALLEL_API_KEY to be configured on the server",
         code: "MISSING_SEARCH_API_KEY",
         reason: "INVALID_REQUEST",
         phase: "setup",
@@ -239,6 +272,7 @@ export function validateTaskRequest(
     return {
       status: 500,
       response: createErrorResponse({
+        message: "AI provider is not configured.",
         code: "MISSING_API_KEY",
         reason: "PROVIDER_UNAUTHORIZED",
         phase: "setup",

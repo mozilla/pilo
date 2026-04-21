@@ -75,6 +75,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               ws,
               "error",
               createErrorResponse({
+                message: "Invalid JSON message",
                 code: "INVALID_MESSAGE",
                 reason: "INVALID_REQUEST",
                 phase: "setup",
@@ -89,6 +90,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 ws,
                 "error",
                 createErrorResponse({
+                  message: "A task is already running on this connection",
                   code: "TASK_ALREADY_RUNNING",
                   reason: "INVALID_REQUEST",
                   phase: "setup",
@@ -104,6 +106,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 ws,
                 "error",
                 createErrorResponse({
+                  message: "Missing data",
                   code: "MISSING_DATA",
                   reason: "INVALID_REQUEST",
                   phase: "setup",
@@ -185,6 +188,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 ws,
                 "error",
                 createErrorResponse({
+                  message: "Missing requestId in response",
                   code: "INVALID_RESPONSE",
                   reason: "INVALID_REQUEST",
                 }),
@@ -198,6 +202,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 ws,
                 "error",
                 createErrorResponse({
+                  message: "No pending request matches the given requestId",
                   code: "UNKNOWN_REQUEST_ID",
                   reason: "INVALID_REQUEST",
                 }),
@@ -213,6 +218,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               ws,
               "error",
               createErrorResponse({
+                message: "Unknown event type",
                 code: "UNKNOWN_EVENT",
                 reason: "INVALID_REQUEST",
               }),
