@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
-import { withSpan, SpanName } from "../telemetry/tracing.js";
+import { withSpan, SpanName, recordSanitizedException } from "../telemetry/tracing.js";
 
 interface SearchToolContext {
   searchService: SearchService;
@@ -64,7 +64,7 @@ export function createSearchTools(context: SearchToolContext) {
               // recoverable (the LLM sees the error and can retry or move on).
               // We do NOT set span status to ERROR — matching the webActionTools
               // pattern for recoverable failures.
-              span.recordException(error instanceof Error ? error : new Error(errorMessage));
+              recordSanitizedException(span, error);
               return {
                 success: false,
                 action: "webSearch",

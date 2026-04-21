@@ -7,6 +7,7 @@ interface Span {
   setAttribute(key: string, value: string | number | boolean): this;
   setStatus(status: { code: number; message?: string }): this;
   recordException(error: Error | string): void;
+  addEvent(name: string, attributes?: Record<string, string | number | boolean>): void;
   end(): void;
 }
 
@@ -67,6 +68,9 @@ function makeNoOpSpan(): Span {
       return span;
     },
     recordException(_error: Error | string): void {
+      // no-op
+    },
+    addEvent(_name: string, _attributes?: Record<string, string | number | boolean>): void {
       // no-op
     },
     end(): void {
@@ -221,4 +225,32 @@ async function withSpanAsync<T>(
       span.end();
     }
   });
+}
+
+/**
+ * Record an exception on a span with data-sensitivity protection.
+ *
+ * Unlike OTel's standard `span.recordException`, this helper emits ONLY the
+ * OTel `exception.type` attribute (the error's class name). It deliberately
+ * omits `exception.message` and `exception.stacktrace`, both of which
+ * commonly embed user input or page content in this codebase (agent errors
+ * quote the task, Playwright errors include selectors derived from the DOM,
+ * AI SDK errors can echo prompt fragments).
+ *
+ * Also sets:
+ * - `pilo.error.class` attribute (same value as `exception.type`) so dashboards
+ *   can filter on it without depending on OTel exception-event semantics.
+ * - `pilo.error.code` attribute when `opts.code` is provided.
+ */
+export function recordSanitizedException(
+  span: Span,
+  error: unknown,
+  opts: { code?: string } = {},
+): void {
+  const errorClass = error instanceof Error ? error.constructor.name : "Unknown";
+  span.addEvent("exception", { "exception.type": errorClass });
+  span.setAttribute("pilo.error.class", errorClass);
+  if (opts.code) {
+    span.setAttribute("pilo.error.code", opts.code);
+  }
 }

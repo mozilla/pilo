@@ -230,6 +230,145 @@ describe("tracing helpers", () => {
     });
   });
 
+  describe("recordSanitizedException", () => {
+    it("sets pilo.error.class from error constructor name", async () => {
+      const mockSetAttribute = vi.fn().mockReturnThis();
+      const mockAddEvent = vi.fn();
+      const span = {
+        setAttribute: mockSetAttribute,
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: mockAddEvent,
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new TypeError("bad"));
+
+      expect(mockSetAttribute).toHaveBeenCalledWith("pilo.error.class", "TypeError");
+    });
+
+    it("emits an OTel exception event with only exception.type", async () => {
+      const mockAddEvent = vi.fn();
+      const span = {
+        setAttribute: vi.fn().mockReturnThis(),
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: mockAddEvent,
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new TypeError("bad"));
+
+      expect(mockAddEvent).toHaveBeenCalledWith("exception", { "exception.type": "TypeError" });
+    });
+
+    it("never emits exception.message or exception.stacktrace", async () => {
+      const mockAddEvent = vi.fn();
+      const span = {
+        setAttribute: vi.fn().mockReturnThis(),
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: mockAddEvent,
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new Error("DO NOT LOG THIS SENTINEL"));
+
+      for (const call of mockAddEvent.mock.calls) {
+        const attrs = (call[1] as Record<string, unknown>) ?? {};
+        expect(attrs).not.toHaveProperty("exception.message");
+        expect(attrs).not.toHaveProperty("exception.stacktrace");
+      }
+      const allCalls = JSON.stringify([
+        mockAddEvent.mock.calls,
+        (span.setAttribute as any).mock.calls,
+      ]);
+      expect(allCalls).not.toContain("DO NOT LOG THIS SENTINEL");
+    });
+
+    it("never calls span.recordException (avoids OTel's default message+stack emission)", async () => {
+      const mockRecordException = vi.fn();
+      const span = {
+        setAttribute: vi.fn().mockReturnThis(),
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: mockRecordException,
+        addEvent: vi.fn(),
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new Error("anything"));
+
+      expect(mockRecordException).not.toHaveBeenCalled();
+    });
+
+    it("sets class to 'Unknown' for non-Error throws", async () => {
+      const mockSetAttribute = vi.fn().mockReturnThis();
+      const mockAddEvent = vi.fn();
+      const span = {
+        setAttribute: mockSetAttribute,
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: mockAddEvent,
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, "a string");
+
+      expect(mockSetAttribute).toHaveBeenCalledWith("pilo.error.class", "Unknown");
+      expect(mockAddEvent).toHaveBeenCalledWith("exception", { "exception.type": "Unknown" });
+    });
+
+    it("sets pilo.error.code when opts.code is provided", async () => {
+      const mockSetAttribute = vi.fn().mockReturnThis();
+      const span = {
+        setAttribute: mockSetAttribute,
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: vi.fn(),
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new Error("x"), { code: "NAVIGATION_TIMEOUT" });
+
+      expect(mockSetAttribute).toHaveBeenCalledWith("pilo.error.code", "NAVIGATION_TIMEOUT");
+    });
+
+    it("omits pilo.error.code when opts.code is not provided", async () => {
+      const mockSetAttribute = vi.fn().mockReturnThis();
+      const span = {
+        setAttribute: mockSetAttribute,
+        setStatus: vi.fn().mockReturnThis(),
+        recordException: vi.fn(),
+        addEvent: vi.fn(),
+        end: vi.fn(),
+      };
+
+      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+      recordSanitizedException(span as any, new Error("x"));
+
+      const attrCalls = mockSetAttribute.mock.calls.map((c) => c[0]);
+      expect(attrCalls).not.toContain("pilo.error.code");
+    });
+
+    it("works with a no-op span when OTel is not installed", async () => {
+      vi.doMock("@opentelemetry/api", () => {
+        throw new Error("Cannot find module '@opentelemetry/api'");
+      });
+      const { getTracer, recordSanitizedException } =
+        await import("../../src/telemetry/tracing.js");
+      const tracer = await getTracer("test");
+      const span = tracer.startSpan("s");
+
+      expect(() => recordSanitizedException(span, new Error("x"))).not.toThrow();
+    });
+  });
+
   describe("withRemoteContext", () => {
     describe("when @opentelemetry/api is NOT installed", () => {
       beforeEach(() => {

@@ -48,7 +48,12 @@ import {
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
 } from "./constants.js";
-import { withSpan, SpanStatusCode, SpanName } from "./telemetry/tracing.js";
+import {
+  withSpan,
+  SpanStatusCode,
+  SpanName,
+  recordSanitizedException,
+} from "./telemetry/tracing.js";
 
 // === Type Definitions ===
 
@@ -360,9 +365,9 @@ export class WebAgent {
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
           throw error;
         }
       },
@@ -549,9 +554,9 @@ export class WebAgent {
             // Only mark non-disconnect errors as span failures
             stepSpan.setStatus({
               code: SpanStatusCode.ERROR,
-              message: error instanceof Error ? error.message : String(error),
+              message: error instanceof Error ? error.constructor.name : "Unknown",
             });
-            stepSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+            recordSanitizedException(stepSpan, error);
 
             trackError();
 
@@ -966,8 +971,11 @@ export class WebAgent {
         } catch (error) {
           // Preserve original error
           generationError = error instanceof Error ? error : new Error(String(error));
-          aiSpan.setStatus({ code: SpanStatusCode.ERROR, message: generationError.message });
-          aiSpan.recordException(generationError);
+          aiSpan.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: generationError.constructor.name,
+          });
+          recordSanitizedException(aiSpan, generationError);
           return null;
         }
       },
@@ -1308,9 +1316,9 @@ export class WebAgent {
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
 
           // On validation error, accept the result if we've hit max attempts
           if (executionState.validationAttempts >= this.maxValidationAttempts) {
@@ -1453,9 +1461,9 @@ export class WebAgent {
 
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
 
           // Check if the error message already contains "Failed to generate plan" to avoid double-wrapping
           if (errorMsg.includes("Failed to generate plan")) {
@@ -1816,12 +1824,9 @@ export class WebAgent {
       } catch (reconnectError) {
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message:
-            reconnectError instanceof Error ? reconnectError.message : String(reconnectError),
+          message: reconnectError instanceof Error ? reconnectError.constructor.name : "Unknown",
         });
-        span.recordException(
-          reconnectError instanceof Error ? reconnectError : new Error(String(reconnectError)),
-        );
+        recordSanitizedException(span, reconnectError);
         throw reconnectError;
       }
     });

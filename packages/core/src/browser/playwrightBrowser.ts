@@ -26,7 +26,12 @@ import { NavigationRetryConfig, calculateTimeout } from "./navigationRetry.js";
 import { getConfigDefaults } from "../config/defaults.js";
 import { createNavigationRetryConfig } from "../utils/configMerge.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
-import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
+import {
+  withSpan,
+  SpanStatusCode,
+  SpanName,
+  recordSanitizedException,
+} from "../telemetry/tracing.js";
 
 export interface PlaywrightBrowserOptions {
   /** Browser type to use (defaults to 'firefox') */
@@ -351,9 +356,9 @@ export class PlaywrightBrowser implements AriaBrowser {
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
           throw error;
         }
       },
@@ -576,15 +581,15 @@ export class PlaywrightBrowser implements AriaBrowser {
       } catch (error) {
         if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
           const disconnectError = new BrowserDisconnectedError(error.message);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-          span.recordException(disconnectError);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: "BrowserDisconnectedError" });
+          recordSanitizedException(span, disconnectError);
           throw disconnectError;
         }
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
+          message: error instanceof Error ? error.constructor.name : "Unknown",
         });
-        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        recordSanitizedException(span, error);
         throw error;
       }
     });
@@ -739,9 +744,9 @@ export class PlaywrightBrowser implements AriaBrowser {
       } catch (error) {
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
+          message: error instanceof Error ? error.constructor.name : "Unknown",
         });
-        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        recordSanitizedException(span, error);
         throw error;
       }
     });
@@ -927,9 +932,9 @@ export class PlaywrightBrowser implements AriaBrowser {
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
           throw error;
         }
       },
