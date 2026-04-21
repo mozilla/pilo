@@ -368,7 +368,10 @@ describe("taskRunner", () => {
       });
 
       expect(result.success).toBe(true);
-      expect(consoleError).toHaveBeenCalledWith("Error closing agent:", expect.any(Error));
+      expect(consoleError).toHaveBeenCalledWith(
+        "[pilo-server] error closing agent",
+        expect.objectContaining({ error_class: expect.any(String) }),
+      );
       consoleError.mockRestore();
     });
   });

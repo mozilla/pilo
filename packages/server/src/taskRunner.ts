@@ -378,7 +378,10 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     try {
       await agent.close();
     } catch (closeError) {
-      console.error("Error closing agent:", closeError);
+      console.error("[pilo-server] error closing agent", {
+        taskId,
+        error_class: closeError instanceof Error ? closeError.constructor.name : "Unknown",
+      });
     }
   }
 }
