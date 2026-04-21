@@ -288,15 +288,6 @@ describe("MetricsCollector", () => {
           totalTokens: 150,
           inputTokens: 100,
           outputTokens: 50,
-          inputTokenDetails: {
-            noCacheTokens: 100,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-          },
-          outputTokenDetails: {
-            textTokens: 50,
-            reasoningTokens: 0,
-          },
         },
         providerMetadata: {},
         warnings: [],
@@ -315,15 +306,6 @@ describe("MetricsCollector", () => {
             totalTokens: 275,
             inputTokens: 200,
             outputTokens: 75,
-            inputTokenDetails: {
-              noCacheTokens: 200,
-              cacheReadTokens: 0,
-              cacheWriteTokens: 0,
-            },
-            outputTokenDetails: {
-              textTokens: 75,
-              reasoningTokens: 0,
-            },
           },
         },
       });
@@ -361,15 +343,6 @@ describe("MetricsCollector", () => {
           totalTokens: 150,
           inputTokens: undefined,
           outputTokens: undefined,
-          inputTokenDetails: {
-            noCacheTokens: undefined,
-            cacheReadTokens: undefined,
-            cacheWriteTokens: undefined,
-          },
-          outputTokenDetails: {
-            textTokens: undefined,
-            reasoningTokens: undefined,
-          },
         },
         providerMetadata: {},
         warnings: [],
