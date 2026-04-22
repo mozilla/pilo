@@ -64,7 +64,7 @@
     "liquidjs": "^10.25.5",
     "nanoid": "^5.1.7",
     "ollama-ai-provider-v2": "^3.5.0",
-    "playwright": "1.58.2",
+    "playwright": "1.59.1",
     "turndown": "^7.2.2",
     "web-ext": "^10.0.0",
     "zod": "^4.3.6"
