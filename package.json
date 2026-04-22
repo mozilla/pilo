@@ -64,13 +64,13 @@
     "liquidjs": "^10.25.5",
     "nanoid": "^5.1.7",
     "ollama-ai-provider-v2": "^3.5.0",
-    "playwright": "1.58.2",
+    "playwright": "1.59.1",
     "turndown": "^7.2.2",
     "web-ext": "^10.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.0",
     "prettier": "^3.8.1",
     "tsup": "^8.3.5",
     "tsx": "^4.21.0",

@@ -1,6 +1,5 @@
-import { ModelMessage, StreamTextResult } from "ai";
+import { ModelMessage } from "ai";
 import { EventEmitter } from "eventemitter3";
-import type { AwaitedProperties } from "./utils/types.js";
 import type { FormFieldRequest } from "./types/interactive.js";
 
 /**
@@ -153,13 +152,30 @@ export interface TaskMetricsEventData extends WebAgentEventData {
   totalOutputTokens: number;
 }
 
-// Get a nondescript StreamTextResult type for usage in event data
-type StreamTextResultGeneric = StreamTextResult<any, never>;
-
-// Extract and await the stream result properties we need for AI generation events
-type AIGenerationStreamData = AwaitedProperties<
-  Pick<StreamTextResultGeneric, "finishReason" | "usage" | "providerMetadata" | "warnings">
->;
+/**
+ * Inlined shape of the AI SDK's `StreamTextResult` fields we surface on AI
+ * generation events.
+ *
+ * Previously derived as `AwaitedProperties<Pick<StreamTextResult, ...>>`, but
+ * that form pulls through AI SDK's generics in a way `ts-json-schema-generator`
+ * can't resolve — which breaks extraction of the whole `WebAgentEvent` union
+ * for downstream tooling (tabs-api's OpenAPI spec, Stainless SDK generation).
+ *
+ * Fields mirror AI SDK's awaited `StreamTextResult` shape as of the `ai`
+ * package version pinned in package.json. Keep the sub-field types loose
+ * enough (optional, `unknown`, etc.) to absorb minor AI SDK evolution
+ * without compile breakage here.
+ */
+type AIGenerationStreamData = {
+  finishReason: "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other";
+  usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+  providerMetadata?: Record<string, unknown>;
+  warnings?: unknown[];
+};
 
 /**
  * Event data when AI generation occurs
