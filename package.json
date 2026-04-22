@@ -2,6 +2,7 @@
   "name": "@tabstack/pilo",
   "version": "0.0.0-dev",
   "description": "AI-powered web automation library and CLI tool",
+  "repository": "github:mozilla/pilo",
   "type": "module",
   "engines": {
     "node": "^22.0.0"
