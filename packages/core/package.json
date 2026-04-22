@@ -62,7 +62,7 @@
     "@types/node": "^25.5.2",
     "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.1.1",
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.0",
     "jsdom": "^29.0.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
