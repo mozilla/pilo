@@ -25,7 +25,9 @@
     "pretest": "pnpm run bundle:aria",
     "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "test:only": "pnpm run bundle:aria && pnpm run test"
+    "test:only": "pnpm run bundle:aria && pnpm run test",
+    "generate:schemas": "ts-json-schema-generator --path src/events.ts --tsconfig tsconfig.json --type WebAgentEvent --out schemas/webagent-event.json && node scripts/normalize-schema.cjs schemas/webagent-event.json",
+    "check:schemas": "pnpm run generate:schemas && git diff --exit-code schemas/"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.59",
@@ -64,6 +66,7 @@
     "@vitest/coverage-v8": "^4.1.1",
     "esbuild": "^0.28.0",
     "jsdom": "^29.0.2",
+    "ts-json-schema-generator": "2.5.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.3"

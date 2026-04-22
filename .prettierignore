@@ -11,6 +11,11 @@ build/
 # Generated bundles
 packages/core/src/browser/ariaTree/bundle.ts
 
+# Generated JSON Schema artifacts (from `pnpm --filter pilo-core run generate:schemas`)
+# Excluded because prettier's formatting diverges from ts-json-schema-generator's
+# output, which would cause the check:schemas drift gate to fail after a reformat.
+packages/core/schemas/
+
 # WXT framework auto-generated files
 packages/extension/.wxt/
 

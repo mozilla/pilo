@@ -117,6 +117,7 @@ pnpm pilo extension install firefox [--tmp] [--firefox-binary <path>]
    - Run `pnpm run typecheck` to run formatting checks and typecheck all packages (single entry point for both).
    - Run `pnpm -r run test` to verify all tests pass.
 3. **Full validation**: `pnpm run check` chains `typecheck` (which includes pretest + format:check + per-package typechecks) and then all tests.
+4. **Before pushing to a branch**: always run at minimum `pnpm run format:check` locally so CI's `Check formatting` step doesn't fail on missed prettier pass. Per-package filters (e.g. `pnpm --filter pilo-core run check:schemas`) only cover the named package — they do NOT run the root-level prettier check.
 
 ## Testing
 

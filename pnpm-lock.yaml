@@ -212,6 +212,9 @@ importers:
       jsdom:
         specifier: ^29.0.2
         version: 29.0.2
+      ts-json-schema-generator:
+        specifier: 2.5.0
+        version: 2.5.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -4683,6 +4686,11 @@ packages:
   ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
 
+  ts-json-schema-generator@2.5.0:
+    resolution: {integrity: sha512-sYY7AInozRbtj9OD3ynJJuMDWZ5lGxzxTevtmH3W9Hnd2J2szBC0HdPqSyuIirXnQ6g8KDJxS/HENoypUwBrlg==}
+    engines: {node: '>=22.0.0'}
+    hasBin: true
+
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
@@ -4730,6 +4738,11 @@ packages:
 
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
 
   typescript@6.0.2:
     resolution: {integrity: sha512-bGdAIrZ0wiGDo5l8c++HWtbaNCWTS4UTv7RaTH/ThVIgjkveJt83m74bBHMJkuCbslY8ixgLBVZJIOiQlQTjfQ==}
@@ -9167,6 +9180,16 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
+  ts-json-schema-generator@2.5.0:
+    dependencies:
+      '@types/json-schema': 7.0.15
+      commander: 14.0.3
+      json5: 2.2.3
+      normalize-path: 3.0.0
+      safe-stable-stringify: 2.5.0
+      tslib: 2.8.1
+      typescript: 5.9.3
+
   tslib@2.8.1: {}
 
   tsup@8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@6.0.2)(yaml@2.8.3):
@@ -9219,6 +9242,8 @@ snapshots:
   type-fest@4.41.0: {}
 
   typedarray@0.0.6: {}
+
+  typescript@5.9.3: {}
 
   typescript@6.0.2: {}
 

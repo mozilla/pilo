@@ -143,6 +143,13 @@ jobs:
       - name: Typecheck core
         run: pnpm --filter pilo-core run typecheck
 
+      - name: Check schema artifacts are up-to-date
+        # Regenerates schemas/ and fails if the committed artifact drifts
+        # from what the generator produces. If this fails, run
+        # `pnpm --filter pilo-core run generate:schemas` locally and commit.
+        if: needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+        run: pnpm --filter pilo-core run check:schemas
+
       - name: Test core
         if: needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
         run: pnpm --filter pilo-core run test
