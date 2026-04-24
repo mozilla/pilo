@@ -1,6 +1,7 @@
 import { ModelMessage } from "ai";
 import { EventEmitter } from "eventemitter3";
 import type { FormFieldRequest } from "./types/interactive.js";
+import type { TaskExecutionResult } from "./webAgent.js";
 
 /**
  * Enum of all possible event types in the web agent
@@ -387,6 +388,65 @@ export type WebAgentEvent =
       type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR;
       data: InteractiveFormDataErrorEventData;
     };
+
+// ============================================================================
+// Stream-wrapper events
+// ============================================================================
+//
+// The events below are emitted by the HTTP route handler
+// (packages/server/src/routes/pilo.ts) after the agent loop completes, not
+// through WebAgentEventEmitter. They terminate the SSE stream. Wire-level
+// consumers see them interleaved with WebAgentEvents on the response stream,
+// so the authoritative schema for /v1/automate is AutomateStreamEvent (below),
+// which composes both sets.
+
+/**
+ * Payload for the `complete` stream event. Structurally identical to
+ * TaskExecutionResult from webAgent.ts — the `complete` event's data is
+ * the agent's final TaskExecutionResult, stringified onto the SSE stream.
+ */
+export type StreamCompleteEventData = TaskExecutionResult;
+
+/**
+ * Payload for the `done` stream terminator event. Empty today; reserved for
+ * future metadata.
+ */
+export type StreamDoneEventData = Record<string, never>;
+
+/**
+ * Payload for the top-level `error` stream event. Emitted when an uncaught
+ * error escapes the task runner. Mirrors `ErrorResponse` from the server
+ * package's `taskRunner.ts` — kept structurally aligned so schema and
+ * runtime stay consistent. Distinct from agent-level error events like
+ * `ai:generation:error` and `task:validation_error`, which are emitted
+ * through the normal event emitter during the agent loop.
+ */
+export interface StreamErrorEventData {
+  success: false;
+  error: {
+    message: string;
+    code: string;
+    /** ISO-8601 timestamp */
+    timestamp: string;
+  };
+}
+
+/**
+ * Top-level discriminated union of every event a `/v1/automate` SSE client
+ * can receive on the wire. Composes {@link WebAgentEvent} (agent-loop events
+ * emitted via {@link WebAgentEventEmitter}) with the stream-wrapper events
+ * (`complete`, `done`, `error`) emitted by the HTTP route handler after the
+ * agent returns.
+ *
+ * This is the authoritative source-of-truth for downstream SDK generation.
+ * Its JSON Schema export (`schemas/automate-stream-event.json`) is consumed
+ * by tabs-api to type `/v1/automate`'s SSE response in `@tabstack/sdk`.
+ */
+export type AutomateStreamEvent =
+  | WebAgentEvent
+  | { type: "complete"; data: StreamCompleteEventData }
+  | { type: "done"; data: StreamDoneEventData }
+  | { type: "error"; data: StreamErrorEventData };
 
 /**
  * Event emitter for WebAgent events

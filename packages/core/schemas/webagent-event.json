@@ -1,5 +1,5 @@
 {
-  "$ref": "#/definitions/WebAgentEvent",
+  "$ref": "#/definitions/AutomateStreamEvent",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "AIGenerationErrorEventData": {
@@ -3168,6 +3168,65 @@
       ],
       "type": "object"
     },
+    "AutomateStreamEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/WebAgentEvent"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/StreamCompleteEventData"
+            },
+            "type": {
+              "const": "complete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/StreamDoneEventData"
+            },
+            "type": {
+              "const": "done",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/StreamErrorEventData"
+            },
+            "type": {
+              "const": "error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Top-level discriminated union of every event a `/v1/automate` SSE client can receive on the wire. Composes  {@link  WebAgentEvent }  (agent-loop events emitted via  {@link  WebAgentEventEmitter } ) with the stream-wrapper events (`complete`, `done`, `error`) emitted by the HTTP route handler after the agent returns.\n\nThis is the authoritative source-of-truth for downstream SDK generation. Its JSON Schema export (`schemas/automate-stream-event.json`) is consumed by tabs-api to type `/v1/automate`'s SSE response in `@tabstack/sdk`."
+    },
     "BrowserReconnectedEventData": {
       "additionalProperties": false,
       "description": "Event data when the browser reconnects after a mid-task disconnect",
@@ -3626,6 +3685,53 @@
       ],
       "type": "object"
     },
+    "StreamCompleteEventData": {
+      "$ref": "#/definitions/TaskExecutionResult",
+      "description": "Payload for the `complete` stream event. Structurally identical to TaskExecutionResult from webAgent.ts — the `complete` event's data is the agent's final TaskExecutionResult, stringified onto the SSE stream."
+    },
+    "StreamDoneEventData": {
+      "additionalProperties": {
+        "not": {}
+      },
+      "description": "Payload for the `done` stream terminator event. Empty today; reserved for future metadata.",
+      "type": "object"
+    },
+    "StreamErrorEventData": {
+      "additionalProperties": false,
+      "description": "Payload for the top-level `error` stream event. Emitted when an uncaught error escapes the task runner. Mirrors `ErrorResponse` from the server package's `taskRunner.ts` — kept structurally aligned so schema and runtime stay consistent. Distinct from agent-level error events like `ai:generation:error` and `task:validation_error`, which are emitted through the normal event emitter during the agent loop.",
+      "properties": {
+        "error": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "timestamp": {
+              "description": "ISO-8601 timestamp",
+              "type": "string"
+            }
+          },
+          "required": [
+            "message",
+            "code",
+            "timestamp"
+          ],
+          "type": "object"
+        },
+        "success": {
+          "const": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success",
+        "error"
+      ],
+      "type": "object"
+    },
     "TaskAbortedEventData": {
       "additionalProperties": false,
       "description": "Event data when a task is aborted",
@@ -3675,6 +3781,90 @@
         "finalAnswer",
         "iterationId",
         "timestamp"
+      ],
+      "type": "object"
+    },
+    "TaskError": {
+      "additionalProperties": false,
+      "description": "Structured error information for failed tasks",
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/TaskErrorCode",
+          "description": "Error code for programmatic handling"
+        },
+        "message": {
+          "description": "Human-readable error message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "TaskErrorCode": {
+      "description": "Error codes for task failures",
+      "enum": [
+        "TASK_ABORTED",
+        "MAX_ITERATIONS",
+        "MAX_ERRORS",
+        "TASK_FAILED"
+      ],
+      "type": "string"
+    },
+    "TaskExecutionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/TaskError",
+          "description": "Error details when success is false"
+        },
+        "finalAnswer": {
+          "description": "Final answer or result from the agent",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stats": {
+          "additionalProperties": false,
+          "description": "Execution statistics",
+          "properties": {
+            "actions": {
+              "type": "number"
+            },
+            "durationMs": {
+              "type": "number"
+            },
+            "endTime": {
+              "type": "number"
+            },
+            "iterations": {
+              "type": "number"
+            },
+            "startTime": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "iterations",
+            "actions",
+            "startTime",
+            "endTime",
+            "durationMs"
+          ],
+          "type": "object"
+        },
+        "success": {
+          "description": "Whether the task completed successfully",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success",
+        "finalAnswer",
+        "stats"
       ],
       "type": "object"
     },

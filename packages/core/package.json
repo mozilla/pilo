@@ -26,7 +26,7 @@
     "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
     "test": "vitest run",
     "test:only": "pnpm run bundle:aria && pnpm run test",
-    "generate:schemas": "ts-json-schema-generator --path src/events.ts --tsconfig tsconfig.json --type WebAgentEvent --out schemas/webagent-event.json && node scripts/normalize-schema.cjs schemas/webagent-event.json",
+    "generate:schemas": "ts-json-schema-generator --path src/events.ts --tsconfig tsconfig.json --type AutomateStreamEvent --out schemas/webagent-event.json && node scripts/normalize-schema.cjs schemas/webagent-event.json",
     "check:schemas": "pnpm run generate:schemas && git diff --exit-code schemas/"
   },
   "dependencies": {
