@@ -67,7 +67,11 @@ pilo.post("/run", async (c) => {
         if (abortController.signal.aborted) {
           console.log("🛑 Task execution aborted due to client disconnection");
         } else {
-          console.error("Pilo task execution failed:", error);
+          console.error("[pilo-server] task execution failed", {
+            taskId,
+            phase: "execution",
+            error_class: error instanceof Error ? error.constructor.name : "Unknown",
+          });
           await stream.writeSSE({
             event: "error",
             data: JSON.stringify(
@@ -82,7 +86,11 @@ pilo.post("/run", async (c) => {
       }
     });
   } catch (error) {
-    console.error("Pilo task setup failed:", error);
+    console.error("[pilo-server] task setup failed", {
+      taskId,
+      phase: "setup",
+      error_class: error instanceof Error ? error.constructor.name : "Unknown",
+    });
     return c.json(
       createErrorResponse({
         message: "Failed to parse request body.",
