@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
@@ -7,12 +8,20 @@ const pilo = new Hono();
 
 // POST /pilo/run - Execute a Pilo task with real-time SSE streaming (non-interactive)
 pilo.post("/run", async (c) => {
+  const taskId = randomUUID();
+  c.header("x-pilo-task-id", taskId);
   try {
     const body = (await c.req.json()) as PiloTaskRequest;
 
     const validationError = validateTaskRequest(body);
     if (validationError) {
-      return c.json(validationError.response, validationError.status as any);
+      return c.json(
+        {
+          ...validationError.response,
+          error: { ...validationError.response.error, taskId },
+        },
+        validationError.status as any,
+      );
     }
 
     return streamSSE(c, async (stream) => {
@@ -26,11 +35,12 @@ pilo.post("/run", async (c) => {
       try {
         await stream.writeSSE({
           event: "start",
-          data: JSON.stringify({ task: body.task, url: body.url }),
+          data: JSON.stringify({ taskId, task: body.task, url: body.url }),
         });
 
         const result = await runTask({
           body,
+          taskId,
           sendEvent: async (event, data) => {
             await stream.writeSSE({ event, data: JSON.stringify(data) });
           },
@@ -56,7 +66,7 @@ pilo.post("/run", async (c) => {
           await stream.writeSSE({
             event: "error",
             data: JSON.stringify(
-              createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
+              createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED", taskId),
             ),
           });
         }
@@ -64,7 +74,7 @@ pilo.post("/run", async (c) => {
     });
   } catch (error) {
     console.error("Pilo task setup failed:", error);
-    return c.json(createErrorResponse(errorToString(error), "TASK_SETUP_FAILED"), 500);
+    return c.json(createErrorResponse(errorToString(error), "TASK_SETUP_FAILED", taskId), 500);
   }
 });
 

@@ -87,6 +87,8 @@ export interface WebAgentOptions {
   tabstackApiUrl?: string;
   /** Callback for interactive mode: called when the agent needs user data for form fields. Presence enables interactive mode. */
   onUserDataRequired?: UserDataCallback;
+  /** Correlation ID for this task, propagated to logs and traces. */
+  taskId?: string;
 }
 
 export interface ExecuteOptions {
@@ -214,6 +216,7 @@ export class WebAgent {
   private readonly tabstackApiKey: string | undefined;
   private readonly tabstackApiUrl: string | undefined;
   private readonly onUserDataRequired: UserDataCallback | undefined;
+  private readonly taskId: string | undefined;
 
   constructor(
     private browser: AriaBrowser,
@@ -237,6 +240,7 @@ export class WebAgent {
     this.tabstackApiKey = options.tabstackApiKey;
     this.tabstackApiUrl = options.tabstackApiUrl;
     this.onUserDataRequired = options.onUserDataRequired;
+    this.taskId = options.taskId;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -286,6 +290,7 @@ export class WebAgent {
         attributes: {
           "pilo.task": task,
           ...(options.startingUrl && { "pilo.url": options.startingUrl }),
+          ...(this.taskId && { "pilo.task.id": this.taskId }),
         },
       },
       async (span) => {

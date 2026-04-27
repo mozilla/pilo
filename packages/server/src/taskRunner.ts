@@ -89,6 +89,7 @@ export interface ErrorResponse {
     message: string;
     code: string;
     timestamp: string;
+    taskId?: string;
   };
 }
 
@@ -96,12 +97,17 @@ export interface ErrorResponse {
 export const errorToString = (error: unknown): string =>
   error instanceof Error ? error.name : "Unknown error";
 
-export const createErrorResponse = (message: string, code: string): ErrorResponse => ({
+export const createErrorResponse = (
+  message: string,
+  code: string,
+  taskId?: string,
+): ErrorResponse => ({
   success: false,
   error: {
     message,
     code,
     timestamp: new Date().toISOString(),
+    ...(taskId !== undefined && { taskId }),
   },
 });
 
@@ -162,13 +168,14 @@ export interface TaskRunnerOptions {
   sendEvent: EventSender;
   abortSignal: AbortSignal;
   onUserDataRequired?: UserDataCallback;
+  taskId?: string;
 }
 
 /**
  * Run a Pilo task with the given options. Shared by SSE and WebSocket endpoints.
  */
 export async function runTask(options: TaskRunnerOptions): Promise<TaskExecutionResult> {
-  const { body, sendEvent, abortSignal, onUserDataRequired } = options;
+  const { body, sendEvent, abortSignal, onUserDataRequired, taskId } = options;
   const serverConfig = config.getConfig();
 
   const browserConfig = {
@@ -236,6 +243,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     providerConfig,
     logger,
     onUserDataRequired,
+    taskId,
   });
 
   try {
