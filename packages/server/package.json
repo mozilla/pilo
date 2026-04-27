@@ -23,6 +23,7 @@
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@sentry/types": "^8.9.2",
     "@types/node": "^25.5.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",

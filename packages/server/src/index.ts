@@ -10,6 +10,8 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
 import { requestLog } from "./middleware/requestLog.js";
+import { sentryContext } from "./middleware/sentryContext.js";
+import { scrubBeforeBreadcrumb, scrubBeforeSend } from "./middleware/sentryScrubber.js";
 import piloRoutes from "./routes/pilo.js";
 import { createPiloWsRoute } from "./routes/piloWs.js";
 
@@ -18,11 +20,14 @@ const app = new Hono();
 // Create WebSocket support
 const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
 
-// Add Sentry middleware
+// Add Sentry middleware. Scrubbers run on every event/breadcrumb before
+// transport so user content never leaves the process via Sentry.
 app.use(
   "*",
   sentry({
     dsn: process.env.SENTRY_DSN,
+    beforeSend: scrubBeforeSend,
+    beforeBreadcrumb: scrubBeforeBreadcrumb,
   }),
 );
 
@@ -45,6 +50,9 @@ app.use(
 
 // Structured request access log (metadata only — no path/body/headers/IP).
 app.use("*", requestLog());
+
+// Sentry per-request scope tags (taskId, method, route, status).
+app.use("*", sentryContext());
 
 // Health check endpoint
 app.get("/health", (c) => {
