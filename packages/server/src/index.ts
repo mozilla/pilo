@@ -9,6 +9,7 @@ import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
+import { requestLog } from "./middleware/requestLog.js";
 import piloRoutes from "./routes/pilo.js";
 import { createPiloWsRoute } from "./routes/piloWs.js";
 
@@ -41,6 +42,9 @@ app.use(
     credentials: false,
   }),
 );
+
+// Structured request access log (metadata only — no path/body/headers/IP).
+app.use("*", requestLog());
 
 // Health check endpoint
 app.get("/health", (c) => {
