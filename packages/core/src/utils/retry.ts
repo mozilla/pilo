@@ -12,7 +12,12 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
-import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
+import {
+  withSpan,
+  SpanStatusCode,
+  SpanName,
+  recordSanitizedException,
+} from "../telemetry/tracing.js";
 
 /**
  * Check if an error is retryable
@@ -120,9 +125,9 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
           span.setAttribute("pilo.ai.attempts", attempt);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: errorMessage,
+            message: error instanceof Error ? error.constructor.name : "Unknown",
           });
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          recordSanitizedException(span, error);
           throw error;
         }
 
@@ -164,9 +169,9 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
     span.setAttribute("pilo.ai.attempts", maxAttempts);
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: errorMessage,
+      message: lastError instanceof Error ? lastError.constructor.name : "Unknown",
     });
-    span.recordException(lastError instanceof Error ? lastError : new Error(String(lastError)));
+    recordSanitizedException(span, lastError);
     throw lastError;
   });
 }

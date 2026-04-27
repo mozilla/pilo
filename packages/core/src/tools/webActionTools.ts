@@ -13,7 +13,12 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
-import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
+import {
+  withSpan,
+  SpanStatusCode,
+  SpanName,
+  recordSanitizedException,
+} from "../telemetry/tracing.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -124,9 +129,9 @@ async function performActionWithValidation(
 
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
+          message: error instanceof Error ? error.constructor.name : "Unknown",
         });
-        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        recordSanitizedException(span, error);
         throw error;
       }
     },
