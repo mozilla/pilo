@@ -21,6 +21,7 @@ import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
 import { withRemoteContext } from "pilo-core";
+import { release, tryAcquire } from "../concurrency.js";
 import {
   runTask,
   validateTaskRequest,
@@ -125,6 +126,21 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               return;
             }
 
+            if (!tryAcquire()) {
+              send(
+                ws,
+                "error",
+                createErrorResponse({
+                  message: "The server is at capacity. Retry after a short delay.",
+                  code: "AT_CAPACITY",
+                  reason: "AT_CAPACITY",
+                  phase: "setup",
+                  taskId,
+                }),
+              );
+              return;
+            }
+
             taskRunning = true;
             send(ws, "task:accepted", { taskId });
 
@@ -173,6 +189,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
                 }
               } finally {
                 taskRunning = false;
+                release();
                 for (const [id, pending] of pendingRequests) {
                   clearTimeout(pending.timer);
                   pending.reject(new Error("Task ended"));

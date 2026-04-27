@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { release, tryAcquire } from "../concurrency.js";
 import {
   runTask,
   validateTaskRequest,
@@ -8,6 +9,8 @@ import {
   errorResponseFromError,
 } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
+
+const RETRY_AFTER_SECONDS = "30";
 
 const pilo = new Hono();
 
@@ -26,6 +29,20 @@ pilo.post("/run", async (c) => {
           error: { ...validationError.response.error, taskId },
         },
         validationError.status as any,
+      );
+    }
+
+    if (!tryAcquire()) {
+      c.header("Retry-After", RETRY_AFTER_SECONDS);
+      return c.json(
+        createErrorResponse({
+          message: "The server is at capacity. Retry after a short delay.",
+          code: "AT_CAPACITY",
+          reason: "AT_CAPACITY",
+          phase: "setup",
+          taskId,
+        }),
+        429,
       );
     }
 
@@ -83,6 +100,8 @@ pilo.post("/run", async (c) => {
             ),
           });
         }
+      } finally {
+        release();
       }
     });
   } catch (error) {

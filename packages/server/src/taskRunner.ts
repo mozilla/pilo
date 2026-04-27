@@ -97,6 +97,7 @@ export type ErrorReason =
   | "MAX_ITERATIONS"
   | "MAX_ERRORS"
   | "TIMEOUT"
+  | "AT_CAPACITY"
   | "INTERNAL_ERROR";
 
 /** Which phase of the request pipeline produced the error. */
@@ -167,6 +168,7 @@ const REASON_HINTS: Record<ErrorReason, string> = {
     "The agent exceeded the maximum number of iterations without completing the task.",
   MAX_ERRORS: "The agent hit the error threshold and aborted.",
   TIMEOUT: "The task exceeded its time budget.",
+  AT_CAPACITY: "The server is at capacity. Retry after a short delay.",
   INTERNAL_ERROR: "The task failed due to an internal error.",
 };
 

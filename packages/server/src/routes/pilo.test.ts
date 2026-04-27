@@ -60,15 +60,22 @@ vi.mock("../StreamLogger.js", () => ({
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+import { _resetInflight } from "../concurrency.js";
+
 describe("Pilo Routes", () => {
   let app: Hono;
 
   beforeEach(() => {
+    _resetInflight();
     app = new Hono();
     app.route("/pilo", piloRoutes);
 
     // Don't clear mocks - it breaks our mock setup
     // vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetInflight();
   });
 
   describe("POST /pilo/run", () => {
@@ -272,6 +279,40 @@ describe("Pilo Routes", () => {
 
       const data = await res.json();
       expect(res.headers.get("x-pilo-task-id")).toBe(data.error.taskId);
+    });
+
+    it("should return 429 with AT_CAPACITY when inflight tasks are at the limit", async () => {
+      process.env.PILO_MAX_CONCURRENT_TASKS = "1";
+      const { tryAcquire } = await import("../concurrency.js");
+      expect(tryAcquire()).toBe(true);
+
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(429);
+      expect(res.headers.get("Retry-After")).toBeDefined();
+      const data = await res.json();
+      expect(data.error.code).toBe("AT_CAPACITY");
+      expect(data.error.reason).toBe("AT_CAPACITY");
+      expect(data.error.taskId).toBeDefined();
+      delete process.env.PILO_MAX_CONCURRENT_TASKS;
+    });
+
+    it("should release the inflight slot after a successful SSE request completes", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      // Drain the SSE stream so the streamSSE callback finishes.
+      await res.text();
+
+      const { getInflight } = await import("../concurrency.js");
+      expect(getInflight()).toBe(0);
     });
 
     it("should include taskId in SSE start event", async () => {

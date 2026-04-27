@@ -80,6 +80,7 @@ vi.mock("../taskRunner.js", () => ({
 
 import { createPiloWsRoute } from "./piloWs.js";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
+import { _resetInflight, tryAcquire } from "../concurrency.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -344,6 +345,55 @@ describe("piloWs", () => {
       const actionMsg = h.sentMessages.find((m) => m.event === "agent:action");
       expect(actionMsg).toBeDefined();
       expect(actionMsg!.data).toEqual({ action: "click" });
+    });
+  });
+
+  describe("capacity limit", () => {
+    afterEach(() => {
+      delete process.env.PILO_MAX_CONCURRENT_TASKS;
+      _resetInflight();
+    });
+
+    it("should send AT_CAPACITY error and not start a task when at limit", async () => {
+      process.env.PILO_MAX_CONCURRENT_TASKS = "1";
+      _resetInflight();
+      expect(tryAcquire()).toBe(true);
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg!.data.error.code).toBe("AT_CAPACITY");
+      expect(errorMsg!.data.error.reason).toBe("AT_CAPACITY");
+      expect(errorMsg!.data.error.taskId).toMatch(UUID_RE);
+      // runTask must not have been called
+      expect(mockRunTask).not.toHaveBeenCalled();
+    });
+
+    it("should release the slot after a successful task completes", async () => {
+      _resetInflight();
+      mockRunTask.mockResolvedValue({ success: true });
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const { getInflight } = await import("../concurrency.js");
+      expect(getInflight()).toBe(0);
+    });
+
+    it("should release the slot after a task throws", async () => {
+      _resetInflight();
+      mockRunTask.mockRejectedValue(new Error("boom"));
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const { getInflight } = await import("../concurrency.js");
+      expect(getInflight()).toBe(0);
     });
   });
 
