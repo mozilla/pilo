@@ -264,45 +264,145 @@ describe("tracing helpers", () => {
       expect(mockAddEvent).toHaveBeenCalledWith("exception", { "exception.type": "TypeError" });
     });
 
-    it("never emits exception.message or exception.stacktrace", async () => {
-      const mockAddEvent = vi.fn();
-      const span = {
-        setAttribute: vi.fn().mockReturnThis(),
-        setStatus: vi.fn().mockReturnThis(),
-        recordException: vi.fn(),
-        addEvent: mockAddEvent,
-        end: vi.fn(),
-      };
+    it("by default, never emits exception.message or exception.stacktrace", async () => {
+      const prev = process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      try {
+        const mockAddEvent = vi.fn();
+        const span = {
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: vi.fn(),
+          addEvent: mockAddEvent,
+          end: vi.fn(),
+        };
 
-      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
-      recordSanitizedException(span as any, new Error("DO NOT LOG THIS SENTINEL"));
+        const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+        recordSanitizedException(span as any, new Error("DO NOT LOG THIS SENTINEL"));
 
-      for (const call of mockAddEvent.mock.calls) {
-        const attrs = (call[1] as Record<string, unknown>) ?? {};
-        expect(attrs).not.toHaveProperty("exception.message");
-        expect(attrs).not.toHaveProperty("exception.stacktrace");
+        for (const call of mockAddEvent.mock.calls) {
+          const attrs = (call[1] as Record<string, unknown>) ?? {};
+          expect(attrs).not.toHaveProperty("exception.message");
+          expect(attrs).not.toHaveProperty("exception.stacktrace");
+        }
+        const allCalls = JSON.stringify([
+          mockAddEvent.mock.calls,
+          (span.setAttribute as any).mock.calls,
+        ]);
+        expect(allCalls).not.toContain("DO NOT LOG THIS SENTINEL");
+      } finally {
+        if (prev === undefined) delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+        else process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = prev;
       }
-      const allCalls = JSON.stringify([
-        mockAddEvent.mock.calls,
-        (span.setAttribute as any).mock.calls,
-      ]);
-      expect(allCalls).not.toContain("DO NOT LOG THIS SENTINEL");
     });
 
-    it("never calls span.recordException (avoids OTel's default message+stack emission)", async () => {
-      const mockRecordException = vi.fn();
-      const span = {
-        setAttribute: vi.fn().mockReturnThis(),
-        setStatus: vi.fn().mockReturnThis(),
-        recordException: mockRecordException,
-        addEvent: vi.fn(),
-        end: vi.fn(),
-      };
+    it("by default, never calls span.recordException (avoids OTel's default message+stack emission)", async () => {
+      const prev = process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      try {
+        const mockRecordException = vi.fn();
+        const span = {
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: mockRecordException,
+          addEvent: vi.fn(),
+          end: vi.fn(),
+        };
 
-      const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
-      recordSanitizedException(span as any, new Error("anything"));
+        const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+        recordSanitizedException(span as any, new Error("anything"));
 
-      expect(mockRecordException).not.toHaveBeenCalled();
+        expect(mockRecordException).not.toHaveBeenCalled();
+      } finally {
+        if (prev === undefined) delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+        else process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = prev;
+      }
+    });
+
+    it("when PILO_TELEMETRY_INCLUDE_ERROR_DETAILS=1, calls span.recordException with the full error", async () => {
+      const prev = process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = "1";
+      try {
+        const mockRecordException = vi.fn();
+        const mockAddEvent = vi.fn();
+        const span = {
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: mockRecordException,
+          addEvent: mockAddEvent,
+          end: vi.fn(),
+        };
+
+        const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+        const err = new TypeError("opt-in reveals this");
+        recordSanitizedException(span as any, err);
+
+        // Opt-in: OTel's recordException emits exception.message + stacktrace.
+        expect(mockRecordException).toHaveBeenCalledTimes(1);
+        expect(mockRecordException).toHaveBeenCalledWith(err);
+        // pilo.error.class still set unconditionally for dashboard parity.
+        expect(span.setAttribute).toHaveBeenCalledWith("pilo.error.class", "TypeError");
+        // The sanitized addEvent fallback should NOT also fire on the opt-in
+        // path — avoids double-recording.
+        expect(mockAddEvent).not.toHaveBeenCalled();
+      } finally {
+        if (prev === undefined) delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+        else process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = prev;
+      }
+    });
+
+    it("when PILO_TELEMETRY_INCLUDE_ERROR_DETAILS=1 but throw is non-Error, falls back to sanitized path", async () => {
+      const prev = process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = "1";
+      try {
+        const mockRecordException = vi.fn();
+        const mockAddEvent = vi.fn();
+        const span = {
+          setAttribute: vi.fn().mockReturnThis(),
+          setStatus: vi.fn().mockReturnThis(),
+          recordException: mockRecordException,
+          addEvent: mockAddEvent,
+          end: vi.fn(),
+        };
+
+        const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+        recordSanitizedException(span as any, "a string");
+
+        // Non-Error can't carry message/stack meaningfully; the sanitized
+        // addEvent path is the safety net.
+        expect(mockRecordException).not.toHaveBeenCalled();
+        expect(mockAddEvent).toHaveBeenCalledWith("exception", { "exception.type": "Unknown" });
+      } finally {
+        if (prev === undefined) delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+        else process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = prev;
+      }
+    });
+
+    it("treats env var values other than '1' as default-sanitized", async () => {
+      const prev = process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+      try {
+        for (const val of ["0", "true", "yes", "", "TRUE"]) {
+          process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = val;
+          const mockRecordException = vi.fn();
+          const mockAddEvent = vi.fn();
+          const span = {
+            setAttribute: vi.fn().mockReturnThis(),
+            setStatus: vi.fn().mockReturnThis(),
+            recordException: mockRecordException,
+            addEvent: mockAddEvent,
+            end: vi.fn(),
+          };
+          const { recordSanitizedException } = await import("../../src/telemetry/tracing.js");
+          recordSanitizedException(span as any, new Error("would-leak-if-misparsed"));
+          expect(mockRecordException, `value=${val}`).not.toHaveBeenCalled();
+          expect(mockAddEvent, `value=${val}`).toHaveBeenCalledWith("exception", {
+            "exception.type": "Error",
+          });
+        }
+      } finally {
+        if (prev === undefined) delete process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS;
+        else process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS = prev;
+      }
     });
 
     it("sets class to 'Unknown' for non-Error throws", async () => {
