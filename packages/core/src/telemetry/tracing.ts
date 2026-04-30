@@ -262,10 +262,7 @@ export function recordSanitizedException(
     span.setAttribute("pilo.error.code", opts.code);
   }
 
-  if (
-    process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS === "1" &&
-    error instanceof Error
-  ) {
+  if (process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS === "1" && error instanceof Error) {
     // Opt-in unsafe path: OTel's recordException emits message + stacktrace.
     span.recordException(error);
   } else {
