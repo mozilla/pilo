@@ -241,6 +241,15 @@ async function withSpanAsync<T>(
  * - `pilo.error.class` attribute (same value as `exception.type`) so dashboards
  *   can filter on it without depending on OTel exception-event semantics.
  * - `pilo.error.code` attribute when `opts.code` is provided.
+ *
+ * **Opt-in relaxation for non-customer-facing environments**: setting the
+ * env var `PILO_TELEMETRY_INCLUDE_ERROR_DETAILS=1` falls back to OTel's
+ * standard `span.recordException`, which emits `exception.message` and
+ * `exception.stacktrace`. Intended for staging/eval contexts where the
+ * trace data is consumed by automation, not served to customers. **Never
+ * enable in production** — the trace data may include user task text,
+ * page content, or prompt fragments. Default behaviour (env var unset or
+ * any value other than "1") is fully sanitized.
  */
 export function recordSanitizedException(
   span: Span,
@@ -248,9 +257,19 @@ export function recordSanitizedException(
   opts: { code?: string } = {},
 ): void {
   const errorClass = error instanceof Error ? error.constructor.name : "Unknown";
-  span.addEvent("exception", { "exception.type": errorClass });
   span.setAttribute("pilo.error.class", errorClass);
   if (opts.code) {
     span.setAttribute("pilo.error.code", opts.code);
+  }
+
+  if (
+    process.env.PILO_TELEMETRY_INCLUDE_ERROR_DETAILS === "1" &&
+    error instanceof Error
+  ) {
+    // Opt-in unsafe path: OTel's recordException emits message + stacktrace.
+    span.recordException(error);
+  } else {
+    // Default: only the class name. No message, no stacktrace.
+    span.addEvent("exception", { "exception.type": errorClass });
   }
 }
