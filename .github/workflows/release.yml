@@ -57,10 +57,13 @@ jobs:
           npm pkg set version="$TAG_VERSION"
           echo "Set package.json version to $TAG_VERSION"
 
+      - name: Build
+        run: pnpm run build
+
       - name: Create package tarball
         id: tarball
         run: |
-          npm pack
+          npm pack --ignore-scripts
           echo "filename=$(ls *.tgz)" >> $GITHUB_OUTPUT
 
       - name: Upload tarball to release
