@@ -518,6 +518,65 @@ describe("piloWs", () => {
     });
   });
 
+  describe("send guards", () => {
+    it("drops messages when the socket is no longer OPEN", async () => {
+      let resumeEmit!: () => void;
+      const emitGate = new Promise<void>((resolve) => {
+        resumeEmit = resolve;
+      });
+
+      mockRunTask.mockImplementation(async ({ sendEvent }) => {
+        // Agent waits for the test to disconnect the client, then emits.
+        await emitGate;
+        await sendEvent("agent:action", { foo: "bar" });
+        return { success: true };
+      });
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+
+      // Mid-task: simulate client disconnect, then let the agent emit.
+      (h.mockWs as any).readyState = 3;
+      resumeEmit();
+
+      await vi.runAllTimersAsync();
+
+      const sentEvents = h.mockRawSend.mock.calls.map((c) => JSON.parse(c[0]).event);
+      expect(sentEvents).not.toContain("agent:action");
+      expect(sentEvents).not.toContain("complete");
+    });
+
+    it("swallows raw.send errors so they cannot escape as unhandled rejections", async () => {
+      let sendEventOutcome: "resolved" | "rejected" = "rejected";
+      mockRunTask.mockImplementation(async ({ sendEvent }) => {
+        try {
+          await sendEvent("agent:action", { foo: "bar" });
+          sendEventOutcome = "resolved";
+        } catch {
+          sendEventOutcome = "rejected";
+        }
+        return { success: true };
+      });
+
+      const h = createTestHarness();
+      // Simulate ws@8 reporting a post-close failure via the callback for the
+      // agent:action event only (other events still succeed).
+      h.mockRawSend.mockImplementation((data, cb) => {
+        const parsed = JSON.parse(data);
+        if (parsed.event === "agent:action") {
+          cb?.(new Error("WebSocket is not open: readyState 3 (CLOSED)"));
+          return;
+        }
+        cb?.();
+      });
+
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      expect(sendEventOutcome).toBe("resolved");
+    });
+  });
+
   describe("onError", () => {
     it("should abort the task on WebSocket error", async () => {
       let receivedSignal: AbortSignal | undefined;
