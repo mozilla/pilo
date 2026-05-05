@@ -38,13 +38,20 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/**
+ * Send a flat { event, data } message to the client.
+ *
+ * Always resolves: if the socket is not OPEN we drop the message, and if the
+ * underlying ws.send fails (e.g. the client disconnected mid-send) we swallow
+ * the error. The connection's onClose handler is the source of truth for
+ * teardown; surfacing a rejection here would only produce unhandled promise
+ * rejections at the many non-awaited call sites and crash the process.
+ */
 function send(ws: WSContext, event: string, data: any): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+  if (ws.readyState !== 1 /* OPEN */) return Promise.resolve();
+  return new Promise<void>((resolve) => {
     const raw = ws.raw as { send(data: string, cb?: (err?: Error) => void): void };
-    raw.send(JSON.stringify({ event, data }), (err?: Error) => {
-      if (err) reject(err);
-      else resolve();
-    });
+    raw.send(JSON.stringify({ event, data }), () => resolve());
   });
 }
 
