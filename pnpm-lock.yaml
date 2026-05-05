@@ -39,8 +39,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0
       dotenv:
-        specifier: ^17.2.4
-        version: 17.3.1
+        specifier: ^17.4.2
+        version: 17.4.2
       eventemitter3:
         specifier: ^5.0.4
         version: 5.0.4
@@ -167,8 +167,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0
       dotenv:
-        specifier: ^17.2.4
-        version: 17.3.1
+        specifier: ^17.4.2
+        version: 17.4.2
       eventemitter3:
         specifier: ^5.0.4
         version: 5.0.4
@@ -382,8 +382,8 @@ importers:
         specifier: ^1.34.0
         version: 1.40.0
       dotenv:
-        specifier: ^17.2.4
-        version: 17.3.1
+        specifier: ^17.4.2
+        version: 17.4.2
       hono:
         specifier: ^4.12.14
         version: 4.12.14
@@ -3035,8 +3035,8 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
-  dotenv@17.3.1:
-    resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   ecdsa-sig-formatter@1.0.11:
@@ -7114,7 +7114,7 @@ snapshots:
       chokidar: 5.0.0
       confbox: 0.2.4
       defu: 6.1.4
-      dotenv: 17.3.1
+      dotenv: 17.4.2
       exsolve: 1.0.8
       giget: 2.0.0
       jiti: 2.6.1
@@ -7399,7 +7399,7 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  dotenv@17.3.1: {}
+  dotenv@17.4.2: {}
 
   ecdsa-sig-formatter@1.0.11:
     dependencies:
@@ -8598,7 +8598,7 @@ snapshots:
     dependencies:
       cac: 6.7.14
       consola: 3.4.2
-      dotenv: 17.3.1
+      dotenv: 17.4.2
       form-data-encoder: 4.1.0
       formdata-node: 6.0.3
       jsonwebtoken: 9.0.3
@@ -9419,7 +9419,7 @@ snapshots:
       ci-info: 4.4.0
       consola: 3.4.2
       defu: 6.1.4
-      dotenv: 17.3.1
+      dotenv: 17.4.2
       dotenv-expand: 12.0.3
       esbuild: 0.27.7
       filesize: 11.0.13
