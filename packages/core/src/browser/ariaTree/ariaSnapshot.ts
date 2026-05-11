@@ -44,6 +44,10 @@ export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): 
     el.removeAttribute("data-pilo-role");
   });
 
+  // Initialize ref map for direct element lookup (survives DOM re-renders
+  // that strip data-pilo-ref attributes, e.g. React reconciliation)
+  (globalThis as any).__piloRefMap = new Map<string, Element>();
+
   const ariaTree = generateAriaTree(root);
   return renderAriaTree(ariaTree, refCounter);
 }
@@ -485,6 +489,10 @@ function renderAriaTree(root: AriaNode, counter: RefCounter): string {
       ariaNode.element?.setAttribute("data-pilo-ref", ref);
       // Store computed role for accurate SoM filtering (avoids re-computing or parsing raw role attribute)
       ariaNode.element?.setAttribute("data-pilo-role", ariaNode.role);
+      // Also store direct element reference in the ref map
+      if (ariaNode.element) {
+        (globalThis as any).__piloRefMap?.set(ref, ariaNode.element);
+      }
     }
 
     const escapedKey = indent + "- " + yamlEscapeKeyIfNeeded(key);

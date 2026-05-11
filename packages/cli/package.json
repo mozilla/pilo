@@ -12,22 +12,22 @@
     "pilo": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.3.2",
+    "@inquirer/prompts": "^8.4.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "pilo-core": "workspace:*",
     "web-ext": "^10.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.51",
-    "@ai-sdk/google-vertex": "^4.0.92",
-    "@ai-sdk/openai": "^3.0.46",
-    "@ai-sdk/openai-compatible": "^2.0.36",
-    "@openrouter/ai-sdk-provider": "^2.3.3",
-    "@types/node": "^25.5.0",
+    "@ai-sdk/google": "^3.0.64",
+    "@ai-sdk/google-vertex": "^4.0.112",
+    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/openai-compatible": "^2.0.41",
+    "@openrouter/ai-sdk-provider": "^2.8.0",
+    "@types/node": "^25.5.2",
     "ollama-ai-provider-v2": "^3.5.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }

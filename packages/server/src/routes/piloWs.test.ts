@@ -39,15 +39,49 @@ const mockValidateTaskRequest = vi.fn().mockReturnValue(null);
 vi.mock("../taskRunner.js", () => ({
   runTask: (...args: any[]) => mockRunTask(...args),
   validateTaskRequest: (...args: any[]) => mockValidateTaskRequest(...args),
-  createErrorResponse: (message: string, code: string) => ({
+  createErrorResponse: (params: {
+    message: string;
+    class?: string;
+    code: string;
+    reason: string;
+    recoverable?: boolean;
+    phase?: string;
+    taskId?: string;
+  }) => ({
     success: false,
-    error: { message, code, timestamp: new Date().toISOString() },
+    error: {
+      message: params.message,
+      code: params.code,
+      timestamp: new Date().toISOString(),
+      class: params.class ?? "Error",
+      reason: params.reason,
+      recoverable: params.recoverable ?? false,
+      ...(params.phase && { phase: params.phase }),
+      ...(params.taskId && { taskId: params.taskId }),
+    },
   }),
-  errorToString: (error: unknown) => (error instanceof Error ? error.name : "Unknown error"),
+  errorResponseFromError: (
+    error: unknown,
+    opts: { code: string; phase: string; taskId?: string },
+  ) => ({
+    success: false,
+    error: {
+      message: "The task failed due to an internal error.",
+      code: opts.code,
+      timestamp: new Date().toISOString(),
+      class: error instanceof Error ? error.constructor.name : "Unknown",
+      reason: "INTERNAL_ERROR",
+      recoverable: false,
+      phase: opts.phase,
+      ...(opts.taskId && { taskId: opts.taskId }),
+    },
+  }),
 }));
 
 import { createPiloWsRoute, type ActiveWS } from "./piloWs.js";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Helper to extract the WebSocket event handlers from createPiloWsRoute.
@@ -170,7 +204,7 @@ describe("piloWs", () => {
       expect(h.sentMessages).toHaveLength(1);
       expect(h.sentMessages[0].event).toBe("error");
       expect(h.sentMessages[0].data.error.code).toBe("UNKNOWN_EVENT");
-      expect(h.sentMessages[0].data.error.message).toContain("unknown_event");
+      expect(h.sentMessages[0].data.error.reason).toBe("INVALID_REQUEST");
     });
   });
 
@@ -226,7 +260,7 @@ describe("piloWs", () => {
       expect(h.closeReason).toBe("Task finished");
     });
 
-    it("should send error event when task throws", async () => {
+    it("should send error event with new shape when task throws", async () => {
       mockRunTask.mockRejectedValue(new TypeError("something broke"));
 
       const h = createTestHarness();
@@ -236,7 +270,24 @@ describe("piloWs", () => {
       const errorMsg = h.sentMessages.find((m) => m.event === "error");
       expect(errorMsg).toBeDefined();
       expect(errorMsg!.data.error.code).toBe("TASK_EXECUTION_FAILED");
-      expect(errorMsg!.data.error.message).toBe("TypeError");
+      expect(errorMsg!.data.error.class).toBe("TypeError");
+      expect(errorMsg!.data.error.phase).toBe("execution");
+      expect(errorMsg!.data.error.message).toBeDefined();
+      // Message is server-controlled, never forwards the thrown value's message
+      expect(errorMsg!.data.error.message).not.toContain("something broke");
+    });
+
+    it("should never leak error.message into WS error event", async () => {
+      mockRunTask.mockRejectedValue(new Error("SENSITIVE: task data was fill-form-with-ssn"));
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      const json = JSON.stringify(errorMsg);
+      expect(json).not.toContain("SENSITIVE");
+      expect(json).not.toContain("fill-form-with-ssn");
     });
 
     it("should close WebSocket after task error", async () => {
@@ -302,6 +353,56 @@ describe("piloWs", () => {
     });
   });
 
+  describe("taskId", () => {
+    it("should emit task:accepted event with taskId after validation passes", async () => {
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const accepted = h.sentMessages.find((m) => m.event === "task:accepted");
+      expect(accepted).toBeDefined();
+      expect(accepted!.data.taskId).toMatch(UUID_RE);
+    });
+
+    it("should pass taskId to runTask", async () => {
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      expect(mockRunTask).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: expect.stringMatching(UUID_RE) }),
+      );
+    });
+
+    it("should include taskId in validation-error response", () => {
+      mockValidateTaskRequest.mockReturnValue({
+        status: 400,
+        response: {
+          success: false,
+          error: { message: "Task is required", code: "MISSING_TASK", timestamp: "" },
+        },
+      });
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "" } });
+
+      expect(h.sentMessages[0].event).toBe("error");
+      expect(h.sentMessages[0].data.error.taskId).toMatch(UUID_RE);
+    });
+
+    it("should include taskId in task-execution error response", async () => {
+      mockRunTask.mockRejectedValue(new TypeError("something broke"));
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg!.data.error.taskId).toMatch(UUID_RE);
+    });
+  });
+
   describe("user_data_response", () => {
     it("should reject when requestId is missing", () => {
       const h = createTestHarness();
@@ -320,7 +421,7 @@ describe("piloWs", () => {
 
       expect(h.sentMessages).toHaveLength(1);
       expect(h.sentMessages[0].data.error.code).toBe("UNKNOWN_REQUEST_ID");
-      expect(h.sentMessages[0].data.error.message).toContain("nonexistent");
+      expect(h.sentMessages[0].data.error.reason).toBe("INVALID_REQUEST");
     });
 
     it("should resolve a pending request when matched", async () => {
@@ -420,6 +521,65 @@ describe("piloWs", () => {
       await vi.runAllTimersAsync();
 
       await expect(pendingPromise!).rejects.toThrow("WebSocket closed");
+    });
+  });
+
+  describe("send guards", () => {
+    it("drops messages when the socket is no longer OPEN", async () => {
+      let resumeEmit!: () => void;
+      const emitGate = new Promise<void>((resolve) => {
+        resumeEmit = resolve;
+      });
+
+      mockRunTask.mockImplementation(async ({ sendEvent }) => {
+        // Agent waits for the test to disconnect the client, then emits.
+        await emitGate;
+        await sendEvent("agent:action", { foo: "bar" });
+        return { success: true };
+      });
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+
+      // Mid-task: simulate client disconnect, then let the agent emit.
+      (h.mockWs as any).readyState = 3;
+      resumeEmit();
+
+      await vi.runAllTimersAsync();
+
+      const sentEvents = h.mockRawSend.mock.calls.map((c) => JSON.parse(c[0]).event);
+      expect(sentEvents).not.toContain("agent:action");
+      expect(sentEvents).not.toContain("complete");
+    });
+
+    it("swallows raw.send errors so they cannot escape as unhandled rejections", async () => {
+      let sendEventOutcome: "resolved" | "rejected" = "rejected";
+      mockRunTask.mockImplementation(async ({ sendEvent }) => {
+        try {
+          await sendEvent("agent:action", { foo: "bar" });
+          sendEventOutcome = "resolved";
+        } catch {
+          sendEventOutcome = "rejected";
+        }
+        return { success: true };
+      });
+
+      const h = createTestHarness();
+      // Simulate ws@8 reporting a post-close failure via the callback for the
+      // agent:action event only (other events still succeed).
+      h.mockRawSend.mockImplementation((data, cb) => {
+        const parsed = JSON.parse(data);
+        if (parsed.event === "agent:action") {
+          cb?.(new Error("WebSocket is not open: readyState 3 (CLOSED)"));
+          return;
+        }
+        cb?.();
+      });
+
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+      await vi.runAllTimersAsync();
+
+      expect(sendEventOutcome).toBe("resolved");
     });
   });
 

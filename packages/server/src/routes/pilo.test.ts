@@ -4,6 +4,7 @@ import piloRoutes from "./pilo.js";
 
 // Mock the pilo library
 vi.mock("pilo-core", () => ({
+  RecoverableError: class extends Error {},
   WebAgent: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({
       success: true,
@@ -57,6 +58,8 @@ vi.mock("../StreamLogger.js", () => ({
   StreamLogger: vi.fn().mockImplementation(() => ({})),
 }));
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 describe("Pilo Routes", () => {
   let app: Hono;
 
@@ -86,7 +89,7 @@ describe("Pilo Routes", () => {
       delete process.env.OPENAI_API_KEY;
     });
 
-    it("should reject requests without task", async () => {
+    it("should reject requests without task with new error shape", async () => {
       const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,11 +101,12 @@ describe("Pilo Routes", () => {
       expect(data.success).toBe(false);
       expect(data.error.message).toBe("Task is required");
       expect(data.error.code).toBe("MISSING_TASK");
+      expect(data.error.reason).toBe("INVALID_REQUEST");
+      expect(data.error.phase).toBe("setup");
       expect(data.error.timestamp).toBeDefined();
     });
 
-    it("should reject requests without OpenAI API key", async () => {
-      // Mock getAIProviderInfo to throw an error for missing API key
+    it("should reject requests without OpenAI API key with new error shape", async () => {
       const { getAIProviderInfo } = await import("pilo-core");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error(
@@ -119,9 +123,12 @@ describe("Pilo Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
-      expect(data.error.message).toBe("AI provider not configured: Error");
+      expect(data.error.message).toBe("AI provider is not configured.");
       expect(data.error.code).toBe("MISSING_API_KEY");
-      expect(data.error.timestamp).toBeDefined();
+      expect(data.error.reason).toBe("PROVIDER_UNAUTHORIZED");
+      expect(data.error.phase).toBe("setup");
+      // Must not leak the original dynamic message from pilo-core
+      expect(data.error.message).not.toContain("OPENAI_API_KEY");
     });
 
     it("should return SSE headers for valid request", async () => {
@@ -167,7 +174,7 @@ describe("Pilo Routes", () => {
       expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     });
 
-    it("should handle malformed JSON", async () => {
+    it("should handle malformed JSON with new error shape", async () => {
       const res = await app.request("/pilo/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,8 +184,11 @@ describe("Pilo Routes", () => {
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
-      expect(data.error.message).toBe("SyntaxError");
+      expect(data.error.message).toBe("Failed to parse request body.");
+      expect(data.error.class).toBe("SyntaxError");
       expect(data.error.code).toBe("TASK_SETUP_FAILED");
+      expect(data.error.reason).toBe("INVALID_REQUEST");
+      expect(data.error.phase).toBe("setup");
       expect(data.error.timestamp).toBeDefined();
     });
 
@@ -194,6 +204,94 @@ describe("Pilo Routes", () => {
       expect(res.headers.get("Content-Type")).toBe("text/event-stream");
       expect(res.headers.get("Cache-Control")).toBe("no-cache");
       expect(res.headers.get("Connection")).toBe("keep-alive");
+    });
+
+    it("should include taskId in validation-error response", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error.taskId).toMatch(UUID_RE);
+    });
+
+    it("should include taskId in setup-error response for malformed JSON", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "invalid json",
+      });
+
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.error.taskId).toMatch(UUID_RE);
+    });
+
+    it("should return x-pilo-task-id header on successful request", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should return x-pilo-task-id header on validation error", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should return x-pilo-task-id header on setup error", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "invalid json",
+      });
+
+      expect(res.status).toBe(500);
+      expect(res.headers.get("x-pilo-task-id")).toMatch(UUID_RE);
+    });
+
+    it("should use the same taskId in header and body", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+      expect(res.headers.get("x-pilo-task-id")).toBe(data.error.taskId);
+    });
+
+    it("should include taskId in SSE start event", async () => {
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(200);
+      const reader = res.body!.getReader();
+      const { value } = await reader.read();
+      const chunk = new TextDecoder().decode(value);
+      expect(chunk).toMatch(/^event: start\ndata: /);
+
+      const dataLine = chunk.split("\n").find((l) => l.startsWith("data: "))!;
+      const data = JSON.parse(dataLine.slice("data: ".length));
+      expect(data.taskId).toMatch(UUID_RE);
+
+      reader.releaseLock();
     });
 
     it("should stream SSE events with proper format", async () => {

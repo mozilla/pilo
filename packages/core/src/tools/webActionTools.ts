@@ -13,6 +13,12 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import {
+  withSpan,
+  SpanStatusCode,
+  SpanName,
+  recordSanitizedException,
+} from "../telemetry/tracing.js";
 
 interface WebActionContext {
   browser: AriaBrowser;
@@ -53,58 +59,83 @@ async function performActionWithValidation(
   ref?: string,
   value?: string,
 ): Promise<ActionResult> {
-  try {
-    // Emit action started events
-    context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
-      action,
-      ref,
-      value,
-    });
+  return withSpan(
+    SpanName.BROWSER_ACTION,
+    {
+      attributes: {
+        "pilo.browser.action_type": String(action),
+        ...(ref && { "pilo.browser.element_ref": ref }),
+      },
+    },
+    async (span) => {
+      try {
+        // Emit action started events
+        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+          action,
+          ref,
+          value,
+        });
 
-    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
-      action,
-      ref,
-      value,
-    });
+        context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+          action,
+          ref,
+          value,
+        });
 
-    // Perform the action
-    await context.browser.performAction(ref || "", action, value);
+        // Perform the action
+        await context.browser.performAction(ref || "", action, value);
 
-    // Emit success
-    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-      success: true,
-      action,
-    });
+        // Emit success
+        context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+          success: true,
+          action,
+        });
 
-    return { success: true, action, ...(ref && { ref }), ...(value !== undefined && { value }) };
-  } catch (error) {
-    // For browser exceptions, emit failure with error details and return error info
-    if (error instanceof BrowserException) {
-      context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-        success: false,
-        action,
-        error: error.message,
-        isRecoverable: true,
-      });
+        span.setAttribute("pilo.browser.success", true);
+        return {
+          success: true,
+          action,
+          ...(ref && { ref }),
+          ...(value !== undefined && { value }),
+        };
+      } catch (error) {
+        // For browser exceptions, emit failure with error details and return error info
+        if (error instanceof BrowserException) {
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+            success: false,
+            action,
+            error: error.message,
+            isRecoverable: true,
+          });
 
-      return {
-        success: false,
-        action,
-        ...(ref && { ref }),
-        ...(value !== undefined && { value }),
-        error: error.message,
-        isRecoverable: true,
-      };
-    }
+          span.setAttribute("pilo.browser.success", false);
+          span.setAttribute("pilo.browser.recoverable", true);
+          // Do NOT set span status ERROR for recoverable browser exceptions
+          return {
+            success: false,
+            action,
+            ...(ref && { ref }),
+            ...(value !== undefined && { value }),
+            error: error.message,
+            isRecoverable: true,
+          };
+        }
 
-    // For non-browser errors, emit failure without recoverable flag and re-throw
-    context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-      success: false,
-      action,
-    });
+        // For non-browser errors, emit failure without recoverable flag and re-throw
+        context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+          success: false,
+          action,
+        });
 
-    throw error;
-  }
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.constructor.name : "Unknown",
+        });
+        recordSanitizedException(span, error);
+        throw error;
+      }
+    },
+  );
 }
 
 export function createWebActionTools(context: WebActionContext) {

@@ -19,9 +19,12 @@ vi.mock("pilo-core", () => {
   }
   class MockPlaywrightBrowser {}
 
+  class RecoverableError extends Error {}
+
   return {
     WebAgent: MockWebAgent,
     PlaywrightBrowser: MockPlaywrightBrowser,
+    RecoverableError,
     config: {
       getConfig: vi.fn(() => ({
         provider: "openai",
@@ -51,39 +54,144 @@ vi.mock("./StreamLogger.js", () => ({
   StreamLogger: class MockStreamLogger {},
 }));
 
-import { validateTaskRequest, createErrorResponse, errorToString, runTask } from "./taskRunner.js";
+import {
+  validateTaskRequest,
+  createErrorResponse,
+  errorResponseFromError,
+  runTask,
+} from "./taskRunner.js";
 
 describe("taskRunner", () => {
-  describe("errorToString", () => {
-    it("should return error name for Error instances", () => {
-      expect(errorToString(new Error("something broke"))).toBe("Error");
-    });
-
-    it("should return error name for typed errors", () => {
-      expect(errorToString(new TypeError("bad type"))).toBe("TypeError");
-    });
-
-    it("should return 'Unknown error' for non-Error values", () => {
-      expect(errorToString("a string")).toBe("Unknown error");
-      expect(errorToString(null)).toBe("Unknown error");
-      expect(errorToString(undefined)).toBe("Unknown error");
-      expect(errorToString(42)).toBe("Unknown error");
-    });
-  });
-
   describe("createErrorResponse", () => {
-    it("should create a properly shaped error response", () => {
-      const res = createErrorResponse("something failed", "SOME_CODE");
+    it("should build the structured error shape from explicit fields", () => {
+      const res = createErrorResponse({
+        message: "something failed",
+        class: "CustomError",
+        code: "SOME_CODE",
+        reason: "INVALID_REQUEST",
+        recoverable: false,
+        phase: "setup",
+        taskId: "task-abc-123",
+      });
       expect(res.success).toBe(false);
       expect(res.error.message).toBe("something failed");
+      expect(res.error.class).toBe("CustomError");
       expect(res.error.code).toBe("SOME_CODE");
+      expect(res.error.reason).toBe("INVALID_REQUEST");
+      expect(res.error.recoverable).toBe(false);
+      expect(res.error.phase).toBe("setup");
+      expect(res.error.taskId).toBe("task-abc-123");
       expect(res.error.timestamp).toBeDefined();
     });
 
-    it("should have a valid ISO timestamp", () => {
-      const res = createErrorResponse("msg", "CODE");
+    it("should produce a valid ISO timestamp", () => {
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
       const parsed = new Date(res.error.timestamp);
       expect(parsed.getTime()).not.toBeNaN();
+    });
+
+    it("should default class to 'Error' when not provided", () => {
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect(res.error.class).toBe("Error");
+    });
+
+    it("should default recoverable to false when not provided", () => {
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect(res.error.recoverable).toBe(false);
+    });
+
+    it("should omit taskId when not provided", () => {
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect(res.error.taskId).toBeUndefined();
+    });
+
+    it("should omit phase when not provided", () => {
+      const res = createErrorResponse({
+        message: "msg",
+        code: "CODE",
+        reason: "INTERNAL_ERROR",
+      });
+      expect(res.error.phase).toBeUndefined();
+    });
+  });
+
+  describe("errorResponseFromError", () => {
+    it("should derive class from error constructor name", () => {
+      const res = errorResponseFromError(new TypeError("bad"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.class).toBe("TypeError");
+    });
+
+    it("should never forward error.message to the response", () => {
+      const res = errorResponseFromError(new Error("DO NOT LOG THIS SENTINEL"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      const json = JSON.stringify(res);
+      expect(json).not.toContain("DO NOT LOG THIS SENTINEL");
+    });
+
+    it("should set message from the reason hint map (not error.message)", () => {
+      const res = errorResponseFromError(new Error("ignored dynamic detail"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      // INTERNAL_ERROR hint
+      expect(res.error.message).toBe("The task failed due to an internal error.");
+    });
+
+    it("should classify unknown errors as INTERNAL_ERROR, not recoverable", () => {
+      const res = errorResponseFromError(new Error("boom"), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.reason).toBe("INTERNAL_ERROR");
+      expect(res.error.recoverable).toBe(false);
+    });
+
+    it("should classify non-Error throws as INTERNAL_ERROR with class Unknown", () => {
+      const res = errorResponseFromError("a string", {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.class).toBe("Unknown");
+      expect(res.error.reason).toBe("INTERNAL_ERROR");
+      expect(res.error.recoverable).toBe(false);
+    });
+
+    it("should include the phase passed in opts", () => {
+      const res = errorResponseFromError(new Error(), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+      });
+      expect(res.error.phase).toBe("execution");
+    });
+
+    it("should include taskId when provided", () => {
+      const res = errorResponseFromError(new Error(), {
+        code: "TASK_EXECUTION_FAILED",
+        phase: "execution",
+        taskId: "task-abc-123",
+      });
+      expect(res.error.taskId).toBe("task-abc-123");
     });
   });
 
@@ -103,11 +211,14 @@ describe("taskRunner", () => {
       delete process.env.OPENAI_API_KEY;
     });
 
-    it("should return error when task is missing", () => {
+    it("should return INVALID_REQUEST when task is missing", () => {
       const result = validateTaskRequest({ task: "" });
       expect(result).not.toBeNull();
       expect(result!.status).toBe(400);
+      expect(result!.response.error.message).toBe("Task is required");
       expect(result!.response.error.code).toBe("MISSING_TASK");
+      expect(result!.response.error.reason).toBe("INVALID_REQUEST");
+      expect(result!.response.error.phase).toBe("setup");
     });
 
     it("should return null for a valid request", () => {
@@ -115,7 +226,7 @@ describe("taskRunner", () => {
       expect(result).toBeNull();
     });
 
-    it("should return error for invalid search provider", () => {
+    it("should return INVALID_REQUEST for invalid search provider", () => {
       const result = validateTaskRequest({
         task: "test",
         searchProvider: "invalid-provider" as any,
@@ -123,7 +234,10 @@ describe("taskRunner", () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe(400);
       expect(result!.response.error.code).toBe("INVALID_SEARCH_PROVIDER");
-      expect(result!.response.error.message).toContain("invalid-provider");
+      expect(result!.response.error.reason).toBe("INVALID_REQUEST");
+      expect(result!.response.error.message).toContain("Must be one of");
+      // Must not echo the user-provided value back
+      expect(result!.response.error.message).not.toContain("invalid-provider");
     });
 
     it("should accept valid search providers", () => {
@@ -133,7 +247,7 @@ describe("taskRunner", () => {
       }
     });
 
-    it("should return error when AI provider is not configured", async () => {
+    it("should return PROVIDER_UNAUTHORIZED when AI provider is not configured", async () => {
       const { getAIProviderInfo } = await import("pilo-core");
       vi.mocked(getAIProviderInfo).mockImplementation(() => {
         throw new Error("No API key found");
@@ -142,7 +256,22 @@ describe("taskRunner", () => {
       const result = validateTaskRequest({ task: "test" });
       expect(result).not.toBeNull();
       expect(result!.status).toBe(500);
+      expect(result!.response.error.message).toBe("AI provider is not configured.");
       expect(result!.response.error.code).toBe("MISSING_API_KEY");
+      expect(result!.response.error.reason).toBe("PROVIDER_UNAUTHORIZED");
+      expect(result!.response.error.phase).toBe("setup");
+    });
+
+    it("should never leak error.message from getAIProviderInfo into validation response", async () => {
+      const { getAIProviderInfo } = await import("pilo-core");
+      vi.mocked(getAIProviderInfo).mockImplementation(() => {
+        throw new Error("SENSITIVE: key sk-abc123 not found in env");
+      });
+
+      const result = validateTaskRequest({ task: "test" });
+      const json = JSON.stringify(result!.response);
+      expect(json).not.toContain("SENSITIVE");
+      expect(json).not.toContain("sk-abc123");
     });
   });
 
@@ -214,6 +343,19 @@ describe("taskRunner", () => {
       expect(mockClose).toHaveBeenCalled();
     });
 
+    it("should pass taskId to WebAgent constructor when provided", async () => {
+      await runTask({
+        body: { task: "test" },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+        taskId: "task-abc-123",
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: "task-abc-123" }),
+      );
+    });
+
     it("should not throw when agent.close fails", async () => {
       mockClose = vi.fn().mockRejectedValue(new Error("close failed"));
 
@@ -226,7 +368,10 @@ describe("taskRunner", () => {
       });
 
       expect(result.success).toBe(true);
-      expect(consoleError).toHaveBeenCalledWith("Error closing agent:", expect.any(Error));
+      expect(consoleError).toHaveBeenCalledWith(
+        "[pilo-server] error closing agent",
+        expect.objectContaining({ error_class: expect.any(String) }),
+      );
       consoleError.mockRestore();
     });
   });

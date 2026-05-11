@@ -35,6 +35,10 @@ export type {
   ValidationErrorEventData,
   InteractiveFormDataRequestEventData,
   InteractiveFormDataErrorEventData,
+  AutomateStreamEvent,
+  StreamCompleteEventData,
+  StreamDoneEventData,
+  StreamErrorEventData,
 } from "./events.js";
 export { GenericLogger } from "./loggers/generic.js";
 export { ConsoleLogger } from "./loggers/console.js";

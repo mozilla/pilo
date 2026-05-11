@@ -25,38 +25,50 @@
     "pretest": "pnpm run bundle:aria",
     "typecheck": "pnpm run bundle:aria && tsc --project tsconfig.check.json",
     "test": "vitest run",
-    "test:only": "pnpm run bundle:aria && pnpm run test"
+    "test:only": "pnpm run bundle:aria && pnpm run test",
+    "generate:schemas": "ts-json-schema-generator --path src/events.ts --tsconfig tsconfig.json --type AutomateStreamEvent --out schemas/webagent-event.json && node scripts/normalize-schema.cjs schemas/webagent-event.json",
+    "check:schemas": "pnpm run generate:schemas && git diff --exit-code schemas/"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.51",
-    "@ai-sdk/google-vertex": "^4.0.92",
-    "@ai-sdk/openai": "^3.0.46",
-    "@ai-sdk/openai-compatible": "^2.0.36",
+    "@ai-sdk/google": "^3.0.64",
+    "@ai-sdk/google-vertex": "^4.0.112",
+    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/openai-compatible": "^2.0.41",
     "@ghostery/adblocker-playwright": "^2.14.1",
-    "@openrouter/ai-sdk-provider": "^2.3.3",
+    "@openrouter/ai-sdk-provider": "^2.8.0",
     "@tabstack/sdk": "^2.3.0",
-    "ai": "^6.0.129",
+    "ai": "^6.0.168",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "cross-fetch": "^4.1.0",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.4.2",
     "eventemitter3": "^5.0.4",
-    "liquidjs": "^10.25.0",
+    "liquidjs": "^10.25.7",
     "nanoid": "^5.1.7",
     "ollama-ai-provider-v2": "^3.5.0",
-    "playwright": "1.58.2",
+    "playwright": "1.59.1",
     "turndown": "^7.2.2",
     "zod": "^4.3.6"
   },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.1"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "@types/jsdom": "^28.0.0",
-    "@types/node": "^25.5.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@types/jsdom": "^28.0.1",
+    "@types/node": "^25.5.2",
     "@types/turndown": "^5.0.6",
-    "@vitest/coverage-v8": "^4.0.18",
-    "esbuild": "^0.27.4",
-    "jsdom": "^29.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
+    "esbuild": "^0.28.0",
+    "jsdom": "^29.0.2",
+    "ts-json-schema-generator": "2.9.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }

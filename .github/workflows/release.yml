@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Setup pnpm
@@ -45,10 +45,25 @@ jobs:
       - name: Run tests
         run: pnpm -r run test
 
+      - name: Set package version from release tag
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          TAG_VERSION="${TAG_NAME#v}"
+          if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag '$TAG_NAME' is not a valid semver version"
+            exit 1
+          fi
+          npm pkg set version="$TAG_VERSION"
+          echo "Set package.json version to $TAG_VERSION"
+
+      - name: Build
+        run: pnpm run build
+
       - name: Create package tarball
         id: tarball
         run: |
-          npm pack
+          npm pack --ignore-scripts
           echo "filename=$(ls *.tgz)" >> $GITHUB_OUTPUT
 
       - name: Upload tarball to release

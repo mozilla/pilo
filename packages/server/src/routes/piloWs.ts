@@ -16,11 +16,17 @@
  *   { "event": "error", "data": ErrorResponse }
  */
 
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
 import { withRemoteContext } from "pilo-core";
-import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
+import {
+  runTask,
+  validateTaskRequest,
+  createErrorResponse,
+  errorResponseFromError,
+} from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
 /** Default timeout for waiting on a user data response (5 minutes). */
@@ -35,13 +41,20 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/**
+ * Send a flat { event, data } message to the client.
+ *
+ * Always resolves: if the socket is not OPEN we drop the message, and if the
+ * underlying ws.send fails (e.g. the client disconnected mid-send) we swallow
+ * the error. The connection's onClose handler is the source of truth for
+ * teardown; surfacing a rejection here would only produce unhandled promise
+ * rejections at the many non-awaited call sites and crash the process.
+ */
 function send(ws: WSContext, event: string, data: any): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+  if (ws.readyState !== 1 /* OPEN */) return Promise.resolve();
+  return new Promise<void>((resolve) => {
     const raw = ws.raw as { send(data: string, cb?: (err?: Error) => void): void };
-    raw.send(JSON.stringify({ event, data }), (err?: Error) => {
-      if (err) reject(err);
-      else resolve();
-    });
+    raw.send(JSON.stringify({ event, data }), () => resolve());
   });
 }
 
@@ -71,7 +84,16 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
           try {
             msg = JSON.parse(typeof evt.data === "string" ? evt.data : String(evt.data));
           } catch {
-            send(ws, "error", createErrorResponse("Invalid JSON message", "INVALID_MESSAGE"));
+            send(
+              ws,
+              "error",
+              createErrorResponse({
+                message: "Invalid JSON message",
+                code: "INVALID_MESSAGE",
+                reason: "INVALID_REQUEST",
+                phase: "setup",
+              }),
+            );
             return;
           }
 
@@ -80,27 +102,44 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
               send(
                 ws,
                 "error",
-                createErrorResponse(
-                  "A task is already running on this connection",
-                  "TASK_ALREADY_RUNNING",
-                ),
+                createErrorResponse({
+                  message: "A task is already running on this connection",
+                  code: "TASK_ALREADY_RUNNING",
+                  reason: "INVALID_REQUEST",
+                  phase: "setup",
+                }),
               );
               return;
             }
 
             const body = msg.data as PiloTaskRequest;
+            const taskId = randomUUID();
             if (!body) {
-              send(ws, "error", createErrorResponse("Missing data", "MISSING_DATA"));
+              send(
+                ws,
+                "error",
+                createErrorResponse({
+                  message: "Missing data",
+                  code: "MISSING_DATA",
+                  reason: "INVALID_REQUEST",
+                  phase: "setup",
+                  taskId,
+                }),
+              );
               return;
             }
 
             const validationError = validateTaskRequest(body);
             if (validationError) {
-              send(ws, "error", validationError.response);
+              send(ws, "error", {
+                ...validationError.response,
+                error: { ...validationError.response.error, taskId },
+              });
               return;
             }
 
             taskRunning = true;
+            send(ws, "task:accepted", { taskId });
 
             // The callback just blocks until the client responds.
             // The event (interactive:form_data:request or interactive:form_data:error)
@@ -123,6 +162,7 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
                 const result = await withRemoteContext(traceHeaders, () =>
                   runTask({
                     body,
+                    taskId,
                     sendEvent: async (event, data) => {
                       send(ws, event, data);
                     },
@@ -137,7 +177,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
                   await send(
                     ws,
                     "error",
-                    createErrorResponse(errorToString(error), "TASK_EXECUTION_FAILED"),
+                    errorResponseFromError(error, {
+                      code: "TASK_EXECUTION_FAILED",
+                      phase: "execution",
+                      taskId,
+                    }),
                   );
                 }
               } finally {
@@ -156,7 +200,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
               send(
                 ws,
                 "error",
-                createErrorResponse("Missing requestId in response", "INVALID_RESPONSE"),
+                createErrorResponse({
+                  message: "Missing requestId in response",
+                  code: "INVALID_RESPONSE",
+                  reason: "INVALID_REQUEST",
+                }),
               );
               return;
             }
@@ -166,10 +214,11 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
               send(
                 ws,
                 "error",
-                createErrorResponse(
-                  `No pending request for id: ${response.requestId}`,
-                  "UNKNOWN_REQUEST_ID",
-                ),
+                createErrorResponse({
+                  message: "No pending request matches the given requestId",
+                  code: "UNKNOWN_REQUEST_ID",
+                  reason: "INVALID_REQUEST",
+                }),
               );
               return;
             }
@@ -178,7 +227,15 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConn
             pendingRequests.delete(response.requestId);
             pending.resolve(response);
           } else {
-            send(ws, "error", createErrorResponse(`Unknown event: ${msg.event}`, "UNKNOWN_EVENT"));
+            send(
+              ws,
+              "error",
+              createErrorResponse({
+                message: "Unknown event type",
+                code: "UNKNOWN_EVENT",
+                reason: "INVALID_REQUEST",
+              }),
+            );
           }
         },
 

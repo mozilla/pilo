@@ -20,6 +20,16 @@ export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 export { MetricsCollector } from "./loggers/metricsCollector.js";
 export { SecretsRedactor } from "./loggers/secretsRedactor.js";
 
+// Telemetry
+export {
+  getTracer,
+  getOTelApi,
+  SpanStatusCode,
+  SpanName,
+  withSpan,
+  withRemoteContext,
+} from "./telemetry/tracing.js";
+
 // Configuration and Provider System
 export {
   config,
