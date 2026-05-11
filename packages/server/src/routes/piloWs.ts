@@ -58,7 +58,10 @@ function send(ws: WSContext, event: string, data: any): Promise<void> {
   });
 }
 
-export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConnections: Set<ActiveWS>): Hono {
+export function createPiloWsRoute(
+  upgradeWebSocket: UpgradeWebSocket,
+  activeConnections: Set<ActiveWS>,
+): Hono {
   const piloWs = new Hono();
 
   piloWs.get(
