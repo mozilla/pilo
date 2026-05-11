@@ -19,11 +19,15 @@
 import { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import type { UserDataCallback, UserDataResponse } from "pilo-core";
+import { withRemoteContext } from "pilo-core";
 import { runTask, validateTaskRequest, createErrorResponse, errorToString } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
 /** Default timeout for waiting on a user data response (5 minutes). */
 const USER_DATA_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Minimal interface for the underlying Node.js WebSocket used for graceful shutdown. */
+export type ActiveWS = { close(code?: number, reason?: string): void };
 
 interface PendingRequest {
   resolve: (response: UserDataResponse) => void;
@@ -41,17 +45,27 @@ function send(ws: WSContext, event: string, data: any): Promise<void> {
   });
 }
 
-export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
+export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket, activeConnections: Set<ActiveWS>): Hono {
   const piloWs = new Hono();
 
   piloWs.get(
     "/run",
-    upgradeWebSocket((_c) => {
+    upgradeWebSocket((c) => {
+      // Capture W3C trace context headers from the WebSocket upgrade request
+      // so that task execution joins the caller's distributed trace.
+      const traceHeaders = {
+        traceparent: c.req.header("traceparent"),
+        tracestate: c.req.header("tracestate"),
+      };
+
       const abortController = new AbortController();
       const pendingRequests = new Map<string, PendingRequest>();
       let taskRunning = false;
 
       return {
+        onOpen(_, ws) {
+          activeConnections.add(ws.raw as ActiveWS);
+        },
         onMessage(evt, ws) {
           let msg: any;
           try {
@@ -103,17 +117,19 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
               });
             };
 
-            // Run task asynchronously
+            // Run task asynchronously within the caller's trace context (if any).
             (async () => {
               try {
-                const result = await runTask({
-                  body,
-                  sendEvent: async (event, data) => {
-                    send(ws, event, data);
-                  },
-                  abortSignal: abortController.signal,
-                  onUserDataRequired,
-                });
+                const result = await withRemoteContext(traceHeaders, () =>
+                  runTask({
+                    body,
+                    sendEvent: async (event, data) => {
+                      send(ws, event, data);
+                    },
+                    abortSignal: abortController.signal,
+                    onUserDataRequired,
+                  }),
+                );
 
                 await send(ws, "complete", result);
               } catch (error) {
@@ -166,7 +182,8 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           }
         },
 
-        onClose() {
+        onClose(_, ws) {
+          activeConnections.delete(ws.raw as ActiveWS);
           abortController.abort();
           for (const [id, pending] of pendingRequests) {
             clearTimeout(pending.timer);
@@ -175,7 +192,8 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           }
         },
 
-        onError() {
+        onError(_, ws) {
+          activeConnections.delete(ws.raw as ActiveWS);
           abortController.abort();
         },
       };

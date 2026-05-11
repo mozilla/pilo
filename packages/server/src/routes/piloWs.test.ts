@@ -26,6 +26,7 @@ vi.mock("pilo-core", () => ({
   })),
   createNavigationRetryConfig: vi.fn(() => ({})),
   SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
+  withRemoteContext: vi.fn((_headers: any, fn: any) => fn()),
 }));
 
 vi.mock("../../StreamLogger.js", () => ({
@@ -45,7 +46,7 @@ vi.mock("../taskRunner.js", () => ({
   errorToString: (error: unknown) => (error instanceof Error ? error.name : "Unknown error"),
 }));
 
-import { createPiloWsRoute } from "./piloWs.js";
+import { createPiloWsRoute, type ActiveWS } from "./piloWs.js";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 
 /**
@@ -55,7 +56,7 @@ import type { UpgradeWebSocket, WSContext } from "hono/ws";
  * handler factory passed to upgradeWebSocket and invoke onMessage/onClose
  * directly against a mock WSContext.
  */
-function createTestHarness() {
+function createTestHarness(activeConnections = new Set<ActiveWS>()) {
   let handlerFactory: (c: any) => any;
 
   const fakeUpgradeWebSocket: UpgradeWebSocket = (factory) => {
@@ -64,7 +65,7 @@ function createTestHarness() {
     return async (c, next) => next();
   };
 
-  createPiloWsRoute(fakeUpgradeWebSocket);
+  createPiloWsRoute(fakeUpgradeWebSocket, activeConnections);
 
   // Messages sent by the server to the client
   const sentMessages: Array<{ event: string; data: any }> = [];
@@ -92,7 +93,9 @@ function createTestHarness() {
   } as unknown as WSContext;
 
   // Get the handlers for a new connection
-  const handlers = handlerFactory!(/* context */ {});
+  const handlers = handlerFactory!({
+    req: { header: () => undefined },
+  });
 
   function sendMessage(obj: any) {
     const evt = { data: JSON.stringify(obj) } as MessageEvent;
@@ -102,6 +105,10 @@ function createTestHarness() {
   function sendRaw(raw: string) {
     const evt = { data: raw } as MessageEvent;
     handlers.onMessage(evt, mockWs);
+  }
+
+  function triggerOpen() {
+    handlers.onOpen?.({} as any, mockWs);
   }
 
   function triggerClose() {
@@ -115,11 +122,13 @@ function createTestHarness() {
   return {
     sendMessage,
     sendRaw,
+    triggerOpen,
     triggerClose,
     triggerError,
     sentMessages,
     mockWs,
     mockRawSend,
+    activeConnections,
     get closeCalled() {
       return closeCalled;
     },
@@ -428,6 +437,40 @@ describe("piloWs", () => {
 
       h.triggerError();
       expect(receivedSignal?.aborted).toBe(true);
+    });
+  });
+
+  describe("connection tracking", () => {
+    it("should add connection to activeConnections on open", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      expect(connections.size).toBe(0);
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+      expect(connections.has(h.mockWs.raw as ActiveWS)).toBe(true);
+    });
+
+    it("should remove connection from activeConnections on close", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+
+      h.triggerClose();
+      expect(connections.size).toBe(0);
+    });
+
+    it("should remove connection from activeConnections on error", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+
+      h.triggerError();
+      expect(connections.size).toBe(0);
     });
   });
 });

@@ -1,11 +1,16 @@
 import "dotenv/config";
+import { initTelemetry } from "./telemetry.js";
+
+// Initialize OTel SDK before app creation
+initTelemetry();
+
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
 import piloRoutes from "./routes/pilo.js";
-import { createPiloWsRoute } from "./routes/piloWs.js";
+import { createPiloWsRoute, type ActiveWS } from "./routes/piloWs.js";
 
 const app = new Hono();
 
@@ -54,8 +59,11 @@ app.get("/", (c) => {
 // Mount SSE routes (legacy, non-interactive)
 app.route("/pilo", piloRoutes);
 
+// Track active WebSocket connections for graceful shutdown
+const activeConnections = new Set<ActiveWS>();
+
 // Mount WebSocket routes (interactive)
-app.route("/pilo", createPiloWsRoute(upgradeWebSocket));
+app.route("/pilo", createPiloWsRoute(upgradeWebSocket, activeConnections));
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -68,3 +76,19 @@ const server = serve({
 
 // Inject WebSocket support into the HTTP server
 injectWebSocket(server);
+
+// Graceful shutdown: send close frames to all active WebSocket connections before exiting
+// so that clients (e.g. tabs-api) receive code 1001 rather than an abrupt 1006.
+process.on("SIGTERM", () => {
+  console.log("[pilo] SIGTERM received, closing active WebSocket connections...");
+  for (const ws of activeConnections) {
+    try {
+      ws.close(1001, "Server shutting down");
+    } catch {
+      // ignore errors on already-closed connections
+    }
+  }
+  server.close();
+  // Safety valve: if the event loop hasn't drained after 10s, exit cleanly.
+  setTimeout(() => process.exit(0), 10_000).unref();
+});
