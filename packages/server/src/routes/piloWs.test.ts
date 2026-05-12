@@ -78,7 +78,7 @@ vi.mock("../taskRunner.js", () => ({
   }),
 }));
 
-import { createPiloWsRoute } from "./piloWs.js";
+import { createPiloWsRoute, type ActiveWS } from "./piloWs.js";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -90,7 +90,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
  * handler factory passed to upgradeWebSocket and invoke onMessage/onClose
  * directly against a mock WSContext.
  */
-function createTestHarness() {
+function createTestHarness(activeConnections = new Set<ActiveWS>()) {
   let handlerFactory: (c: any) => any;
 
   const fakeUpgradeWebSocket: UpgradeWebSocket = (factory) => {
@@ -99,7 +99,7 @@ function createTestHarness() {
     return async (c, next) => next();
   };
 
-  createPiloWsRoute(fakeUpgradeWebSocket);
+  createPiloWsRoute(fakeUpgradeWebSocket, activeConnections);
 
   // Messages sent by the server to the client
   const sentMessages: Array<{ event: string; data: any }> = [];
@@ -141,6 +141,10 @@ function createTestHarness() {
     handlers.onMessage(evt, mockWs);
   }
 
+  function triggerOpen() {
+    handlers.onOpen?.({} as any, mockWs);
+  }
+
   function triggerClose() {
     handlers.onClose({ type: "close" } as any, mockWs);
   }
@@ -152,11 +156,13 @@ function createTestHarness() {
   return {
     sendMessage,
     sendRaw,
+    triggerOpen,
     triggerClose,
     triggerError,
     sentMessages,
     mockWs,
     mockRawSend,
+    activeConnections,
     get closeCalled() {
       return closeCalled;
     },
@@ -591,6 +597,40 @@ describe("piloWs", () => {
 
       h.triggerError();
       expect(receivedSignal?.aborted).toBe(true);
+    });
+  });
+
+  describe("connection tracking", () => {
+    it("should add connection to activeConnections on open", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      expect(connections.size).toBe(0);
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+      expect(connections.has(h.mockWs.raw as ActiveWS)).toBe(true);
+    });
+
+    it("should remove connection from activeConnections on close", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+
+      h.triggerClose();
+      expect(connections.size).toBe(0);
+    });
+
+    it("should remove connection from activeConnections on error", () => {
+      const connections = new Set<ActiveWS>();
+      const h = createTestHarness(connections);
+
+      h.triggerOpen();
+      expect(connections.size).toBe(1);
+
+      h.triggerError();
+      expect(connections.size).toBe(0);
     });
   });
 });

@@ -32,6 +32,9 @@ import type { PiloTaskRequest } from "../taskRunner.js";
 /** Default timeout for waiting on a user data response (5 minutes). */
 const USER_DATA_TIMEOUT_MS = 5 * 60 * 1000;
 
+/** Minimal interface for the underlying Node.js WebSocket used for graceful shutdown. */
+export type ActiveWS = { close(code?: number, reason?: string): void };
+
 interface PendingRequest {
   resolve: (response: UserDataResponse) => void;
   reject: (error: Error) => void;
@@ -55,7 +58,10 @@ function send(ws: WSContext, event: string, data: any): Promise<void> {
   });
 }
 
-export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
+export function createPiloWsRoute(
+  upgradeWebSocket: UpgradeWebSocket,
+  activeConnections: Set<ActiveWS>,
+): Hono {
   const piloWs = new Hono();
 
   piloWs.get(
@@ -73,6 +79,9 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
       let taskRunning = false;
 
       return {
+        onOpen(_, ws) {
+          activeConnections.add(ws.raw as ActiveWS);
+        },
         onMessage(evt, ws) {
           let msg: any;
           try {
@@ -233,7 +242,8 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           }
         },
 
-        onClose() {
+        onClose(_, ws) {
+          activeConnections.delete(ws.raw as ActiveWS);
           abortController.abort();
           for (const [id, pending] of pendingRequests) {
             clearTimeout(pending.timer);
@@ -242,7 +252,8 @@ export function createPiloWsRoute(upgradeWebSocket: UpgradeWebSocket): Hono {
           }
         },
 
-        onError() {
+        onError(_, ws) {
+          activeConnections.delete(ws.raw as ActiveWS);
           abortController.abort();
         },
       };
