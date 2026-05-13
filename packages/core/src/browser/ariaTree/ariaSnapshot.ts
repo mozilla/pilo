@@ -24,7 +24,7 @@ import { box, getElementComputedStyle, isElementVisible } from "./domUtils.js";
 import * as roleUtils from "./roleUtils.js";
 import { yamlEscapeKeyIfNeeded, yamlEscapeValueIfNeeded } from "./yamlUtils.js";
 import type { AriaNode } from "./types.js";
-import { computeNodeHash, gatedAttrsFor, fnv1a32, formatRef, REF_HASH_LENGTH } from "./refHash.js";
+import { computeNodeHash, gatedAttrsFor, fnv1a32, formatRef, hashHex } from "./refHash.js";
 
 function computeRootHash(frameIndex: number): number {
   // Pathname keeps refs stable across re-renders within a page and
@@ -424,7 +424,7 @@ export function isInteractiveElement(el: Element): boolean {
 
 /**
  * Overlay labeled badges on interactive elements that have `data-pilo-ref` attributes.
- * Each badge shows the ref ID (e.g., "E1") positioned at the element's top-left corner
+ * Each badge shows the ref ID (e.g., "E_a3f2") positioned at the element's top-left corner
  * with a colored outline. Only interactive elements get marks — structural containers
  * are skipped to reduce visual noise.
  *
@@ -498,7 +498,7 @@ function renderAriaTree(root: AriaNode): string {
   const occurrenceByHashHex = new Map<string, number>();
 
   const assignRef = (ariaNode: AriaNode): string => {
-    const hex = ariaNode.hash.toString(16).padStart(8, "0").slice(-REF_HASH_LENGTH);
+    const hex = hashHex(ariaNode.hash);
     const occurrence = (occurrenceByHashHex.get(hex) ?? 0) + 1;
     occurrenceByHashHex.set(hex, occurrence);
     return formatRef(ariaNode.hash, occurrence);

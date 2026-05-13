@@ -197,7 +197,7 @@ function buildToolExamples(
 
   if (hasInteractive) {
     lines.push(
-      `- request_user_data({"reason": "initial", "formDescription": "Account signup form", "fields": [{"ref": "E42", "label": "Email", "fieldType": "email", "required": true}]}) - ${TOOL_STRINGS.webActions.requestUserData.description}`,
+      `- request_user_data({"reason": "initial", "formDescription": "Account signup form", "fields": [{"ref": "E_a3f2", "label": "Email", "fieldType": "email", "required": true}]}) - ${TOOL_STRINGS.webActions.requestUserData.description}`,
     );
   }
 

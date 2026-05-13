@@ -6,6 +6,7 @@ import {
   fnv1a32,
   formatRef,
   gatedAttrsFor,
+  hashHex,
 } from "../../../src/browser/ariaTree/refHash.js";
 
 describe("fnv1a32", () => {
@@ -122,6 +123,22 @@ describe("gatedAttrsFor", () => {
 
   it("emits keys with empty values for inputs missing gated attrs", () => {
     expect(gatedAttrsFor(makeEl("input", {}))).toBe("type=|name=");
+  });
+});
+
+describe("hashHex", () => {
+  it("returns the trailing REF_HASH_LENGTH hex chars of the 32-bit hash", () => {
+    expect(hashHex(0xabcdef01)).toBe("ef01");
+  });
+
+  it("zero-pads small hashes to REF_HASH_LENGTH chars", () => {
+    expect(hashHex(0x00000001)).toHaveLength(REF_HASH_LENGTH);
+    expect(hashHex(0)).toHaveLength(REF_HASH_LENGTH);
+  });
+
+  it("agrees with formatRef on the displayed hex prefix", () => {
+    const ref = formatRef(0xabcdef01, 1);
+    expect(ref).toBe(REF_PREFIX + hashHex(0xabcdef01));
   });
 });
 

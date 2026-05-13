@@ -8,7 +8,7 @@
 
 /** A single form field the agent needs data for. */
 export interface FormFieldRequest {
-  /** Element ref from the accessibility tree (e.g., "E42") */
+  /** Element ref from the accessibility tree (e.g., "E_a3f2") */
   ref: string;
   /** The field's visible label */
   label: string;
