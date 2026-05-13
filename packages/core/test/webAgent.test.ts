@@ -5,6 +5,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
+import { PlanningError } from "../src/errors.js";
 
 // Mock the AI module
 vi.mock("ai", () => ({
@@ -649,6 +650,17 @@ describe("WebAgent", () => {
       ).rejects.toThrow(/Failed to generate plan/);
     });
 
+    it("should propagate planning failures as PlanningError instances", async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "No tool result",
+        toolResults: [],
+      } as any);
+
+      await expect(
+        webAgent.execute("Test task", { startingUrl: "https://example.com" }),
+      ).rejects.toBeInstanceOf(PlanningError);
+    });
+
     it("should start on about:blank when planner returns no URL", async () => {
       // Planner returns plan without url (e.g., webSearch-enabled scenario)
       mockGenerateTextWithRetry.mockResolvedValueOnce({
@@ -1113,6 +1125,111 @@ describe("WebAgent", () => {
       });
 
       expect(result.success).toBe(true);
+    });
+
+    it("should warn and emit SYSTEM_DEBUG_TOOL_DROP when provider returns multiple tool calls", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // Provider returns 3 tool calls in one turn; only the first ('click')
+      // should be processed, and the extras should be reported.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Multi",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              input: { ref: "btn1" },
+              output: { action: "click", ref: "btn1", isTerminal: false },
+            },
+            {
+              type: "tool-result",
+              toolCallId: "fill_1",
+              toolName: "fill",
+              input: { ref: "input1", value: "x" },
+              output: { action: "fill", ref: "input1", isTerminal: false },
+            },
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "x" },
+              output: { action: "done", result: "x", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Multi" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "click_1",
+                    toolName: "click",
+                    output: { action: "click", ref: "btn1" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Second turn: wrap up with a clean done.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              input: { result: "Clicked" },
+              output: { action: "done", result: "Clicked", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_2",
+                    toolName: "done",
+                    output: { action: "done", result: "Clicked", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Multi-tool", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+
+      const dropEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP,
+      );
+      expect(dropEvent).toBeDefined();
+      expect(dropEvent?.data.droppedCount).toBe(2);
+      expect(dropEvent?.data.droppedTools).toEqual(["fill", "done"]);
+      expect(dropEvent?.data.keptTool).toBe("click");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Provider returned 3 tool calls in one turn"),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 
