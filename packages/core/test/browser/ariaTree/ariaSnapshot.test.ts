@@ -172,7 +172,7 @@ describe("ariaTree module", () => {
     it("should use ref= prefix format in YAML (not bare refs)", async () => {
       // NOTE: jsdom has no layout engine so refs don't appear in YAML output
       // (nodeReceivesPointerEvents returns false). We verify the format rule:
-      // the YAML should never contain bare [E###] without the ref= prefix.
+      // the YAML should never contain bare [E_xxxx] without the ref= prefix.
       setupDOM("<html><body><button>Click</button></body></html>");
 
       const { generateAndRenderAriaTree } =
