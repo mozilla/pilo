@@ -676,12 +676,33 @@ describe("PlaywrightBrowser", () => {
           PageAction.Goto,
           PageAction.Back,
           PageAction.Forward,
+          PageAction.Scroll,
           PageAction.Done,
         ];
 
         nonElementActions.forEach((action) => {
           expect((browser as any).actionRequiresElement(action)).toBe(false);
         });
+      });
+
+      it("should run scroll via page.evaluate with the given direction", async () => {
+        const evaluateSpy = vi.fn().mockResolvedValue(undefined);
+        (browser as any).page = { evaluate: evaluateSpy };
+
+        await browser.performAction("", PageAction.Scroll, "down");
+
+        expect(evaluateSpy).toHaveBeenCalledWith(expect.any(Function), "down");
+      });
+
+      it("should throw BrowserActionException for missing direction on scroll", async () => {
+        (browser as any).page = { evaluate: vi.fn() };
+
+        await expect(browser.performAction("", PageAction.Scroll)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("", PageAction.Scroll)).rejects.toThrow(
+          "Direction required for scroll action",
+        );
       });
     });
 

@@ -893,6 +893,36 @@ export class PlaywrightBrowser implements AriaBrowser {
                 // Note: goForward already calls ensureOptimizedPageLoad internally
                 break;
 
+              case PageAction.Scroll:
+                if (!value)
+                  throw new BrowserActionException(
+                    "scroll",
+                    "Direction required for scroll action",
+                  );
+                await this.page!.evaluate((direction: string) => {
+                  switch (direction) {
+                    case "down":
+                      window.scrollBy({ left: 0, top: window.innerHeight, behavior: "instant" });
+                      return;
+                    case "up":
+                      window.scrollBy({ left: 0, top: -window.innerHeight, behavior: "instant" });
+                      return;
+                    case "top":
+                      window.scrollTo({ left: 0, top: 0, behavior: "instant" });
+                      return;
+                    case "bottom":
+                      window.scrollTo({
+                        left: 0,
+                        top: document.documentElement.scrollHeight,
+                        behavior: "instant",
+                      });
+                      return;
+                    default:
+                      throw new Error(`Unsupported scroll direction: ${direction}`);
+                  }
+                }, value);
+                break;
+
               case PageAction.Extract:
                 // Extract is handled at a higher level in the automation flow
                 // The browser implementation doesn't need to do anything

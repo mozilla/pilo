@@ -7,7 +7,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
+import { AriaBrowser, PageAction, SCROLL_DIRECTIONS } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
@@ -241,6 +241,16 @@ export function createWebActionTools(context: WebActionContext) {
         }
 
         return result;
+      },
+    }),
+
+    scroll: tool({
+      description: TOOL_STRINGS.webActions.scroll.description,
+      inputSchema: z.object({
+        direction: z.enum(SCROLL_DIRECTIONS).describe(TOOL_STRINGS.webActions.scroll.direction),
+      }),
+      execute: async ({ direction }) => {
+        return await performActionWithValidation(PageAction.Scroll, context, undefined, direction);
       },
     }),
 

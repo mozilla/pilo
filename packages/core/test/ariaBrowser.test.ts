@@ -17,6 +17,7 @@ describe("AriaBrowser interface", () => {
         "goto",
         "back",
         "forward",
+        "scroll",
         "extract",
         "done",
         "abort",
@@ -63,7 +64,12 @@ describe("AriaBrowser interface", () => {
       ];
 
       // Navigation actions
-      const navigationActions = [PageAction.Goto, PageAction.Back, PageAction.Forward];
+      const navigationActions = [
+        PageAction.Goto,
+        PageAction.Back,
+        PageAction.Forward,
+        PageAction.Scroll,
+      ];
 
       // Control actions
       const controlActions = [

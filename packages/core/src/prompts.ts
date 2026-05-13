@@ -56,6 +56,11 @@ export const TOOL_STRINGS = {
     forward: {
       description: "Go forward to the next page",
     },
+    scroll: {
+      description:
+        "Scroll the page. 'up'/'down' scroll one viewport in that direction; 'top'/'bottom' jump to the start/end of the document. Use after the accessibility tree appears incomplete on dynamic / infinite-scroll pages.",
+      direction: "Direction to scroll: 'up', 'down', 'top', or 'bottom'",
+    },
     extract: {
       description: "Extract specific data from the current page for later reference",
       dataDescription:
@@ -155,7 +160,7 @@ You adapt to situations and find creative ways to complete tasks without getting
 
 IMPORTANT:
 - You can see the entire page content through the accessibility tree snapshot.
-- The accessibility tree shows all currently loaded page elements. On dynamic pages, some content may only appear after scrolling or interaction — if expected data isn't visible, try scrolling or interacting to trigger loading.
+- The accessibility tree shows all currently loaded page elements. On dynamic pages, some content may only appear after scrolling or interaction — if expected data isn't visible, try scroll() or wait() to trigger loading.
 - Focus on the elements you need to interact with directly.
 `.trim();
 
@@ -178,6 +183,7 @@ function buildToolExamples(
     `- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}`,
     `- back() - ${TOOL_STRINGS.webActions.back.description}`,
     `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
+    `- scroll({"direction": "down"}) - ${TOOL_STRINGS.webActions.scroll.description}`,
     `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
   ];
 
@@ -336,7 +342,7 @@ Analyze the current page state and determine your next action based on previous 
 - extract() if you need more information
 
 **Best Practices:**
-- The accessibility tree shows currently loaded elements; dynamic pages may load more content on scroll
+- The accessibility tree shows currently loaded elements; if expected content is missing, use scroll() to reveal more of the page or wait() to let dynamic content load
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
 - Submit forms via enter() or submit button after filling
