@@ -3409,7 +3409,7 @@
           "type": "array"
         },
         "ref": {
-          "description": "Element ref from the accessibility tree (e.g., \"E42\")",
+          "description": "Element ref from the accessibility tree (e.g., \"E_a3f2\")",
           "type": "string"
         },
         "required": {
