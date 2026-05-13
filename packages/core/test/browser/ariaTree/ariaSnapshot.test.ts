@@ -593,7 +593,7 @@ describe("ariaTree module", () => {
       expect(yaml1).toBe(yaml2);
     });
 
-    it("accepts a numeric frameIndex parameter", async () => {
+    it("produces identical counter-based YAML regardless of frameIndex (display unchanged in Task 2)", async () => {
       setupDOM("<html><body><button>Save</button></body></html>");
 
       const { generateAndRenderAriaTree } =
@@ -601,11 +601,11 @@ describe("ariaTree module", () => {
 
       const yamlA = generateAndRenderAriaTree(document.body, 0);
       const yamlB = generateAndRenderAriaTree(document.body, 1);
-      // Task 2 keeps the counter-based display, so we just verify both
-      // generations succeed with the numeric parameter. Task 3 asserts the
-      // actual divergence in rendered refs.
-      expect(yamlA).toContain("button");
-      expect(yamlB).toContain("button");
+      // The hash inputs differ (different frameIndex → different root sentinel),
+      // but the rendered refs are still counter-based in Task 2. So the YAMLs
+      // are byte-for-byte identical. Task 3 changes this — when it lands, this
+      // test must be updated to assert divergence.
+      expect(yamlA).toBe(yamlB);
     });
   });
 });

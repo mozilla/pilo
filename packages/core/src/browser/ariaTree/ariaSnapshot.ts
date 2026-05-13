@@ -158,8 +158,14 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0, initialParentHa
     }
 
     const expectedRole = roleUtils.getAriaRole(element) ?? "generic";
-    const siblingIndex = getSiblingIndex(ariaNode, element.tagName, expectedRole);
-    const childAriaNode = toAriaNode(element, ariaNode.hash, siblingIndex);
+    const childAriaNode =
+      expectedRole === "presentation" || expectedRole === "none"
+        ? null
+        : toAriaNode(
+            element,
+            ariaNode.hash,
+            getSiblingIndex(ariaNode, element.tagName, expectedRole),
+          );
     if (childAriaNode) {
       ariaNode.children.push(childAriaNode);
     }
