@@ -5,14 +5,14 @@
  * Each tool includes description, inputSchema, and execute function.
  */
 
-import { tool } from "ai";
+import { tool, jsonSchema } from "ai";
 import { z } from "zod";
 import { AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
-import { generateTextWithRetry } from "../utils/retry.js";
+import { generateTextWithRetry, generateObjectWithRetry } from "../utils/retry.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -311,8 +311,12 @@ export function createWebActionTools(context: WebActionContext) {
       description: TOOL_STRINGS.webActions.extract.description,
       inputSchema: z.object({
         description: z.string().describe(TOOL_STRINGS.webActions.extract.dataDescription),
+        outputSchema: z
+          .record(z.string(), z.any())
+          .optional()
+          .describe(TOOL_STRINGS.webActions.extract.outputSchema),
       }),
-      execute: async ({ description }) => {
+      execute: async ({ description, outputSchema }) => {
         // Extract doesn't use browser.performAction - it's a special AI operation
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "extract",
@@ -325,7 +329,42 @@ export function createWebActionTools(context: WebActionContext) {
         // Build extraction prompt
         const prompt = buildExtractionPrompt(description, markdown);
 
-        // Use the provider to extract the data with retry
+        // Structured branch: when outputSchema is provided, use generateObject with
+        // jsonSchema() to validate the LLM output against the schema.
+        if (outputSchema) {
+          const { object } = await generateObjectWithRetry(
+            {
+              ...context.providerConfig,
+              prompt,
+              schema: jsonSchema(outputSchema as any),
+              maxOutputTokens: 5000,
+              abortSignal: context.abortSignal,
+            },
+            {
+              maxAttempts: 3,
+              onRetry: (attempt, error) => {
+                context.eventEmitter.emit(WebAgentEventType.AGENT_STATUS, {
+                  message: `Extract (structured) retry attempt ${attempt} after error: ${error instanceof Error ? error.message : String(error)}`,
+                });
+              },
+            },
+          );
+
+          // Emit the extracted data event (stringified for event consumers
+          // that expect a string payload)
+          context.eventEmitter.emit(WebAgentEventType.AGENT_EXTRACTED, {
+            extractedData: JSON.stringify(object),
+          });
+
+          return {
+            success: true,
+            action: "extract",
+            description,
+            data: object,
+          };
+        }
+
+        // Markdown branch (default): use the provider to extract the data with retry
         const extractResponse = await generateTextWithRetry(
           {
             ...context.providerConfig,

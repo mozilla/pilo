@@ -34,6 +34,7 @@ import {
 } from "./prompts.js";
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
+import { createInspectionTools } from "./tools/inspectionTools.js";
 import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
@@ -389,6 +390,12 @@ export class WebAgent {
       abortSignal: this.abortSignal,
     });
 
+    // Inspection tools (zero-LLM page-inspection primitives) are always available.
+    const inspectionTools = createInspectionTools({
+      browser: this.browser,
+      eventEmitter: this.eventEmitter,
+    });
+
     // Only include search tools if a search service was created
     const searchTools = this.searchService
       ? createSearchTools({ searchService: this.searchService, eventEmitter: this.eventEmitter })
@@ -448,7 +455,13 @@ export class WebAgent {
     }
 
     // Merge all tools
-    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...interactiveToolSet };
+    const allTools = {
+      ...webActionTools,
+      ...inspectionTools,
+      ...searchTools,
+      ...tabstackTools,
+      ...interactiveToolSet,
+    };
 
     // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
     // The empty page has no useful elements and the snapshot prompt causes the model
@@ -1044,7 +1057,11 @@ export class WebAgent {
     }
 
     // Determine if page changed (most actions change the page, except extract and webSearch)
-    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
+    const pageChanged =
+      actionOutput.action !== "extract" &&
+      actionOutput.action !== "webSearch" &&
+      actionOutput.action !== "search_page" &&
+      actionOutput.action !== "find_elements";
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {

@@ -57,9 +57,12 @@ export const TOOL_STRINGS = {
       description: "Go forward to the next page",
     },
     extract: {
-      description: "Extract specific data from the current page for later reference",
+      description:
+        "Extract data from the current page. Pass `outputSchema` (a JSON Schema object) to get structured data; omit it for markdown text.",
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
+      outputSchema:
+        "Optional JSON Schema describing the desired structured output. When provided, returns `data` (an object matching the schema) instead of `extractedData` (markdown).",
     },
     done: {
       description: "Complete the task with your final answer",
@@ -84,6 +87,25 @@ export const TOOL_STRINGS = {
       description:
         "Search the web for information. Returns the search results page as markdown. Use when you need to find websites or information but don't know the URL.",
       query: "The search query to execute",
+    },
+    searchPage: {
+      description:
+        "Search visible text on the current page. Free and fast — prefer this over extract when you know what text to look for.",
+      pattern: "Text or regex pattern to search for",
+      regex: "Treat `pattern` as a regular expression",
+      caseSensitive: "Match case sensitively",
+      contextChars: "Characters of context before/after each match (0-500)",
+      maxResults: "Maximum number of matches to return (1-50)",
+    },
+    findElements: {
+      description:
+        'Query elements by CSS selector. Free and fast — useful for inventory questions ("how many cards?") before deciding to extract.',
+      selector: "CSS selector",
+      withinRef: "Optional aria-tree ref to scope the query to that element's subtree",
+      attributes:
+        "Element attributes to include (e.g., ['href', 'data-id']). href/src are auto-included as absolute URLs.",
+      maxResults: "Maximum number of elements to return (1-100)",
+      includeText: "Include each element's text content (truncated to 500 chars)",
     },
   },
 
@@ -178,7 +200,9 @@ function buildToolExamples(
     `- goto({"url": "https://example.com"}) - ${TOOL_STRINGS.webActions.goto.description}`,
     `- back() - ${TOOL_STRINGS.webActions.back.description}`,
     `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
-    `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
+    `- extract({"description": "data to extract", "outputSchema": {"type": "object", "properties": {"title": {"type": "string"}}}}) - ${TOOL_STRINGS.webActions.extract.description}`,
+    `- search_page({"pattern": "logout"}) - ${TOOL_STRINGS.webActions.searchPage.description}`,
+    `- find_elements({"selector": "a.nav-link"}) - ${TOOL_STRINGS.webActions.findElements.description}`,
   ];
 
   if (hasWebSearch) {
@@ -349,6 +373,7 @@ Analyze the current page state and determine your next action based on previous 
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
 - If you have found the core information requested but cannot access supplementary details due to site limitations, use done() with what you have — only use abort() when the core task cannot be completed at all
 - For research: Use extract() immediately when finding relevant data
+- For inventory questions ("how many X?", "is Y on the page?", "what's the href of link Z?"), prefer search_page or find_elements — they are zero-LLM and instant. Reserve extract() for synthesized or structured data from the CURRENT page; pass outputSchema to extract() when you need JSON-shaped output instead of markdown{% if hasTabstack %}. Use tabstack_extract_json only for off-page URL fetches, not the current page{% endif %}
 - For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable{% if hasTabstack %} — use tabstack_extract_markdown to read PDF content directly{% endif %}{% if not hasTabstack %} — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF{% endif %}
 {% if hasWebSearch %}- If you need to search the web, use webSearch({query}) directly rather than filling in a browser search engine (DuckDuckGo, Google, Bing, etc.) — webSearch avoids CAPTCHA and bot detection that will block browser-based searches{% endif %}
 {% if hasTabstack %}- **Tabstack cloud tools are available — prefer them over manual browsing when they fit:**

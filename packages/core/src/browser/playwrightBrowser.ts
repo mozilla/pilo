@@ -11,7 +11,18 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
-import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.js";
+import {
+  AriaBrowser,
+  PageAction,
+  LoadState,
+  TemporaryTab,
+  SearchPageOptions,
+  SearchPageMatch,
+  SearchPageResult,
+  FindElementsOptions,
+  FindElementsMatch,
+  FindElementsResult,
+} from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
 import TurndownService from "turndown";
@@ -972,6 +983,322 @@ export class PlaywrightBrowser implements AriaBrowser {
       }
     }
   }
+
+  async searchPage(opts: SearchPageOptions): Promise<SearchPageResult> {
+    if (!this.page) throw new Error("Browser not started");
+
+    const evalOpts = {
+      pattern: opts.pattern,
+      regex: opts.regex ?? false,
+      caseSensitive: opts.caseSensitive ?? false,
+      contextChars: opts.contextChars ?? 80,
+      maxResults: opts.maxResults ?? 10,
+    };
+
+    const aggregated: SearchPageMatch[] = [];
+    let totalMatches = 0;
+
+    // Main frame
+    try {
+      const mainResult = await this.page.evaluate(
+        PlaywrightBrowser.searchInDocumentSource,
+        evalOpts,
+      );
+      totalMatches += mainResult.totalMatches;
+      for (const m of mainResult.matches) {
+        if (aggregated.length >= evalOpts.maxResults) break;
+        aggregated.push({ ...m, frameUrl: undefined });
+      }
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BrowserActionException("search_page", `search_page failed: ${message}`);
+    }
+
+    // Iterate non-main frames (same-origin / accessible cross-origin)
+    const frames = this.page.frames();
+    for (const frame of frames) {
+      if (frame === this.page.mainFrame()) continue;
+      try {
+        const frameResult = await frame.evaluate(
+          PlaywrightBrowser.searchInDocumentSource,
+          evalOpts,
+        );
+        totalMatches += frameResult.totalMatches;
+        const frameUrl = frame.url();
+        for (const m of frameResult.matches) {
+          if (aggregated.length >= evalOpts.maxResults) break;
+          aggregated.push({ ...m, frameUrl });
+        }
+      } catch {
+        // Cross-origin or detached frame, skip silently (mirrors getTreeWithRefsImpl)
+      }
+    }
+
+    return {
+      totalMatches,
+      truncated: totalMatches > aggregated.length,
+      matches: aggregated,
+    };
+  }
+
+  /**
+   * In-page text-search helper. Runs inside `page.evaluate` / `frame.evaluate`,
+   * so it must be self-contained and use only DOM APIs available in the page context.
+   * Returns the per-frame partial result; the wrapper tags each match with `frameUrl`.
+   */
+  private static readonly searchInDocumentSource = (opts: {
+    pattern: string;
+    regex: boolean;
+    caseSensitive: boolean;
+    contextChars: number;
+    maxResults: number;
+  }): {
+    totalMatches: number;
+    matches: Array<{
+      match: string;
+      contextBefore: string;
+      contextAfter: string;
+      nearestRef?: string;
+    }>;
+  } => {
+    const flags = opts.caseSensitive ? "g" : "gi";
+    const re = opts.regex
+      ? new RegExp(opts.pattern, flags)
+      : new RegExp(opts.pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+
+    const matches: Array<{
+      match: string;
+      contextBefore: string;
+      contextAfter: string;
+      nearestRef?: string;
+    }> = [];
+    let totalMatches = 0;
+
+    if (!document.body) {
+      return { totalMatches, matches };
+    }
+
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const p = node.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.tagName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const text = (node as Text).data;
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        totalMatches++;
+        if (matches.length < opts.maxResults) {
+          const start = Math.max(0, m.index - opts.contextChars);
+          const end = Math.min(text.length, m.index + m[0].length + opts.contextChars);
+          const parentEl = (node as Text).parentElement;
+          const refEl = parentEl?.closest("[data-pilo-ref]") ?? null;
+          matches.push({
+            match: m[0],
+            contextBefore: text.slice(start, m.index),
+            contextAfter: text.slice(m.index + m[0].length, end),
+            nearestRef: refEl?.getAttribute("data-pilo-ref") ?? undefined,
+          });
+        }
+        // Zero-width match guard
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+    }
+
+    return { totalMatches, matches };
+  };
+
+  async findElements(opts: FindElementsOptions): Promise<FindElementsResult> {
+    if (!this.page) throw new Error("Browser not started");
+
+    const evalOpts = {
+      selector: opts.selector,
+      withinRef: opts.withinRef ?? null,
+      attributes: opts.attributes ?? null,
+      maxResults: opts.maxResults ?? 20,
+      includeText: opts.includeText ?? true,
+    };
+
+    const aggregated: FindElementsMatch[] = [];
+    let totalMatches = 0;
+    let anyFrameFoundRef = evalOpts.withinRef === null;
+
+    // Main frame
+    let mainResult:
+      | { totalMatches: number; matches: Array<Omit<FindElementsMatch, "frameUrl">> }
+      | { error: string; kind: "bad-selector" | "within-ref-miss" };
+    try {
+      mainResult = await this.page.evaluate(
+        PlaywrightBrowser.findElementsInDocumentSource,
+        evalOpts,
+      );
+    } catch (error) {
+      if (error instanceof Error && this.isBrowserDisconnectedError(error)) {
+        throw new BrowserDisconnectedError(error.message);
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BrowserActionException("find_elements", `find_elements failed: ${message}`);
+    }
+
+    if ("error" in mainResult) {
+      if (mainResult.kind !== "within-ref-miss") {
+        // Bad selector or other in-page error: short-circuit, surface as recoverable
+        throw new BrowserActionException(
+          "find_elements",
+          `find_elements failed: ${mainResult.error}`,
+        );
+      }
+      // withinRef miss in main frame — continue iterating frames
+    } else {
+      anyFrameFoundRef = true;
+      totalMatches += mainResult.totalMatches;
+      for (const m of mainResult.matches) {
+        if (aggregated.length >= evalOpts.maxResults) break;
+        aggregated.push({ ...m, frameUrl: undefined });
+      }
+    }
+
+    // Iterate non-main frames (same-origin / accessible cross-origin)
+    const frames = this.page.frames();
+    for (const frame of frames) {
+      if (frame === this.page.mainFrame()) continue;
+      let frameResult:
+        | { totalMatches: number; matches: Array<Omit<FindElementsMatch, "frameUrl">> }
+        | { error: string; kind: "bad-selector" | "within-ref-miss" };
+      try {
+        frameResult = await frame.evaluate(
+          PlaywrightBrowser.findElementsInDocumentSource,
+          evalOpts,
+        );
+      } catch {
+        // Cross-origin or detached frame, skip silently (mirrors getTreeWithRefsImpl)
+        continue;
+      }
+
+      if ("error" in frameResult) {
+        if (frameResult.kind !== "within-ref-miss") {
+          // Bad selector in this frame — selector is identical across frames, so
+          // short-circuit rather than continue (mirrors plan contract).
+          throw new BrowserActionException(
+            "find_elements",
+            `find_elements failed: ${frameResult.error}`,
+          );
+        }
+        // withinRef miss in this frame — try next frame
+        continue;
+      }
+
+      anyFrameFoundRef = true;
+      totalMatches += frameResult.totalMatches;
+      const frameUrl = frame.url();
+      for (const m of frameResult.matches) {
+        if (aggregated.length >= evalOpts.maxResults) break;
+        aggregated.push({ ...m, frameUrl });
+      }
+    }
+
+    if (!anyFrameFoundRef) {
+      throw new BrowserActionException(
+        "find_elements",
+        `find_elements failed: withinRef "${evalOpts.withinRef}" not found`,
+      );
+    }
+
+    return {
+      totalMatches,
+      truncated: totalMatches > aggregated.length,
+      elements: aggregated,
+    };
+  }
+
+  /**
+   * In-page CSS-selector query helper. Runs inside `page.evaluate` / `frame.evaluate`,
+   * so it must be self-contained and use only DOM APIs available in the page context.
+   * Returns either a per-frame partial result OR an `{ error }` object for bad
+   * selectors / withinRef-not-found in this frame; the wrapper interprets these.
+   */
+  private static readonly findElementsInDocumentSource = (opts: {
+    selector: string;
+    withinRef: string | null;
+    attributes: string[] | null;
+    maxResults: number;
+    includeText: boolean;
+  }):
+    | {
+        totalMatches: number;
+        matches: Array<{
+          tag: string;
+          text?: string;
+          attributes?: Record<string, string>;
+          nearestRef?: string;
+        }>;
+      }
+    | { error: string; kind: "bad-selector" | "within-ref-miss" } => {
+    // Resolve scope root
+    let root: Document | Element = document;
+    if (opts.withinRef !== null) {
+      const r = document.querySelector(`[data-pilo-ref="${CSS.escape(opts.withinRef)}"]`);
+      if (!r)
+        return {
+          error: `withinRef "${opts.withinRef}" not found in this frame`,
+          kind: "within-ref-miss",
+        };
+      root = r;
+    }
+
+    let nodeList: NodeListOf<Element>;
+    try {
+      nodeList = root.querySelectorAll(opts.selector);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e), kind: "bad-selector" };
+    }
+
+    const totalMatches = nodeList.length;
+    const matches: Array<{
+      tag: string;
+      text?: string;
+      attributes?: Record<string, string>;
+      nearestRef?: string;
+    }> = [];
+    for (let i = 0; i < nodeList.length && matches.length < opts.maxResults; i++) {
+      const el = nodeList[i];
+      let attrs: Record<string, string> | undefined;
+      if (opts.attributes && opts.attributes.length > 0) {
+        attrs = {};
+        for (const name of opts.attributes) {
+          const v = el.getAttribute(name);
+          if (v !== null) attrs[name] = v;
+        }
+      }
+      // Auto-resolve href/src to absolute URLs when present, even if not requested explicitly
+      const href = (el as HTMLAnchorElement | HTMLAreaElement).href;
+      const src = (el as HTMLImageElement | HTMLScriptElement | HTMLIFrameElement).src;
+      if (typeof href === "string" && href) (attrs ??= {})["href"] = href;
+      if (typeof src === "string" && src) (attrs ??= {})["src"] = src;
+
+      matches.push({
+        tag: el.tagName.toLowerCase(),
+        text: opts.includeText ? (el.textContent ?? "").trim().slice(0, 500) : undefined,
+        attributes: attrs && Object.keys(attrs).length > 0 ? attrs : undefined,
+        nearestRef:
+          (el.closest("[data-pilo-ref]") as Element | null)?.getAttribute("data-pilo-ref") ??
+          undefined,
+      });
+    }
+    return { totalMatches, matches };
+  };
 
   /**
    * Check if an action requires an element reference
