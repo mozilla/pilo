@@ -1,5 +1,13 @@
 import browser from "webextension-polyfill";
-import type { AriaBrowser } from "pilo-core/core";
+import type {
+  AriaBrowser,
+  SearchPageOptions,
+  SearchPageMatch,
+  SearchPageResult,
+  FindElementsOptions,
+  FindElementsMatch,
+  FindElementsResult,
+} from "pilo-core/core";
 import { PageAction, LoadState } from "pilo-core/core";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "../shared/utils/logger";
@@ -637,6 +645,218 @@ export class ExtensionBrowser implements AriaBrowser {
       throw new Error("No active tab found");
     }
     return tabs[0];
+  }
+
+  async searchPage(opts: SearchPageOptions): Promise<SearchPageResult> {
+    const tab = await this.getActiveTab();
+    this.logger.info("searchPage() called", { tabId: tab.id, pattern: opts.pattern });
+
+    const evalOpts = {
+      pattern: opts.pattern,
+      regex: opts.regex ?? false,
+      caseSensitive: opts.caseSensitive ?? false,
+      contextChars: opts.contextChars ?? 80,
+      maxResults: opts.maxResults ?? 10,
+    };
+
+    let result: { totalMatches: number; matches: Array<Omit<SearchPageMatch, "frameUrl">> };
+    try {
+      const [scriptResult] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (params: {
+          pattern: string;
+          regex: boolean;
+          caseSensitive: boolean;
+          contextChars: number;
+          maxResults: number;
+        }) => {
+          const flags = params.caseSensitive ? "g" : "gi";
+          const re = params.regex
+            ? new RegExp(params.pattern, flags)
+            : new RegExp(params.pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+
+          const matches: Array<{
+            match: string;
+            contextBefore: string;
+            contextAfter: string;
+            nearestRef?: string;
+          }> = [];
+          let totalMatches = 0;
+
+          if (!document.body) {
+            return { totalMatches, matches };
+          }
+
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+              const p = node.parentElement;
+              if (!p) return NodeFilter.FILTER_REJECT;
+              const tag = p.tagName;
+              if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            },
+          });
+
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const text = (node as Text).data;
+            re.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(text)) !== null) {
+              totalMatches++;
+              if (matches.length < params.maxResults) {
+                const start = Math.max(0, m.index - params.contextChars);
+                const end = Math.min(text.length, m.index + m[0].length + params.contextChars);
+                const parentEl = (node as Text).parentElement;
+                const refEl = parentEl?.closest("[data-pilo-ref]") ?? null;
+                matches.push({
+                  match: m[0],
+                  contextBefore: text.slice(start, m.index),
+                  contextAfter: text.slice(m.index + m[0].length, end),
+                  nearestRef: refEl?.getAttribute("data-pilo-ref") ?? undefined,
+                });
+              }
+              if (m.index === re.lastIndex) re.lastIndex++;
+            }
+          }
+
+          return { totalMatches, matches };
+        },
+        args: [evalOpts],
+      });
+
+      result = scriptResult.result as typeof result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error("searchPage execution error", { tabId: tab.id }, error);
+      throw new Error(`search_page failed: ${message}`);
+    }
+
+    const aggregated: SearchPageMatch[] = result.matches.map((m) => ({
+      ...m,
+      frameUrl: undefined,
+    }));
+
+    return {
+      totalMatches: result.totalMatches,
+      truncated: result.totalMatches > aggregated.length,
+      matches: aggregated,
+    };
+  }
+
+  async findElements(opts: FindElementsOptions): Promise<FindElementsResult> {
+    const tab = await this.getActiveTab();
+    this.logger.info("findElements() called", { tabId: tab.id, selector: opts.selector });
+
+    const evalOpts = {
+      selector: opts.selector,
+      withinRef: opts.withinRef ?? null,
+      attributes: opts.attributes ?? null,
+      maxResults: opts.maxResults ?? 20,
+      includeText: opts.includeText ?? true,
+    };
+
+    let scriptOutcome:
+      | { totalMatches: number; matches: Array<Omit<FindElementsMatch, "frameUrl">> }
+      | { error: string; kind: "bad-selector" | "within-ref-miss" };
+    try {
+      const [scriptResult] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (params: {
+          selector: string;
+          withinRef: string | null;
+          attributes: string[] | null;
+          maxResults: number;
+          includeText: boolean;
+        }):
+          | {
+              totalMatches: number;
+              matches: Array<{
+                tag: string;
+                text?: string;
+                attributes?: Record<string, string>;
+                nearestRef?: string;
+              }>;
+            }
+          | { error: string; kind: "bad-selector" | "within-ref-miss" } => {
+          // Resolve scope root
+          let root: Document | Element = document;
+          if (params.withinRef !== null) {
+            const r = document.querySelector(`[data-pilo-ref="${CSS.escape(params.withinRef)}"]`);
+            if (!r)
+              return {
+                error: `withinRef "${params.withinRef}" not found in this frame`,
+                kind: "within-ref-miss",
+              };
+            root = r;
+          }
+
+          let nodeList: NodeListOf<Element>;
+          try {
+            nodeList = root.querySelectorAll(params.selector);
+          } catch (e) {
+            return { error: e instanceof Error ? e.message : String(e), kind: "bad-selector" };
+          }
+
+          const totalMatches = nodeList.length;
+          const matches: Array<{
+            tag: string;
+            text?: string;
+            attributes?: Record<string, string>;
+            nearestRef?: string;
+          }> = [];
+          for (let i = 0; i < nodeList.length && matches.length < params.maxResults; i++) {
+            const el = nodeList[i];
+            let attrs: Record<string, string> | undefined;
+            if (params.attributes && params.attributes.length > 0) {
+              attrs = {};
+              for (const name of params.attributes) {
+                const v = el.getAttribute(name);
+                if (v !== null) attrs[name] = v;
+              }
+            }
+            const href = (el as HTMLAnchorElement | HTMLAreaElement).href;
+            const src = (el as HTMLImageElement | HTMLScriptElement | HTMLIFrameElement).src;
+            if (typeof href === "string" && href) (attrs ??= {})["href"] = href;
+            if (typeof src === "string" && src) (attrs ??= {})["src"] = src;
+
+            matches.push({
+              tag: el.tagName.toLowerCase(),
+              text: params.includeText ? (el.textContent ?? "").trim().slice(0, 500) : undefined,
+              attributes: attrs && Object.keys(attrs).length > 0 ? attrs : undefined,
+              nearestRef:
+                (el.closest("[data-pilo-ref]") as Element | null)?.getAttribute("data-pilo-ref") ??
+                undefined,
+            });
+          }
+          return { totalMatches, matches };
+        },
+        args: [evalOpts],
+      });
+
+      scriptOutcome = scriptResult.result as typeof scriptOutcome;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error("findElements execution error", { tabId: tab.id }, error);
+      throw new Error(`find_elements failed: ${message}`);
+    }
+
+    if ("error" in scriptOutcome) {
+      throw new Error(`find_elements failed: ${scriptOutcome.error}`);
+    }
+
+    const aggregated: FindElementsMatch[] = scriptOutcome.matches.map((m) => ({
+      ...m,
+      frameUrl: undefined,
+    }));
+
+    return {
+      totalMatches: scriptOutcome.totalMatches,
+      truncated: scriptOutcome.totalMatches > aggregated.length,
+      elements: aggregated,
+    };
   }
 
   async runInTemporaryTab<T>(
