@@ -23,6 +23,14 @@ import { box, getElementComputedStyle, isElementVisible } from "./domUtils.js";
 import * as roleUtils from "./roleUtils.js";
 import { yamlEscapeKeyIfNeeded, yamlEscapeValueIfNeeded } from "./yamlUtils.js";
 import type { AriaNode, RefCounter } from "./types.js";
+import { computeNodeHash, gatedAttrsFor, fnv1a32 } from "./refHash.js";
+
+function computeRootHash(frameIndex: number): number {
+  // Pathname keeps refs stable across re-renders within a page and
+  // invalidates everything on navigation.
+  const path = typeof location !== "undefined" && location?.pathname ? location.pathname : "";
+  return fnv1a32(frameIndex.toString(10) + "@" + path);
+}
 
 /**
  * Generate an ARIA tree from a root element and render it as YAML.
@@ -31,12 +39,12 @@ import type { AriaNode, RefCounter } from "./types.js";
  * Sets `data-pilo-ref` attributes on DOM elements during generation for fast lookup.
  *
  * @param root - The root element to start from (typically document.body)
- * @param counter - Mutable counter for sequential ref numbering across frames.
- *                  If not provided, starts at 0.
+ * @param frameIndex - Numeric index for this frame (0 for main frame, 1+ for iframes).
+ *                     Used to compute stable content-derived hashes per node.
  * @returns The YAML string of the accessibility tree
  */
-export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): string {
-  const refCounter = counter || { value: 0 };
+export function generateAndRenderAriaTree(root: Element, frameIndex: number = 0): string {
+  const refCounter = { value: 0 }; // Temporary; Task 3 removes counter rendering entirely.
 
   // Clean up any existing data-pilo-ref attributes from a previous snapshot
   root.querySelectorAll("[data-pilo-ref]").forEach((el) => {
@@ -48,14 +56,27 @@ export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): 
   // that strip data-pilo-ref attributes, e.g. React reconciliation)
   (globalThis as any).__piloRefMap = new Map<string, Element>();
 
-  const ariaTree = generateAriaTree(root);
+  const ariaTree = generateAriaTree(root, 0, computeRootHash(frameIndex));
   return renderAriaTree(ariaTree, refCounter);
 }
 
 const MAX_IFRAME_DEPTH = 5;
 
-function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
+function generateAriaTree(rootElement: Element, iframeDepth = 0, initialParentHash = 0): AriaNode {
   const visited = new Set<Node>();
+  const siblingCountersByParent = new WeakMap<AriaNode, Map<string, number>>();
+
+  const getSiblingIndex = (parent: AriaNode, tagName: string, role: string): number => {
+    let map = siblingCountersByParent.get(parent);
+    if (!map) {
+      map = new Map();
+      siblingCountersByParent.set(parent, map);
+    }
+    const key = tagName + "|" + role;
+    const idx = map.get(key) ?? 0;
+    map.set(key, idx + 1);
+    return idx;
+  };
 
   const root: AriaNode = {
     role: "fragment",
@@ -65,6 +86,7 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
     props: {},
     box: box(rootElement),
     receivesPointerEvents: true,
+    hash: initialParentHash, // Fragment root carries the frame sentinel; visible children hash off of it.
   };
 
   const visit = (ariaNode: AriaNode, node: Node) => {
@@ -104,7 +126,7 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
           iframeDoc.body
             .querySelectorAll("[data-pilo-ref]")
             .forEach((el) => el.removeAttribute("data-pilo-ref"));
-          const iframeTree = generateAriaTree(iframeDoc.body, iframeDepth + 1);
+          const iframeTree = generateAriaTree(iframeDoc.body, iframeDepth + 1, ariaNode.hash);
           // Merge iframe children into current node
           for (const child of iframeTree.children) {
             ariaNode.children.push(child);
@@ -122,12 +144,22 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
         element,
         box: box(element),
         receivesPointerEvents: true,
+        hash: computeNodeHash(
+          ariaNode.hash,
+          "IFRAME",
+          "iframe",
+          "",
+          "",
+          getSiblingIndex(ariaNode, "IFRAME", "iframe"),
+        ),
       };
       ariaNode.children.push(iframeNode);
       return;
     }
 
-    const childAriaNode = toAriaNode(element);
+    const expectedRole = roleUtils.getAriaRole(element) ?? "generic";
+    const siblingIndex = getSiblingIndex(ariaNode, element.tagName, expectedRole);
+    const childAriaNode = toAriaNode(element, ariaNode.hash, siblingIndex);
     if (childAriaNode) {
       ariaNode.children.push(childAriaNode);
     }
@@ -181,7 +213,7 @@ function generateAriaTree(rootElement: Element, iframeDepth = 0): AriaNode {
   return root;
 }
 
-function toAriaNode(element: Element): AriaNode | null {
+function toAriaNode(element: Element, parentHash: number, siblingIndex: number): AriaNode | null {
   const role = roleUtils.getAriaRole(element) ?? "generic";
   if (role === "presentation" || role === "none") return null;
 
@@ -196,6 +228,14 @@ function toAriaNode(element: Element): AriaNode | null {
     element,
     box: box(element),
     receivesPointerEvents: pointerEvents,
+    hash: computeNodeHash(
+      parentHash,
+      element.tagName,
+      role,
+      name,
+      gatedAttrsFor(element),
+      siblingIndex,
+    ),
   };
 
   if (roleUtils.kAriaCheckedRoles.includes(role))

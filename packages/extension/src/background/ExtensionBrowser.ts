@@ -12,7 +12,7 @@ interface ActionResult {
 }
 
 interface AriaSnapshotWindow {
-  generateAndRenderAriaTree: (root: Element, counter?: { value: number }) => string;
+  generateAndRenderAriaTree: (root: Element, frameIndex?: number) => string;
 }
 
 /**
@@ -128,7 +128,7 @@ export class ExtensionBrowser implements AriaBrowser {
 
           // generateAndRenderAriaTree handles everything:
           // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-pilo-ref', ref), YAML rendering
-          return win.generateAndRenderAriaTree(document.body);
+          return win.generateAndRenderAriaTree(document.body, 0);
         },
       });
 

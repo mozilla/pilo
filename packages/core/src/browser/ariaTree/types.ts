@@ -116,6 +116,7 @@ export type AriaProps = {
 export type AriaNode = AriaProps & {
   role: AriaRole | "fragment" | "iframe";
   name: string;
+  hash: number;
   ref?: string;
   children: (AriaNode | string)[];
   element: Element;

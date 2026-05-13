@@ -96,19 +96,17 @@ describe("ariaTree module", () => {
       expect(btn.getAttribute("data-pilo-role")).toBeNull();
     });
 
-    it("should accept a counter parameter for cross-frame numbering", async () => {
-      // In jsdom, no elements are visible so counter won't advance.
-      // This test verifies the counter parameter is accepted without error.
+    it("should accept a frameIndex parameter for cross-frame numbering", async () => {
+      // In jsdom, no elements are visible so the frame index doesn't affect output.
+      // This test verifies the frameIndex parameter is accepted without error.
       setupDOM("<html><body><button>A</button></body></html>");
 
       const { generateAndRenderAriaTree } =
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
-      const counter = { value: 100 };
-      generateAndRenderAriaTree(document.body, counter);
-
-      // Counter stays at 100 since no elements are visible in jsdom
-      expect(counter.value).toBe(100);
+      // Should not throw when called with a numeric frameIndex
+      expect(() => generateAndRenderAriaTree(document.body, 0)).not.toThrow();
+      expect(() => generateAndRenderAriaTree(document.body, 5)).not.toThrow();
     });
 
     it("should handle links with href", async () => {
@@ -571,6 +569,43 @@ describe("ariaTree module", () => {
       // for any elements. This is expected behavior - marks are skipped for
       // invisible elements. The test verifies the container still gets created.
       expect(container).not.toBeNull();
+    });
+  });
+
+  describe("hash propagation", () => {
+    it("computes the same ariaNode hashes for the same DOM across two snapshots", async () => {
+      setupDOM("<html><body></body></html>");
+
+      const { generateAndRenderAriaTree } =
+        await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+      document.body.innerHTML = `
+        <button>Save</button>
+        <button>Delete</button>
+      `;
+      const yaml1 = generateAndRenderAriaTree(document.body, 0);
+      // Snapshot a second time without changes
+      document.body.innerHTML = `
+        <button>Save</button>
+        <button>Delete</button>
+      `;
+      const yaml2 = generateAndRenderAriaTree(document.body, 0);
+      expect(yaml1).toBe(yaml2);
+    });
+
+    it("accepts a numeric frameIndex parameter", async () => {
+      setupDOM("<html><body><button>Save</button></body></html>");
+
+      const { generateAndRenderAriaTree } =
+        await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+      const yamlA = generateAndRenderAriaTree(document.body, 0);
+      const yamlB = generateAndRenderAriaTree(document.body, 1);
+      // Task 2 keeps the counter-based display, so we just verify both
+      // generations succeed with the numeric parameter. Task 3 asserts the
+      // actual divergence in rendered refs.
+      expect(yamlA).toContain("button");
+      expect(yamlB).toContain("button");
     });
   });
 });

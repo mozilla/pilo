@@ -606,9 +606,8 @@ export class PlaywrightBrowser implements AriaBrowser {
           fn();
           win.__piloAriaTree = (globalThis as any).__piloAriaTree;
         }
-        const counter = { value: 0 };
-        const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
-        return { yaml, counterValue: counter.value };
+        const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, 0);
+        return { yaml };
       },
       { script: ARIA_TREE_SCRIPT },
     );
@@ -616,7 +615,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Handle cross-origin iframes via Playwright's frame API
     const frames = this.page!.frames();
     const childYamls: string[] = [];
-    let counter = mainResult.counterValue;
+    let frameIndex = 1;
 
     for (const frame of frames) {
       // Skip the main frame
@@ -624,28 +623,29 @@ export class PlaywrightBrowser implements AriaBrowser {
 
       try {
         const frameResult = await frame.evaluate(
-          ({ script, counterStart }) => {
+          ({ script, frameIdx }) => {
             const win = window as any;
             if (!win.__piloAriaTree) {
               const fn = new Function(script);
               fn();
               win.__piloAriaTree = (globalThis as any).__piloAriaTree;
             }
-            const counter = { value: counterStart };
             const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
               document.body,
-              counter,
+              frameIdx,
             );
-            return { yaml, counterValue: counter.value };
+            return { yaml };
           },
-          { script: ARIA_TREE_SCRIPT, counterStart: counter },
+          { script: ARIA_TREE_SCRIPT, frameIdx: frameIndex },
         );
         if (frameResult.yaml) {
           childYamls.push(frameResult.yaml);
-          counter = frameResult.counterValue;
         }
+        frameIndex++;
       } catch {
-        // Cross-origin or detached frame, skip
+        // Cross-origin or detached frame, skip — but still bump frameIndex so
+        // a successful next frame gets a stable distinct index.
+        frameIndex++;
       }
     }
 
