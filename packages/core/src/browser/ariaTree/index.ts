@@ -10,4 +10,4 @@
  */
 
 export { generateAndRenderAriaTree, applySetOfMarks, removeSetOfMarks } from "./ariaSnapshot.js";
-export type { AriaNode, AriaRole, AriaProps, Box, RefCounter } from "./types.js";
+export type { AriaNode, AriaRole, AriaProps, Box } from "./types.js";

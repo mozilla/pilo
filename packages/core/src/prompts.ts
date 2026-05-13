@@ -12,8 +12,8 @@ export const TOOL_STRINGS = {
   webActions: {
     /** Common parameter descriptions used across multiple tools */
     common: {
-      elementRefExample: "E###",
-      elementRef: "Element reference from page snapshot (e.g., E###)",
+      elementRefExample: "E_a3f2",
+      elementRef: "Element reference from page snapshot (e.g., E_a3f2)",
       textValue: "Text to enter into the field",
     },
     /** Individual tool descriptions */
@@ -481,18 +481,18 @@ Today's Date: {{ currentDate }}
 The above accessibility tree shows page elements in a hierarchical text format. Each line represents an element with:
 - Element type (button, link, textbox, generic, etc.)
 - Text content in quotes or description
-- Reference ID in brackets like [ref=E###] - use these exact IDs when interacting with elements
+- Reference ID in brackets like [ref=E_a3f2] - use these exact IDs when interacting with elements
 - Properties like [cursor=pointer] or [disabled]
-Example: button "Submit Form" [ref=E455] [cursor=pointer]
+Example: button "Submit Form" [ref=E_b9c1] [cursor=pointer]
 
-This shows the complete current page content.{% if hasScreenshot %} A labeled screenshot is included. The screenshot marks interactive elements (links, buttons, inputs) with colored badges showing their ref IDs (E1, E2, etc.). The tree above includes refs on all visible elements for structural context — only the interactive ones are labeled in the screenshot.{% endif %}
+This shows the complete current page content.{% if hasScreenshot %} A labeled screenshot is included. The screenshot marks interactive elements (links, buttons, inputs) with colored badges showing their ref IDs (E_a3f2, E_b9c1, etc.). The tree above includes refs on all visible elements for structural context — only the interactive ones are labeled in the screenshot.{% endif %}
 
 **Your task:**
 - Analyze the current state and select your next action
 - Target the most relevant elements for your objective
 - If an action fails, adapt immediately—don't repeat failed attempts
 - Find alternative approaches when planned steps aren't viable
-{% if hasScreenshot %}- Use the labeled screenshot to visually locate interactive elements and match them to [ref=E###] IDs in the tree{% endif %}
+{% if hasScreenshot %}- Use the labeled screenshot to visually locate interactive elements and match them to [ref=E_a3f2] IDs in the tree{% endif %}
 - Follow all guardrails
 
 ${toolCallInstruction}

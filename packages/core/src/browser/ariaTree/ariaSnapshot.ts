@@ -14,16 +14,17 @@
  * limitations under the License.
  *
  * ---
- * Adapted for Pilo: stripped to AI-mode only, unified sequential refs (E1, E2, ...),
- * sets data-pilo-ref attribute during tree generation, walks same-origin iframes inline.
+ * Adapted for Pilo: stripped to AI-mode only, content-derived hash refs
+ * (E_<hex>, see refHash.ts), sets data-pilo-ref attribute during tree
+ * generation, walks same-origin iframes inline.
  */
 
 import { normalizeWhiteSpace } from "./stringUtils.js";
 import { box, getElementComputedStyle, isElementVisible } from "./domUtils.js";
 import * as roleUtils from "./roleUtils.js";
 import { yamlEscapeKeyIfNeeded, yamlEscapeValueIfNeeded } from "./yamlUtils.js";
-import type { AriaNode, RefCounter } from "./types.js";
-import { computeNodeHash, gatedAttrsFor, fnv1a32 } from "./refHash.js";
+import type { AriaNode } from "./types.js";
+import { computeNodeHash, gatedAttrsFor, fnv1a32, formatRef, REF_HASH_LENGTH } from "./refHash.js";
 
 function computeRootHash(frameIndex: number): number {
   // Pathname keeps refs stable across re-renders within a page and
@@ -35,7 +36,8 @@ function computeRootHash(frameIndex: number): number {
 /**
  * Generate an ARIA tree from a root element and render it as YAML.
  *
- * Uses a global sequential counter (E1, E2, ...) for refs across the entire page.
+ * Refs are content-derived: each element's ref is computed from its role,
+ * accessible name, structural path, and frameIndex via FNV-1a. See refHash.ts.
  * Sets `data-pilo-ref` attributes on DOM elements during generation for fast lookup.
  *
  * @param root - The root element to start from (typically document.body)
@@ -44,8 +46,6 @@ function computeRootHash(frameIndex: number): number {
  * @returns The YAML string of the accessibility tree
  */
 export function generateAndRenderAriaTree(root: Element, frameIndex: number = 0): string {
-  const refCounter = { value: 0 }; // Temporary; Task 3 removes counter rendering entirely.
-
   // Clean up any existing data-pilo-ref attributes from a previous snapshot
   root.querySelectorAll("[data-pilo-ref]").forEach((el) => {
     el.removeAttribute("data-pilo-ref");
@@ -57,7 +57,7 @@ export function generateAndRenderAriaTree(root: Element, frameIndex: number = 0)
   (globalThis as any).__piloRefMap = new Map<string, Element>();
 
   const ariaTree = generateAriaTree(root, 0, computeRootHash(frameIndex));
-  return renderAriaTree(ariaTree, refCounter);
+  return renderAriaTree(ariaTree);
 }
 
 const MAX_IFRAME_DEPTH = 5;
@@ -493,8 +493,16 @@ function hasPointerCursor(ariaNode: AriaNode): boolean {
   return ariaNode.box.style?.cursor === "pointer";
 }
 
-function renderAriaTree(root: AriaNode, counter: RefCounter): string {
+function renderAriaTree(root: AriaNode): string {
   const lines: string[] = [];
+  const occurrenceByHashHex = new Map<string, number>();
+
+  const assignRef = (ariaNode: AriaNode): string => {
+    const hex = ariaNode.hash.toString(16).padStart(8, "0").slice(-REF_HASH_LENGTH);
+    const occurrence = (occurrenceByHashHex.get(hex) ?? 0) + 1;
+    occurrenceByHashHex.set(hex, occurrence);
+    return formatRef(ariaNode.hash, occurrence);
+  };
 
   const visit = (ariaNode: AriaNode | string, _parentAriaNode: AriaNode | null, indent: string) => {
     if (typeof ariaNode === "string") {
@@ -526,10 +534,12 @@ function renderAriaTree(root: AriaNode, counter: RefCounter): string {
     if (ariaNode.description) key += ` [description=${JSON.stringify(ariaNode.description)}]`;
 
     // Assign ref only for visible, interactable elements.
-    // SECURITY: Refs are counter-generated ("E1", "E2", ...) — never from external input,
-    // since they're used in CSS attribute selectors for element lookup.
+    // SECURITY: refs are derived deterministically from element identity inputs
+    // (role, accessible name, structural path). They are not influenced by
+    // external untrusted input, and consist solely of [0-9a-f_E] characters,
+    // so they remain safe to interpolate into CSS attribute selectors.
     if (nodeReceivesPointerEvents(ariaNode)) {
-      const ref = "E" + ++counter.value;
+      const ref = assignRef(ariaNode);
       const cursor = hasPointerCursor(ariaNode) ? " [cursor=pointer]" : "";
       key += ` [ref=${ref}]${cursor}`;
       ariaNode.element?.setAttribute("data-pilo-ref", ref);

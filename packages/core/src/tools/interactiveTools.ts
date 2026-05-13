@@ -107,7 +107,7 @@ export function createInteractiveTools(context: InteractiveToolContext) {
         fields: z
           .array(
             z.object({
-              ref: z.string().describe("Element reference from page snapshot (e.g., E###)"),
+              ref: z.string().describe("Element reference from page snapshot (e.g., E_a3f2)"),
               label: z.string().describe("The field's visible label"),
               fieldType: z.enum([
                 "text",

@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { JSDOM, VirtualConsole } from "jsdom";
+import { REF_HASH_LENGTH, REF_PREFIX } from "../../../src/browser/ariaTree/refHash.js";
 
 // We test the ariaSnapshot module by importing it directly and running in jsdom.
 // NOTE: jsdom lacks a layout engine, so getBoundingClientRect() returns 0x0 rects.
@@ -178,8 +179,8 @@ describe("ariaTree module", () => {
         await import("../../../src/browser/ariaTree/ariaSnapshot.js");
 
       const yaml = generateAndRenderAriaTree(document.body);
-      // No bare [E\d+] — if refs appeared they'd be [ref=E\d+]
-      expect(yaml).not.toMatch(/\[E\d+\]/);
+      // No bare [E_...] — if refs appeared they'd be [ref=E_xxxx]
+      expect(yaml).not.toMatch(/\[E_[0-9a-f]+\]/);
     });
 
     it("should not set data-pilo-ref in jsdom (no layout engine)", async () => {
@@ -592,20 +593,177 @@ describe("ariaTree module", () => {
       const yaml2 = generateAndRenderAriaTree(document.body, 0);
       expect(yaml1).toBe(yaml2);
     });
+  });
+});
 
-    it("produces identical counter-based YAML regardless of frameIndex (display unchanged in Task 2)", async () => {
-      setupDOM("<html><body><button>Save</button></body></html>");
+// Helpers used in content-derived refs tests.
+// These are defined at module scope so both describe blocks can use them.
+const refPattern = new RegExp(
+  `${REF_PREFIX.replace("_", "\\_")}[0-9a-f]{${REF_HASH_LENGTH}}(_\\d+)?`,
+);
 
-      const { generateAndRenderAriaTree } =
-        await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+const extractRefs = (yaml: string): string[] => {
+  const out: string[] = [];
+  const re = new RegExp(
+    `\\[ref=(${REF_PREFIX.replace("_", "\\_")}[0-9a-f]{${REF_HASH_LENGTH}}(?:_\\d+)?)\\]`,
+    "g",
+  );
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(yaml)) !== null) out.push(m[1]);
+  return out;
+};
 
-      const yamlA = generateAndRenderAriaTree(document.body, 0);
-      const yamlB = generateAndRenderAriaTree(document.body, 1);
-      // The hash inputs differ (different frameIndex → different root sentinel),
-      // but the rendered refs are still counter-based in Task 2. So the YAMLs
-      // are byte-for-byte identical. Task 3 changes this — when it lands, this
-      // test must be updated to assert divergence.
-      expect(yamlA).toBe(yamlB);
-    });
+describe("content-derived refs", () => {
+  // jsdom has no layout engine: getBoundingClientRect() always returns 0x0, so
+  // nodeReceivesPointerEvents() returns false and no refs appear in YAML.
+  // We patch the prototype to return a non-zero rect so elements are treated as
+  // visible, which is the case we actually want to test.
+  let origGetBoundingClientRect: typeof Element.prototype.getBoundingClientRect;
+
+  beforeEach(() => {
+    setupDOM("<html><body></body></html>");
+    origGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      return {
+        width: 100,
+        height: 30,
+        top: 0,
+        left: 0,
+        bottom: 30,
+        right: 100,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return this;
+        },
+      } as DOMRect;
+    };
+  });
+
+  afterEach(() => {
+    Element.prototype.getBoundingClientRect = origGetBoundingClientRect;
+  });
+
+  it("locality: inserting a sibling of a different type leaves original refs unchanged", async () => {
+    // Sibling indices are keyed by tagName|role, so inserting an element of a
+    // different type (e.g. a link before a button) does NOT shift the button's
+    // sibling index and therefore preserves its ref.
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    document.body.innerHTML = `<button>Save</button>`;
+    const before = generateAndRenderAriaTree(document.body, 0);
+    const saveRefBefore = extractRefs(before).find((r) =>
+      before.includes(`button "Save" [ref=${r}]`),
+    );
+
+    // Insert a link before the button — different tagName|role, so the button
+    // stays at BUTTON|button sibling index 0 and its hash is unchanged.
+    document.body.innerHTML = `<a href="/somewhere">Link</a><button>Save</button>`;
+    const after = generateAndRenderAriaTree(document.body, 0);
+    const saveRefAfter = extractRefs(after).find((r) => after.includes(`button "Save" [ref=${r}]`));
+
+    expect(saveRefAfter).toBe(saveRefBefore);
+  });
+
+  it("rename invalidation: changing accessible name changes the ref", async () => {
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    document.body.innerHTML = `<button>Save</button>`;
+    const refBefore = extractRefs(generateAndRenderAriaTree(document.body, 0))[0];
+
+    document.body.innerHTML = `<button>Saving...</button>`;
+    const refAfter = extractRefs(generateAndRenderAriaTree(document.body, 0))[0];
+
+    expect(refAfter).not.toBe(refBefore);
+  });
+
+  it("distinguishable reorder: refs change, set stays unique", async () => {
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    document.body.innerHTML = `
+      <button>Edit</button>
+      <button>Delete</button>
+      <button>Share</button>
+    `;
+    const before = generateAndRenderAriaTree(document.body, 0);
+    const refsBefore = extractRefs(before);
+
+    document.body.innerHTML = `
+      <button>Share</button>
+      <button>Edit</button>
+      <button>Delete</button>
+    `;
+    const after = generateAndRenderAriaTree(document.body, 0);
+    const refsAfter = extractRefs(after);
+
+    // All refs in the new snapshot are unique (no two elements share a ref).
+    expect(new Set(refsAfter).size).toBe(refsAfter.length);
+    // The overall sets differ — every sibling index changed so every hash changed.
+    // (Per-position equality could still hold due to hash truncation collisions
+    // at REF_HASH_LENGTH=4, so we compare the full sorted sets instead.)
+    expect([...refsAfter].sort()).not.toEqual([...refsBefore].sort());
+  });
+
+  it("indistinguishable reorder (known limit): hash set is structural, not identity-bearing", async () => {
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    const buttonRefsFrom = (yaml: string): string[] => {
+      // Extract only refs that appear on button lines (not on containing elements)
+      const out: string[] = [];
+      const re = new RegExp(
+        `button "Delete" \\[ref=(${REF_PREFIX.replace("_", "\\_")}[0-9a-f]{${REF_HASH_LENGTH}}(?:_\\d+)?)\\]`,
+        "g",
+      );
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(yaml)) !== null) out.push(m[1]);
+      return out;
+    };
+
+    document.body.innerHTML = `
+      <button>Delete</button>
+      <button>Delete</button>
+      <button>Delete</button>
+    `;
+    const refsBefore = buttonRefsFrom(generateAndRenderAriaTree(document.body, 0));
+    expect(new Set(refsBefore).size).toBe(3); // three distinct refs via sibling index
+
+    // Rebuild identical DOM. The hash set is purely a function of structure,
+    // so it's preserved across rebuilds. After a real reorder of three
+    // accessibly-identical siblings, the same set would result — meaning
+    // identity tracks DOM position, not the original element. This is the
+    // documented limit; refs of identical siblings should not be relied on
+    // for cross-snapshot identity.
+    document.body.innerHTML = `
+      <button>Delete</button>
+      <button>Delete</button>
+      <button>Delete</button>
+    `;
+    const refsAfter = buttonRefsFrom(generateAndRenderAriaTree(document.body, 0));
+    expect(new Set(refsAfter)).toEqual(new Set(refsBefore));
+  });
+
+  it("cross-frame uniqueness: same DOM, different frameIndex => different refs", async () => {
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    document.body.innerHTML = `<button>Save</button>`;
+    const refA = extractRefs(generateAndRenderAriaTree(document.body, 0))[0];
+    const refB = extractRefs(generateAndRenderAriaTree(document.body, 1))[0];
+    expect(refA).not.toBe(refB);
+  });
+
+  it("emits refs matching the documented format", async () => {
+    const { generateAndRenderAriaTree } =
+      await import("../../../src/browser/ariaTree/ariaSnapshot.js");
+
+    document.body.innerHTML = `<button>Save</button>`;
+    const yaml = generateAndRenderAriaTree(document.body, 0);
+    const refs = extractRefs(yaml);
+    expect(refs.length).toBeGreaterThan(0);
+    for (const ref of refs) expect(ref).toMatch(refPattern);
   });
 });

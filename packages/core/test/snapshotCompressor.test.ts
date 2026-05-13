@@ -40,21 +40,21 @@ describe("SnapshotCompressor", () => {
 
     it("should preserve ref= prefix in refs", () => {
       const compressor = new SnapshotCompressor();
-      const snapshot = '- button "Click" [ref=E1] [cursor=pointer]';
+      const snapshot = '- button "Click" [ref=E_a3f2] [cursor=pointer]';
       const result = compressor.compress(snapshot);
-      expect(result).toContain("[ref=E1]");
+      expect(result).toContain("[ref=E_a3f2]");
       expect(result).toContain("[cursor=pointer]");
     });
 
     it("should preserve ref= in multiple refs across lines", () => {
       const compressor = new SnapshotCompressor();
-      const snapshot = `- button "Submit" [ref=E1]
-- button "Cancel" [ref=E2]
-- link "Help" [ref=E3]`;
+      const snapshot = `- button "Submit" [ref=E_a3f2]
+- button "Cancel" [ref=E_b9c1]
+- link "Help" [ref=E_c4d5]`;
       const result = compressor.compress(snapshot);
-      expect(result).toContain("[ref=E1]");
-      expect(result).toContain("[ref=E2]");
-      expect(result).toContain("[ref=E3]");
+      expect(result).toContain("[ref=E_a3f2]");
+      expect(result).toContain("[ref=E_b9c1]");
+      expect(result).toContain("[ref=E_c4d5]");
     });
 
     it("should deduplicate consecutive identical quoted text", () => {

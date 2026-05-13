@@ -130,6 +130,3 @@ export type Box = {
   rect?: DOMRect;
   style?: CSSStyleDeclaration;
 };
-
-/** Mutable counter passed through frame boundaries for sequential refs */
-export type RefCounter = { value: number };
