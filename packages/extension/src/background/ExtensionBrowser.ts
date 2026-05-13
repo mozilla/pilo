@@ -127,7 +127,8 @@ export class ExtensionBrowser implements AriaBrowser {
           }
 
           // generateAndRenderAriaTree handles everything:
-          // - tree generation, ref assignment (E1, E2, ...), setAttribute('data-pilo-ref', ref), YAML rendering
+          // - tree generation, content-derived ref assignment (E_<hex>, see refHash.ts),
+          //   setAttribute('data-pilo-ref', ref), YAML rendering
           return win.generateAndRenderAriaTree(document.body, 0);
         },
       });
