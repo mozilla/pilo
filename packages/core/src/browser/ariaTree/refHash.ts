@@ -27,7 +27,7 @@ export function fnv1a32(s: string): number {
 // U+001F (ASCII Unit Separator) — a C0 control character. Browsers strip
 // or reject these in attribute values, so user-controlled input strings
 // cannot inject a fake separator and forge a different field layout.
-const FIELD_SEP = "";
+const FIELD_SEP = "\x1f";
 
 /**
  * Compute a 32-bit identity hash for one ariaNode. Inputs delimited so that
