@@ -1036,7 +1036,7 @@ export class WebAgent {
           maxAttempts: 2,
           onRetry: (attempt, error) => {
             this.emit(WebAgentEventType.AGENT_STATUS, {
-              message: `Validation retry attempt ${attempt} after error: ${this.extractErrorMessage(error)}`,
+              message: `Validation retry attempt ${attempt} after error: ${this.summarizeRetryError(error)}`,
               iterationId: this.currentIterationId,
             });
           },
@@ -1182,7 +1182,7 @@ export class WebAgent {
             const errorMsg = this.extractErrorMessage(error);
             console.warn(`[WebAgent] Planning retry attempt ${attempt}/3 after error:`, errorMsg);
             this.emit(WebAgentEventType.AGENT_STATUS, {
-              message: `Planning retry attempt ${attempt} after error: ${errorMsg}`,
+              message: `Planning retry attempt ${attempt} after error: ${this.summarizeRetryError(error)}`,
               iterationId: this.currentIterationId || "planning",
             });
           },
@@ -1243,6 +1243,15 @@ export class WebAgent {
     const status = e.statusCode || e.status;
 
     return status ? `[${status}] ${error.message}` : error.message;
+  }
+
+  /**
+   * Error summary safe to emit on the status stream — strips the diagnostic
+   * suffix `(finishReason=..., text="...")` that retry helpers attach for log
+   * use. Keeps the leading human-readable message intact.
+   */
+  private summarizeRetryError(error: unknown): string {
+    return this.extractErrorMessage(error).replace(/ \(finishReason=.*\)$/s, "");
   }
 
   /**

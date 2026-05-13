@@ -5,13 +5,70 @@
  * Handles transient errors while avoiding retry on non-recoverable errors.
  */
 
-import { generateText } from "ai";
+import { generateText, type ModelMessage } from "ai";
 import {
   DEFAULT_RETRY_MAX_ATTEMPTS,
   DEFAULT_RETRY_INITIAL_DELAY_MS,
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
+
+const TOOL_REQUIRED_ERROR_PREFIX = "Tool call was required but model did not call any tools";
+
+const TOOL_REQUIRED_REMINDER =
+  "Reminder: You MUST respond by invoking one of the provided tools with valid JSON arguments. Do not reply with prose, explanation, apology, or refusal — call the tool now.";
+
+const MODEL_TEXT_PREVIEW_LIMIT = 300;
+
+function buildToolRequiredError(result: { text?: unknown; finishReason?: unknown }): Error {
+  const rawText = typeof result.text === "string" ? result.text.trim() : "";
+  const textPreview =
+    rawText.length > MODEL_TEXT_PREVIEW_LIMIT
+      ? `${rawText.slice(0, MODEL_TEXT_PREVIEW_LIMIT)}...`
+      : rawText;
+  const detail = [
+    result.finishReason ? `finishReason=${String(result.finishReason)}` : null,
+    textPreview ? `text=${JSON.stringify(textPreview)}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return new Error(
+    detail ? `${TOOL_REQUIRED_ERROR_PREFIX} (${detail})` : TOOL_REQUIRED_ERROR_PREFIX,
+  );
+}
+
+function isToolRequiredError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith(TOOL_REQUIRED_ERROR_PREFIX);
+}
+
+/**
+ * Append a corrective reminder to a `generateText` params object so the next
+ * retry has a stronger nudge toward emitting a tool call. Handles both
+ * `prompt` (string) and `messages` (array) shapes.
+ *
+ * Typed as `any`-in/`any`-out so callers can keep their own generic over
+ * `generateText`'s `TOOLS` parameter without TS losing the relationship
+ * between the params and the result type.
+ */
+function augmentParamsForToolRequiredRetry(params: any): any {
+  if (typeof params.prompt === "string") {
+    return {
+      ...params,
+      prompt: `${params.prompt}\n\n${TOOL_REQUIRED_REMINDER}`,
+    };
+  }
+  if (Array.isArray(params.messages)) {
+    const messages = params.messages as ModelMessage[];
+    return {
+      ...params,
+      messages: [
+        ...messages,
+        { role: "user", content: TOOL_REQUIRED_REMINDER } satisfies ModelMessage,
+      ],
+    };
+  }
+  return params;
+}
 
 /**
  * Check if an error is retryable
@@ -89,15 +146,17 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
 
   let lastError: unknown;
   let delay = initialDelay;
+  let currentParams = params;
+  let toolRequiredReminderApplied = false;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       // Attempt the generateText call
-      const result = await generateText(params);
+      const result = await generateText(currentParams);
 
       // Simple validation: if toolChoice is "required", we must have tool results
-      if (params.toolChoice === "required" && !result.toolResults?.length) {
-        throw new Error("Tool call was required but model did not call any tools");
+      if (currentParams.toolChoice === "required" && !result.toolResults?.length) {
+        throw buildToolRequiredError(result);
       }
 
       return result;
@@ -135,6 +194,14 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
       // Call retry callback if provided
       if (onRetry) {
         onRetry(attempt, error);
+      }
+
+      // If the model returned text instead of a tool call, identical retries
+      // will reproduce the same failure. Augment the prompt once with a
+      // corrective reminder so subsequent attempts have a different shape.
+      if (!toolRequiredReminderApplied && isToolRequiredError(error)) {
+        currentParams = augmentParamsForToolRequiredRetry(currentParams);
+        toolRequiredReminderApplied = true;
       }
 
       // Wait with exponential backoff and jitter

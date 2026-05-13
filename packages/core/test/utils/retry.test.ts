@@ -126,6 +126,115 @@ describe("generateTextWithRetry", () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(3);
   });
 
+  it("should throw with text preview and finishReason when toolChoice required and model returned text", async () => {
+    mockGenerateText.mockResolvedValue({
+      text: "I cannot help with that request.",
+      toolResults: [],
+      finishReason: "stop",
+    });
+
+    await expect(
+      generateTextWithRetry(
+        {
+          prompt: "Plan this task",
+          model: "test-model" as any,
+          toolChoice: "required",
+        },
+        { maxAttempts: 1, initialDelay: 1 },
+      ),
+    ).rejects.toThrow(/Tool call was required.*finishReason=stop.*I cannot help/);
+  });
+
+  it("should augment prompt with corrective reminder after tool-required failure", async () => {
+    mockGenerateText
+      .mockResolvedValueOnce({
+        text: "Here is a plan in prose...",
+        toolResults: [],
+        finishReason: "stop",
+      })
+      .mockResolvedValueOnce({
+        text: "ok",
+        toolResults: [{ output: { plan: "test" } }],
+        finishReason: "tool-calls",
+      });
+
+    const result = await generateTextWithRetry(
+      {
+        prompt: "Plan this task",
+        model: "test-model" as any,
+        toolChoice: "required",
+      },
+      { maxAttempts: 3, initialDelay: 1 },
+    );
+
+    expect(result.toolResults).toHaveLength(1);
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    const secondCallParams = mockGenerateText.mock.calls[1][0];
+    expect(secondCallParams.prompt).toMatch(/Plan this task/);
+    expect(secondCallParams.prompt).toMatch(/MUST respond by invoking one of the provided tools/);
+  });
+
+  it("should augment messages with corrective reminder after tool-required failure", async () => {
+    const baseMessages = [
+      { role: "system", content: "you are an agent" },
+      { role: "user", content: "do the thing" },
+    ];
+
+    mockGenerateText
+      .mockResolvedValueOnce({
+        text: "prose response",
+        toolResults: [],
+        finishReason: "stop",
+      })
+      .mockResolvedValueOnce({
+        text: "ok",
+        toolResults: [{ output: { plan: "test" } }],
+        finishReason: "tool-calls",
+      });
+
+    await generateTextWithRetry(
+      {
+        messages: baseMessages,
+        model: "test-model" as any,
+        toolChoice: "required",
+      } as any,
+      { maxAttempts: 3, initialDelay: 1 },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    const secondCallParams = mockGenerateText.mock.calls[1][0];
+    expect(secondCallParams.messages).toHaveLength(baseMessages.length + 1);
+    const appended = secondCallParams.messages[secondCallParams.messages.length - 1];
+    expect(appended.role).toBe("user");
+    expect(appended.content).toMatch(/MUST respond by invoking one of the provided tools/);
+  });
+
+  it("should only append the corrective reminder once across multiple retries", async () => {
+    mockGenerateText
+      .mockResolvedValueOnce({ text: "prose 1", toolResults: [], finishReason: "stop" })
+      .mockResolvedValueOnce({ text: "prose 2", toolResults: [], finishReason: "stop" })
+      .mockResolvedValueOnce({
+        text: "ok",
+        toolResults: [{ output: { plan: "test" } }],
+        finishReason: "tool-calls",
+      });
+
+    await generateTextWithRetry(
+      {
+        prompt: "Plan this",
+        model: "test-model" as any,
+        toolChoice: "required",
+      },
+      { maxAttempts: 3, initialDelay: 1 },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(3);
+    const secondPrompt = mockGenerateText.mock.calls[1][0].prompt;
+    const thirdPrompt = mockGenerateText.mock.calls[2][0].prompt;
+    expect(secondPrompt).toBe(thirdPrompt);
+    expect((secondPrompt.match(/MUST respond by invoking/g) ?? []).length).toBe(1);
+  });
+
   it("should apply exponential backoff", async () => {
     const expectedResult = { text: "Success" };
     const error = new Error("Temporary error");
