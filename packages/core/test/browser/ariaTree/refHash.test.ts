@@ -80,10 +80,11 @@ describe("computeNodeHash", () => {
   });
 
   it("is not vulnerable to field-boundary confusion (delimiter present)", () => {
-    // e.g. tagName 'BUTTONbutton' vs ('BUTTON' + 'button') must hash differently
-    expect(call({ tagName: "BUTTONbutton", role: "" })).not.toBe(
-      call({ tagName: "BUTTON", role: "button" }),
-    );
+    // Without a field separator, these two inputs would concatenate to identical
+    // payloads ("AB" + "C" === "A" + "BC"). With FIELD_SEP between fields, the
+    // payloads diverge ("AB\x1fC" vs "A\x1fBC"). This test fails if FIELD_SEP
+    // is removed or set to "".
+    expect(call({ tagName: "AB", role: "C" })).not.toBe(call({ tagName: "A", role: "BC" }));
   });
 });
 
@@ -119,7 +120,7 @@ describe("gatedAttrsFor", () => {
     expect(gatedAttrsFor(makeEl("div", { foo: "bar" }))).toBe("");
   });
 
-  it("returns empty string for inputs without gated attrs", () => {
+  it("emits keys with empty values for inputs missing gated attrs", () => {
     expect(gatedAttrsFor(makeEl("input", {}))).toBe("type=|name=");
   });
 });
@@ -148,5 +149,11 @@ describe("formatRef", () => {
     const ref = formatRef(0x00000001, 1);
     // Whatever REF_HASH_LENGTH is, the hex portion should be exactly that length.
     expect(ref.slice(REF_PREFIX.length)).toHaveLength(REF_HASH_LENGTH);
+  });
+
+  it("keeps the low REF_HASH_LENGTH hex digits of the 32-bit hash", () => {
+    // 0xabcdef01 with REF_HASH_LENGTH=4 should keep "ef01" (the low 16 bits).
+    // This pins the truncation policy: low nibbles, not high.
+    expect(formatRef(0xabcdef01, 1)).toBe(REF_PREFIX + "ef01");
   });
 });

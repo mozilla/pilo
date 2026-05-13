@@ -17,14 +17,17 @@ export function fnv1a32(s: string): number {
   let h = FNV_OFFSET_BASIS_32;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
-    // Multiply with Math.imul to keep within 32-bit signed range, then
-    // mask back to unsigned 32-bit at the end.
+    // Math.imul avoids JS's default `*` promoting to float64, which would
+    // silently lose precision on 32-bit wrap-around.
     h = Math.imul(h, FNV_PRIME_32);
   }
   return h >>> 0;
 }
 
-const FIELD_SEP = ""; // Unit Separator character, unlikely to appear in tag/role/name
+// U+001F (ASCII Unit Separator) — a C0 control character. Browsers strip
+// or reject these in attribute values, so user-controlled input strings
+// cannot inject a fake separator and forge a different field layout.
+const FIELD_SEP = "";
 
 /**
  * Compute a 32-bit identity hash for one ariaNode. Inputs delimited so that
@@ -90,7 +93,13 @@ export function gatedAttrsFor(element: Element): string {
  * the second is `2` (rendered `_2`), and so on.
  */
 export function formatRef(hash: number, occurrence: number): string {
-  const hex = hash.toString(16).padStart(REF_HASH_LENGTH, "0").slice(-REF_HASH_LENGTH);
+  // Format the 32-bit hash as exactly 8 hex chars (zero-padded), then keep
+  // the trailing REF_HASH_LENGTH chars. The low nibbles are kept; FNV-1a
+  // mixes uniformly across the whole word, so any contiguous slice is
+  // equally well-distributed. The two-step form makes the truncation
+  // explicit and works for any REF_HASH_LENGTH in [1, 8].
+  const fullHex = hash.toString(16).padStart(8, "0");
+  const hex = fullHex.slice(-REF_HASH_LENGTH);
   const base = REF_PREFIX + hex;
   return occurrence > 1 ? `${base}_${occurrence}` : base;
 }
