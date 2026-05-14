@@ -62,7 +62,7 @@ export const TOOL_STRINGS = {
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
       outputSchema:
-        'JSON Schema (object) describing the desired output shape. REQUIRED whenever the task asks for structured data — lists, JSON, tables, or any answer with explicit fields. Must be a REAL schema with `type` and `properties`/`items` defined for every field you want. Example for a list of items: {"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"price":{"type":"number"}},"required":["name","price"]}}. An empty {} is NOT valid — it provides no validation and defeats the purpose. Omit this argument entirely for free-form prose summaries.',
+        'JSON Schema for the response shape. If you pass `{}` you get NOTHING — the schema must enumerate every field you want, with types. STOP and write out the shape before calling extract.\n\nSimple examples (copy and adapt):\n- Single object: {"type":"object","properties":{"price":{"type":"number"}},"required":["price"]}\n- List of items: {"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"points":{"type":"number"}},"required":["title","points"]}}\n- Boolean + reason: {"type":"object","properties":{"answer":{"type":"boolean"},"quote":{"type":"string"}},"required":["answer"]}\n\nIf you cannot describe the shape, omit this argument entirely and the response will be markdown.',
     },
     done: {
       description: "Complete the task with your final answer",
@@ -90,7 +90,7 @@ export const TOOL_STRINGS = {
     },
     searchPage: {
       description:
-        "Zero-LLM, zero-token text search of the current page. Use ONLY when the answer ISN'T already visible in the aria-tree snapshot but should be in the page text — e.g., a specific value buried in a paragraph (a year, a price, a quote, a code snippet), or checking whether some phrase appears on a long page. Returns matches with surrounding context, so you can read the answer directly from the result. If the snapshot already shows the answer, just call done() — don't search redundantly. If a query returns zero matches, try alternate spellings (e.g., 'Beautiful Soup' vs 'BeautifulSoup') or regex with word boundaries before giving up.",
+        "Zero-LLM, zero-token text search of the current page. Use ONLY when the answer ISN'T already visible in the aria-tree snapshot but should be in the page text — e.g., a specific value buried in a paragraph (a year, a price, a quote, a code snippet), or checking whether some phrase appears on a long page. Returns matches with surrounding context, so you can read the answer directly from the result. If the snapshot already shows the answer, just call done() — don't search redundantly.\n\nZero-match recovery is REQUIRED: if a search returns 0 matches but the user's question implies the term should be on the page, you MUST try at least one variant before concluding 'no'. Common variants: insert/remove spaces ('BeautifulSoup' ↔ 'Beautiful Soup'), regex alternation ({pattern: 'Beautiful ?Soup', regex: true}), case toggles, hyphenation. A single zero-match search is NOT a final answer.",
       pattern: "Text or regex pattern to search for. Try simple substrings first.",
       regex:
         "Treat `pattern` as a regular expression. Useful for word boundaries (\\bword\\b) or alternation.",
