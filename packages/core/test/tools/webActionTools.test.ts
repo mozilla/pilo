@@ -173,9 +173,8 @@ describe("Web Action Tools", () => {
       );
       expect(tools.back.description).toBe("Go back to the previous page");
       expect(tools.forward.description).toBe("Go forward to the next page");
-      expect(tools.extract.description).toBe(
-        "Extract data from the current page. Pass `outputSchema` (a JSON Schema object) to get structured data; omit it for markdown text.",
-      );
+      expect(tools.extract.description).toMatch(/Extract data from the current page/);
+      expect(tools.extract.description).toMatch(/outputSchema/);
       expect(tools.done.description).toBe("Complete the task with your final answer");
       expect(tools.abort.description).toContain("Abort the task when it cannot be completed");
     });

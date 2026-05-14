@@ -58,11 +58,11 @@ export const TOOL_STRINGS = {
     },
     extract: {
       description:
-        "Extract data from the current page. Pass `outputSchema` (a JSON Schema object) to get structured data; omit it for markdown text.",
+        "Extract data from the current page via an LLM round-trip. Use ONLY when the aria-tree snapshot doesn't already contain the answer — most simple reads (titles, counts, prices visible on the page) can be answered directly via done() without calling extract. When the user asks for STRUCTURED data (a list of items, a JSON object, tabular output, fields like {name, price, url}), you MUST pass a real `outputSchema` so the SDK validates and returns the object directly — do NOT serialize JSON into markdown by hand, and do NOT pass an empty {}. Omit `outputSchema` only for free-form narrative summaries.",
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
       outputSchema:
-        "Optional JSON Schema describing the desired structured output. When provided, returns `data` (an object matching the schema) instead of `extractedData` (markdown).",
+        'JSON Schema (object) describing the desired output shape. REQUIRED whenever the task asks for structured data — lists, JSON, tables, or any answer with explicit fields. Must be a REAL schema with `type` and `properties`/`items` defined for every field you want. Example for a list of items: {"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"price":{"type":"number"}},"required":["name","price"]}}. An empty {} is NOT valid — it provides no validation and defeats the purpose. Omit this argument entirely for free-form prose summaries.',
     },
     done: {
       description: "Complete the task with your final answer",
@@ -90,20 +90,22 @@ export const TOOL_STRINGS = {
     },
     searchPage: {
       description:
-        "Search visible text on the current page. Free and fast — prefer this over extract when you know what text to look for.",
-      pattern: "Text or regex pattern to search for",
-      regex: "Treat `pattern` as a regular expression",
+        "Zero-LLM, zero-token text search of the current page. Use ONLY when the answer ISN'T already visible in the aria-tree snapshot but should be in the page text — e.g., a specific value buried in a paragraph (a year, a price, a quote, a code snippet), or checking whether some phrase appears on a long page. Returns matches with surrounding context, so you can read the answer directly from the result. If the snapshot already shows the answer, just call done() — don't search redundantly. If a query returns zero matches, try alternate spellings (e.g., 'Beautiful Soup' vs 'BeautifulSoup') or regex with word boundaries before giving up.",
+      pattern: "Text or regex pattern to search for. Try simple substrings first.",
+      regex:
+        "Treat `pattern` as a regular expression. Useful for word boundaries (\\bword\\b) or alternation.",
       caseSensitive: "Match case sensitively",
       contextChars: "Characters of context before/after each match (0-500)",
       maxResults: "Maximum number of matches to return (1-50)",
     },
     findElements: {
       description:
-        'Query elements by CSS selector. Free and fast — useful for inventory questions ("how many cards?") before deciding to extract.',
+        "Zero-LLM, zero-token CSS-selector query of the current page. Use ONLY when the aria-tree snapshot doesn't have what you need. Best fits: (1) collecting hrefs/srcs at scale (href/src auto-resolved to absolute URLs), (2) listing items inside a specific section via `withinRef` to scope to an aria-tree subtree, (3) when the snapshot is truncated and you need to enumerate beyond what's shown. For simple 'how many X are there?' questions where the snapshot shows the items, just count them in the snapshot and call done() — don't call find_elements just to confirm what you can already see.",
       selector: "CSS selector",
-      withinRef: "Optional aria-tree ref to scope the query to that element's subtree",
+      withinRef:
+        "Optional aria-tree ref (e.g. E42) to scope the query to that element's subtree. Use to list items inside a specific section.",
       attributes:
-        "Element attributes to include (e.g., ['href', 'data-id']). href/src are auto-included as absolute URLs.",
+        "Element attributes to include (e.g., ['href', 'data-id']). `href` and `src` are auto-included as absolute URLs even if not requested.",
       maxResults: "Maximum number of elements to return (1-100)",
       includeText: "Include each element's text content (truncated to 500 chars)",
     },
@@ -201,8 +203,8 @@ function buildToolExamples(
     `- back() - ${TOOL_STRINGS.webActions.back.description}`,
     `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
     `- extract({"description": "data to extract", "outputSchema": {"type": "object", "properties": {"title": {"type": "string"}}}}) - ${TOOL_STRINGS.webActions.extract.description}`,
-    `- search_page({"pattern": "logout"}) - ${TOOL_STRINGS.webActions.searchPage.description}`,
-    `- find_elements({"selector": "a.nav-link"}) - ${TOOL_STRINGS.webActions.findElements.description}`,
+    `- search_page({"pattern": "Founded in"}) - ${TOOL_STRINGS.webActions.searchPage.description}`,
+    `- find_elements({"selector": "a", "attributes": ["href"], "withinRef": "E42"}) - ${TOOL_STRINGS.webActions.findElements.description}`,
   ];
 
   if (hasWebSearch) {
@@ -372,8 +374,13 @@ Analyze the current page state and determine your next action based on previous 
 - Adapt your approach based on what's actually available
 - If you don't find relevant links or buttons, and the site has a search form, prioritize using it for navigation
 - If you have found the core information requested but cannot access supplementary details due to site limitations, use done() with what you have — only use abort() when the core task cannot be completed at all
-- For research: Use extract() immediately when finding relevant data
-- For inventory questions ("how many X?", "is Y on the page?", "what's the href of link Z?"), prefer search_page or find_elements — they are zero-LLM and instant. Reserve extract() for synthesized or structured data from the CURRENT page; pass outputSchema to extract() when you need JSON-shaped output instead of markdown{% if hasTabstack %}. Use tabstack_extract_json only for off-page URL fetches, not the current page{% endif %}
+- **Reading from the page — check the snapshot first, escalate only when needed:**
+  - **Default: trust the snapshot.** The aria-tree snapshot you receive each turn shows the page's text, links, headings, prices, counts, and visible content. If your answer is already visible there (count of items, a title, a short value), call done() directly — DO NOT call any inspection tool to "confirm" what you can already read
+  - If the snapshot is truncated, OR shows the section but not the exact value buried inside it, OR you need to find a specific phrase in long page text: use search_page({pattern}) (zero-LLM, zero-token). If zero matches, try alternate spellings or regex word boundaries
+  - If you need href/src/data-* attributes at scale, or to enumerate items inside a specific section via withinRef: use find_elements({selector, withinRef?, attributes?}) (zero-LLM, zero-token)
+  - If the task asks for STRUCTURED data (a list of items, JSON object, tabular output, fields like {name, price, url}) and the snapshot doesn't already give it to you: use extract({description, outputSchema:{...real JSON Schema...}}). The outputSchema MUST be a real schema with type and properties — never {} . Without a real schema, prefer reading from the snapshot
+  - If the task asks for a free-form narrative summary that requires synthesis beyond what the snapshot shows: use extract({description}) without outputSchema{% if hasTabstack %}
+  - For OFF-page URL fetches (not the current page), tabstack_extract_json and tabstack_extract_markdown are appropriate. Never use them for the current page{% endif %}
 - For academic papers or documents that require reading, counting, or extracting content (e.g., counting figures/tables, reading body text): PDFs are often unscrollable and unreadable{% if hasTabstack %} — use tabstack_extract_markdown to read PDF content directly{% endif %}{% if not hasTabstack %} — use webSearch to find an HTML version (e.g., ACL Anthology, Semantic Scholar) or the abstract page before attempting the PDF{% endif %}
 {% if hasWebSearch %}- If you need to search the web, use webSearch({query}) directly rather than filling in a browser search engine (DuckDuckGo, Google, Bing, etc.) — webSearch avoids CAPTCHA and bot detection that will block browser-based searches{% endif %}
 {% if hasTabstack %}- **Tabstack cloud tools are available — prefer them over manual browsing when they fit:**
