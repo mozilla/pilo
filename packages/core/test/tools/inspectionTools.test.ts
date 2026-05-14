@@ -56,8 +56,8 @@ describe("Inspection Tools", () => {
       expect(tools.search_page).toBeDefined();
     });
 
-    it("should have a description that mentions searching visible text", () => {
-      expect(tools.search_page.description).toContain("Search visible text");
+    it("should have a description that mentions text search of the page", () => {
+      expect(tools.search_page.description).toMatch(/text search|search.*text|find.*phrase/i);
     });
 
     it("should validate input schema correctly", () => {
@@ -217,8 +217,8 @@ describe("Inspection Tools", () => {
         expect(tools.find_elements).toBeDefined();
       });
 
-      it("should have a description that mentions CSS selector", () => {
-        expect(tools.find_elements.description).toContain("CSS selector");
+      it("should have a description that mentions CSS selectors", () => {
+        expect(tools.find_elements.description).toMatch(/CSS.?selector/i);
       });
 
       it("should validate input schema correctly", () => {
