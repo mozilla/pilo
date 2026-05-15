@@ -364,6 +364,10 @@ export class ExtensionBrowser implements AriaBrowser {
             },
             args: [value],
           });
+          // Settle window for lazy-loaded content. Extension runtime has no
+          // networkidle equivalent, so a short fixed wait is the simplest
+          // mirror of the Playwright implementation's settle.
+          await new Promise((resolve) => setTimeout(resolve, 300));
           return;
         }
 

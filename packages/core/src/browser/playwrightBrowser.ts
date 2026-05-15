@@ -921,6 +921,12 @@ export class PlaywrightBrowser implements AriaBrowser {
                       throw new Error(`Unsupported scroll direction: ${direction}`);
                   }
                 }, value);
+                // Settle window for lazy-loaded content: scroll commonly
+                // triggers IntersectionObserver-driven loads that hadn't
+                // resolved before our next aria snapshot. Tight timeout so
+                // we don't burn turns on background telemetry traffic; the
+                // catch makes this best-effort.
+                await this.page!.waitForLoadState("networkidle", { timeout: 500 }).catch(() => {});
                 break;
 
               case PageAction.Extract:

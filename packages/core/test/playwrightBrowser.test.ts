@@ -687,15 +687,37 @@ describe("PlaywrightBrowser", () => {
 
       it("should run scroll via page.evaluate with the given direction", async () => {
         const evaluateSpy = vi.fn().mockResolvedValue(undefined);
-        (browser as any).page = { evaluate: evaluateSpy };
+        const waitForLoadStateSpy = vi.fn().mockResolvedValue(undefined);
+        (browser as any).page = {
+          evaluate: evaluateSpy,
+          waitForLoadState: waitForLoadStateSpy,
+        };
 
         await browser.performAction("", PageAction.Scroll, "down");
 
         expect(evaluateSpy).toHaveBeenCalledWith(expect.any(Function), "down");
+        // Scroll should also settle briefly so lazy-loaded content can render
+        // before the next aria-tree snapshot.
+        expect(waitForLoadStateSpy).toHaveBeenCalledWith("networkidle", { timeout: 500 });
+      });
+
+      it("should not fail scroll if the settle timeout fires", async () => {
+        // The settle is best-effort — a thrown timeout from waitForLoadState
+        // must not bubble up and fail the scroll action.
+        const evaluateSpy = vi.fn().mockResolvedValue(undefined);
+        const waitForLoadStateSpy = vi
+          .fn()
+          .mockRejectedValue(new Error("Timeout 500ms exceeded waiting for networkidle"));
+        (browser as any).page = {
+          evaluate: evaluateSpy,
+          waitForLoadState: waitForLoadStateSpy,
+        };
+
+        await expect(browser.performAction("", PageAction.Scroll, "down")).resolves.not.toThrow();
       });
 
       it("should throw BrowserActionException for missing direction on scroll", async () => {
-        (browser as any).page = { evaluate: vi.fn() };
+        (browser as any).page = { evaluate: vi.fn(), waitForLoadState: vi.fn() };
 
         await expect(browser.performAction("", PageAction.Scroll)).rejects.toThrow(
           BrowserActionException,
