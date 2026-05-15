@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { _resetActiveTasksForTesting } from "../concurrencyGuard.js";
 
 // Mock pilo-core before any imports that use it
 vi.mock("pilo-core", () => ({
@@ -181,10 +182,13 @@ describe("piloWs", () => {
     mockRunTask.mockReset();
     mockValidateTaskRequest.mockReset().mockReturnValue(null);
     mockRunTask.mockResolvedValue({ success: true, stats: { actions: 1 } });
+    _resetActiveTasksForTesting();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    _resetActiveTasksForTesting();
+    delete process.env.MAX_CONCURRENT_TASKS;
   });
 
   describe("message parsing", () => {
@@ -299,6 +303,37 @@ describe("piloWs", () => {
 
       expect(h.closeCalled).toBe(true);
       expect(h.closeCode).toBe(1000);
+    });
+
+    it("should return CONCURRENCY_LIMIT error when pod is at capacity", () => {
+      process.env.MAX_CONCURRENT_TASKS = "0";
+
+      const h = createTestHarness();
+      h.sendMessage({ event: "task:details", data: { task: "test" } });
+
+      const errorMsg = h.sentMessages.find((m) => m.data?.error?.code === "CONCURRENCY_LIMIT");
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg?.data.success).toBe(false);
+    });
+
+    it("should enforce cap across concurrent WebSocket connections", () => {
+      process.env.MAX_CONCURRENT_TASKS = "2";
+
+      // Make tasks hang so slots stay occupied
+      mockRunTask.mockReturnValue(new Promise(() => {}));
+
+      const connections = Array.from({ length: 4 }, () => createTestHarness());
+      connections.forEach((h) => h.sendMessage({ event: "task:details", data: { task: "test" } }));
+
+      const shed = connections.filter((h) =>
+        h.sentMessages.some((m) => m.data?.error?.code === "CONCURRENCY_LIMIT"),
+      );
+      const accepted = connections.filter((h) =>
+        h.sentMessages.some((m) => m.event === "task:accepted"),
+      );
+
+      expect(accepted.length).toBeLessThanOrEqual(2);
+      expect(shed.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should reject a second task while one is running", async () => {

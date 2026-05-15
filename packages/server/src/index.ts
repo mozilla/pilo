@@ -9,7 +9,8 @@ import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
-import piloRoutes, { isAtCapacity } from "./routes/pilo.js";
+import piloRoutes from "./routes/pilo.js";
+import { isAtCapacity } from "./concurrencyGuard.js";
 import { createPiloWsRoute, type ActiveWS } from "./routes/piloWs.js";
 
 const app = new Hono();

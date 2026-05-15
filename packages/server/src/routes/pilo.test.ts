@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import piloRoutes, { _resetActiveTasksForTesting } from "./pilo.js";
+import piloRoutes from "./pilo.js";
+import { _resetActiveTasksForTesting } from "../concurrencyGuard.js";
 
 // Mock the pilo library
 vi.mock("pilo-core", () => ({
@@ -101,6 +102,30 @@ describe("Pilo Routes", () => {
       const data = await res.json();
       expect(data.success).toBe(false);
       expect(data.error.code).toBe("CONCURRENCY_LIMIT");
+    });
+
+    it("should enforce the cap under concurrent arrivals without a TOCTOU race", async () => {
+      // Cap at 2. Fire 5 requests simultaneously. Without the synchronous
+      // check+increment, all 5 could read activeTasks=0 before any increments
+      // and all pass — this test guards against that regression.
+      process.env.MAX_CONCURRENT_TASKS = "2";
+
+      const requests = Array.from({ length: 5 }, () =>
+        app.request("/pilo/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: "test task" }),
+        }),
+      );
+
+      const responses = await Promise.all(requests);
+      const statuses = responses.map((r) => r.status);
+
+      const accepted = statuses.filter((s) => s !== 503).length;
+      const shed = statuses.filter((s) => s === 503).length;
+
+      expect(accepted).toBeLessThanOrEqual(2);
+      expect(shed).toBeGreaterThanOrEqual(3);
     });
 
     it("should reject requests without task with new error shape", async () => {

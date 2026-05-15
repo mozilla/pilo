@@ -8,17 +8,14 @@ import {
   errorResponseFromError,
 } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
+import {
+  acquireSlot,
+  releaseSlot,
+  isAtCapacity,
+  getMaxConcurrentTasks,
+} from "../concurrencyGuard.js";
 
-const getMaxConcurrentTasks = () => Number(process.env.MAX_CONCURRENT_TASKS ?? 3);
-let activeTasks = 0;
-
-/** Returns true when the pod is at or above its concurrency limit. Used by the /ready endpoint. */
-export const isAtCapacity = () => activeTasks >= getMaxConcurrentTasks();
-
-/** Exposed for unit tests only — resets the in-process concurrency counter. */
-export const _resetActiveTasksForTesting = () => {
-  activeTasks = 0;
-};
+export { isAtCapacity };
 
 const pilo = new Hono();
 
@@ -26,30 +23,35 @@ const pilo = new Hono();
 pilo.post("/run", async (c) => {
   const taskId = randomUUID();
   c.header("x-pilo-task-id", taskId);
+
+  // Guard and reserve slot before any await — keeps the check+increment in
+  // the same synchronous turn of the event loop so concurrent requests can't
+  // all slip past with activeTasks=0.
+  if (!acquireSlot()) {
+    return c.json(
+      createErrorResponse({
+        message: `Server at capacity (${getMaxConcurrentTasks()} concurrent tasks). Retry shortly.`,
+        code: "CONCURRENCY_LIMIT",
+        reason: "INTERNAL_ERROR",
+        phase: "setup",
+        taskId,
+      }),
+      503,
+    );
+  }
+
   try {
     const body = (await c.req.json()) as PiloTaskRequest;
 
     const validationError = validateTaskRequest(body);
     if (validationError) {
+      releaseSlot();
       return c.json(
         {
           ...validationError.response,
           error: { ...validationError.response.error, taskId },
         },
         validationError.status as any,
-      );
-    }
-
-    if (isAtCapacity()) {
-      return c.json(
-        createErrorResponse({
-          message: `Server at capacity (${getMaxConcurrentTasks()} concurrent tasks). Retry shortly.`,
-          code: "CONCURRENCY_LIMIT",
-          reason: "INTERNAL_ERROR",
-          phase: "setup",
-          taskId,
-        }),
-        503,
       );
     }
 
@@ -61,7 +63,6 @@ pilo.post("/run", async (c) => {
         abortController.abort();
       });
 
-      activeTasks++;
       try {
         await stream.writeSSE({
           event: "start",
@@ -109,10 +110,11 @@ pilo.post("/run", async (c) => {
           });
         }
       } finally {
-        activeTasks--;
+        releaseSlot();
       }
     });
   } catch (error) {
+    releaseSlot();
     console.error("[pilo-server] task setup failed", {
       taskId,
       phase: "setup",

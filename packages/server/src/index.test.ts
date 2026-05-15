@@ -54,7 +54,7 @@ describe("Server Application", () => {
     });
 
     it("should return 200 when below capacity", async () => {
-      const { isAtCapacity } = await import("./routes/pilo.js");
+      const { isAtCapacity } = await import("./concurrencyGuard.js");
       const app = new Hono();
       app.get("/ready", (c) =>
         isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
@@ -68,7 +68,7 @@ describe("Server Application", () => {
 
     it("should return 503 when at capacity", async () => {
       process.env.MAX_CONCURRENT_TASKS = "0";
-      const { isAtCapacity } = await import("./routes/pilo.js");
+      const { isAtCapacity } = await import("./concurrencyGuard.js");
       const app = new Hono();
       app.get("/ready", (c) =>
         isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
