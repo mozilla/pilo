@@ -9,6 +9,17 @@ import {
 } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
 
+const getMaxConcurrentTasks = () => Number(process.env.MAX_CONCURRENT_TASKS ?? 3);
+let activeTasks = 0;
+
+/** Returns true when the pod is at or above its concurrency limit. Used by the /ready endpoint. */
+export const isAtCapacity = () => activeTasks >= getMaxConcurrentTasks();
+
+/** Exposed for unit tests only — resets the in-process concurrency counter. */
+export const _resetActiveTasksForTesting = () => {
+  activeTasks = 0;
+};
+
 const pilo = new Hono();
 
 // POST /pilo/run - Execute a Pilo task with real-time SSE streaming (non-interactive)
@@ -29,6 +40,19 @@ pilo.post("/run", async (c) => {
       );
     }
 
+    if (isAtCapacity()) {
+      return c.json(
+        createErrorResponse({
+          message: `Server at capacity (${getMaxConcurrentTasks()} concurrent tasks). Retry shortly.`,
+          code: "CONCURRENCY_LIMIT",
+          reason: "INTERNAL_ERROR",
+          phase: "setup",
+          taskId,
+        }),
+        503,
+      );
+    }
+
     return streamSSE(c, async (stream) => {
       const abortController = new AbortController();
 
@@ -37,6 +61,7 @@ pilo.post("/run", async (c) => {
         abortController.abort();
       });
 
+      activeTasks++;
       try {
         await stream.writeSSE({
           event: "start",
@@ -83,6 +108,8 @@ pilo.post("/run", async (c) => {
             ),
           });
         }
+      } finally {
+        activeTasks--;
       }
     });
   } catch (error) {

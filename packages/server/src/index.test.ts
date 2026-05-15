@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
@@ -42,6 +42,43 @@ describe("Server Application", () => {
     expect(data.name).toBe("Pilo Server");
     expect(data.version).toBe("0.1.0");
     expect(data.description).toBe("Web server for Pilo AI-powered web automation");
+  });
+
+  describe("GET /ready", () => {
+    beforeEach(() => {
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      delete process.env.MAX_CONCURRENT_TASKS;
+    });
+
+    it("should return 200 when below capacity", async () => {
+      const { isAtCapacity } = await import("./routes/pilo.js");
+      const app = new Hono();
+      app.get("/ready", (c) =>
+        isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
+      );
+
+      const res = await app.request("/ready");
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.status).toBe("ok");
+    });
+
+    it("should return 503 when at capacity", async () => {
+      process.env.MAX_CONCURRENT_TASKS = "0";
+      const { isAtCapacity } = await import("./routes/pilo.js");
+      const app = new Hono();
+      app.get("/ready", (c) =>
+        isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
+      );
+
+      const res = await app.request("/ready");
+      expect(res.status).toBe(503);
+      const data = await res.json();
+      expect(data.status).toBe("at capacity");
+    });
   });
 
   it("should set CORS headers correctly", async () => {

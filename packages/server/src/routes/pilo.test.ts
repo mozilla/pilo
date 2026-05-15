@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import piloRoutes from "./pilo.js";
+import piloRoutes, { _resetActiveTasksForTesting } from "./pilo.js";
 
 // Mock the pilo library
 vi.mock("pilo-core", () => ({
@@ -66,9 +66,7 @@ describe("Pilo Routes", () => {
   beforeEach(() => {
     app = new Hono();
     app.route("/pilo", piloRoutes);
-
-    // Don't clear mocks - it breaks our mock setup
-    // vi.clearAllMocks();
+    _resetActiveTasksForTesting();
   });
 
   describe("POST /pilo/run", () => {
@@ -87,6 +85,22 @@ describe("Pilo Routes", () => {
 
     afterEach(() => {
       delete process.env.OPENAI_API_KEY;
+      delete process.env.MAX_CONCURRENT_TASKS;
+    });
+
+    it("should return 503 when at concurrency limit", async () => {
+      process.env.MAX_CONCURRENT_TASKS = "0";
+
+      const res = await app.request("/pilo/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "test task" }),
+      });
+
+      expect(res.status).toBe(503);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error.code).toBe("CONCURRENCY_LIMIT");
     });
 
     it("should reject requests without task with new error shape", async () => {

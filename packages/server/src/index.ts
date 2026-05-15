@@ -9,7 +9,7 @@ import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
-import piloRoutes from "./routes/pilo.js";
+import piloRoutes, { isAtCapacity } from "./routes/pilo.js";
 import { createPiloWsRoute, type ActiveWS } from "./routes/piloWs.js";
 
 const app = new Hono();
@@ -42,9 +42,18 @@ app.use(
   }),
 );
 
-// Health check endpoint
+// Liveness: is the process alive?
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Readiness: should this pod receive traffic?
+// Returns 503 when at concurrency limit so the load balancer stops routing here.
+app.get("/ready", (c) => {
+  if (isAtCapacity()) {
+    return c.json({ status: "at capacity" }, 503);
+  }
+  return c.json({ status: "ok" });
 });
 
 // Basic info endpoint
