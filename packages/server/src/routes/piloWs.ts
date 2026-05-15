@@ -28,6 +28,7 @@ import {
   errorResponseFromError,
 } from "../taskRunner.js";
 import type { PiloTaskRequest } from "../taskRunner.js";
+import { acquireSlot, releaseSlot, getMaxConcurrentTasks } from "../concurrencyGuard.js";
 
 /** Default timeout for waiting on a user data response (5 minutes). */
 const USER_DATA_TIMEOUT_MS = 5 * 60 * 1000;
@@ -115,9 +116,28 @@ export function createPiloWsRoute(
               return;
             }
 
+            // Claim a concurrency slot synchronously before any async work.
+            // onMessage is a synchronous event callback so there is no await
+            // between the check and increment — no TOCTOU race possible.
+            if (!acquireSlot()) {
+              send(
+                ws,
+                "error",
+                createErrorResponse({
+                  message: `Server at capacity (${getMaxConcurrentTasks()} concurrent tasks). Retry shortly.`,
+                  code: "CONCURRENCY_LIMIT",
+                  reason: "INTERNAL_ERROR",
+                  phase: "setup",
+                }),
+              );
+              return;
+            }
+
             const body = msg.data as PiloTaskRequest;
             const taskId = randomUUID();
+
             if (!body) {
+              releaseSlot();
               send(
                 ws,
                 "error",
@@ -134,6 +154,7 @@ export function createPiloWsRoute(
 
             const validationError = validateTaskRequest(body);
             if (validationError) {
+              releaseSlot();
               send(ws, "error", {
                 ...validationError.response,
                 error: { ...validationError.response.error, taskId },
@@ -188,6 +209,7 @@ export function createPiloWsRoute(
                   );
                 }
               } finally {
+                releaseSlot();
                 taskRunning = false;
                 for (const [id, pending] of pendingRequests) {
                   clearTimeout(pending.timer);
