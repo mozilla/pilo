@@ -651,6 +651,30 @@ describe("Web Action Tools", () => {
       expect((result as any).extractedData).toBeUndefined();
     });
 
+    it("should reject empty outputSchema {} as a recoverable error", async () => {
+      const getMarkdownSpy = vi.spyOn(mockBrowser, "getMarkdown");
+
+      const result = await tools.extract.execute({
+        description: "product details",
+        outputSchema: {},
+      });
+
+      // Should NOT have called generateObjectWithRetry or generateTextWithRetry
+      expect(mockGenerateObjectWithRetry).not.toHaveBeenCalled();
+      expect(mockGenerateTextWithRetry).not.toHaveBeenCalled();
+      // It also short-circuits before fetching the page markdown — the schema is
+      // already invalid before any work happens.
+      expect(getMarkdownSpy).not.toHaveBeenCalled();
+
+      expect(result).toMatchObject({
+        success: false,
+        action: "extract",
+        description: "product details",
+        isRecoverable: true,
+      });
+      expect((result as any).error).toMatch(/outputSchema cannot be \{\}/);
+    });
+
     it("should still use generateText (markdown branch) when outputSchema is omitted", async () => {
       mockGenerateTextWithRetry.mockResolvedValueOnce({
         text: "markdown extracted",
