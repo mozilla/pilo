@@ -62,7 +62,7 @@ export const TOOL_STRINGS = {
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
       outputSchema:
-        'JSON Schema for the response shape. If you pass `{}` you get NOTHING — the schema must enumerate every field you want, with types. STOP and write out the shape before calling extract.\n\nSimple examples (copy and adapt):\n- Single object: {"type":"object","properties":{"price":{"type":"number"}},"required":["price"]}\n- List of items: {"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"points":{"type":"number"}},"required":["title","points"]}}\n- Boolean + reason: {"type":"object","properties":{"answer":{"type":"boolean"},"quote":{"type":"string"}},"required":["answer"]}\n\nIf you cannot describe the shape, omit this argument entirely and the response will be markdown.',
+        'JSON Schema for the response shape. The schema MUST enumerate every field you want, with types — an empty {} will be REJECTED with a recoverable error (the tool checks at runtime). STOP and write out the shape before calling extract.\n\nSimple examples (copy and adapt):\n- Single object: {"type":"object","properties":{"price":{"type":"number"}},"required":["price"]}\n- List of items: {"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"points":{"type":"number"}},"required":["title","points"]}}\n- Boolean + reason: {"type":"object","properties":{"answer":{"type":"boolean"},"quote":{"type":"string"}},"required":["answer"]}\n\nIf you cannot describe the shape, OMIT this argument entirely and you will get markdown text instead.',
     },
     done: {
       description: "Complete the task with your final answer",

@@ -323,6 +323,23 @@ export function createWebActionTools(context: WebActionContext) {
           value: description,
         });
 
+        // Runtime guard (before any work): an empty outputSchema {} doesn't
+        // constrain the LLM output and makes the structured branch
+        // indistinguishable from the markdown branch. Models tend to pass {}
+        // when prompted for outputSchema without supplying real properties;
+        // reject with a recoverable error so the agent fixes it or omits it.
+        if (outputSchema && Object.keys(outputSchema).length === 0) {
+          const errorMessage =
+            "outputSchema cannot be {} — that's an empty schema and does nothing. Either fill it in with real type/properties (e.g. {type:'object',properties:{title:{type:'string'}},required:['title']}) or OMIT the outputSchema argument entirely to get markdown text instead.";
+          return {
+            success: false,
+            action: "extract",
+            description,
+            error: errorMessage,
+            isRecoverable: true,
+          };
+        }
+
         // Get the page markdown content
         const markdown = await context.browser.getMarkdown();
 
