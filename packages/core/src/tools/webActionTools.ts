@@ -323,21 +323,20 @@ export function createWebActionTools(context: WebActionContext) {
           value: description,
         });
 
-        // Runtime guard (before any work): an empty outputSchema {} doesn't
-        // constrain the LLM output and makes the structured branch
-        // indistinguishable from the markdown branch. Models tend to pass {}
-        // when prompted for outputSchema without supplying real properties;
-        // reject with a recoverable error so the agent fixes it or omits it.
-        if (outputSchema && Object.keys(outputSchema).length === 0) {
-          const errorMessage =
-            "outputSchema cannot be {} — that's an empty schema and does nothing. Either fill it in with real type/properties (e.g. {type:'object',properties:{title:{type:'string'}},required:['title']}) or OMIT the outputSchema argument entirely to get markdown text instead.";
-          return {
-            success: false,
-            action: "extract",
-            description,
-            error: errorMessage,
-            isRecoverable: true,
-          };
+        // Soft guard: an empty outputSchema {} doesn't constrain the LLM
+        // output and makes the structured branch indistinguishable from the
+        // markdown branch. Models (notably gemini-2.5-flash) tend to pass {}
+        // when asked for outputSchema without supplying real properties.
+        // Silently downgrade to the markdown branch rather than reject — a
+        // hard rejection traps the agent in a retry loop because the model
+        // keeps producing the same empty schema.
+        const effectiveSchema =
+          outputSchema && Object.keys(outputSchema).length > 0 ? outputSchema : undefined;
+        if (outputSchema && !effectiveSchema) {
+          context.eventEmitter.emit(WebAgentEventType.AGENT_STATUS, {
+            message:
+              "extract: outputSchema was empty ({}); falling back to markdown extraction. Provide a real JSON Schema (with type/properties) for structured output.",
+          });
         }
 
         // Get the page markdown content
@@ -346,14 +345,16 @@ export function createWebActionTools(context: WebActionContext) {
         // Build extraction prompt
         const prompt = buildExtractionPrompt(description, markdown);
 
-        // Structured branch: when outputSchema is provided, use generateObject with
-        // jsonSchema() to validate the LLM output against the schema.
-        if (outputSchema) {
+        // Structured branch: when a non-empty outputSchema is provided, use
+        // generateObject with jsonSchema() to validate the LLM output against
+        // the schema. Empty {} is downgraded above to undefined and falls
+        // through to the markdown branch.
+        if (effectiveSchema) {
           const { object } = await generateObjectWithRetry(
             {
               ...context.providerConfig,
               prompt,
-              schema: jsonSchema(outputSchema as any),
+              schema: jsonSchema(effectiveSchema as any),
               maxOutputTokens: 5000,
               abortSignal: context.abortSignal,
             },

@@ -651,28 +651,41 @@ describe("Web Action Tools", () => {
       expect((result as any).extractedData).toBeUndefined();
     });
 
-    it("should reject empty outputSchema {} as a recoverable error", async () => {
+    it("should silently downgrade empty outputSchema {} to the markdown branch", async () => {
       const getMarkdownSpy = vi.spyOn(mockBrowser, "getMarkdown");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "markdown extracted",
+      } as any);
 
       const result = await tools.extract.execute({
         description: "product details",
         outputSchema: {},
       });
 
-      // Should NOT have called generateObjectWithRetry or generateTextWithRetry
+      // generateObjectWithRetry should NOT be called — empty schema falls through.
       expect(mockGenerateObjectWithRetry).not.toHaveBeenCalled();
-      expect(mockGenerateTextWithRetry).not.toHaveBeenCalled();
-      // It also short-circuits before fetching the page markdown — the schema is
-      // already invalid before any work happens.
-      expect(getMarkdownSpy).not.toHaveBeenCalled();
+      // generateTextWithRetry IS called (markdown branch took over).
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledTimes(1);
+      // getMarkdown is also called as part of the normal markdown path.
+      expect(getMarkdownSpy).toHaveBeenCalled();
 
-      expect(result).toMatchObject({
-        success: false,
+      // A status event should explain the silent downgrade.
+      expect(emitSpy).toHaveBeenCalledWith(
+        WebAgentEventType.AGENT_STATUS,
+        expect.objectContaining({
+          message: expect.stringMatching(/outputSchema was empty.*markdown/i),
+        }),
+      );
+
+      // Result shape matches the markdown branch (extractedData, not data).
+      expect(result).toEqual({
+        success: true,
         action: "extract",
         description: "product details",
-        isRecoverable: true,
+        extractedData: "markdown extracted",
       });
-      expect((result as any).error).toMatch(/outputSchema cannot be \{\}/);
+      expect((result as any).data).toBeUndefined();
     });
 
     it("should still use generateText (markdown branch) when outputSchema is omitted", async () => {
