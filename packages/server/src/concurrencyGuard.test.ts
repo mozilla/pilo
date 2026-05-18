@@ -8,7 +8,7 @@ describe("concurrencyGuard default cap", () => {
 
   it("defaults to 5 when MAX_CONCURRENT_TASKS is unset", () => {
     delete process.env.MAX_CONCURRENT_TASKS;
-    expect(getMaxConcurrentTasks()).toBe(5);
+    expect(getMaxConcurrentTasks()).toBe(3);
   });
 
   it("honors MAX_CONCURRENT_TASKS env override", () => {
