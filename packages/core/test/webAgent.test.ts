@@ -407,6 +407,69 @@ describe("WebAgent", () => {
       expect(result.stats.actions).toBeGreaterThan(0);
     });
 
+    it("should pass system prompt via system param, not in messages array", async () => {
+      const task = "Click the button";
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Button clicked", plan: "1. Click button" },
+            output: { successCriteria: "Button clicked", plan: "1. Click button" },
+          },
+        ],
+      } as any);
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Done" },
+              output: { action: "done", result: "Done", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Task complete" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Done" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute(task, { startingUrl: "https://example.com" });
+
+      const streamTextCall = mockStreamText.mock.calls[0][0];
+
+      expect(streamTextCall.system).toBeDefined();
+      expect(typeof streamTextCall.system === "string" && streamTextCall.system.length > 0).toBe(
+        true,
+      );
+
+      const messages: any[] = streamTextCall.messages ?? [];
+      const systemInMessages = messages.some((m: any) => m.role === "system");
+      expect(systemInMessages).toBe(false);
+    });
+
     it("should handle task with data parameter", async () => {
       const task = "Fill form with data";
       const data = { name: "John", email: "john@example.com" };
