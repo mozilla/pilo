@@ -212,6 +212,7 @@ describe("prompts", () => {
         "goto",
         "back",
         "forward",
+        "scroll",
         "done",
         "abort",
       ];

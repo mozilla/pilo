@@ -335,6 +335,42 @@ export class ExtensionBrowser implements AriaBrowser {
           // Note: goForward already calls ensureOptimizedPageLoad internally
           return;
 
+        case PageAction.Scroll: {
+          if (!value) throw new Error("Direction required for scroll action");
+          const tab = await this.getActiveTab();
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id! },
+            func: (direction: string) => {
+              switch (direction) {
+                case "down":
+                  window.scrollBy({ left: 0, top: window.innerHeight, behavior: "instant" });
+                  return;
+                case "up":
+                  window.scrollBy({ left: 0, top: -window.innerHeight, behavior: "instant" });
+                  return;
+                case "top":
+                  window.scrollTo({ left: 0, top: 0, behavior: "instant" });
+                  return;
+                case "bottom":
+                  window.scrollTo({
+                    left: 0,
+                    top: document.documentElement.scrollHeight,
+                    behavior: "instant",
+                  });
+                  return;
+                default:
+                  throw new Error(`Unsupported scroll direction: ${direction}`);
+              }
+            },
+            args: [value],
+          });
+          // Settle window for lazy-loaded content. Extension runtime has no
+          // networkidle equivalent, so a short fixed wait is the simplest
+          // mirror of the Playwright implementation's settle.
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          return;
+        }
+
         case PageAction.Done:
           // This is a no-op in the browser implementation
           // It's handled at a higher level in the automation flow

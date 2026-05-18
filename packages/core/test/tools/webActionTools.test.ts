@@ -129,6 +129,7 @@ describe("Web Action Tools", () => {
       expect(tools.goto).toBeDefined();
       expect(tools.back).toBeDefined();
       expect(tools.forward).toBeDefined();
+      expect(tools.scroll).toBeDefined();
       expect(tools.extract).toBeDefined();
       expect(tools.done).toBeDefined();
       expect(tools.abort).toBeDefined();
@@ -153,6 +154,7 @@ describe("Web Action Tools", () => {
       );
       expect(tools.back.description).toBe("Go back to the previous page");
       expect(tools.forward.description).toBe("Go forward to the next page");
+      expect(tools.scroll.description).toContain("Scroll the page");
       expect(tools.extract.description).toBe(
         "Extract specific data from the current page for later reference",
       );
@@ -445,6 +447,35 @@ describe("Web Action Tools", () => {
 
       const tooLong = schema.safeParse({ seconds: 121 });
       expect(tooLong.success).toBe(false);
+    });
+  });
+
+  describe("Scroll Action", () => {
+    it("should dispatch scroll action with the requested direction", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.scroll.execute({ direction: "down" });
+
+      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Scroll, "down");
+      expect(result).toEqual({
+        success: true,
+        action: "scroll",
+        value: "down",
+      });
+    });
+
+    it("should accept all four directions", () => {
+      const schema = tools.scroll.inputSchema;
+      for (const direction of ["up", "down", "top", "bottom"]) {
+        expect(schema.safeParse({ direction }).success).toBe(true);
+      }
+    });
+
+    it("should reject unknown directions", () => {
+      const schema = tools.scroll.inputSchema;
+      expect(schema.safeParse({ direction: "left" }).success).toBe(false);
+      expect(schema.safeParse({ direction: "" }).success).toBe(false);
+      expect(schema.safeParse({}).success).toBe(false);
     });
   });
 

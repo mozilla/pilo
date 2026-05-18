@@ -21,10 +21,19 @@ export enum PageAction {
   Goto = "goto",
   Back = "back",
   Forward = "forward",
+  Scroll = "scroll",
   Extract = "extract",
   Done = "done",
   Abort = "abort",
 }
+
+/**
+ * Scroll directions supported by {@link PageAction.Scroll}.
+ * - `up` / `down`: scroll one viewport in that direction
+ * - `top` / `bottom`: scroll all the way to the top/bottom of the document
+ */
+export type ScrollDirection = "up" | "down" | "top" | "bottom";
+export const SCROLL_DIRECTIONS: ScrollDirection[] = ["up", "down", "top", "bottom"];
 
 /**
  * Page load states to wait for
