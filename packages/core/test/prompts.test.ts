@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPlanPrompt,
-  actionLoopSystemPrompt,
   buildActionLoopSystemPrompt,
   buildTaskAndPlanPrompt,
   buildPageSnapshotPrompt,
@@ -9,6 +8,10 @@ import {
   buildTaskValidationPrompt,
   buildExtractionPrompt,
 } from "../src/prompts.js";
+
+// Default action-loop prompt used by the tests below. Mirrors the historical
+// `actionLoopSystemPrompt` export (built with both gating flags off).
+const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false, false);
 
 // Mock Date for consistent test results
 const mockDate = new Date("2024-01-15T10:00:00Z");

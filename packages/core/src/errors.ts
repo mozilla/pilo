@@ -97,6 +97,36 @@ export class ToolExecutionError extends RecoverableError {
 }
 
 /**
+ * Thrown when task planning fails (model never returns a usable plan after retries).
+ *
+ * Setup error: extends Error rather than RecoverableError because the agent's
+ * execute loop should propagate it to the caller rather than treat it as a
+ * retryable mid-task error.
+ */
+export class PlanningError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PlanningError";
+  }
+}
+
+/**
+ * Defensive guard: thrown by `navigateToStart` when `this.url` is unexpectedly
+ * unset. Under normal flow `planTask` defaults `this.url` to `about:blank`, so
+ * this should not fire — it exists to fail loudly rather than silently navigate
+ * nowhere if that invariant is ever broken.
+ *
+ * Setup error: extends Error rather than RecoverableError for the same reason
+ * as PlanningError.
+ */
+export class NoStartingUrlError extends Error {
+  constructor(message = "No starting URL determined") {
+    super(message);
+    this.name = "NoStartingUrlError";
+  }
+}
+
+/**
  * Thrown when navigation times out after all retry attempts.
  *
  * @see browser/navigationRetry.ts for retry configuration

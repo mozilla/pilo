@@ -43,8 +43,8 @@ export const TOOL_STRINGS = {
       description: "Press Enter key on an element (useful for form submission)",
     },
     wait: {
-      description: "Wait for a specified number of seconds",
-      seconds: "Number of seconds to wait (0-30)",
+      description: "Wait for a specified number of seconds (up to 120 for slow-loading pages)",
+      seconds: "Number of seconds to wait (0-120)",
     },
     goto: {
       description: "Navigate to a URL that was previously seen in the conversation",
@@ -422,7 +422,6 @@ const buildActionLoopSystemPrompt = (
     currentDate: getCurrentFormattedDate(),
   });
 
-export const actionLoopSystemPrompt = buildActionLoopSystemPrompt(false, false);
 export { buildActionLoopSystemPrompt };
 
 /**

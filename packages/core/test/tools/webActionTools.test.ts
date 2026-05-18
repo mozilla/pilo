@@ -145,7 +145,9 @@ describe("Web Action Tools", () => {
       expect(tools.enter.description).toBe(
         "Press Enter key on an element (useful for form submission)",
       );
-      expect(tools.wait.description).toBe("Wait for a specified number of seconds");
+      expect(tools.wait.description).toBe(
+        "Wait for a specified number of seconds (up to 120 for slow-loading pages)",
+      );
       expect(tools.goto.description).toBe(
         "Navigate to a URL that was previously seen in the conversation",
       );
@@ -392,18 +394,41 @@ describe("Web Action Tools", () => {
 
   describe("Wait Action", () => {
     it("should execute wait action successfully", async () => {
+      // wait no longer goes through browser.performAction — it sleeps directly
+      // in the tool so the abort signal can interrupt it.
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
-      const result = await tools.wait.execute({ seconds: 2 });
+      const promise = tools.wait.execute({ seconds: 2 });
+      await vi.advanceTimersByTimeAsync(2000);
+      const result = await promise;
 
-      expect(performActionSpy).toHaveBeenCalledWith("", PageAction.Wait, "2");
+      expect(performActionSpy).not.toHaveBeenCalled();
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_WAITING, { seconds: 2 });
       expect(result).toEqual({
         success: true,
         action: "wait",
-        value: "2", // performActionWithValidation adds value field
+        value: "2",
       });
+    });
+
+    it("should abort wait when abort signal fires", async () => {
+      const controller = new AbortController();
+      context.abortSignal = controller.signal;
+      tools = createWebActionTools(context);
+
+      const promise = tools.wait.execute({ seconds: 60 });
+      // Attach a rejection handler before triggering abort so vitest's
+      // fake-timer scheduler doesn't see an unhandled rejection.
+      const settled = promise.catch((err: unknown) => err);
+
+      controller.abort();
+      // Advance past one poll interval (500ms) so the loop notices the abort.
+      await vi.advanceTimersByTimeAsync(500);
+
+      const err = await settled;
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toContain("Wait cancelled by abort signal");
     });
 
     it("should validate wait time constraints", () => {
@@ -415,7 +440,10 @@ describe("Web Action Tools", () => {
       const tooShort = schema.safeParse({ seconds: -1 });
       expect(tooShort.success).toBe(false);
 
-      const tooLong = schema.safeParse({ seconds: 31 });
+      const validLong = schema.safeParse({ seconds: 120 });
+      expect(validLong.success).toBe(true);
+
+      const tooLong = schema.safeParse({ seconds: 121 });
       expect(tooLong.success).toBe(false);
     });
   });

@@ -225,22 +225,58 @@ export function createWebActionTools(context: WebActionContext) {
     wait: tool({
       description: TOOL_STRINGS.webActions.wait.description,
       inputSchema: z.object({
-        seconds: z.number().min(0).max(30).describe(TOOL_STRINGS.webActions.wait.seconds),
+        seconds: z.number().min(0).max(120).describe(TOOL_STRINGS.webActions.wait.seconds),
       }),
       execute: async ({ seconds }) => {
-        // Wait uses browser.performAction which expects value as string
-        const result = await performActionWithValidation(
-          PageAction.Wait,
-          context,
-          undefined,
-          String(seconds),
+        // Sleep here rather than going through browser.performAction (which
+        // calls page.waitForTimeout — a fixed, abort-blind timeout). Polling
+        // the abort signal keeps user aborts responsive to within ~500ms even
+        // at the full 120s cap.
+        return withSpan(
+          SpanName.BROWSER_ACTION,
+          { attributes: { "pilo.browser.action_type": "wait" } },
+          async (span) => {
+            context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+              action: "wait",
+              value: String(seconds),
+            });
+            context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+              action: "wait",
+              value: String(seconds),
+            });
+
+            const ABORT_POLL_MS = 500;
+            const deadline = Date.now() + seconds * 1000;
+            while (Date.now() < deadline) {
+              if (context.abortSignal?.aborted) {
+                const error = new Error("Wait cancelled by abort signal");
+                context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+                  success: false,
+                  action: "wait",
+                  error: error.message,
+                });
+                span.setAttribute("pilo.browser.success", false);
+                throw error;
+              }
+              await new Promise((resolve) =>
+                setTimeout(resolve, Math.min(ABORT_POLL_MS, deadline - Date.now())),
+              );
+            }
+
+            context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+              success: true,
+              action: "wait",
+            });
+            context.eventEmitter.emit(WebAgentEventType.AGENT_WAITING, { seconds });
+            span.setAttribute("pilo.browser.success", true);
+
+            return {
+              success: true,
+              action: "wait",
+              value: String(seconds),
+            };
+          },
         );
-
-        if (result.success) {
-          context.eventEmitter.emit(WebAgentEventType.AGENT_WAITING, { seconds });
-        }
-
-        return result;
       },
     }),
 

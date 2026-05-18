@@ -40,6 +40,7 @@ export enum WebAgentEventType {
   // System/Debug
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
+  SYSTEM_DEBUG_TOOL_DROP = "system:debug_tool_drop",
 
   // CDP endpoint failover
   CDP_ENDPOINT_CONNECTED = "cdp:endpoint_connected",
@@ -271,6 +272,22 @@ export interface MessagesDebugEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for tool-drop diagnostics: emitted when a provider returns more
+ * than one tool call in a single turn and the extras are dropped. The system
+ * prompt instructs the model to call exactly one tool per turn, but some
+ * providers occasionally return multiple — this event surfaces those cases
+ * so they can be observed instead of silently lost.
+ */
+export interface ToolDropDebugEventData extends WebAgentEventData {
+  /** Number of tool calls that were dropped (returnedCount - 1). */
+  droppedCount: number;
+  /** Names of the dropped tools (in original order, excluding the first). */
+  droppedTools: string[];
+  /** Name of the tool that was kept (first in the provider's response). */
+  keptTool: string;
+}
+
+/**
  * Event data for waiting notifications
  */
 export interface WaitingEventData extends WebAgentEventData {
@@ -377,6 +394,7 @@ export type WebAgentEvent =
     }
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP; data: ToolDropDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }

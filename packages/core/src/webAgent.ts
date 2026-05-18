@@ -20,7 +20,13 @@ import {
 import { SnapshotCompressor } from "./snapshotCompressor.js";
 import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
-import { BrowserDisconnectedError, RecoverableError, ToolExecutionError } from "./errors.js";
+import {
+  BrowserDisconnectedError,
+  NoStartingUrlError,
+  PlanningError,
+  RecoverableError,
+  ToolExecutionError,
+} from "./errors.js";
 import { generateTextWithRetry } from "./utils/retry.js";
 import type { AwaitedProperties } from "./utils/types.js";
 import {
@@ -1018,6 +1024,25 @@ export class WebAgent {
       );
     }
 
+    // The system prompt instructs the model to call exactly one tool per turn,
+    // but providers occasionally return more (especially on retries or with
+    // certain models). Warn + emit a debug event so the drop is observable
+    // instead of silently lost.
+    if (aiResponse.toolResults.length > 1) {
+      const keptTool = aiResponse.toolResults[0].toolName;
+      const droppedTools = aiResponse.toolResults.slice(1).map((r: any) => r.toolName);
+      console.warn(
+        `[WebAgent] Provider returned ${aiResponse.toolResults.length} tool calls in one turn; ` +
+          `keeping '${keptTool}', dropping: ${droppedTools.join(", ")}`,
+      );
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP, {
+        iterationId: this.currentIterationId,
+        droppedCount: droppedTools.length,
+        droppedTools,
+        keptTool,
+      });
+    }
+
     const toolResult = aiResponse.toolResults[0];
     const actionOutput = toolResult.output as any;
 
@@ -1467,12 +1492,11 @@ export class WebAgent {
           });
           recordSanitizedException(span, error);
 
-          // Check if the error message already contains "Failed to generate plan" to avoid double-wrapping
-          if (errorMsg.includes("Failed to generate plan")) {
-            throw new Error(errorMsg);
-          } else {
-            throw new Error(`Failed to generate plan: ${errorMsg}`);
+          // Avoid double-wrapping if we already produced a PlanningError up-stack.
+          if (error instanceof PlanningError) {
+            throw error;
           }
+          throw new PlanningError(`Failed to generate plan: ${errorMsg}`);
         }
       },
     );
@@ -1518,14 +1542,11 @@ export class WebAgent {
   }
 
   /**
-   * Check if error is a setup/planning error that should be re-thrown
+   * Check if error is a setup/planning error that should be re-thrown to the
+   * caller rather than converted into a TASK_FAILED result.
    */
   private isSetupError(error: unknown): boolean {
-    return (
-      error instanceof Error &&
-      (error.message.includes("Failed to generate plan") ||
-        error.message.includes("No starting URL"))
-    );
+    return error instanceof PlanningError || error instanceof NoStartingUrlError;
   }
 
   /**
@@ -1622,7 +1643,7 @@ export class WebAgent {
 
   private async navigateToStart(task: string): Promise<void> {
     if (!this.url) {
-      throw new Error("No starting URL determined");
+      throw new NoStartingUrlError();
     }
 
     if (this.url !== "about:blank") {

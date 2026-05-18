@@ -49,7 +49,13 @@ export type { Logger } from "./loggers/types.js";
 export type { Action, TaskValidationResult } from "./schemas.js";
 
 // Error types
-export { RecoverableError, BrowserException, NavigationTimeoutException } from "./errors.js";
+export {
+  RecoverableError,
+  BrowserException,
+  NavigationTimeoutException,
+  PlanningError,
+  NoStartingUrlError,
+} from "./errors.js";
 
 // Navigation retry configuration
 export type { NavigationRetryConfig } from "./browser/navigationRetry.js";

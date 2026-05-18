@@ -4059,6 +4059,41 @@
       ],
       "type": "object"
     },
+    "ToolDropDebugEventData": {
+      "additionalProperties": false,
+      "description": "Event data for tool-drop diagnostics: emitted when a provider returns more than one tool call in a single turn and the extras are dropped. The system prompt instructs the model to call exactly one tool per turn, but some providers occasionally return multiple — this event surfaces those cases so they can be observed instead of silently lost.",
+      "properties": {
+        "droppedCount": {
+          "description": "Number of tool calls that were dropped (returnedCount - 1).",
+          "type": "number"
+        },
+        "droppedTools": {
+          "description": "Names of the dropped tools (in original order, excluding the first).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "keptTool": {
+          "description": "Name of the tool that was kept (first in the provider's response).",
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "droppedCount",
+        "droppedTools",
+        "iterationId",
+        "keptTool",
+        "timestamp"
+      ],
+      "type": "object"
+    },
     "ValidationErrorEventData": {
       "additionalProperties": false,
       "description": "Event data for validation errors during action response processing",
@@ -4511,6 +4546,23 @@
             },
             "type": {
               "const": "system:debug_message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/ToolDropDebugEventData"
+            },
+            "type": {
+              "const": "system:debug_tool_drop",
               "type": "string"
             }
           },
