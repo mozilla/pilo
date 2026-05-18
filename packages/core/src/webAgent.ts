@@ -192,6 +192,7 @@ export class WebAgent {
   private plan: string = "";
   private url: string = "";
   private messages: ModelMessage[] = [];
+  private systemPrompt: string = "";
   private successCriteria: string = "";
   private actionItems?: string[];
   private currentPage: { url: string; title: string } = { url: "", title: "" };
@@ -900,6 +901,7 @@ export class WebAgent {
           // Generate AI response using streamText
           const streamResult = streamText({
             ...this.providerConfig,
+            system: this.systemPrompt,
             messages: this.messages,
             tools: webActionTools,
             toolChoice: "required",
@@ -1653,17 +1655,15 @@ export class WebAgent {
       this.guardrails,
     );
 
+    this.systemPrompt = buildActionLoopSystemPrompt(
+      hasGuardrails,
+      hasWebSearch,
+      hasTabstack,
+      hasStartingUrl,
+      hasInteractive,
+    );
+
     this.messages = [
-      {
-        role: "system",
-        content: buildActionLoopSystemPrompt(
-          hasGuardrails,
-          hasWebSearch,
-          hasTabstack,
-          hasStartingUrl,
-          hasInteractive,
-        ),
-      },
       {
         role: "user",
         content: taskPromptContent,
@@ -1719,6 +1719,7 @@ export class WebAgent {
     this.plan = "";
     this.url = "";
     this.messages = [];
+    this.systemPrompt = "";
     this.successCriteria = "";
     this.actionItems = undefined;
     this.currentPage = { url: "", title: "" };
