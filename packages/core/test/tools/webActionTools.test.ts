@@ -5,7 +5,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
-import { generateTextWithRetry } from "../../src/utils/retry.js";
+import { generateTextWithRetry, generateObjectWithRetry } from "../../src/utils/retry.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -16,14 +16,20 @@ vi.mock("ai", () => ({
     execute: config.execute,
   })),
   generateText: vi.fn(),
+  generateObject: vi.fn(),
+  // jsonSchema() is called inline in webActionTools to wrap the user's schema;
+  // return a marker we can identify in test assertions.
+  jsonSchema: vi.fn((schema: any) => ({ __jsonSchema: true, schema })),
 }));
 
 // Mock the retry module to bypass retry logic in tests
 vi.mock("../../src/utils/retry.js", () => ({
   generateTextWithRetry: vi.fn(),
+  generateObjectWithRetry: vi.fn(),
 }));
 
 const mockGenerateTextWithRetry = vi.mocked(generateTextWithRetry);
+const mockGenerateObjectWithRetry = vi.mocked(generateObjectWithRetry);
 
 // Mock browser implementation
 class MockBrowser implements AriaBrowser {
@@ -82,6 +88,22 @@ class MockBrowser implements AriaBrowser {
       getMarkdown: async () => "# Mock Results",
     };
     return fn(mockTab);
+  }
+
+  async searchPage(): Promise<{
+    totalMatches: number;
+    truncated: boolean;
+    matches: any[];
+  }> {
+    return { totalMatches: 0, truncated: false, matches: [] };
+  }
+
+  async findElements(): Promise<{
+    totalMatches: number;
+    truncated: boolean;
+    elements: any[];
+  }> {
+    return { totalMatches: 0, truncated: false, elements: [] };
   }
 }
 
@@ -155,9 +177,8 @@ describe("Web Action Tools", () => {
       expect(tools.back.description).toBe("Go back to the previous page");
       expect(tools.forward.description).toBe("Go forward to the next page");
       expect(tools.scroll.description).toContain("Scroll the page");
-      expect(tools.extract.description).toBe(
-        "Extract specific data from the current page for later reference",
-      );
+      expect(tools.extract.description).toMatch(/Extract data from the current page/);
+      expect(tools.extract.description).toMatch(/outputSchema/);
       expect(tools.done.description).toBe("Complete the task with your final answer");
       expect(tools.abort.description).toContain("Abort the task when it cannot be completed");
     });
@@ -626,6 +647,146 @@ describe("Web Action Tools", () => {
         }),
         expect.any(Object),
       );
+    });
+
+    it("should route through generateObject when outputSchema is provided", async () => {
+      const getMarkdownSpy = vi.spyOn(mockBrowser, "getMarkdown");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      const extracted = { title: "Hello", price: 9.99 };
+      mockGenerateObjectWithRetry.mockResolvedValueOnce({
+        object: extracted,
+      } as any);
+
+      const userSchema = {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          price: { type: "number" },
+        },
+        required: ["title", "price"],
+      };
+
+      const result = await tools.extract.execute({
+        description: "product details",
+        outputSchema: userSchema,
+      });
+
+      expect(getMarkdownSpy).toHaveBeenCalled();
+      // generateTextWithRetry should NOT have been called in the structured branch
+      expect(mockGenerateTextWithRetry).not.toHaveBeenCalled();
+      // generateObjectWithRetry should be called with the wrapped schema (marker from
+      // the jsonSchema() mock) and the provider/prompt/abort settings.
+      expect(mockGenerateObjectWithRetry).toHaveBeenCalledWith(
+        {
+          model: { specificationVersion: "v1" },
+          prompt: expect.stringContaining("product details"),
+          schema: { __jsonSchema: true, schema: userSchema },
+          maxOutputTokens: 5000,
+          abortSignal: undefined,
+        },
+        expect.objectContaining({
+          maxAttempts: 3,
+          onRetry: expect.any(Function),
+        }),
+      );
+
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "extract",
+        ref: undefined,
+        value: "product details",
+      });
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_EXTRACTED, {
+        extractedData: JSON.stringify(extracted),
+      });
+
+      expect(result).toEqual({
+        success: true,
+        action: "extract",
+        description: "product details",
+        data: extracted,
+      });
+      // The structured branch returns `data`, not `extractedData`.
+      expect((result as any).extractedData).toBeUndefined();
+    });
+
+    it("should silently downgrade empty outputSchema {} to the markdown branch", async () => {
+      const getMarkdownSpy = vi.spyOn(mockBrowser, "getMarkdown");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "markdown extracted",
+      } as any);
+
+      const result = await tools.extract.execute({
+        description: "product details",
+        outputSchema: {},
+      });
+
+      // generateObjectWithRetry should NOT be called — empty schema falls through.
+      expect(mockGenerateObjectWithRetry).not.toHaveBeenCalled();
+      // generateTextWithRetry IS called (markdown branch took over).
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledTimes(1);
+      // getMarkdown is also called as part of the normal markdown path.
+      expect(getMarkdownSpy).toHaveBeenCalled();
+
+      // A status event should explain the silent downgrade.
+      expect(emitSpy).toHaveBeenCalledWith(
+        WebAgentEventType.AGENT_STATUS,
+        expect.objectContaining({
+          message: expect.stringMatching(/outputSchema was empty.*markdown/i),
+        }),
+      );
+
+      // Result shape matches the markdown branch (extractedData, not data).
+      expect(result).toEqual({
+        success: true,
+        action: "extract",
+        description: "product details",
+        extractedData: "markdown extracted",
+      });
+      expect((result as any).data).toBeUndefined();
+    });
+
+    it("should still use generateText (markdown branch) when outputSchema is omitted", async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "markdown extracted",
+      } as any);
+
+      const result = await tools.extract.execute({ description: "Get info" });
+
+      // generateObjectWithRetry should NOT be called in the markdown branch
+      expect(mockGenerateObjectWithRetry).not.toHaveBeenCalled();
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual({
+        success: true,
+        action: "extract",
+        description: "Get info",
+        extractedData: "markdown extracted",
+      });
+      // The markdown branch returns `extractedData`, not `data`.
+      expect((result as any).data).toBeUndefined();
+    });
+
+    it("should validate extract inputSchema with optional outputSchema", () => {
+      const schema = tools.extract.inputSchema;
+
+      // Just a description is valid
+      const validMinimal = schema.safeParse({ description: "data" });
+      expect(validMinimal.success).toBe(true);
+
+      // Description + outputSchema is valid
+      const validWithSchema = schema.safeParse({
+        description: "data",
+        outputSchema: { type: "object", properties: { title: { type: "string" } } },
+      });
+      expect(validWithSchema.success).toBe(true);
+
+      // Missing description is invalid
+      const invalid = schema.safeParse({
+        outputSchema: { type: "object" },
+      });
+      expect(invalid.success).toBe(false);
     });
   });
 

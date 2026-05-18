@@ -45,6 +45,68 @@ export enum LoadState {
 }
 
 /**
+ * Options for searchPage — a zero-LLM, in-page text search.
+ */
+export interface SearchPageOptions {
+  pattern: string;
+  regex?: boolean;
+  caseSensitive?: boolean;
+  contextChars?: number;
+  maxResults?: number;
+}
+
+/**
+ * A single match returned by searchPage.
+ */
+export interface SearchPageMatch {
+  match: string;
+  contextBefore: string;
+  contextAfter: string;
+  nearestRef?: string;
+  frameUrl?: string;
+}
+
+/**
+ * Aggregate result returned by searchPage.
+ */
+export interface SearchPageResult {
+  totalMatches: number;
+  truncated: boolean;
+  matches: SearchPageMatch[];
+}
+
+/**
+ * Options for findElements — a zero-LLM CSS-selector query.
+ */
+export interface FindElementsOptions {
+  selector: string;
+  withinRef?: string;
+  attributes?: string[];
+  maxResults?: number;
+  includeText?: boolean;
+}
+
+/**
+ * A single element returned by findElements.
+ */
+export interface FindElementsMatch {
+  tag: string;
+  text?: string;
+  attributes?: Record<string, string>;
+  nearestRef?: string;
+  frameUrl?: string;
+}
+
+/**
+ * Aggregate result returned by findElements.
+ */
+export interface FindElementsResult {
+  totalMatches: number;
+  truncated: boolean;
+  elements: FindElementsMatch[];
+}
+
+/**
  * Limited interface for temporary tab operations.
  * Used for "side quest" operations like search that shouldn't affect main page state.
  */
@@ -113,4 +175,10 @@ export interface AriaBrowser {
    * @returns The result of the function
    */
   runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T>;
+
+  /** Searches visible text in the page (and same-origin/cross-origin frames where supported) */
+  searchPage(opts: SearchPageOptions): Promise<SearchPageResult>;
+
+  /** Queries elements by CSS selector (optionally scoped to a `data-pilo-ref` subtree) */
+  findElements(opts: FindElementsOptions): Promise<FindElementsResult>;
 }
