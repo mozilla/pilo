@@ -72,7 +72,7 @@ export function isElementStyleVisibilityVisible(
   if (!style) return true;
   // @ts-ignore
   if (Element.prototype.checkVisibility) {
-    if (!element.checkVisibility()) return false;
+    if (!element.checkVisibility({ checkOpacity: true })) return false;
   } else {
     const detailsOrSummary = element.closest("details,summary");
     if (
