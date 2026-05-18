@@ -1,4 +1,4 @@
-const getMax = () => Number(process.env.MAX_CONCURRENT_TASKS ?? 5);
+const getMax = () => Number(process.env.MAX_CONCURRENT_TASKS ?? 3);
 
 let activeTasks = 0;
 
