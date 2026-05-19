@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { _resetActiveTasksForTesting } from "../concurrencyGuard.js";
+import { _resetActiveTasksForTesting, setDraining, acquireSlot } from "../concurrencyGuard.js";
 
 // Mock pilo-core before any imports that use it
 vi.mock("pilo-core", () => ({
@@ -666,6 +666,28 @@ describe("piloWs", () => {
 
       h.triggerError();
       expect(connections.size).toBe(0);
+    });
+  });
+
+  describe("drain mode", () => {
+    it("should reject new tasks when draining", () => {
+      const h = createTestHarness();
+      h.triggerOpen();
+      setDraining();
+
+      h.sendMessage({ event: "task:details", data: { task: "test task" } });
+
+      const errorMsg = h.sentMessages.find((m) => m.event === "error");
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg?.data?.error?.code).toBe("CONCURRENCY_LIMIT");
+    });
+
+    it("setDraining prevents acquireSlot from succeeding", () => {
+      expect(acquireSlot()).toBe(true);
+      _resetActiveTasksForTesting();
+
+      setDraining();
+      expect(acquireSlot()).toBe(false);
     });
   });
 });
