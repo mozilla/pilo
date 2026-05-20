@@ -13,6 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -398,7 +399,10 @@ export function createWebActionTools(context: WebActionContext) {
           success: true,
           action: "extract",
           description,
-          extractedData: extractResponse.text,
+          extractedData: wrapExternalContentWithWarning(
+            extractResponse.text,
+            ExternalContentLabel.ExtractResult,
+          ),
         };
       },
     }),

@@ -746,6 +746,10 @@ export class WebAgent {
    * Truncate old external content in messages to keep context size down.
    * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
    * while preserving the tag structure and warning.
+   *
+   * Walks both `role: "user"` messages (text + multimodal) and `role: "tool"`
+   * messages (whose `tool-result` `output` value is a structured object that
+   * may contain wrapped external content in nested string fields).
    */
   private truncateOldExternalContent(): void {
     const clipExternalContent = (text: string): string =>
@@ -753,6 +757,26 @@ export class WebAgent {
         /(<EXTERNAL-CONTENT[\s\S]*?>)\n[\s\S]*?\n(<\/EXTERNAL-CONTENT>)/g,
         "$1\n> [clipped for brevity]\n$2",
       );
+
+    // Recursively walk a tool-result output value, returning a new value with
+    // any string fields containing <EXTERNAL-CONTENT> blocks clipped. Non-string
+    // primitives (booleans, numbers, null, undefined) are returned unchanged.
+    const clipInValue = (value: unknown): unknown => {
+      if (typeof value === "string") {
+        return value.includes("<EXTERNAL-CONTENT") ? clipExternalContent(value) : value;
+      }
+      if (Array.isArray(value)) {
+        return value.map(clipInValue);
+      }
+      if (value && typeof value === "object") {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+          out[k] = clipInValue(v);
+        }
+        return out;
+      }
+      return value;
+    };
 
     this.messages = this.messages.map((msg) => {
       if (msg.role === "user") {
@@ -776,6 +800,23 @@ export class WebAgent {
           };
         }
       }
+
+      // Tool-result messages: wrapped external content may live inside the
+      // structured `output` value (e.g. extract.extractedData,
+      // tabstack_extract_markdown.content). Recursively clip any wrapped
+      // strings while leaving the surrounding structure intact.
+      if (msg.role === "tool" && Array.isArray(msg.content)) {
+        return {
+          ...msg,
+          content: msg.content.map((part: any) => {
+            if (part.type === "tool-result" && part.output !== undefined) {
+              return { ...part, output: clipInValue(part.output) };
+            }
+            return part;
+          }),
+        };
+      }
+
       return msg;
     });
   }
