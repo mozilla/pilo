@@ -2710,6 +2710,302 @@ describe("WebAgent", () => {
       );
       expect(validationEvent?.data.completionQuality).toBe("failed");
     });
+
+    it("should set validationOutcome to 'accepted' when validator accepts on first attempt", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock done action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Task completed",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Mock validation response as complete (accepted on first attempt)
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.validationOutcome).toBe("accepted");
+    });
+
+    it("should set validationOutcome to 'force-accepted' when validator rejects to max attempts", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        maxValidationAttempts: 2,
+      });
+
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // First attempt - done action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Incomplete result",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // First validation: partial (reject)
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("partial"));
+
+      // Second attempt - done action again
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Another attempt",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Still incomplete result",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Another attempt",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Second validation: partial again — hits max attempts, force-accept kicks in
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("partial"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.validationOutcome).toBe("force-accepted");
+    });
+
+    it("should set validationOutcome to 'force-accepted' when validation errors to max attempts", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        maxValidationAttempts: 2,
+      });
+
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // First attempt - done action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Result",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // First validation call throws (error path → returns isAccepted: false, retry)
+      mockGenerateTextWithRetry.mockRejectedValueOnce(new Error("Validation service unavailable"));
+
+      // Second attempt - done action again
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete again",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_2",
+              toolName: "done",
+              output: {
+                action: "done",
+                result: "Result again",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Task complete again",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Second validation call throws — hits max attempts, catch-block force-accepts
+      mockGenerateTextWithRetry.mockRejectedValueOnce(new Error("Validation service unavailable"));
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      expect(result.validationOutcome).toBe("force-accepted");
+    });
+
+    it("should leave validationOutcome undefined when task fails before done()", async () => {
+      const webAgent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        maxIterations: 1,
+      });
+
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Mock a non-terminal action (click) — agent runs out of iterations without calling done()
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Clicking something",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "click_1",
+              toolName: "click",
+              output: {
+                action: "click",
+                success: true,
+                isTerminal: false,
+              },
+            },
+          ],
+          response: {
+            messages: [
+              {
+                role: "assistant",
+                content: "Clicking something",
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      const result = await webAgent.execute("Test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.validationOutcome).toBeUndefined();
+    });
   });
 
   describe("guardrails", () => {
