@@ -11,6 +11,7 @@ export enum ExternalContentLabel {
   PageSnapshot = "page-snapshot",
   PageMarkdown = "page-markdown",
   SearchResults = "search-results",
+  ConversationHistory = "conversation-history",
   ExtractResult = "extract-result",
   TabstackContent = "tabstack-content",
   ValidatorFeedback = "validator-feedback",
