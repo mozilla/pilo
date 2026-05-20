@@ -3859,6 +3859,14 @@
         "success": {
           "description": "Whether the task completed successfully",
           "type": "boolean"
+        },
+        "validationOutcome": {
+          "description": "How validation resolved when a final answer was accepted:\n- \"accepted\": validator returned complete/excellent\n- \"force-accepted\": validator never accepted but maxValidationAttempts was hit\n- undefined: no answer was ever accepted (task aborted, max iterations, error,   or validation rejected without reaching force-accept)",
+          "enum": [
+            "accepted",
+            "force-accepted"
+          ],
+          "type": "string"
         }
       },
       "required": [
