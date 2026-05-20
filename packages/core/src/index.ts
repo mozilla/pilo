@@ -69,3 +69,10 @@ export type { ProviderConfig } from "./provider.js";
 
 // Config merge utilities
 export { mergeWithDefaults, createNavigationRetryConfig } from "./utils/configMerge.js";
+
+// Skill cache (Node-only — performs disk I/O)
+export { SkillStore } from "./skills/store.js";
+export type { SkillEntry, SkillStoreOptions } from "./skills/store.js";
+export { resolveHost } from "./skills/host.js";
+export { getDefaultSkillsCacheDir } from "./skills/paths.js";
+export { createSkillStoreFromConfig } from "./skills/factory.js";

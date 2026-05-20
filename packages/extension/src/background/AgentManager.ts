@@ -61,7 +61,12 @@ export class AgentManager {
       modelName,
     );
 
-    // Create WebAgent - same as CLI and server
+    // Create WebAgent - same as CLI and server.
+    //
+    // Skills cache is intentionally not wired here — `SkillStore` requires
+    // Node fs/path/os, which the extension's browser bundle cannot provide.
+    // With no `skillStore` passed, the WebAgent's skills feature stays inert
+    // (no reads, no writes, no extraction LLM calls).
     const agent = new WebAgent(browser, {
       providerConfig: {
         model,

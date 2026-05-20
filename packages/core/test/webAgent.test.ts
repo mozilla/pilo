@@ -6,6 +6,11 @@ import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
 import { PlanningError } from "../src/errors.js";
+// Imported below the vi.mock("../src/skills/store.js") factory — at runtime
+// this resolves to the mocked SkillStore class (the one with read/append/clear
+// bound to the mock fns), not the real one. We instantiate it to hand a
+// `skillStore` option to WebAgent.
+import { SkillStore } from "../src/skills/store.js";
 
 // Mock the AI module
 vi.mock("ai", () => ({
@@ -28,6 +33,34 @@ vi.mock("../src/search/searchService.js", () => ({
       search: vi.fn().mockResolvedValue("# Mock Results"),
     }),
   },
+}));
+
+// Mock SkillStore so tests can inject host content without touching disk
+const mockSkillStoreRead = vi.fn<(host: string) => Promise<string | null>>();
+const mockSkillStoreAppend = vi.fn<(...args: any[]) => Promise<void>>();
+const mockSkillStoreClear = vi.fn<(...args: any[]) => Promise<void>>();
+vi.mock("../src/skills/store.js", () => ({
+  SkillStore: class {
+    read = mockSkillStoreRead;
+    append = mockSkillStoreAppend;
+    clear = mockSkillStoreClear;
+  },
+}));
+
+// Mock the extractor so tests don't hit the LLM. Defaults to a successful
+// extraction so the happy path is "extraction returned something". Tests that
+// need null / throw can override per-call.
+//
+// Use vi.hoisted because the factory references the mock fn directly (as a
+// value), which requires the var to exist when vi.mock is hoisted to the top
+// of the file. The SkillStore mock above gets away without this because its
+// factory only references the mock fns inside a class body that's evaluated
+// lazily on instantiation.
+const { mockExtractSkill } = vi.hoisted(() => ({
+  mockExtractSkill: vi.fn<(...args: any[]) => Promise<any>>(),
+}));
+vi.mock("../src/skills/extractor.js", () => ({
+  extractSkill: mockExtractSkill,
 }));
 
 const mockStreamText = vi.mocked(streamText);
@@ -3866,6 +3899,620 @@ describe("WebAgent", () => {
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Completed");
       expect(result.stats.actions).toBe(4); // 2 clicks + 1 fill + 1 done
+    });
+  });
+
+  describe("skills injection", () => {
+    const SKILLS_MARKER = "<!-- NOTES FROM PRIOR RUNS ON THIS SITE -->";
+
+    // Run a simple done() task with the supplied agent and return the system
+    // prompt that streamText saw on its first call.
+    async function runTaskAndCaptureSystemPrompt(
+      agent: WebAgent,
+      startingUrl: string,
+    ): Promise<string> {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. Done" },
+            output: { successCriteria: "Done", plan: "1. Done" },
+          },
+        ],
+      } as any);
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "ok" },
+              output: { action: "done", result: "ok", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "ok" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("test task", { startingUrl });
+      expect(result.success).toBe(true);
+
+      const call = mockStreamText.mock.calls[0]?.[0];
+      expect(call?.system).toBeDefined();
+      return String(call!.system);
+    }
+
+    beforeEach(() => {
+      mockSkillStoreRead.mockReset();
+    });
+
+    it("injects the skills section when the store returns content for the host", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce("## 2026-01-01 — prior run\n\nPrior hint.");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const systemPrompt = await runTaskAndCaptureSystemPrompt(agent, "https://example.com");
+        expect(systemPrompt).toContain(SKILLS_MARKER);
+        expect(systemPrompt).toContain("Prior hint.");
+        expect(mockSkillStoreRead).toHaveBeenCalledWith("example.com");
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT inject when no skillStore is passed (feature inert)", async () => {
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      try {
+        const systemPrompt = await runTaskAndCaptureSystemPrompt(agent, "https://example.com");
+        expect(systemPrompt).not.toContain(SKILLS_MARKER);
+        expect(mockSkillStoreRead).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT inject when the store returns null", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const systemPrompt = await runTaskAndCaptureSystemPrompt(agent, "https://example.com");
+        expect(systemPrompt).not.toContain(SKILLS_MARKER);
+        expect(mockSkillStoreRead).toHaveBeenCalledWith("example.com");
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT inject when the URL has no resolvable host (about:blank)", async () => {
+      // Use search-first flow: planner returns no URL, the agent stays on about:blank.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. Done" },
+            output: { successCriteria: "Done", plan: "1. Done" },
+          },
+        ],
+      } as any);
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "ok" },
+              output: { action: "done", result: "ok", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+        searchProvider: "parallel-api",
+        searchApiKey: "fake-test-key",
+      });
+
+      try {
+        // No startingUrl, search provider enabled -> url stays at about:blank.
+        const result = await agent.execute("test task");
+        expect(result.success).toBe(true);
+
+        const call = mockStreamText.mock.calls[0]?.[0];
+        const systemPrompt = String(call!.system);
+        expect(systemPrompt).not.toContain(SKILLS_MARKER);
+        // resolveHost("about:blank") returns null, so read should never be called.
+        expect(mockSkillStoreRead).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("survives SkillStore.read() throwing without failing the task", async () => {
+      mockSkillStoreRead.mockRejectedValueOnce(new Error("disk on fire"));
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const systemPrompt = await runTaskAndCaptureSystemPrompt(agent, "https://example.com");
+        expect(systemPrompt).not.toContain(SKILLS_MARKER);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[skills] failed to read host file for example.com"),
+          expect.any(Error),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        await agent.close();
+      }
+    });
+  });
+
+  describe("skill extraction", () => {
+    // Wire up the standard task mocks: plan -> done -> validation. The
+    // validation quality is configurable so tests can drive the extraction
+    // gate (excellent / complete / partial / failed).
+    function wireSuccessfulTask(
+      quality: "failed" | "partial" | "complete" | "excellent" = "excellent",
+    ): void {
+      // Planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. Done" },
+            output: { successCriteria: "Done", plan: "1. Done" },
+          },
+        ],
+      } as any);
+
+      // done() action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "ok" },
+              output: { action: "done", result: "ok", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "ok" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Validation
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse(quality));
+    }
+
+    beforeEach(() => {
+      mockSkillStoreRead.mockReset();
+      mockSkillStoreAppend.mockReset();
+      mockExtractSkill.mockReset();
+      // Default: extractor returns a successful extraction. Individual tests
+      // override per-call when they need null or a throw.
+      mockExtractSkill.mockResolvedValue({
+        hint: "Use the search bar at the top.",
+        taskHeadline: "test task",
+      });
+    });
+
+    it("calls extractSkill and appends on excellent completion", async () => {
+      // No prior skill content for this host.
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+      wireSuccessfulTask("excellent");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+
+        expect(mockExtractSkill).toHaveBeenCalledTimes(1);
+        const extractArgs = mockExtractSkill.mock.calls[0][0];
+        expect(extractArgs.task).toBe("test task");
+        expect(extractArgs.host).toBe("example.com");
+        expect(extractArgs.providerConfig).toEqual({ model: mockProvider });
+        expect(Array.isArray(extractArgs.messages)).toBe(true);
+
+        expect(mockSkillStoreAppend).toHaveBeenCalledWith(
+          "example.com",
+          expect.objectContaining({
+            date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+            taskHeadline: expect.any(String),
+            hint: expect.any(String),
+          }),
+        );
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT extract when completionQuality is 'complete' (not excellent)", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+      wireSuccessfulTask("complete");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).not.toHaveBeenCalled();
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT extract when force-accepted at the max-attempts cap", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+
+      // Planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. Done" },
+            output: { successCriteria: "Done", plan: "1. Done" },
+          },
+        ],
+      } as any);
+
+      // done() action
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "ok" },
+              output: { action: "done", result: "ok", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Done" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "ok" },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+
+      // Validation returns "failed" — with maxValidationAttempts = 1, this
+      // hits the cap on the first attempt and the agent force-accepts.
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("failed"));
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+        maxValidationAttempts: 1,
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).not.toHaveBeenCalled();
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT extract when no skillStore is passed (feature inert)", async () => {
+      wireSuccessfulTask("excellent");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).not.toHaveBeenCalled();
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT extract when the task failed", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+
+      // Planning succeeds.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. Done" },
+            output: { successCriteria: "Done", plan: "1. Done" },
+          },
+        ],
+      } as any);
+
+      // Action fails: agent calls abort() and the task terminates with success=false.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Aborting",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "abort_1",
+              toolName: "abort",
+              input: { reason: "Cannot proceed" },
+              output: { action: "abort", reason: "Cannot proceed", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Aborting" }],
+          },
+        }) as any,
+      );
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(false);
+        expect(mockExtractSkill).not.toHaveBeenCalled();
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT extract when the ending URL has no resolvable host", async () => {
+      // Plan with a non-http URL so the loaded page has no host. The host
+      // resolver returns null for file://, so extraction must be skipped.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {
+              successCriteria: "Done",
+              plan: "1. Done",
+              url: "file:///tmp/local.html",
+            },
+            output: {
+              successCriteria: "Done",
+              plan: "1. Done",
+              url: "file:///tmp/local.html",
+            },
+          },
+        ],
+      } as any);
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "ok" },
+              output: { action: "done", result: "ok", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("excellent"));
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task");
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).not.toHaveBeenCalled();
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("does NOT append when extractSkill returns null", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+      mockExtractSkill.mockResolvedValueOnce(null);
+      wireSuccessfulTask("excellent");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).toHaveBeenCalledTimes(1);
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+      } finally {
+        await agent.close();
+      }
+    });
+
+    it("swallows extractSkill throws and still completes the task", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+      mockExtractSkill.mockRejectedValueOnce(new Error("LLM down"));
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      wireSuccessfulTask("excellent");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockSkillStoreAppend).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[skills] extraction failed for example.com"),
+          expect.any(Error),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        await agent.close();
+      }
+    });
+
+    it("swallows SkillStore.append throws and still completes the task", async () => {
+      mockSkillStoreRead.mockResolvedValueOnce(null);
+      mockSkillStoreAppend.mockRejectedValueOnce(new Error("disk full"));
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      wireSuccessfulTask("excellent");
+
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        eventEmitter,
+        logger: mockLogger,
+        skillStore: new SkillStore({ cacheDir: "/tmp/test-skill-cache" }),
+      });
+
+      try {
+        const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+        expect(result.success).toBe(true);
+        expect(mockExtractSkill).toHaveBeenCalledTimes(1);
+        expect(mockSkillStoreAppend).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[skills] extraction failed for example.com"),
+          expect.any(Error),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        await agent.close();
+      }
     });
   });
 });

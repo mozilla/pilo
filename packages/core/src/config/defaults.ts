@@ -47,7 +47,8 @@ export type ConfigCategory =
   | "navigation"
   | "action"
   | "search"
-  | "tabstack";
+  | "tabstack"
+  | "skills";
 
 // =============================================================================
 // PiloConfig Interface (Manual for Readability)
@@ -120,6 +121,11 @@ export interface PiloConfig {
   // Tabstack Configuration
   tabstack_api_key?: string;
   tabstack_api_url?: string;
+
+  // Skills Configuration
+  skills_enabled?: boolean;
+  skills_cache_dir?: string;
+  skills_max_host_tokens?: number;
 }
 
 /** PiloConfigResolved type - output type (defaults applied) */
@@ -189,6 +195,11 @@ export interface PiloConfigResolved {
   // Tabstack Configuration
   tabstack_api_key?: string;
   tabstack_api_url?: string;
+
+  // Skills Configuration
+  skills_enabled: boolean;
+  skills_cache_dir?: string;
+  skills_max_host_tokens: number;
 }
 
 export type ConfigKey = keyof PiloConfigResolved;
@@ -625,6 +636,30 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Tabstack API base URL (default: https://api.tabstack.ai)",
     category: "tabstack",
   },
+
+  // Skills Configuration
+  skills_enabled: {
+    default: false,
+    type: "boolean",
+    env: ["PILO_SKILLS_ENABLED"],
+    description:
+      "Enable local skill cache: store NL hints from successful tasks and inject them on future runs",
+    category: "skills",
+  },
+  skills_cache_dir: {
+    type: "string",
+    env: ["PILO_SKILLS_CACHE_DIR"],
+    description: "Directory for skill cache files (default: platform cache dir + /pilo/skills)",
+    category: "skills",
+  },
+  skills_max_host_tokens: {
+    default: 4000,
+    type: "number",
+    env: ["PILO_SKILLS_MAX_HOST_TOKENS"],
+    description:
+      "Approximate token budget per host's skill file (oldest entries trimmed when over budget)",
+    category: "skills",
+  },
 };
 
 // =============================================================================
@@ -664,6 +699,8 @@ function buildDefaults(): PiloConfigResolved {
     "navigation_timeout_multiplier",
     "action_timeout_ms",
     "search_provider",
+    "skills_enabled",
+    "skills_max_host_tokens",
   ];
 
   for (const field of requiredFields) {

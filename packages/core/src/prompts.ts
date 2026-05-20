@@ -378,6 +378,10 @@ Provide your final answer:
 🚨 **GUARDRAIL COMPLIANCE:** Any action violating the provided guardrails is FORBIDDEN.
 {% endif %}
 
+{% if hasSkills %}
+{{ skillsBlock }}
+{% endif %}
+
 {% if hasInteractive %}
 🔒 **INTERACTIVE MODE (MANDATORY):**
 You MUST use request_user_data() for any form field that requires the user's personal or business data. This tool collects the data AND fills the fields directly. Do NOT use fill/select/check on these fields afterward. Generating, guessing, or fabricating personal data is a **privacy violation** and is strictly forbidden.
@@ -410,13 +414,15 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails, web search, Tabstack, and interactive tools. */
+/** Build action system prompt with optional guardrails, web search, Tabstack, interactive tools, and skills. */
 const buildActionLoopSystemPrompt = (
   hasGuardrails: boolean,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
   hasStartingUrl: boolean = false,
   hasInteractive: boolean = false,
+  hasSkills: boolean = false,
+  skillsBlock: string = "",
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -424,6 +430,8 @@ const buildActionLoopSystemPrompt = (
     hasTabstack,
     hasStartingUrl,
     hasInteractive,
+    hasSkills,
+    skillsBlock,
     toolExamples: buildToolExamples(hasWebSearch, hasTabstack, hasInteractive),
     currentDate: getCurrentFormattedDate(),
   });

@@ -13,6 +13,7 @@ import {
   WebAgentEventEmitter,
   MetricsCollector,
   SecretsRedactor,
+  createSkillStoreFromConfig,
 } from "pilo-core";
 import type { Logger, UserDataCallback, UserDataRequest, UserDataResponse } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
@@ -279,6 +280,11 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       });
     }
 
+    // Build a skill store from config (null when skills_enabled is false).
+    // The WebAgent reads / writes through this store; passing null keeps the
+    // skills feature inert.
+    const skillStore = createSkillStoreFromConfig(cfg);
+
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
@@ -298,6 +304,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       logger,
       eventEmitter,
       onUserDataRequired: options.interactive ? createTerminalPromptCallback() : undefined,
+      skillStore,
     });
 
     // Execute the task

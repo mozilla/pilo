@@ -60,6 +60,14 @@ import {
   SpanName,
   recordSanitizedException,
 } from "./telemetry/tracing.js";
+// Skill store type — `import type` keeps the (Node-only) `./skills/store.js`
+// module out of the runtime import graph, so this file stays browser-safe.
+// Callers wire a SkillStore via the `skillStore` option; constructing one
+// requires Node fs/path/os, which the extension's bundle can't provide.
+import type { SkillStore as SkillStoreType } from "./skills/store.js";
+import { resolveHost } from "./skills/host.js";
+import { formatSkillSection } from "./skills/injector.js";
+import { extractSkill } from "./skills/extractor.js";
 
 // === Type Definitions ===
 
@@ -100,6 +108,17 @@ export interface WebAgentOptions {
   onUserDataRequired?: UserDataCallback;
   /** Correlation ID for this task, propagated to logs and traces. */
   taskId?: string;
+  /**
+   * Optional skill cache store. When provided, the agent reads per-host skill
+   * notes from this store at task start and writes new ones on excellent
+   * completion. When null / omitted, the skills feature is inert (no reads,
+   * no writes, no extraction LLM calls).
+   *
+   * Constructing a SkillStore requires Node fs/path/os; do not pass one from
+   * browser contexts. Use `createSkillStoreFromConfig(config)` from the
+   * Node-only `index.ts` entry to build one from a resolved Pilo config.
+   */
+  skillStore?: SkillStoreType | null;
 }
 
 export interface ExecuteOptions {
@@ -110,6 +129,14 @@ export interface ExecuteOptions {
   /** Abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
+
+/**
+ * Validator-assigned quality of a `done()` answer. Mirrors the four-level
+ * enum returned by the validation tool. Skill extraction only fires on
+ * `"excellent"`, so getting this typed (not `string`) catches typos at
+ * compile time.
+ */
+type CompletionQuality = "failed" | "partial" | "complete" | "excellent";
 
 /** Error codes for task failures */
 export enum TaskErrorCode {
@@ -158,6 +185,8 @@ interface ExecutionState {
   lastAction?: string;
   actionRepeatCount: number;
   validationAttempts: number;
+  completionQuality?: CompletionQuality;
+  forceAccept?: boolean;
 }
 
 interface PlanOutput {
@@ -229,6 +258,7 @@ export class WebAgent {
   private readonly tabstackApiUrl: string | undefined;
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
+  private readonly skillStore: SkillStoreType | null;
 
   constructor(
     private browser: AriaBrowser,
@@ -253,6 +283,7 @@ export class WebAgent {
     this.tabstackApiUrl = options.tabstackApiUrl;
     this.onUserDataRequired = options.onUserDataRequired;
     this.taskId = options.taskId;
+    this.skillStore = options.skillStore ?? null;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -329,12 +360,23 @@ export class WebAgent {
             // 5. Navigation phase (with retry on recoverable errors)
             await this.navigateToStartWithRetry(task);
 
-            this.initializeSystemPromptAndTask(task);
+            await this.initializeSystemPromptAndTask(task);
 
             // 6. Main execution loop
             const loopOutcome = await this.runMainLoop(task, executionState);
 
-            // 7. Return results
+            // 7. Post-loop skill extraction (silent failures; only when accepted
+            //    on quality, not when force-accepted at the validation cap).
+            if (
+              loopOutcome.success &&
+              loopOutcome.completionQuality === "excellent" &&
+              !loopOutcome.forceAccept &&
+              this.skillStore
+            ) {
+              await this.extractAndStoreSkill(task);
+            }
+
+            // 8. Return results
             const result = this.buildResult(loopOutcome, executionState);
             span.setAttribute("pilo.task.success", result.success);
             return result;
@@ -387,7 +429,13 @@ export class WebAgent {
   private async runMainLoop(
     task: string,
     executionState: ExecutionState,
-  ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+  ): Promise<{
+    success: boolean;
+    finalAnswer: string | null;
+    error?: TaskError;
+    completionQuality?: CompletionQuality;
+    forceAccept?: boolean;
+  }> {
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
@@ -525,6 +573,8 @@ export class WebAgent {
               executionState.success = result.success;
               executionState.finalAnswer = result.finalAnswer;
               executionState.error = result.error;
+              executionState.completionQuality = result.completionQuality;
+              executionState.forceAccept = result.forceAccept;
               return { flow: "break" as const };
             }
 
@@ -622,6 +672,8 @@ export class WebAgent {
         success: executionState.success,
         finalAnswer: executionState.finalAnswer,
         error: executionState.error,
+        completionQuality: executionState.completionQuality,
+        forceAccept: executionState.forceAccept,
       };
     }
 
@@ -889,6 +941,8 @@ export class WebAgent {
     pageChanged: boolean;
     actionExecuted: boolean;
     error?: TaskError;
+    completionQuality?: CompletionQuality;
+    forceAccept?: boolean;
   }> {
     // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1091,6 +1145,8 @@ export class WebAgent {
             finalAnswer: actionOutput.result,
             pageChanged: false,
             actionExecuted: true,
+            completionQuality: validationResult.completionQuality,
+            forceAccept: validationResult.forceAccept,
           };
         } else {
           // Validation failed - the feedback has been added to messages
@@ -1233,7 +1289,7 @@ export class WebAgent {
     task: string,
     finalAnswer: string,
     executionState: ExecutionState,
-  ): Promise<{ isAccepted: boolean }> {
+  ): Promise<{ isAccepted: boolean; completionQuality: CompletionQuality; forceAccept: boolean }> {
     executionState.validationAttempts++;
 
     return withSpan(
@@ -1287,7 +1343,11 @@ export class WebAgent {
             throw new Error("Failed to validate task completion");
           }
 
-          const validationResult = validationResponse.toolResults[0].output as any;
+          const validationResult = validationResponse.toolResults[0].output as {
+            taskAssessment: string;
+            completionQuality: CompletionQuality;
+            feedback?: string;
+          };
           const { taskAssessment, completionQuality, feedback } = validationResult;
 
           // Emit validation event
@@ -1310,7 +1370,7 @@ export class WebAgent {
             const feedbackMessage = buildValidationFeedbackPrompt(
               executionState.validationAttempts,
               taskAssessment,
-              feedback,
+              feedback ?? null,
             );
 
             this.messages.push({ role: "user", content: feedbackMessage });
@@ -1339,6 +1399,8 @@ export class WebAgent {
 
           return {
             isAccepted: isAccepted || forceAccept,
+            completionQuality,
+            forceAccept,
           };
         } catch (error) {
           span.setStatus({
@@ -1347,9 +1409,11 @@ export class WebAgent {
           });
           recordSanitizedException(span, error);
 
-          // On validation error, accept the result if we've hit max attempts
+          // On validation error, accept the result if we've hit max attempts.
+          // forceAccept: true because we're only accepting due to the cap, not
+          // because validation succeeded.
           if (executionState.validationAttempts >= this.maxValidationAttempts) {
-            return { isAccepted: true };
+            return { isAccepted: true, completionQuality: "failed", forceAccept: true };
           }
 
           // Otherwise, continue execution
@@ -1360,10 +1424,47 @@ export class WebAgent {
             iterationId: this.currentIterationId,
           });
 
-          return { isAccepted: false };
+          return { isAccepted: false, completionQuality: "failed", forceAccept: false };
         }
       },
     );
+  }
+
+  /**
+   * Extract a per-host skill hint from the just-completed task trajectory and
+   * append it to the cached host file. Called only on excellent completion.
+   *
+   * Uses the live page URL (where the task ended) over the originally-planned
+   * URL because the agent may have navigated to a different host mid-task —
+   * the ending host is the most likely starting point for a similar task next
+   * time.
+   *
+   * Failures are swallowed (with a warning); skill extraction must never fail
+   * an otherwise-successful task.
+   */
+  private async extractAndStoreSkill(task: string): Promise<void> {
+    const host = resolveHost(this.currentPage.url || this.url);
+    if (!host || !this.skillStore) return;
+
+    try {
+      const extracted = await extractSkill({
+        task,
+        host,
+        messages: this.messages,
+        providerConfig: this.providerConfig,
+        abortSignal: this.abortSignal,
+      });
+      if (!extracted) return;
+
+      const today = new Date().toISOString().slice(0, 10);
+      await this.skillStore.append(host, {
+        date: today,
+        taskHeadline: extracted.taskHeadline,
+        hint: extracted.hint,
+      });
+    } catch (err) {
+      console.warn(`[skills] extraction failed for ${host}:`, err);
+    }
   }
 
   /**
@@ -1661,12 +1762,32 @@ export class WebAgent {
     });
   }
 
-  private initializeSystemPromptAndTask(task: string): void {
+  private async initializeSystemPromptAndTask(task: string): Promise<void> {
     const hasGuardrails = Boolean(this.guardrails);
     const hasWebSearch = this.searchProvider !== "none";
     const hasTabstack = Boolean(this.tabstackApiKey);
     const hasStartingUrl = Boolean(this.url && this.url !== "about:blank");
     const hasInteractive = Boolean(this.onUserDataRequired);
+
+    let hasSkills = false;
+    let skillsBlock = "";
+    if (this.skillStore) {
+      // Read uses the starting URL because the loop hasn't navigated yet.
+      // Compare with extractAndStoreSkill, which uses the ending URL.
+      const host = resolveHost(this.url);
+      if (host) {
+        try {
+          const content = await this.skillStore.read(host);
+          const rendered = formatSkillSection(content);
+          if (rendered) {
+            hasSkills = true;
+            skillsBlock = rendered;
+          }
+        } catch (err) {
+          console.warn(`[skills] failed to read host file for ${host}:`, err);
+        }
+      }
+    }
 
     const taskPromptContent = buildTaskAndPlanPrompt(
       task,
@@ -1682,6 +1803,8 @@ export class WebAgent {
       hasTabstack,
       hasStartingUrl,
       hasInteractive,
+      hasSkills,
+      skillsBlock,
     );
 
     this.messages = [
@@ -1821,7 +1944,7 @@ export class WebAgent {
 
         // Re-initialize messages: stale DOM snapshots from the old browser would
         // confuse the agent and may trigger false repetition-abort logic.
-        this.initializeSystemPromptAndTask(task);
+        await this.initializeSystemPromptAndTask(task);
 
         // Reset repetition tracking to avoid false "stuck in loop" detection.
         executionState.actionRepeatCount = 0;

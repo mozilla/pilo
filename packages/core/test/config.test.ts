@@ -191,6 +191,9 @@ describe("ConfigManager", () => {
         "parallel_api_key",
         "tabstack_api_key",
         "tabstack_api_url",
+        "skills_enabled",
+        "skills_cache_dir",
+        "skills_max_host_tokens",
       ];
 
       // Check that schema has all PiloConfig keys

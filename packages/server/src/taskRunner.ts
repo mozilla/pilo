@@ -10,6 +10,7 @@ import {
   createNavigationRetryConfig,
   RecoverableError,
   SEARCH_PROVIDERS,
+  createSkillStoreFromConfig,
 } from "pilo-core";
 import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
 import { StreamLogger } from "./StreamLogger.js";
@@ -360,12 +361,18 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     openai_compatible_name: body.openaiCompatibleName,
   });
 
+  // Build a skill store from server config (null when skills_enabled is false).
+  // The WebAgent reads / writes through this store; passing null keeps the
+  // skills feature inert.
+  const skillStore = createSkillStoreFromConfig(serverConfig);
+
   const agent = new WebAgent(browser, {
     ...webAgentConfig,
     providerConfig,
     logger,
     onUserDataRequired,
     taskId,
+    skillStore,
   });
 
   try {

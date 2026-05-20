@@ -271,6 +271,42 @@ describe("prompts", () => {
       expect(prompt).toContain("GUARDRAIL COMPLIANCE");
       expect(prompt).toContain("webSearch(");
     });
+
+    describe("skills block", () => {
+      const SKILLS_MARKER = "<!-- NOTES FROM PRIOR RUNS ON THIS SITE -->";
+      const skillsSample = `${SKILLS_MARKER}\nsample notes\n<!-- END NOTES -->`;
+
+      it("does NOT include the skills block when hasSkills=false", () => {
+        const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, false, "");
+        expect(prompt).not.toContain(SKILLS_MARKER);
+      });
+
+      it("does NOT include the skills block when hasSkills=true but skillsBlock is empty", () => {
+        // Defensive: the {% if hasSkills %} branch may render an empty {{ skillsBlock }}.
+        // Either way, the marker must not appear since the block has no content.
+        const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, true, "");
+        expect(prompt).not.toContain(SKILLS_MARKER);
+      });
+
+      it("includes the skillsBlock content verbatim when hasSkills=true and skillsBlock has content", () => {
+        const prompt = buildActionLoopSystemPrompt(
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          skillsSample,
+        );
+        expect(prompt).toContain(skillsSample);
+      });
+
+      it("preserves backward compatibility for the original 5-argument signature", () => {
+        // Existing callers pass 5 booleans; defaults must keep the skills block out.
+        const prompt = buildActionLoopSystemPrompt(false, false, false, false, false);
+        expect(prompt).not.toContain(SKILLS_MARKER);
+      });
+    });
   });
 
   describe("buildTaskAndPlanPrompt", () => {

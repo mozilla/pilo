@@ -56,6 +56,10 @@ vi.mock("pilo-core", () => {
     })),
     SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
     withRemoteContext: vi.fn((_headers: unknown, fn: () => unknown) => fn()),
+    // Skill cache wiring is exercised in core tests; the server only forwards
+    // the resolved store into WebAgent. Returning null here mirrors the
+    // "skills_enabled: false" production default.
+    createSkillStoreFromConfig: vi.fn(() => null),
   };
 });
 
