@@ -136,6 +136,8 @@ export interface TaskExecutionResult {
   success: boolean;
   /** Final answer or result from the agent */
   finalAnswer: string | null;
+  /** How validation resolved: 'accepted' = validator approved, 'force-accepted' = max attempts hit; undefined = validation did not run */
+  validationOutcome?: "accepted" | "force-accepted";
   /** Error details when success is false */
   error?: TaskError;
   /** Execution statistics */
@@ -158,6 +160,7 @@ interface ExecutionState {
   lastAction?: string;
   actionRepeatCount: number;
   validationAttempts: number;
+  validationOutcome?: "accepted" | "force-accepted";
 }
 
 interface PlanOutput {
@@ -387,7 +390,12 @@ export class WebAgent {
   private async runMainLoop(
     task: string,
     executionState: ExecutionState,
-  ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+  ): Promise<{
+    success: boolean;
+    finalAnswer: string | null;
+    error?: TaskError;
+    validationOutcome?: "accepted" | "force-accepted";
+  }> {
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
@@ -525,6 +533,7 @@ export class WebAgent {
               executionState.success = result.success;
               executionState.finalAnswer = result.finalAnswer;
               executionState.error = result.error;
+              executionState.validationOutcome = result.validationOutcome;
               return { flow: "break" as const };
             }
 
@@ -622,6 +631,7 @@ export class WebAgent {
         success: executionState.success,
         finalAnswer: executionState.finalAnswer,
         error: executionState.error,
+        validationOutcome: executionState.validationOutcome,
       };
     }
 
@@ -889,6 +899,7 @@ export class WebAgent {
     pageChanged: boolean;
     actionExecuted: boolean;
     error?: TaskError;
+    validationOutcome?: "accepted" | "force-accepted";
   }> {
     // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -1091,6 +1102,7 @@ export class WebAgent {
             finalAnswer: actionOutput.result,
             pageChanged: false,
             actionExecuted: true,
+            validationOutcome: validationResult.validationOutcome,
           };
         } else {
           // Validation failed - the feedback has been added to messages
@@ -1233,7 +1245,7 @@ export class WebAgent {
     task: string,
     finalAnswer: string,
     executionState: ExecutionState,
-  ): Promise<{ isAccepted: boolean }> {
+  ): Promise<{ isAccepted: boolean; validationOutcome?: "accepted" | "force-accepted" }> {
     executionState.validationAttempts++;
 
     return withSpan(
@@ -1337,9 +1349,12 @@ export class WebAgent {
 
           span.setAttribute("pilo.validation.accepted", isAccepted || forceAccept);
 
-          return {
-            isAccepted: isAccepted || forceAccept,
-          };
+          const validationOutcome: "accepted" | "force-accepted" | undefined = isAccepted
+            ? "accepted"
+            : forceAccept
+              ? "force-accepted"
+              : undefined;
+          return { isAccepted: isAccepted || forceAccept, validationOutcome };
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
@@ -1349,7 +1364,7 @@ export class WebAgent {
 
           // On validation error, accept the result if we've hit max attempts
           if (executionState.validationAttempts >= this.maxValidationAttempts) {
-            return { isAccepted: true };
+            return { isAccepted: true, validationOutcome: "force-accepted" };
           }
 
           // Otherwise, continue execution
@@ -1763,7 +1778,12 @@ export class WebAgent {
   }
 
   private buildResult(
-    executionOutcome: { success: boolean; finalAnswer: string | null; error?: TaskError },
+    executionOutcome: {
+      success: boolean;
+      finalAnswer: string | null;
+      error?: TaskError;
+      validationOutcome?: "accepted" | "force-accepted";
+    },
     executionState: ExecutionState,
   ): TaskExecutionResult {
     const endTime = Date.now();
@@ -1776,6 +1796,9 @@ export class WebAgent {
     return {
       success: executionOutcome.success,
       finalAnswer: executionOutcome.finalAnswer,
+      ...(executionOutcome.validationOutcome && {
+        validationOutcome: executionOutcome.validationOutcome,
+      }),
       ...(executionOutcome.error && { error: executionOutcome.error }),
       stats: {
         iterations: executionState.currentIteration,
