@@ -10,7 +10,7 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
 import piloRoutes from "./routes/pilo.js";
-import { isAtCapacity } from "./concurrencyGuard.js";
+import { isAtCapacity, setDraining, getActiveTasks } from "./concurrencyGuard.js";
 import { createPiloWsRoute, type ActiveWS } from "./routes/piloWs.js";
 
 const app = new Hono();
@@ -87,10 +87,12 @@ const server = serve({
 // Inject WebSocket support into the HTTP server
 injectWebSocket(server);
 
-// Graceful shutdown: send close frames to all active WebSocket connections before exiting
-// so that clients (e.g. tabs-api) receive code 1001 rather than an abrupt 1006.
-process.on("SIGTERM", () => {
-  console.log("[pilo] SIGTERM received, closing active WebSocket connections...");
+// How long to wait for in-flight tasks to complete before forcing shutdown.
+// Override via PILO_DRAIN_TIMEOUT_MS. Default is 60s, suitable for most
+// deployments. Increase for workloads with longer task durations.
+const DRAIN_TIMEOUT_MS = Number(process.env.PILO_DRAIN_TIMEOUT_MS ?? 60_000);
+
+function closeActiveConnections() {
   for (const ws of activeConnections) {
     try {
       ws.close(1001, "Server shutting down");
@@ -98,7 +100,35 @@ process.on("SIGTERM", () => {
       // ignore errors on already-closed connections
     }
   }
-  server.close();
-  // Safety valve: if the event loop hasn't drained after 10s, exit cleanly.
-  setTimeout(() => process.exit(0), 10_000).unref();
+}
+
+// Graceful shutdown: stop accepting new tasks, wait for in-flight tasks to
+// finish, then close remaining connections and exit.
+process.on("SIGTERM", () => {
+  console.log(
+    `[pilo] SIGTERM received, draining in-flight tasks (timeout: ${DRAIN_TIMEOUT_MS}ms)...`,
+  );
+
+  setDraining(); // refuse new task:details messages
+  server.close(); // stop accepting new HTTP/WS connections
+
+  const deadline = Date.now() + DRAIN_TIMEOUT_MS;
+
+  const poll = setInterval(() => {
+    const remaining = getActiveTasks();
+    if (remaining === 0) {
+      clearInterval(poll);
+      console.log("[pilo] All tasks complete, shutting down.");
+      process.exit(0);
+    }
+    if (Date.now() >= deadline) {
+      clearInterval(poll);
+      console.log(
+        `[pilo] Drain timeout reached with ${remaining} task(s) still active, shutting down.`,
+      );
+      closeActiveConnections();
+      process.exit(0);
+    }
+    console.log(`[pilo] Draining... ${remaining} task(s) remaining.`);
+  }, 1_000);
 });
