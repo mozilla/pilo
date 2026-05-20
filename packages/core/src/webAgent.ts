@@ -136,7 +136,13 @@ export interface TaskExecutionResult {
   success: boolean;
   /** Final answer or result from the agent */
   finalAnswer: string | null;
-  /** How validation resolved: 'accepted' = validator approved, 'force-accepted' = max attempts hit; undefined = validation did not run */
+  /**
+   * How validation resolved when a final answer was accepted:
+   * - "accepted": validator returned complete/excellent
+   * - "force-accepted": validator never accepted but maxValidationAttempts was hit
+   * - undefined: no answer was ever accepted (task aborted, max iterations, error,
+   *   or validation rejected without reaching force-accept)
+   */
   validationOutcome?: "accepted" | "force-accepted";
   /** Error details when success is false */
   error?: TaskError;
