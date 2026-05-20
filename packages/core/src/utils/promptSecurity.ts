@@ -11,6 +11,7 @@ export enum ExternalContentLabel {
   PageSnapshot = "page-snapshot",
   PageMarkdown = "page-markdown",
   SearchResults = "search-results",
+  ConversationHistory = "conversation-history",
 }
 
 /** Reminder appended after search results to encourage visiting actual pages. */
