@@ -21,8 +21,8 @@
     "test:e2e:headless": "HEADLESS=true playwright test"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.64",
-    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/google": "^3.0.72",
+    "@ai-sdk/openai": "^3.0.63",
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
     "@radix-ui/react-label": "^2.1.7",

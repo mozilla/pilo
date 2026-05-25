@@ -19,10 +19,10 @@
     "web-ext": "^10.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.64",
-    "@ai-sdk/google-vertex": "^4.0.112",
-    "@ai-sdk/openai": "^3.0.53",
-    "@ai-sdk/openai-compatible": "^2.0.41",
+    "@ai-sdk/google": "^3.0.72",
+    "@ai-sdk/google-vertex": "^4.0.126",
+    "@ai-sdk/openai": "^3.0.63",
+    "@ai-sdk/openai-compatible": "^2.0.47",
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@types/node": "^25.5.2",
     "ollama-ai-provider-v2": "^3.5.0",
