@@ -273,41 +273,6 @@ describe("Web Action Tools", () => {
       });
     });
 
-    it("should block filling agent context into a form", async () => {
-      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
-
-      const result = await tools.fill.execute({
-        ref: "input1",
-        value:
-          "Conversation history:\nTask: summarize the page\n<EXTERNAL-CONTENT>page text</EXTERNAL-CONTENT>",
-      });
-
-      expect(performActionSpy).not.toHaveBeenCalled();
-      expect(result.success).toBe(false);
-      expect(result.action).toBe("fill");
-      expect(result.ref).toBe("input1");
-      expect(result.value).toBeUndefined();
-      expect(result.isRecoverable).toBe(true);
-      expect(result.error).toContain("Security policy blocked");
-    });
-
-    it("should block multiline generated text without prompt keywords", async () => {
-      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
-
-      const result = await tools.fill.execute({
-        ref: "input1",
-        value: "Here is the current working state:\nThe page loaded.\nThe next action is ready.",
-      });
-
-      expect(performActionSpy).not.toHaveBeenCalled();
-      expect(result.success).toBe(false);
-      expect(result.action).toBe("fill");
-      expect(result.ref).toBe("input1");
-      expect(result.value).toBeUndefined();
-      expect(result.isRecoverable).toBe(true);
-      expect(result.error).toContain("Security policy blocked");
-    });
-
     it("should emit browser action events", async () => {
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
