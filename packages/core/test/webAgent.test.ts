@@ -897,6 +897,77 @@ describe("WebAgent", () => {
       expect(navigatedEvent?.data.url).toBe(startingUrl);
     });
 
+    it("should keep the same snapshot after fill so form refs remain valid for submit", async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Fill then submit",
+              plan: "1. Fill the form\n2. Submit the form",
+            },
+          },
+        ],
+      } as any);
+
+      const snapshotSpy = vi.spyOn(mockBrowser, "getTreeWithRefs");
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Fill",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "fill_1",
+              toolName: "fill",
+              input: { ref: "input1", value: "context" },
+              output: {
+                success: true,
+                action: "fill",
+                ref: "input1",
+                value: "context",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Fill" }],
+          },
+        }) as any,
+      );
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                success: true,
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Fill then submit", { startingUrl: "https://example.com" });
+
+      expect(snapshotSpy).toHaveBeenCalledTimes(1);
+    });
+
     it("should pass webSearchEnabled to planning prompt when search provider is set", async () => {
       // Create a WebAgent with a search provider enabled
       const searchAgent = new WebAgent(mockBrowser, {

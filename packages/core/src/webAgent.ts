@@ -1045,8 +1045,7 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract and webSearch)
-    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
+    const pageChanged = WebAgent.shouldRefreshPageSnapshotAfterAction(actionOutput.action);
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {
@@ -1112,6 +1111,12 @@ export class WebAgent {
       pageChanged,
       actionExecuted: true,
     };
+  }
+
+  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set(["extract", "webSearch", "fill"]);
+
+  private static shouldRefreshPageSnapshotAfterAction(action: string): boolean {
+    return !WebAgent.ACTIONS_WITHOUT_PAGE_REFRESH.has(action);
   }
 
   /**
