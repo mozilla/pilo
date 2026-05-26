@@ -139,6 +139,8 @@ describe("Web Action Tools", () => {
       eventEmitter,
       providerConfig: { model: mockProvider },
       abortSignal: undefined,
+      agentFilledRefs: new Set<string>(),
+      operationalRefs: new Set<string>(),
     };
 
     tools = createWebActionTools(context);
@@ -149,6 +151,16 @@ describe("Web Action Tools", () => {
   });
 
   describe("Tool Structure", () => {
+    it("should require provenance tracking sets", () => {
+      expect(() =>
+        createWebActionTools({
+          browser: mockBrowser,
+          eventEmitter,
+          providerConfig: { model: mockProvider },
+        } as any),
+      ).toThrow("Web action provenance tracking sets are required");
+    });
+
     it("should create all expected tools", () => {
       expect(tools).toBeDefined();
       expect(tools.click).toBeDefined();

@@ -27,8 +27,8 @@ interface WebActionContext {
   providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
   approvedRefs?: { has(ref: string): boolean };
-  agentFilledRefs?: Set<string>;
-  operationalRefs?: Set<string>;
+  agentFilledRefs: Set<string>;
+  operationalRefs: Set<string>;
 }
 
 /**
@@ -112,8 +112,8 @@ async function assessFormSubmissionForAction(
     const assessment = assessFormSubmission({
       form,
       approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
-      agentFilledRefs: context.agentFilledRefs ?? new Set(),
-      operationalRefs: context.operationalRefs ?? new Set(),
+      agentFilledRefs: context.agentFilledRefs,
+      operationalRefs: context.operationalRefs,
     });
 
     if (!assessment.allowed) {
@@ -223,6 +223,10 @@ async function performActionWithValidation(
 }
 
 export function createWebActionTools(context: WebActionContext) {
+  if (!context.agentFilledRefs || !context.operationalRefs) {
+    throw new Error("Web action provenance tracking sets are required");
+  }
+
   return {
     click: tool({
       description: TOOL_STRINGS.webActions.click.description,
@@ -258,9 +262,9 @@ export function createWebActionTools(context: WebActionContext) {
 
           const result = await performActionWithValidation(PageAction.Fill, context, ref, value);
           if (result.success && !userApproved) {
-            context.agentFilledRefs?.add(ref);
+            context.agentFilledRefs.add(ref);
             if (assessment.operational) {
-              context.operationalRefs?.add(ref);
+              context.operationalRefs.add(ref);
             }
           }
           return result;
