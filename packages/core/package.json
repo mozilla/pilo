@@ -34,7 +34,7 @@
     "@ai-sdk/google-vertex": "^4.0.126",
     "@ai-sdk/openai": "^3.0.63",
     "@ai-sdk/openai-compatible": "^2.0.47",
-    "@ghostery/adblocker-playwright": "^2.14.1",
+    "@ghostery/adblocker-playwright": "^2.17.0",
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@tabstack/sdk": "^2.3.0",
     "ai": "^6.0.177",
