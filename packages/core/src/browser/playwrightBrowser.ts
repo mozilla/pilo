@@ -788,6 +788,25 @@ export class PlaywrightBrowser implements AriaBrowser {
     return locator;
   }
 
+  async getRefIdentity(ref: string): Promise<{ role: string; name: string } | null> {
+    if (!this.page) return null;
+    try {
+      return await this.page.evaluate(
+        (refArg) =>
+          (
+            globalThis as unknown as {
+              __piloIdentityMap?: Map<string, { role: string; name: string }>;
+            }
+          ).__piloIdentityMap?.get(refArg) ?? null,
+        ref,
+      );
+    } catch {
+      // The page may have navigated or torn down the identity map. Identity
+      // is advisory for repetition detection — log nothing, just bail out.
+      return null;
+    }
+  }
+
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     if (!this.page) throw new Error("Browser not started");
     return withSpan(
