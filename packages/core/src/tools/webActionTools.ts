@@ -13,6 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import { assessFillValue } from "../security/actionFirewall.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -44,6 +45,30 @@ type ActionResult = {
   error?: string;
   isRecoverable?: boolean;
 };
+
+function securityBlockedResult(
+  action: string,
+  error: string,
+  context: WebActionContext,
+  ref?: string,
+  value?: string | number,
+): ActionResult {
+  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+    success: false,
+    action,
+    error,
+    isRecoverable: true,
+  });
+
+  return {
+    success: false,
+    action,
+    ...(ref && { ref }),
+    ...(value !== undefined && { value }),
+    error,
+    isRecoverable: true,
+  };
+}
 
 /**
  * Helper function to perform an action with full error handling and logging
@@ -157,6 +182,11 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
+        const assessment = assessFillValue({ value });
+        if (!assessment.allowed) {
+          return securityBlockedResult("fill", assessment.reason, context, ref);
+        }
+
         return await performActionWithValidation(PageAction.Fill, context, ref, value);
       },
     }),
