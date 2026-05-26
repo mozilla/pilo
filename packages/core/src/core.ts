@@ -5,7 +5,12 @@
  */
 
 export { WebAgent } from "./webAgent.js";
-export type { AriaBrowser } from "./browser/ariaBrowser.js";
+export type {
+  AriaBrowser,
+  FieldMetadata,
+  FormSubmissionContext,
+  FormSubmissionTrigger,
+} from "./browser/ariaBrowser.js";
 export { PageAction, LoadState } from "./browser/ariaBrowser.js";
 export type { TaskExecutionResult, TaskError, WebAgentOptions } from "./webAgent.js";
 export { TaskErrorCode } from "./webAgent.js";

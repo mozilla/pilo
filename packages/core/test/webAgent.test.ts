@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
-import { AriaBrowser, PageAction } from "../src/browser/ariaBrowser.js";
+import {
+  AriaBrowser,
+  FieldMetadata,
+  FormSubmissionTrigger,
+  FormSubmissionContext,
+  PageAction,
+} from "../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
@@ -152,6 +158,8 @@ class MockBrowser implements AriaBrowser {
     </div>
   `;
   private markdown = "# Mock Page\nContent here";
+  fieldMetadata = new Map<string, FieldMetadata>();
+  formSubmissionContexts = new Map<string, FormSubmissionContext | null>();
 
   async start(): Promise<void> {}
   async shutdown(): Promise<void> {}
@@ -190,6 +198,32 @@ class MockBrowser implements AriaBrowser {
   }
 
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {}
+
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    return (
+      this.fieldMetadata.get(ref) ?? {
+        ref,
+        tagName: "input",
+        inputType: "search",
+        role: "searchbox",
+        name: "q",
+        label: "Search",
+        placeholder: "Search",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "search-form",
+        formAction: "https://example.com/search",
+        formMethod: "get",
+      }
+    );
+  }
+
+  async getFormSubmissionContext(
+    ref: string,
+    _trigger?: FormSubmissionTrigger,
+  ): Promise<FormSubmissionContext | null> {
+    return this.formSubmissionContexts.get(ref) ?? null;
+  }
 
   async waitForLoadState(): Promise<void> {}
 

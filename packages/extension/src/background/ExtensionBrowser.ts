@@ -1,5 +1,10 @@
 import browser from "webextension-polyfill";
-import type { AriaBrowser } from "pilo-core/core";
+import type {
+  AriaBrowser,
+  FieldMetadata,
+  FormSubmissionContext,
+  FormSubmissionTrigger,
+} from "pilo-core/core";
 import { PageAction, LoadState } from "pilo-core/core";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "../shared/utils/logger";
@@ -300,6 +305,201 @@ export class ExtensionBrowser implements AriaBrowser {
     } catch (error) {
       throw error; // Re-throw to allow caller to handle
     }
+  }
+
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    const tab = await this.getActiveTab();
+    await this.ensureContentScript();
+
+    const [{ result }] = await browser.scripting.executeScript({
+      target: { tabId: tab.id! },
+      func: (elementRef: string) => {
+        const element = document.querySelector(`[data-pilo-ref="${elementRef}"]`);
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Element with ref ${elementRef} not found in DOM`);
+        }
+
+        const input = element instanceof HTMLInputElement ? element : null;
+        const form = getElementForm(element);
+
+        return {
+          ref: elementRef,
+          tagName: element.tagName.toLowerCase(),
+          inputType: input?.type?.toLowerCase() ?? null,
+          role: element.getAttribute("role"),
+          name: getElementName(element),
+          label: getElementLabel(element),
+          placeholder: getElementPlaceholder(element),
+          autocomplete: getElementAutocomplete(element),
+          isContentEditable: element.isContentEditable,
+          formId: form?.id || null,
+          formAction: form?.action || null,
+          formMethod: form?.method?.toLowerCase() || null,
+        };
+
+        function getElementForm(node: HTMLElement): HTMLFormElement | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement ||
+            node instanceof HTMLButtonElement
+          ) {
+            return node.form;
+          }
+          return node.closest("form");
+        }
+
+        function getElementName(node: HTMLElement): string | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement ||
+            node instanceof HTMLButtonElement
+          ) {
+            return node.name || null;
+          }
+          return node.getAttribute("name");
+        }
+
+        function getElementLabel(node: HTMLElement): string | null {
+          const ariaLabel = node.getAttribute("aria-label");
+          if (ariaLabel?.trim()) return ariaLabel.trim();
+
+          const labelledBy = node.getAttribute("aria-labelledby");
+          if (labelledBy) {
+            const text = labelledBy
+              .split(/\s+/)
+              .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || "")
+              .filter(Boolean)
+              .join(" ");
+            if (text) return text;
+          }
+
+          if ("labels" in node) {
+            const labels = (node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
+              .labels;
+            const text = Array.from(labels || [])
+              .map((label) => label.textContent?.trim() || "")
+              .filter(Boolean)
+              .join(" ");
+            if (text) return text;
+          }
+
+          return null;
+        }
+
+        function getElementPlaceholder(node: HTMLElement): string | null {
+          if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+            return node.placeholder || null;
+          }
+          return null;
+        }
+
+        function getElementAutocomplete(node: HTMLElement): string | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement
+          ) {
+            return node.autocomplete || null;
+          }
+          return null;
+        }
+      },
+      args: [ref],
+    });
+
+    return result as FieldMetadata;
+  }
+
+  async getFormSubmissionContext(
+    ref: string,
+    trigger: FormSubmissionTrigger = "click",
+  ): Promise<FormSubmissionContext | null> {
+    const tab = await this.getActiveTab();
+    await this.ensureContentScript();
+
+    const [{ result }] = await browser.scripting.executeScript({
+      target: { tabId: tab.id! },
+      func: (paramsJson: string) => {
+        const { ref: submitterRef, trigger: submitTrigger } = JSON.parse(paramsJson) as {
+          ref: string;
+          trigger: FormSubmissionTrigger;
+        };
+        const element = document.querySelector(`[data-pilo-ref="${submitterRef}"]`);
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Element with ref ${submitterRef} not found in DOM`);
+        }
+        if (!canSubmitForm(element, submitTrigger)) return null;
+
+        const form = getSubmissionForm(element);
+        if (!form) return null;
+
+        const fields = Array.from(form.elements)
+          .filter(
+            (field): field is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+              field instanceof HTMLInputElement ||
+              field instanceof HTMLTextAreaElement ||
+              field instanceof HTMLSelectElement,
+          )
+          .filter((field) => !field.disabled)
+          .map((field) => ({
+            ref: field.getAttribute("data-pilo-ref"),
+            name: field.name || null,
+            tagName: field.tagName.toLowerCase(),
+            inputType: field instanceof HTMLInputElement ? field.type.toLowerCase() : null,
+            autocomplete: "autocomplete" in field ? field.autocomplete || null : null,
+          }));
+
+        return {
+          submitterRef,
+          formId: form.id || null,
+          actionUrl: form.action || null,
+          method: form.method?.toLowerCase() || null,
+          fields,
+        };
+
+        function getSubmissionForm(node: HTMLElement): HTMLFormElement | null {
+          if (
+            node instanceof HTMLButtonElement ||
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement
+          ) {
+            return node.form;
+          }
+          return node.closest("form");
+        }
+
+        function canSubmitForm(node: HTMLElement, submitTrigger: FormSubmissionTrigger): boolean {
+          if (submitTrigger === "click") {
+            if (node instanceof HTMLButtonElement) return node.type === "submit";
+            if (node instanceof HTMLInputElement) {
+              return node.type === "submit" || node.type === "image";
+            }
+            return false;
+          }
+
+          if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
+            return false;
+          if (!(node instanceof HTMLInputElement)) return false;
+          return ![
+            "button",
+            "checkbox",
+            "color",
+            "file",
+            "hidden",
+            "radio",
+            "range",
+            "reset",
+            "submit",
+          ].includes(node.type);
+        }
+      },
+      args: [JSON.stringify({ ref, trigger })],
+    });
+
+    return result as FormSubmissionContext | null;
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {

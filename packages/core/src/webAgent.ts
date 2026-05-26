@@ -44,7 +44,7 @@ import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { createTabstackTools } from "./tools/tabstackTools.js";
-import { createInteractiveTools, ApprovedRefs, FILL_GATE_ERROR } from "./tools/interactiveTools.js";
+import { createInteractiveTools, ApprovedRefs } from "./tools/interactiveTools.js";
 import { createTabstackClient } from "./tabstack/client.js";
 import type { UserDataCallback } from "./types/interactive.js";
 import { nanoid } from "nanoid";
@@ -388,12 +388,30 @@ export class WebAgent {
     task: string,
     executionState: ExecutionState,
   ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+    // Only include interactive tools if a callback is provided
+    let interactiveToolSet: Record<string, any> = {};
+    let approvedRefs: ApprovedRefs | null = null;
+    const agentFilledRefs = new Set<string>();
+    const operationalRefs = new Set<string>();
+    if (this.onUserDataRequired) {
+      const result = createInteractiveTools({
+        callback: this.onUserDataRequired,
+        browser: this.browser,
+        eventEmitter: this.eventEmitter,
+      });
+      interactiveToolSet = result.tools;
+      approvedRefs = result.approvedRefs;
+    }
+
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
       eventEmitter: this.eventEmitter,
       providerConfig: this.providerConfig,
       abortSignal: this.abortSignal,
+      approvedRefs: approvedRefs ?? undefined,
+      agentFilledRefs,
+      operationalRefs,
     });
 
     // Only include search tools if a search service was created
@@ -408,51 +426,6 @@ export class WebAgent {
           eventEmitter: this.eventEmitter,
         })
       : {};
-
-    // Only include interactive tools if a callback is provided
-    let interactiveToolSet: Record<string, any> = {};
-    let approvedRefs: ApprovedRefs | null = null;
-    if (this.onUserDataRequired) {
-      const result = createInteractiveTools({
-        callback: this.onUserDataRequired,
-        browser: this.browser,
-        eventEmitter: this.eventEmitter,
-      });
-      interactiveToolSet = result.tools;
-      approvedRefs = result.approvedRefs;
-    }
-
-    // When interactive mode is on, gate fill/select/check to require approved refs.
-    // On first unapproved attempt, return an error. If the agent retries the same ref
-    // (indicating it's a navigation/search field, not a user-data form field), allow it
-    // through on the second attempt to avoid a deadlock.
-    if (approvedRefs) {
-      const warnedRefs = new Set<string>();
-      const gatedActions = ["fill", "select", "check"] as const;
-      for (const actionName of gatedActions) {
-        const originalTool = webActionTools[actionName];
-        if (originalTool) {
-          const originalExecute = originalTool.execute!;
-          (originalTool as any).execute = async (args: any, options: any) => {
-            if (args.ref && !approvedRefs!.has(args.ref)) {
-              if (!warnedRefs.has(args.ref)) {
-                // First attempt: warn and block
-                warnedRefs.add(args.ref);
-                return {
-                  success: false,
-                  action: actionName,
-                  ref: args.ref,
-                  error: FILL_GATE_ERROR,
-                  isRecoverable: true,
-                };
-              }
-              // Second attempt: agent confirmed this is a navigation/search field, allow it
-            }
-            return originalExecute(args, options);
-          };
-        }
-      }
-    }
 
     // Merge all tools
     const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...interactiveToolSet };
@@ -510,6 +483,8 @@ export class WebAgent {
             if (approvedRefs) {
               approvedRefs.clear();
             }
+            agentFilledRefs.clear();
+            operationalRefs.clear();
             await this.addPageSnapshot();
           }
 

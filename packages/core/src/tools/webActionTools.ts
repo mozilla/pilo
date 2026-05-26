@@ -13,6 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
+import { assessFill, assessFormSubmission } from "../security/actionFirewall.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -25,6 +26,9 @@ interface WebActionContext {
   eventEmitter: WebAgentEventEmitter;
   providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
+  approvedRefs?: { has(ref: string): boolean };
+  agentFilledRefs?: Set<string>;
+  operationalRefs?: Set<string>;
 }
 
 /**
@@ -44,6 +48,86 @@ type ActionResult = {
   error?: string;
   isRecoverable?: boolean;
 };
+
+const EMPTY_APPROVED_REFS = { has: () => false };
+
+function recoverableBrowserErrorResult(
+  action: string,
+  error: BrowserException,
+  context: WebActionContext,
+  ref?: string,
+  value?: string | number,
+): ActionResult {
+  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+    success: false,
+    action,
+    error: error.message,
+    isRecoverable: true,
+  });
+
+  return {
+    success: false,
+    action,
+    ...(ref && { ref }),
+    ...(value !== undefined && { value }),
+    error: error.message,
+    isRecoverable: true,
+  };
+}
+
+function securityBlockedResult(
+  action: string,
+  error: string,
+  context: WebActionContext,
+  ref?: string,
+): ActionResult {
+  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+    success: false,
+    action,
+    error,
+    isRecoverable: true,
+  });
+
+  return {
+    success: false,
+    action,
+    ...(ref && { ref }),
+    error,
+    isRecoverable: true,
+  };
+}
+
+async function assessFormSubmissionForAction(
+  action: PageAction.Click | PageAction.Enter,
+  context: WebActionContext,
+  ref: string,
+): Promise<ActionResult | null> {
+  try {
+    const form = await context.browser.getFormSubmissionContext(
+      ref,
+      action === PageAction.Click ? "click" : "enter",
+    );
+    if (!form) return null;
+
+    const assessment = assessFormSubmission({
+      form,
+      approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
+      agentFilledRefs: context.agentFilledRefs ?? new Set(),
+      operationalRefs: context.operationalRefs ?? new Set(),
+    });
+
+    if (!assessment.allowed) {
+      return securityBlockedResult(action, assessment.reason, context, ref);
+    }
+  } catch (error) {
+    if (error instanceof BrowserException) {
+      return recoverableBrowserErrorResult(action, error, context, ref);
+    }
+    throw error;
+  }
+
+  return null;
+}
 
 /**
  * Helper function to perform an action with full error handling and logging
@@ -146,6 +230,9 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        const blocked = await assessFormSubmissionForAction(PageAction.Click, context, ref);
+        if (blocked) return blocked;
+
         return await performActionWithValidation(PageAction.Click, context, ref);
       },
     }),
@@ -157,7 +244,32 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
-        return await performActionWithValidation(PageAction.Fill, context, ref, value);
+        try {
+          const metadata = await context.browser.getFieldMetadata(ref);
+          const userApproved = Boolean(context.approvedRefs?.has(ref));
+          const assessment = assessFill({
+            field: metadata,
+            source: userApproved ? "user-approved" : "agent",
+          });
+
+          if (!assessment.allowed) {
+            return securityBlockedResult(PageAction.Fill, assessment.reason, context, ref);
+          }
+
+          const result = await performActionWithValidation(PageAction.Fill, context, ref, value);
+          if (result.success && !userApproved) {
+            context.agentFilledRefs?.add(ref);
+            if (assessment.operational) {
+              context.operationalRefs?.add(ref);
+            }
+          }
+          return result;
+        } catch (error) {
+          if (error instanceof BrowserException) {
+            return recoverableBrowserErrorResult(PageAction.Fill, error, context, ref);
+          }
+          throw error;
+        }
       },
     }),
 
@@ -218,6 +330,9 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        const blocked = await assessFormSubmissionForAction(PageAction.Enter, context, ref);
+        if (blocked) return blocked;
+
         return await performActionWithValidation(PageAction.Enter, context, ref);
       },
     }),

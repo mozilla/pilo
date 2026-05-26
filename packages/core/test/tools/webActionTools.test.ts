@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createWebActionTools } from "../../src/tools/webActionTools.js";
-import { AriaBrowser, PageAction } from "../../src/browser/ariaBrowser.js";
+import {
+  AriaBrowser,
+  FieldMetadata,
+  FormSubmissionTrigger,
+  FormSubmissionContext,
+  PageAction,
+} from "../../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import { LanguageModel } from "ai";
 import { z } from "zod";
@@ -30,6 +36,8 @@ class MockBrowser implements AriaBrowser {
   browserName = "mock-browser";
   public url = "https://example.com";
   public title = "Example Page";
+  public fieldMetadata = new Map<string, FieldMetadata>();
+  public formSubmissionContexts = new Map<string, FormSubmissionContext | null>();
 
   async start(): Promise<void> {}
   async shutdown(): Promise<void> {}
@@ -71,6 +79,32 @@ class MockBrowser implements AriaBrowser {
 
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {
     // Mock implementation - can be configured to throw errors for testing
+  }
+
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    return (
+      this.fieldMetadata.get(ref) ?? {
+        ref,
+        tagName: "input",
+        inputType: "search",
+        role: "searchbox",
+        name: "q",
+        label: "Search",
+        placeholder: "Search",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "search-form",
+        formAction: "https://example.com/search",
+        formMethod: "get",
+      }
+    );
+  }
+
+  async getFormSubmissionContext(
+    ref: string,
+    _trigger?: FormSubmissionTrigger,
+  ): Promise<FormSubmissionContext | null> {
+    return this.formSubmissionContexts.get(ref) ?? null;
   }
 
   async waitForLoadState(): Promise<void> {}
@@ -271,6 +305,76 @@ describe("Web Action Tools", () => {
         ref: "input1",
         value: "test text",
       });
+    });
+
+    it("should block agent fill of freeform submittable fields", async () => {
+      mockBrowser.fieldMetadata.set("input1", {
+        ref: "input1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "message",
+        label: "Message",
+        placeholder: "Message",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "contact",
+        formAction: "https://example.com/contact",
+        formMethod: "post",
+      });
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.fill.execute({ ref: "input1", value: "generated payload" });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: false,
+        action: "fill",
+        ref: "input1",
+        error: "Security policy blocked filling a submittable form field without user approval",
+        isRecoverable: true,
+      });
+      expect(result.value).toBeUndefined();
+    });
+
+    it("should allow approved freeform field fills", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      mockBrowser.fieldMetadata.set("input1", {
+        ref: "input1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "message",
+        label: "Message",
+        placeholder: "Message",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "contact",
+        formAction: "https://example.com/contact",
+        formMethod: "post",
+      });
+      context.approvedRefs = new Set(["input1"]);
+      tools = createWebActionTools(context);
+
+      const result = await tools.fill.execute({ ref: "input1", value: "user-provided value" });
+
+      expect(performActionSpy).toHaveBeenCalledWith(
+        "input1",
+        PageAction.Fill,
+        "user-provided value",
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it("should track agent-filled operational refs", async () => {
+      context.agentFilledRefs = new Set<string>();
+      context.operationalRefs = new Set<string>();
+      tools = createWebActionTools(context);
+
+      await tools.fill.execute({ ref: "input1", value: "pilo" });
+
+      expect(context.agentFilledRefs.has("input1")).toBe(true);
+      expect(context.operationalRefs.has("input1")).toBe(true);
     });
 
     it("should emit browser action events", async () => {
@@ -507,6 +611,106 @@ describe("Web Action Tools", () => {
 
       const invalid = schema.safeParse({ url: "not-a-url" });
       expect(invalid.success).toBe(false);
+    });
+
+    it("should block click submit when form contains unauthorized agent-filled values", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      context.agentFilledRefs = new Set(["message"]);
+      context.operationalRefs = new Set<string>();
+      context.approvedRefs = new Set<string>();
+      mockBrowser.formSubmissionContexts.set("submit1", {
+        submitterRef: "submit1",
+        formId: "contact",
+        actionUrl: "https://example.com/contact",
+        method: "post",
+        fields: [
+          {
+            ref: "message",
+            name: "message",
+            tagName: "textarea",
+            inputType: null,
+            autocomplete: null,
+          },
+        ],
+      });
+      tools = createWebActionTools(context);
+
+      const result = await tools.click.execute({ ref: "submit1" });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "Security policy blocked submitting a form containing unauthorized agent-filled data",
+      );
+      expect(JSON.stringify(result)).not.toContain("generated payload");
+    });
+
+    it("should allow click submit when form fields are approved or operational", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      context.agentFilledRefs = new Set(["query", "email"]);
+      context.operationalRefs = new Set(["query"]);
+      context.approvedRefs = new Set(["email"]);
+      mockBrowser.formSubmissionContexts.set("submit1", {
+        submitterRef: "submit1",
+        formId: "search",
+        actionUrl: "https://example.com/search",
+        method: "get",
+        fields: [
+          {
+            ref: "query",
+            name: "q",
+            tagName: "input",
+            inputType: "search",
+            autocomplete: null,
+          },
+          {
+            ref: "email",
+            name: "email",
+            tagName: "input",
+            inputType: "email",
+            autocomplete: "email",
+          },
+        ],
+      });
+      tools = createWebActionTools(context);
+
+      const result = await tools.click.execute({ ref: "submit1" });
+
+      expect(performActionSpy).toHaveBeenCalledWith("submit1", PageAction.Click, undefined);
+      expect(result.success).toBe(true);
+    });
+
+    it("should block enter submit when form contains unauthorized agent-filled fields", async () => {
+      const formContextSpy = vi.spyOn(mockBrowser, "getFormSubmissionContext");
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      context.agentFilledRefs = new Set(["message"]);
+      context.operationalRefs = new Set<string>();
+      context.approvedRefs = new Set<string>();
+      mockBrowser.formSubmissionContexts.set("input1", {
+        submitterRef: "input1",
+        formId: "contact",
+        actionUrl: "https://example.com/contact",
+        method: "post",
+        fields: [
+          {
+            ref: "message",
+            name: "message",
+            tagName: "textarea",
+            inputType: null,
+            autocomplete: null,
+          },
+        ],
+      });
+      tools = createWebActionTools(context);
+
+      const result = await tools.enter.execute({ ref: "input1" });
+
+      expect(formContextSpy).toHaveBeenCalledWith("input1", "enter");
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "Security policy blocked submitting a form containing unauthorized agent-filled data",
+      );
     });
 
     it("should execute back action successfully", async () => {
