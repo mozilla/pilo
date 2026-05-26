@@ -27,7 +27,7 @@ const OPERATIONAL_INPUT_TYPES = new Set([
 
 const OPERATIONAL_ROLES = new Set(["searchbox", "combobox", "spinbutton", "slider"]);
 
-const SENSITIVE_AUTOCOMPLETE_TOKENS = [
+const SENSITIVE_AUTOCOMPLETE_TOKENS = new Set([
   "name",
   "honorific-prefix",
   "given-name",
@@ -81,7 +81,7 @@ const SENSITIVE_AUTOCOMPLETE_TOKENS = [
   "impp",
   "url",
   "photo",
-];
+]);
 
 export function assessFill(input: {
   field: FieldMetadata;
@@ -104,7 +104,7 @@ export function assessFill(input: {
 
 export function assessFormSubmission(input: {
   form: FormSubmissionContext;
-  approvedRefs: { has(ref: string): boolean };
+  approvedRefs: ReadonlySet<string>;
   agentFilledRefs: ReadonlySet<string>;
   operationalRefs: ReadonlySet<string>;
 }): ActionFirewallResult {
@@ -136,5 +136,5 @@ function isOperationalField(field: FieldMetadata): boolean {
 function hasSensitiveAutocomplete(autocomplete: string | null): boolean {
   if (!autocomplete) return false;
   const tokens = autocomplete.toLowerCase().split(/\s+/);
-  return tokens.some((token) => SENSITIVE_AUTOCOMPLETE_TOKENS.includes(token));
+  return tokens.some((token) => SENSITIVE_AUTOCOMPLETE_TOKENS.has(token));
 }

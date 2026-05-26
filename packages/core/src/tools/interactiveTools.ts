@@ -26,21 +26,7 @@ interface InteractiveToolContext {
  * Used by the fill gate to prevent the agent from filling form fields with
  * generated data when interactive mode is on.
  */
-export class ApprovedRefs {
-  private refs = new Set<string>();
-
-  add(ref: string): void {
-    this.refs.add(ref);
-  }
-
-  has(ref: string): boolean {
-    return this.refs.has(ref);
-  }
-
-  clear(): void {
-    this.refs.clear();
-  }
-}
+export class ApprovedRefs extends Set<string> {}
 
 /**
  * Maps field types from the request schema to the appropriate browser action.

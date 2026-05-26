@@ -26,7 +26,7 @@ interface WebActionContext {
   eventEmitter: WebAgentEventEmitter;
   providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
-  approvedRefs?: { has(ref: string): boolean };
+  approvedRefs?: ReadonlySet<string>;
   agentFilledRefs: Set<string>;
   operationalRefs: Set<string>;
 }
@@ -49,37 +49,14 @@ type ActionResult = {
   isRecoverable?: boolean;
 };
 
-const EMPTY_APPROVED_REFS = { has: () => false };
+const EMPTY_APPROVED_REFS = new Set<string>();
 
-function recoverableBrowserErrorResult(
-  action: string,
-  error: BrowserException,
-  context: WebActionContext,
-  ref?: string,
-  value?: string | number,
-): ActionResult {
-  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
-    success: false,
-    action,
-    error: error.message,
-    isRecoverable: true,
-  });
-
-  return {
-    success: false,
-    action,
-    ...(ref && { ref }),
-    ...(value !== undefined && { value }),
-    error: error.message,
-    isRecoverable: true,
-  };
-}
-
-function securityBlockedResult(
+function failedActionResult(
   action: string,
   error: string,
   context: WebActionContext,
   ref?: string,
+  value?: string | number,
 ): ActionResult {
   context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
     success: false,
@@ -92,6 +69,7 @@ function securityBlockedResult(
     success: false,
     action,
     ...(ref && { ref }),
+    ...(value !== undefined && { value }),
     error,
     isRecoverable: true,
   };
@@ -117,11 +95,11 @@ async function assessFormSubmissionForAction(
     });
 
     if (!assessment.allowed) {
-      return securityBlockedResult(action, assessment.reason, context, ref);
+      return failedActionResult(action, assessment.reason, context, ref);
     }
   } catch (error) {
     if (error instanceof BrowserException) {
-      return recoverableBrowserErrorResult(action, error, context, ref);
+      return failedActionResult(action, error.message, context, ref);
     }
     throw error;
   }
@@ -257,7 +235,7 @@ export function createWebActionTools(context: WebActionContext) {
           });
 
           if (!assessment.allowed) {
-            return securityBlockedResult(PageAction.Fill, assessment.reason, context, ref);
+            return failedActionResult(PageAction.Fill, assessment.reason, context, ref);
           }
 
           const result = await performActionWithValidation(PageAction.Fill, context, ref, value);
@@ -270,7 +248,7 @@ export function createWebActionTools(context: WebActionContext) {
           return result;
         } catch (error) {
           if (error instanceof BrowserException) {
-            return recoverableBrowserErrorResult(PageAction.Fill, error, context, ref);
+            return failedActionResult(PageAction.Fill, error.message, context, ref);
           }
           throw error;
         }
