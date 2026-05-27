@@ -558,9 +558,15 @@ export class ExtensionBrowser implements AriaBrowser {
     action: "getFieldMetadata" | "getFormSubmissionContext",
   ): T {
     if (!result) {
-      throw new BrowserActionException(action, `Failed to ${action}: script returned no result`, {
-        ref,
-      });
+      const actionDescription =
+        action === "getFieldMetadata" ? "get field metadata" : "get form submission context";
+      throw new BrowserActionException(
+        action,
+        `Failed to ${actionDescription}: script returned no result`,
+        {
+          ref,
+        },
+      );
     }
 
     if (!result.success) {
