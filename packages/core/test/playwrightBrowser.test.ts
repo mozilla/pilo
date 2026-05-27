@@ -854,6 +854,42 @@ describe("PlaywrightBrowser", () => {
         expect(error.ref).toBe("missing");
       });
     });
+
+    describe("metadata error handling", () => {
+      it("should wrap field metadata evaluation errors in BrowserActionException", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          evaluate: vi.fn().mockRejectedValue(new Error("Execution context was destroyed")),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.getFieldMetadata("input1")).rejects.toThrow(BrowserActionException);
+        await expect(browser.getFieldMetadata("input1")).rejects.toThrow(
+          "Failed to get field metadata: Execution context was destroyed",
+        );
+      });
+
+      it("should wrap form submission context evaluation errors in BrowserActionException", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          evaluate: vi.fn().mockRejectedValue(new Error("Execution context was destroyed")),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.getFormSubmissionContext("submit1")).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.getFormSubmissionContext("submit1")).rejects.toThrow(
+          "Failed to get form submission context: Execution context was destroyed",
+        );
+      });
+    });
   });
 
   describe("CDP endpoint failover", () => {

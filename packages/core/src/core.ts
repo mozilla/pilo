@@ -57,6 +57,8 @@ export type { Action, TaskValidationResult } from "./schemas.js";
 export {
   RecoverableError,
   BrowserException,
+  BrowserActionException,
+  InvalidRefException,
   NavigationTimeoutException,
   PlanningError,
   NoStartingUrlError,

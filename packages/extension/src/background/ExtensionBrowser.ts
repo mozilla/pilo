@@ -5,7 +5,7 @@ import type {
   FormSubmissionContext,
   FormSubmissionTrigger,
 } from "pilo-core/core";
-import { PageAction, LoadState } from "pilo-core/core";
+import { BrowserActionException, InvalidRefException, PageAction, LoadState } from "pilo-core/core";
 import type { Tabs } from "webextension-polyfill";
 import { createLogger } from "../shared/utils/logger";
 import TurndownService from "turndown";
@@ -15,6 +15,10 @@ interface ActionResult {
   error?: string;
   message?: string;
 }
+
+type MetadataScriptResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; errorType?: "invalid-ref" };
 
 interface AriaSnapshotWindow {
   generateAndRenderAriaTree: (root: Element, counter?: { value: number }) => string;
@@ -308,198 +312,265 @@ export class ExtensionBrowser implements AriaBrowser {
   }
 
   async getFieldMetadata(ref: string): Promise<FieldMetadata> {
-    const tab = await this.getActiveTab();
-    await this.ensureContentScript();
+    try {
+      const tab = await this.getActiveTab();
+      await this.ensureContentScript();
 
-    const [{ result }] = await browser.scripting.executeScript({
-      target: { tabId: tab.id! },
-      func: (elementRef: string) => {
-        const element = document.querySelector(`[data-pilo-ref="${elementRef}"]`);
-        if (!(element instanceof HTMLElement)) {
-          throw new Error(`Element with ref ${elementRef} not found in DOM`);
-        }
-
-        const input = element instanceof HTMLInputElement ? element : null;
-        const form = getElementForm(element);
-
-        return {
-          ref: elementRef,
-          tagName: element.tagName.toLowerCase(),
-          inputType: input?.type?.toLowerCase() ?? null,
-          role: element.getAttribute("role"),
-          name: getElementName(element),
-          label: getElementLabel(element),
-          placeholder: getElementPlaceholder(element),
-          autocomplete: getElementAutocomplete(element),
-          isContentEditable: element.isContentEditable,
-          formId: form?.id || null,
-          formAction: form?.action || null,
-          formMethod: form?.method?.toLowerCase() || null,
-        };
-
-        function getElementForm(node: HTMLElement): HTMLFormElement | null {
-          if (
-            node instanceof HTMLInputElement ||
-            node instanceof HTMLTextAreaElement ||
-            node instanceof HTMLSelectElement ||
-            node instanceof HTMLButtonElement
-          ) {
-            return node.form;
-          }
-          return node.closest("form");
-        }
-
-        function getElementName(node: HTMLElement): string | null {
-          if (
-            node instanceof HTMLInputElement ||
-            node instanceof HTMLTextAreaElement ||
-            node instanceof HTMLSelectElement ||
-            node instanceof HTMLButtonElement
-          ) {
-            return node.name || null;
-          }
-          return node.getAttribute("name");
-        }
-
-        function getElementLabel(node: HTMLElement): string | null {
-          const ariaLabel = node.getAttribute("aria-label");
-          if (ariaLabel?.trim()) return ariaLabel.trim();
-
-          const labelledBy = node.getAttribute("aria-labelledby");
-          if (labelledBy) {
-            const text = labelledBy
-              .split(/\s+/)
-              .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || "")
-              .filter(Boolean)
-              .join(" ");
-            if (text) return text;
+      const [{ result }] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (elementRef: string): MetadataScriptResult<FieldMetadata> => {
+          const element = document.querySelector(`[data-pilo-ref="${elementRef}"]`);
+          if (!(element instanceof HTMLElement)) {
+            return {
+              success: false,
+              error: `Element with ref ${elementRef} not found in DOM`,
+              errorType: "invalid-ref",
+            };
           }
 
-          if ("labels" in node) {
-            const labels = (node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
-              .labels;
-            const text = Array.from(labels || [])
-              .map((label) => label.textContent?.trim() || "")
-              .filter(Boolean)
-              .join(" ");
-            if (text) return text;
+          const input = element instanceof HTMLInputElement ? element : null;
+          const form = getElementForm(element);
+
+          return {
+            success: true,
+            data: {
+              ref: elementRef,
+              tagName: element.tagName.toLowerCase(),
+              inputType: input?.type?.toLowerCase() ?? null,
+              role: element.getAttribute("role"),
+              name: getElementName(element),
+              label: getElementLabel(element),
+              placeholder: getElementPlaceholder(element),
+              autocomplete: getElementAutocomplete(element),
+              isContentEditable: element.isContentEditable,
+              formId: form?.id || null,
+              formAction: form?.action || null,
+              formMethod: form?.method?.toLowerCase() || null,
+            },
+          };
+
+          function getElementForm(node: HTMLElement): HTMLFormElement | null {
+            if (
+              node instanceof HTMLInputElement ||
+              node instanceof HTMLTextAreaElement ||
+              node instanceof HTMLSelectElement ||
+              node instanceof HTMLButtonElement
+            ) {
+              return node.form;
+            }
+            return node.closest("form");
           }
 
-          return null;
-        }
-
-        function getElementPlaceholder(node: HTMLElement): string | null {
-          if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
-            return node.placeholder || null;
+          function getElementName(node: HTMLElement): string | null {
+            if (
+              node instanceof HTMLInputElement ||
+              node instanceof HTMLTextAreaElement ||
+              node instanceof HTMLSelectElement ||
+              node instanceof HTMLButtonElement
+            ) {
+              return node.name || null;
+            }
+            return node.getAttribute("name");
           }
-          return null;
-        }
 
-        function getElementAutocomplete(node: HTMLElement): string | null {
-          if (
-            node instanceof HTMLInputElement ||
-            node instanceof HTMLTextAreaElement ||
-            node instanceof HTMLSelectElement
-          ) {
-            return node.autocomplete || null;
+          function getElementLabel(node: HTMLElement): string | null {
+            const ariaLabel = node.getAttribute("aria-label");
+            if (ariaLabel?.trim()) return ariaLabel.trim();
+
+            const labelledBy = node.getAttribute("aria-labelledby");
+            if (labelledBy) {
+              const text = labelledBy
+                .split(/\s+/)
+                .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || "")
+                .filter(Boolean)
+                .join(" ");
+              if (text) return text;
+            }
+
+            if ("labels" in node) {
+              const labels = (node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
+                .labels;
+              const text = Array.from(labels || [])
+                .map((label) => label.textContent?.trim() || "")
+                .filter(Boolean)
+                .join(" ");
+              if (text) return text;
+            }
+
+            return null;
           }
-          return null;
-        }
-      },
-      args: [ref],
-    });
 
-    return result as FieldMetadata;
+          function getElementPlaceholder(node: HTMLElement): string | null {
+            if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+              return node.placeholder || null;
+            }
+            return null;
+          }
+
+          function getElementAutocomplete(node: HTMLElement): string | null {
+            if (
+              node instanceof HTMLInputElement ||
+              node instanceof HTMLTextAreaElement ||
+              node instanceof HTMLSelectElement
+            ) {
+              return node.autocomplete || null;
+            }
+            return null;
+          }
+        },
+        args: [ref],
+      });
+
+      return this.unwrapMetadataResult(
+        result as MetadataScriptResult<FieldMetadata> | undefined,
+        ref,
+        "getFieldMetadata",
+      );
+    } catch (error) {
+      if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+        throw error;
+      }
+      throw new BrowserActionException(
+        "getFieldMetadata",
+        `Failed to get field metadata: ${error instanceof Error ? error.message : String(error)}`,
+        { ref, originalError: error },
+      );
+    }
   }
 
   async getFormSubmissionContext(
     ref: string,
     trigger: FormSubmissionTrigger = "click",
   ): Promise<FormSubmissionContext | null> {
-    const tab = await this.getActiveTab();
-    await this.ensureContentScript();
+    try {
+      const tab = await this.getActiveTab();
+      await this.ensureContentScript();
 
-    const [{ result }] = await browser.scripting.executeScript({
-      target: { tabId: tab.id! },
-      func: (paramsJson: string) => {
-        const { ref: submitterRef, trigger: submitTrigger } = JSON.parse(paramsJson) as {
-          ref: string;
-          trigger: FormSubmissionTrigger;
-        };
-        const element = document.querySelector(`[data-pilo-ref="${submitterRef}"]`);
-        if (!(element instanceof HTMLElement)) {
-          throw new Error(`Element with ref ${submitterRef} not found in DOM`);
-        }
-        if (!canSubmitForm(element, submitTrigger)) return null;
-
-        const form = getSubmissionForm(element);
-        if (!form) return null;
-
-        const fields = Array.from(form.elements)
-          .filter(
-            (field): field is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
-              field instanceof HTMLInputElement ||
-              field instanceof HTMLTextAreaElement ||
-              field instanceof HTMLSelectElement,
-          )
-          .filter((field) => !field.disabled)
-          .map((field) => ({
-            ref: field.getAttribute("data-pilo-ref"),
-            name: field.name || null,
-            tagName: field.tagName.toLowerCase(),
-            inputType: field instanceof HTMLInputElement ? field.type.toLowerCase() : null,
-            autocomplete: "autocomplete" in field ? field.autocomplete || null : null,
-          }));
-
-        return {
-          submitterRef,
-          formId: form.id || null,
-          actionUrl: form.action || null,
-          method: form.method?.toLowerCase() || null,
-          fields,
-        };
-
-        function getSubmissionForm(node: HTMLElement): HTMLFormElement | null {
-          if (
-            node instanceof HTMLButtonElement ||
-            node instanceof HTMLInputElement ||
-            node instanceof HTMLTextAreaElement ||
-            node instanceof HTMLSelectElement
-          ) {
-            return node.form;
+      const [{ result }] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (paramsJson: string): MetadataScriptResult<FormSubmissionContext | null> => {
+          const { ref: submitterRef, trigger: submitTrigger } = JSON.parse(paramsJson) as {
+            ref: string;
+            trigger: FormSubmissionTrigger;
+          };
+          const element = document.querySelector(`[data-pilo-ref="${submitterRef}"]`);
+          if (!(element instanceof HTMLElement)) {
+            return {
+              success: false,
+              error: `Element with ref ${submitterRef} not found in DOM`,
+              errorType: "invalid-ref",
+            };
           }
-          return node.closest("form");
-        }
+          if (!canSubmitForm(element, submitTrigger)) return { success: true, data: null };
 
-        function canSubmitForm(node: HTMLElement, submitTrigger: FormSubmissionTrigger): boolean {
-          if (submitTrigger === "click") {
-            if (node instanceof HTMLButtonElement) return node.type === "submit";
-            if (node instanceof HTMLInputElement) {
-              return node.type === "submit" || node.type === "image";
+          const form = getSubmissionForm(element);
+          if (!form) return { success: true, data: null };
+
+          const fields = Array.from(form.elements)
+            .filter(
+              (field): field is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+                field instanceof HTMLInputElement ||
+                field instanceof HTMLTextAreaElement ||
+                field instanceof HTMLSelectElement,
+            )
+            .filter((field) => !field.disabled)
+            .map((field) => ({
+              ref: field.getAttribute("data-pilo-ref"),
+              name: field.name || null,
+              tagName: field.tagName.toLowerCase(),
+              inputType: field instanceof HTMLInputElement ? field.type.toLowerCase() : null,
+              autocomplete: "autocomplete" in field ? field.autocomplete || null : null,
+            }));
+
+          return {
+            success: true,
+            data: {
+              submitterRef,
+              formId: form.id || null,
+              actionUrl: form.action || null,
+              method: form.method?.toLowerCase() || null,
+              fields,
+            },
+          };
+
+          function getSubmissionForm(node: HTMLElement): HTMLFormElement | null {
+            if (
+              node instanceof HTMLButtonElement ||
+              node instanceof HTMLInputElement ||
+              node instanceof HTMLTextAreaElement ||
+              node instanceof HTMLSelectElement
+            ) {
+              return node.form;
             }
-            return false;
+            return node.closest("form");
           }
 
-          if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
-            return false;
-          if (!(node instanceof HTMLInputElement)) return false;
-          return ![
-            "button",
-            "checkbox",
-            "color",
-            "file",
-            "hidden",
-            "radio",
-            "range",
-            "reset",
-            "submit",
-          ].includes(node.type);
-        }
-      },
-      args: [JSON.stringify({ ref, trigger })],
-    });
+          function canSubmitForm(node: HTMLElement, submitTrigger: FormSubmissionTrigger): boolean {
+            if (submitTrigger === "click") {
+              if (node instanceof HTMLButtonElement) return node.type === "submit";
+              if (node instanceof HTMLInputElement) {
+                return node.type === "submit" || node.type === "image";
+              }
+              return false;
+            }
 
-    return result as FormSubmissionContext | null;
+            if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
+              return false;
+            if (!(node instanceof HTMLInputElement)) return false;
+            return ![
+              "button",
+              "checkbox",
+              "color",
+              "file",
+              "hidden",
+              "radio",
+              "range",
+              "reset",
+              "submit",
+            ].includes(node.type);
+          }
+        },
+        args: [JSON.stringify({ ref, trigger })],
+      });
+
+      return this.unwrapMetadataResult(
+        result as MetadataScriptResult<FormSubmissionContext | null> | undefined,
+        ref,
+        "getFormSubmissionContext",
+      );
+    } catch (error) {
+      if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+        throw error;
+      }
+      throw new BrowserActionException(
+        "getFormSubmissionContext",
+        `Failed to get form submission context: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { ref, trigger, originalError: error },
+      );
+    }
+  }
+
+  private unwrapMetadataResult<T>(
+    result: MetadataScriptResult<T> | undefined,
+    ref: string,
+    action: "getFieldMetadata" | "getFormSubmissionContext",
+  ): T {
+    if (!result) {
+      throw new BrowserActionException(action, `Failed to ${action}: script returned no result`, {
+        ref,
+      });
+    }
+
+    if (!result.success) {
+      if (result.errorType === "invalid-ref") {
+        throw new InvalidRefException(ref, result.error);
+      }
+      throw new BrowserActionException(action, result.error, { ref });
+    }
+
+    return result.data;
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
