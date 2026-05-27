@@ -302,6 +302,28 @@ export class ExtensionBrowser implements AriaBrowser {
     }
   }
 
+  async getRefIdentity(ref: string): Promise<{ role: string; name: string } | null> {
+    try {
+      const tab = await this.getActiveTab();
+      const [{ result }] = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (refArg: string) =>
+          (
+            globalThis as unknown as {
+              __piloIdentityMap?: Map<string, { role: string; name: string }>;
+            }
+          ).__piloIdentityMap?.get(refArg) ?? null,
+        args: [ref],
+      });
+      return (result as { role: string; name: string } | null) ?? null;
+    } catch {
+      // Identity is advisory for repetition detection — if the page or
+      // identity map isn't available, bail out rather than failing the
+      // surrounding action.
+      return null;
+    }
+  }
+
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
     console.log(
       `ExtensionBrowser: performAction() called with ref: ${ref}, action: ${action}, value: ${value}`,

@@ -195,6 +195,10 @@ class MockBrowser implements AriaBrowser {
 
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {}
 
+  async getRefIdentity(_ref: string): Promise<{ role: string; name: string } | null> {
+    return null;
+  }
+
   async waitForLoadState(): Promise<void> {}
 
   async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
@@ -3935,6 +3939,426 @@ describe("WebAgent", () => {
       expect(result.success).toBe(true);
       expect(result.finalAnswer).toBe("Completed");
       expect(result.stats.actions).toBe(4); // 2 clicks + 1 fill + 1 done
+    });
+
+    it("should detect repeated clicks across changing element refs", async () => {
+      // Regression test for #430: refs change every snapshot, so the agent
+      // calling click on the "same" logical button gets a different ref each
+      // turn. Pre-fix, this slipped past the detector entirely.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Click submit",
+            },
+          },
+        ],
+      } as any);
+
+      // Five clicks on the "same" logical button, but ref churns each turn.
+      // Defaults: warning at count 3 (maxRepeatedActions+1), abort at count 4.
+      const churningRefs = ["E1", "E5", "E12", "E3", "E8"];
+      for (const ref of churningRefs) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Click",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `click_${ref}`,
+                toolName: "click",
+                input: { ref },
+                output: {
+                  success: true,
+                  action: "click",
+                  ref,
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Click" }],
+            },
+          }) as any,
+        );
+      }
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+      expect(result.finalAnswer).toContain("click");
+    });
+
+    it("should not flag legitimate repeated scroll actions", async () => {
+      // Scroll repeats with the same direction are legitimate workflow
+      // (traversing an infinite-scroll feed). The detector must exempt them.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Reach the bottom of the feed",
+              plan: "1. Scroll down repeatedly",
+            },
+          },
+        ],
+      } as any);
+
+      // Five scrolls in a row would trip the detector under the old logic
+      // (same action, same value, same ref). They must not now.
+      for (let i = 0; i < 5; i++) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Scroll",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `scroll_${i}`,
+                toolName: "scroll",
+                input: { direction: "down" },
+                output: {
+                  success: true,
+                  action: "scroll",
+                  value: "down",
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Scroll" }],
+            },
+          }) as any,
+        );
+      }
+
+      // Then finish cleanly.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Reached bottom" },
+              output: {
+                action: "done",
+                result: "Reached bottom",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Reached bottom");
+
+      // No "repeated the same action" warning should have been injected.
+      const messages = mockStreamText.mock.calls.flatMap((call) => call[0]?.messages || []);
+      const warningMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content?.includes("repeated the same action"),
+      );
+      expect(warningMessage).toBeUndefined();
+    });
+
+    it("should not flag legitimate repeated wait actions", async () => {
+      // Same shape as the scroll exemption test: identical wait calls must
+      // not be flagged as repetition (waiting for a slow page legitimately
+      // repeats with the same duration).
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Wait for page to load",
+              plan: "1. Wait for content",
+            },
+          },
+        ],
+      } as any);
+
+      for (let i = 0; i < 5; i++) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Wait",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `wait_${i}`,
+                toolName: "wait",
+                input: { seconds: 2 },
+                output: {
+                  success: true,
+                  action: "wait",
+                  value: "2",
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Wait" }],
+            },
+          }) as any,
+        );
+      }
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Page loaded" },
+              output: {
+                action: "done",
+                result: "Page loaded",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Page loaded");
+
+      const messages = mockStreamText.mock.calls.flatMap((call) => call[0]?.messages || []);
+      const warningMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content?.includes("repeated the same action"),
+      );
+      expect(warningMessage).toBeUndefined();
+    });
+
+    it("should treat cosmetically different fill values as repetition", async () => {
+      // Value normalization (trim + lowercase) folds near-duplicates. An
+      // agent that fills "hello", then "HELLO ", then "hello" again is in a
+      // loop even though the strings aren't byte-identical.
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Fill input",
+            },
+          },
+        ],
+      } as any);
+
+      const variants = ["hello", "HELLO ", " Hello", "hello", "HELLO"];
+      for (let i = 0; i < variants.length; i++) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Fill",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `fill_${i}`,
+                toolName: "fill",
+                input: { ref: `input_${i}`, value: variants[i] },
+                output: {
+                  success: true,
+                  action: "fill",
+                  ref: `input_${i}`,
+                  value: variants[i],
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Fill" }],
+            },
+          }) as any,
+        );
+      }
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+      expect(result.finalAnswer).toContain("fill");
+    });
+
+    it("should not flag clicks on different logical targets", async () => {
+      // Pass 2: ref-only actions (click, hover, check, etc.) all carry no
+      // `value`, so without element identity the bare `click:` signature
+      // collapses every click together — a multi-step wizard or pagination
+      // run trips the detector falsely. The targetIdentity field on the
+      // tool output distinguishes "click button:Next" from "click button:Submit".
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Walk through a wizard",
+              plan: "1. Click through wizard steps",
+            },
+          },
+        ],
+      } as any);
+
+      const targets = [
+        { ref: "E1", role: "button", name: "Next" },
+        { ref: "E5", role: "button", name: "Continue" },
+        { ref: "E12", role: "link", name: "Skip" },
+        { ref: "E3", role: "button", name: "Confirm" },
+        { ref: "E8", role: "button", name: "Finish" },
+      ];
+      for (const { ref, role, name } of targets) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Click",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `click_${ref}`,
+                toolName: "click",
+                input: { ref },
+                output: {
+                  success: true,
+                  action: "click",
+                  ref,
+                  targetIdentity: { role, name },
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Click" }],
+            },
+          }) as any,
+        );
+      }
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Wizard completed" },
+              output: {
+                action: "done",
+                result: "Wizard completed",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Wizard completed");
+
+      const messages = mockStreamText.mock.calls.flatMap((call) => call[0]?.messages || []);
+      const warningMessage = messages.find(
+        (msg: any) => msg.role === "user" && msg.content?.includes("repeated the same action"),
+      );
+      expect(warningMessage).toBeUndefined();
+    });
+
+    it("should detect repeated clicks on the same logical target across ref churn", async () => {
+      // Hardened version of the Pass 1 regression test: same logical button
+      // (role + name) across changing refs still trips the detector once
+      // identity is in the signature. Distinguishes the bug case (one button
+      // repeatedly clicked) from the wizard case (different buttons clicked).
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Click submit",
+            },
+          },
+        ],
+      } as any);
+
+      const churningRefs = ["E1", "E5", "E12", "E3", "E8"];
+      for (const ref of churningRefs) {
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            text: "Click",
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: `click_${ref}`,
+                toolName: "click",
+                input: { ref },
+                output: {
+                  success: true,
+                  action: "click",
+                  ref,
+                  targetIdentity: { role: "button", name: "Submit" },
+                },
+              },
+            ],
+            response: {
+              messages: [{ role: "assistant", content: "Click" }],
+            },
+          }) as any,
+        );
+      }
+
+      const result = await webAgent.execute("Test task", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+      expect(result.finalAnswer).toContain("click");
     });
   });
 });

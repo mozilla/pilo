@@ -9,7 +9,7 @@
 
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
-import { AriaBrowser } from "./browser/ariaBrowser.js";
+import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
   BrowserReconnectedEventData,
   CdpEndpointConnectedEventData,
@@ -229,6 +229,15 @@ export class WebAgent {
   private readonly tabstackApiUrl: string | undefined;
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
+
+  // Actions where same-action-same-value repetition is legitimate workflow
+  // (e.g. scrolling an infinite feed, waiting for a slow page) rather than a
+  // stuck-loop signal. The detector skips these entirely and resets state so
+  // a real loop interrupted by a scroll doesn't compound across the gap.
+  private static readonly REPETITION_EXEMPT_ACTIONS: ReadonlySet<string> = new Set<string>([
+    PageAction.Scroll,
+    PageAction.Wait,
+  ]);
 
   constructor(
     private browser: AriaBrowser,
@@ -1195,6 +1204,15 @@ export class WebAgent {
     actionExecuted: boolean;
     error?: TaskError;
   } | null {
+    // Skip exempt actions entirely, and reset state so an in-progress repeat
+    // count doesn't carry across them (an exempt action between two clicks
+    // is treated as progress, not as a transparent gap).
+    if (WebAgent.REPETITION_EXEMPT_ACTIONS.has(actionOutput.action)) {
+      executionState.actionRepeatCount = 0;
+      executionState.lastAction = undefined;
+      return null;
+    }
+
     // Define explicit thresholds for warning and abort
     const REPETITION_WARNING_THRESHOLD = this.maxRepeatedActions + 1;
     const REPETITION_ABORT_THRESHOLD = this.maxRepeatedActions + 2;
@@ -1202,8 +1220,8 @@ export class WebAgent {
     // Create signature for current action
     const currentActionSignature = this.createActionSignature(
       actionOutput.action,
-      actionOutput.ref,
       actionOutput.value,
+      actionOutput.targetIdentity,
     );
 
     // Check if this is the same action as the last one
@@ -1546,10 +1564,29 @@ export class WebAgent {
   // === Helper Methods ===
 
   /**
-   * Create a signature for an action to track repetitions
+   * Build a repetition-signature for an action. The element ref is
+   * deliberately excluded because refs are regenerated every snapshot — a
+   * logical "click Submit" gets a new ref each turn, so including it would
+   * make near-duplicate actions hash differently and bypass the detector.
+   * Element identity (role + accessible name) is folded in when present so
+   * ref-only actions like `click` don't collapse different logical targets
+   * (e.g. "click Next" vs "click Submit") onto the same signature.
+   * Value is normalized (lowercase + trim) so cosmetic input variation
+   * doesn't reset the counter on the same logical action.
    */
-  private createActionSignature(action: string, ref?: string, value?: string | number): string {
-    return `${action}:${ref || ""}:${value || ""}`;
+  private createActionSignature(
+    action: string,
+    value?: string | number,
+    identity?: { role: string; name: string },
+  ): string {
+    const normalizedValue = String(value ?? "")
+      .toLowerCase()
+      .trim();
+    if (identity) {
+      const normalizedName = identity.name.toLowerCase().trim();
+      return `${action}:${identity.role}:${normalizedName}:${normalizedValue}`;
+    }
+    return `${action}:${normalizedValue}`;
   }
 
   /**
