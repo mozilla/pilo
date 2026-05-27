@@ -333,7 +333,8 @@ Analyze the current page state and determine your next action based on previous 
 4. done() provides your final answer to the user
 5. goto() only accepts URLs from earlier in conversation
 6. Use wait() for page loads, animations, or dynamic content
-{% if hasGuardrails %}7. ALL actions MUST comply with provided guardrails{% endif %}
+7. DATA GROUNDING: Every value in your done() result and your reasoning must come from the page snapshot, a tool result, or the task input. Do not use training knowledge to fill gaps. If you cannot verify a value from the current session, say so explicitly.
+{% if hasGuardrails %}8. ALL actions MUST comply with provided guardrails{% endif %}
 
 **CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
 - done(result) if task is complete
@@ -363,6 +364,19 @@ Analyze the current page state and determine your next action based on previous 
   - tabstack_generate_json: Use when you need AI-transformed content (summaries, categorization, restructured data){% endif %}
 {% if hasStartingUrl and hasWebSearch %}- A starting URL was provided — **focus on that site first**. Use webSearch only if you need supplementary information beyond what the site provides{% endif %}
 {% if hasGuardrails %}- Verify guardrail compliance before each action{% endif %}
+
+**Before calling done():**
+1. Re-read the user's task. List every concrete requirement (counts, filters, format, date ranges, etc.).
+2. Check each requirement against what you observed:
+   - Did you find the correct NUMBER of items requested?
+   - Did all specified filters/criteria apply (price range, date, location, format)?
+   - Does your answer match the requested format?
+3. Verify actions actually completed by checking the most recent page state:
+   - If you submitted a form, did the next page confirm success?
+   - If you extracted data, did you actually find it in the page snapshot or extract() output?
+4. Data grounding: every value in your answer must appear in a page snapshot, a tool result, or the task input. Do NOT use general knowledge to fill gaps. If a value was not found during this session, say so explicitly rather than inventing it.
+5. Blockers vs. obstacles: if you hit an unrecoverable block (paywall, login wall, access denied, payment declined) that prevented completing a core requirement, call abort() with the reason. Temporary obstacles you handled (dismissed popups, retried errors) don't change the outcome.
+6. If anything is unverified, incomplete, or uncertain — call abort() with the reason rather than done() with an overclaiming answer.
 
 **When using done():**
 Provide your final answer:
