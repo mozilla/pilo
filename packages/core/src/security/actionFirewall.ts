@@ -14,7 +14,6 @@ export type ActionFirewallResult =
 
 const OPERATIONAL_INPUT_TYPES = new Set([
   "search",
-  "url",
   "number",
   "date",
   "datetime-local",

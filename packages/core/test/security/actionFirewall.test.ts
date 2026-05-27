@@ -86,6 +86,17 @@ describe("actionFirewall", () => {
     expect(result.allowed).toBe(false);
   });
 
+  it("blocks agent fills for URL fields without user approval", () => {
+    const result = assessFill({
+      field: field({ inputType: "url", autocomplete: null }),
+      source: "agent",
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error("Expected URL fill to be blocked");
+    expect(result.reason).toBe(SECURITY_BLOCKED_UNAUTHORIZED_FILL);
+  });
+
   it("allows user-approved freeform fields", () => {
     const result = assessFill({
       field: field({ label: "Message" }),

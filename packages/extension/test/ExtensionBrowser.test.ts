@@ -141,6 +141,16 @@ describe("ExtensionBrowser", () => {
       );
     });
 
+    it("should wrap empty field metadata script results in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockResolvedValueOnce([]);
+
+      const error = await extensionBrowser.getFieldMetadata("input1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain("Failed to get field metadata: script returned no result");
+    });
+
     it("should wrap form submission script failures in BrowserActionException", async () => {
       vi.mocked(browser.scripting.executeScript)
         .mockResolvedValueOnce([{ result: true } as any])
@@ -150,6 +160,18 @@ describe("ExtensionBrowser", () => {
       expect(error).toBeInstanceOf(BrowserActionException);
       expect(error.message).toContain(
         "Failed to get form submission context: Cannot access contents of url",
+      );
+    });
+
+    it("should wrap empty form submission script results in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockResolvedValueOnce([]);
+
+      const error = await extensionBrowser.getFormSubmissionContext("submit1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain(
+        "Failed to get form submission context: script returned no result",
       );
     });
   });

@@ -316,7 +316,7 @@ export class ExtensionBrowser implements AriaBrowser {
       const tab = await this.getActiveTab();
       await this.ensureContentScript();
 
-      const [{ result }] = await browser.scripting.executeScript({
+      const results = await browser.scripting.executeScript({
         target: { tabId: tab.id! },
         func: (elementRef: string): MetadataScriptResult<FieldMetadata> => {
           const element = document.querySelector(`[data-pilo-ref="${elementRef}"]`);
@@ -422,7 +422,7 @@ export class ExtensionBrowser implements AriaBrowser {
       });
 
       return this.unwrapMetadataResult(
-        result as MetadataScriptResult<FieldMetadata> | undefined,
+        results[0]?.result as MetadataScriptResult<FieldMetadata> | undefined,
         ref,
         "getFieldMetadata",
       );
@@ -446,7 +446,7 @@ export class ExtensionBrowser implements AriaBrowser {
       const tab = await this.getActiveTab();
       await this.ensureContentScript();
 
-      const [{ result }] = await browser.scripting.executeScript({
+      const results = await browser.scripting.executeScript({
         target: { tabId: tab.id! },
         func: (paramsJson: string): MetadataScriptResult<FormSubmissionContext | null> => {
           const { ref: submitterRef, trigger: submitTrigger } = JSON.parse(paramsJson) as {
@@ -534,7 +534,7 @@ export class ExtensionBrowser implements AriaBrowser {
       });
 
       return this.unwrapMetadataResult(
-        result as MetadataScriptResult<FormSubmissionContext | null> | undefined,
+        results[0]?.result as MetadataScriptResult<FormSubmissionContext | null> | undefined,
         ref,
         "getFormSubmissionContext",
       );
