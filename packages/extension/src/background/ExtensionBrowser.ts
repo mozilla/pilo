@@ -565,7 +565,11 @@ export class ExtensionBrowser implements AriaBrowser {
 
     if (!result.success) {
       if (result.errorType === "invalid-ref") {
-        throw new InvalidRefException(ref, result.error);
+        const invalidRefError = new InvalidRefException(ref);
+        if (result.error) {
+          invalidRefError.message = `${invalidRefError.message} ${result.error}`;
+        }
+        throw invalidRefError;
       }
       throw new BrowserActionException(action, result.error, { ref });
     }
