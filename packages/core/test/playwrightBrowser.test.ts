@@ -603,12 +603,14 @@ describe("PlaywrightBrowser", () => {
 
     describe("validateElementRef", () => {
       it("should throw InvalidRefException when element doesn't exist", async () => {
-        // Mock the page and locator
+        // Mock the page and locator. evaluate returns false so the __piloRefMap
+        // fallback also misses (the simulated DOM has no element for this ref).
         const mockLocator = {
           count: vi.fn().mockResolvedValue(0),
         };
         const mockPage = {
           locator: vi.fn().mockReturnValue(mockLocator),
+          evaluate: vi.fn().mockResolvedValue(false),
         };
         (browser as any).page = mockPage;
 
@@ -649,6 +651,89 @@ describe("PlaywrightBrowser", () => {
         const result = await (browser as any).validateElementRef("valid");
         expect(result).toBe(mockLocator);
         expect(mockPage.locator).toHaveBeenCalledWith('[data-pilo-ref="valid"]');
+      });
+
+      it("recovers via __piloRefMap when attribute is stripped but element still connected", async () => {
+        let attributeSet = false;
+        const mockLocator0 = { count: vi.fn().mockResolvedValue(0) };
+        const mockLocator1 = { count: vi.fn().mockResolvedValue(1) };
+        const mockPage = {
+          locator: vi.fn().mockImplementation(() => (attributeSet ? mockLocator1 : mockLocator0)),
+          evaluate: vi.fn().mockImplementation(async () => {
+            attributeSet = true;
+            return true;
+          }),
+        };
+        (browser as any).page = mockPage;
+
+        const result = await (browser as any).validateElementRef("stripped");
+        expect(result).toBe(mockLocator1);
+        expect(mockPage.locator).toHaveBeenCalledTimes(2);
+        expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
+      });
+
+      it("throws InvalidRefException when __piloRefMap has no entry for the ref", async () => {
+        const mockLocator = { count: vi.fn().mockResolvedValue(0) };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          evaluate: vi.fn().mockResolvedValue(false),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("hallucinated")).rejects.toThrow(
+          InvalidRefException,
+        );
+        expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
+      });
+
+      it("throws InvalidRefException when __piloRefMap entry is no longer connected to DOM", async () => {
+        const mockLocator = { count: vi.fn().mockResolvedValue(0) };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          // isConnected check fails inside evaluate, so the page-side callback returns false
+          evaluate: vi.fn().mockResolvedValue(false),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("removed")).rejects.toThrow(
+          InvalidRefException,
+        );
+      });
+
+      it("throws InvalidRefException when post-recovery locator still matches zero (race)", async () => {
+        // Simulates a reconciliation race: evaluate reports success, but by the
+        // time we re-query the locator, the attribute has been stripped again.
+        const mockLocator = { count: vi.fn().mockResolvedValue(0) };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+          evaluate: vi.fn().mockResolvedValue(true),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("racy")).rejects.toThrow(
+          InvalidRefException,
+        );
+        // First locator returns 0 → triggers fallback. Second locator (post-evaluate)
+        // also returns 0 → throws.
+        expect(mockPage.locator).toHaveBeenCalledTimes(2);
+      });
+
+      it("throws InvalidRefException when post-recovery locator matches multiple elements", async () => {
+        let attributeSet = false;
+        const mockLocator0 = { count: vi.fn().mockResolvedValue(0) };
+        const mockLocator2 = { count: vi.fn().mockResolvedValue(2) };
+        const mockPage = {
+          locator: vi.fn().mockImplementation(() => (attributeSet ? mockLocator2 : mockLocator0)),
+          evaluate: vi.fn().mockImplementation(async () => {
+            attributeSet = true;
+            return true;
+          }),
+        };
+        (browser as any).page = mockPage;
+
+        await expect((browser as any).validateElementRef("dup")).rejects.toThrow(
+          "Multiple elements found with reference 'dup'",
+        );
       });
     });
 
@@ -846,6 +931,8 @@ describe("PlaywrightBrowser", () => {
         };
         const mockPage = {
           locator: vi.fn().mockReturnValue(mockLocator),
+          // evaluate returns false so the __piloRefMap fallback also misses
+          evaluate: vi.fn().mockResolvedValue(false),
         };
         (browser as any).page = mockPage;
 

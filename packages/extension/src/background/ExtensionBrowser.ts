@@ -390,7 +390,22 @@ export class ExtensionBrowser implements AriaBrowser {
           const { ref: refParam, action: actionParam, value: valueParam } = JSON.parse(paramsJson);
 
           // Look up the element using the data-pilo-ref attribute that's now set by ariaSnapshot
-          const element = document.querySelector(`[data-pilo-ref="${refParam}"]`);
+          let element = document.querySelector(`[data-pilo-ref="${refParam}"]`);
+
+          if (!element) {
+            // Fallback: __piloRefMap holds direct Element references that survive
+            // attribute strips (commonly caused by React reconciliation). If the
+            // mapped element is still connected to the DOM of this frame, re-attach
+            // the attribute and use it. The ownerDocument check excludes same-origin
+            // iframe elements that the snapshot may have walked inline — those
+            // can't be acted on from this script's main-document context.
+            const map = (globalThis as { __piloRefMap?: Map<string, Element> }).__piloRefMap;
+            const mapped = map?.get(refParam);
+            if (mapped && mapped.isConnected && mapped.ownerDocument === document) {
+              mapped.setAttribute("data-pilo-ref", refParam);
+              element = mapped;
+            }
+          }
 
           if (!element) {
             return {
