@@ -25,6 +25,9 @@ describe("utils/promptSecurity", () => {
       expect(ExternalContentLabel.PageSnapshot).toBe("page-snapshot");
       expect(ExternalContentLabel.PageMarkdown).toBe("page-markdown");
       expect(ExternalContentLabel.SearchResults).toBe("search-results");
+      expect(ExternalContentLabel.ExtractResult).toBe("extract-result");
+      expect(ExternalContentLabel.TabstackContent).toBe("tabstack-content");
+      expect(ExternalContentLabel.ValidatorFeedback).toBe("validator-feedback");
     });
   });
 

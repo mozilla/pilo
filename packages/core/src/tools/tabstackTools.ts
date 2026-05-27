@@ -12,6 +12,7 @@ import { z } from "zod";
 import type Tabstack from "@tabstack/sdk";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
+import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
 
 export interface TabstackToolContext {
   client: Tabstack;
@@ -43,7 +44,10 @@ export function createTabstackTools(context: TabstackToolContext) {
             success: true,
             action: "tabstack_extract_markdown",
             url: result.url,
-            content: result.content,
+            content: wrapExternalContentWithWarning(
+              result.content,
+              ExternalContentLabel.TabstackContent,
+            ),
             metadata: result.metadata,
           };
         } catch (error) {
@@ -67,6 +71,14 @@ export function createTabstackTools(context: TabstackToolContext) {
       },
     }),
 
+    // Note: `data` is intentionally NOT wrapped in <EXTERNAL-CONTENT> tags
+    // because it's a structured object whose shape is constrained by the
+    // caller-supplied `json_schema`. String values nested inside `data` are
+    // still attacker-controllable (see issue #456 for the residual-risk
+    // discussion); the truncator does walk them and will clip any tagged
+    // content, but attackers crafting non-tagged payloads inside structured
+    // fields are not stopped by this PR. Possible follow-up: per-leaf
+    // wrapping or taint tracking on tool-result string values.
     tabstack_extract_json: tool({
       description: TOOL_STRINGS.tabstack.tabstack_extract_json.description,
       inputSchema: z.object({
@@ -116,6 +128,9 @@ export function createTabstackTools(context: TabstackToolContext) {
       },
     }),
 
+    // Same rationale as tabstack_extract_json above: `data` is intentionally
+    // not wrapped because the caller-supplied schema constrains its shape.
+    // See the comment on tabstack_extract_json for the residual-risk note.
     tabstack_generate_json: tool({
       description: TOOL_STRINGS.tabstack.tabstack_generate_json.description,
       inputSchema: z.object({

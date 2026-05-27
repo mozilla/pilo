@@ -599,12 +599,30 @@ describe("Web Action Tools", () => {
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_EXTRACTED, {
         extractedData: "Extracted data: Important info",
       });
-      expect(result).toEqual({
-        success: true,
-        action: "extract",
-        description: "Get important info",
-        extractedData: "Extracted data: Important info",
-      });
+      expect(result.success).toBe(true);
+      expect((result as any).action).toBe("extract");
+      expect((result as any).description).toBe("Get important info");
+      expect((result as any).extractedData).toContain("Extracted data: Important info");
+    });
+
+    it('wraps extractedData in <EXTERNAL-CONTENT label="extract-result"> with safety warning', async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Hello from the page",
+      } as any);
+
+      const result = await tools.extract.execute({ description: "what's on the page?" });
+
+      // Wrapper structure present
+      const extracted = (result as any).extractedData as string;
+      expect(extracted).toMatch(
+        /<EXTERNAL-CONTENT label="extract-result">[\s\S]*<\/EXTERNAL-CONTENT>/,
+      );
+      // Payload preserved (inside the wrap)
+      expect(extracted).toContain("Hello from the page");
+      // Warning appears AFTER the closing tag, not just anywhere in the string.
+      const closeIdx = extracted.indexOf("</EXTERNAL-CONTENT>");
+      const warnIdx = extracted.indexOf("**IMPORTANT:**", closeIdx);
+      expect(warnIdx).toBeGreaterThan(closeIdx);
     });
 
     it("should handle abort signal in extract", async () => {
