@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
+import { InvalidHostnameError } from "../src/security/actionFirewall.js";
 import {
   AriaBrowser,
   FieldMetadata,
@@ -3972,5 +3973,44 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toBe("Completed");
       expect(result.stats.actions).toBe(4); // 2 clicks + 1 fill + 1 done
     });
+  });
+});
+
+describe("WebAgent firewall options", () => {
+  let mockProvider: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProvider = { specificationVersion: "v1" } as unknown as any;
+  });
+
+  it("throws InvalidHostnameError when trustedHostnames contains an invalid entry", () => {
+    const browser = new MockBrowser();
+    expect(() =>
+      new WebAgent(browser, {
+        providerConfig: { model: mockProvider },
+        trustedHostnames: ["bad value"],
+      }),
+    ).toThrow(InvalidHostnameError);
+  });
+
+  it("normalizes trustedHostnames at construction", () => {
+    const browser = new MockBrowser();
+    expect(() =>
+      new WebAgent(browser, {
+        providerConfig: { model: mockProvider },
+        trustedHostnames: ["Example.COM", "app.example.com."],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts unsafeMode true", () => {
+    const browser = new MockBrowser();
+    expect(() =>
+      new WebAgent(browser, {
+        providerConfig: { model: mockProvider },
+        unsafeMode: true,
+      }),
+    ).not.toThrow();
   });
 });

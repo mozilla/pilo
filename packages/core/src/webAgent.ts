@@ -60,6 +60,10 @@ import {
   SpanName,
   recordSanitizedException,
 } from "./telemetry/tracing.js";
+import {
+  normalizeHostname,
+  type FirewallConfig,
+} from "./security/actionFirewall.js";
 
 // === Type Definitions ===
 
@@ -100,6 +104,26 @@ export interface WebAgentOptions {
   onUserDataRequired?: UserDataCallback;
   /** Correlation ID for this task, propagated to logs and traces. */
   taskId?: string;
+  /**
+   * Hostnames where the action firewall is bypassed for fills and submissions.
+   *
+   * @warning On listed hosts, prompt injection from page content can drive the
+   * agent to fill and submit any field, including personal and credential data.
+   * Use only for sites you fully trust to receive your data. The bypass applies
+   * only when the current page hostname AND every form-action hostname (the
+   * form's `action` plus any submitter `formaction` override) are all in this
+   * list.
+   */
+  trustedHostnames?: readonly string[];
+  /**
+   * Disables the action firewall entirely.
+   *
+   * @warning When true, prompt injection from page content can cause the agent
+   * to submit your data, including credentials, personal information, and
+   * conversation context, to attacker-controlled forms. Only enable for
+   * trusted, controlled environments.
+   */
+  unsafeMode?: boolean;
 }
 
 export interface ExecuteOptions {
@@ -229,6 +253,7 @@ export class WebAgent {
   private readonly tabstackApiUrl: string | undefined;
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
+  private readonly firewall: FirewallConfig;
 
   constructor(
     private browser: AriaBrowser,
@@ -253,6 +278,10 @@ export class WebAgent {
     this.tabstackApiUrl = options.tabstackApiUrl;
     this.onUserDataRequired = options.onUserDataRequired;
     this.taskId = options.taskId;
+    this.firewall = Object.freeze({
+      trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
+      unsafeMode: Boolean(options.unsafeMode),
+    });
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -412,6 +441,8 @@ export class WebAgent {
       approvedRefs: approvedRefs ?? undefined,
       agentFilledRefs,
       operationalRefs,
+      firewall: this.firewall,
+      interactive: Boolean(this.onUserDataRequired),
     });
 
     // Only include search tools if a search service was created
