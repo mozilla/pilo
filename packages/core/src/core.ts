@@ -40,6 +40,8 @@ export type {
   ValidationErrorEventData,
   InteractiveFormDataRequestEventData,
   InteractiveFormDataErrorEventData,
+  FirewallBlockedNonInteractiveEventData,
+  FirewallRemediation,
   AutomateStreamEvent,
   StreamCompleteEventData,
   StreamDoneEventData,
