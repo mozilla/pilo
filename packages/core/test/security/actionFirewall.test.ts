@@ -3,6 +3,9 @@ import type { FieldMetadata, FormSubmissionContext } from "../../src/browser/ari
 import {
   assessFill,
   assessFormSubmission,
+  normalizeHostname,
+  extractHostname,
+  InvalidHostnameError,
   SECURITY_BLOCKED_UNAUTHORIZED_FILL,
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
 } from "../../src/security/actionFirewall.js";
@@ -156,5 +159,110 @@ describe("actionFirewall", () => {
     });
 
     expect(result.allowed).toBe(true);
+  });
+});
+
+describe("normalizeHostname", () => {
+  it("lowercases input", () => {
+    expect(normalizeHostname("Example.COM")).toBe("example.com");
+  });
+
+  it("strips a single trailing dot", () => {
+    expect(normalizeHostname("example.com.")).toBe("example.com");
+  });
+
+  it("accepts bare hostnames", () => {
+    expect(normalizeHostname("app.example.com")).toBe("app.example.com");
+  });
+
+  it("accepts IDN punycode", () => {
+    expect(normalizeHostname("xn--mnich-kva.de")).toBe("xn--mnich-kva.de");
+  });
+
+  it("accepts bare IPv4 literals", () => {
+    expect(normalizeHostname("127.0.0.1")).toBe("127.0.0.1");
+  });
+
+  it("rejects empty string", () => {
+    expect(() => normalizeHostname("")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects whitespace-only", () => {
+    expect(() => normalizeHostname("   ")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects strings with whitespace", () => {
+    expect(() => normalizeHostname("ex ample.com")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects strings with slashes", () => {
+    expect(() => normalizeHostname("example.com/path")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects strings with colons", () => {
+    expect(() => normalizeHostname("example.com:8080")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects strings with wildcards", () => {
+    expect(() => normalizeHostname("*.example.com")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects URL inputs with scheme", () => {
+    expect(() => normalizeHostname("https://example.com")).toThrow(InvalidHostnameError);
+  });
+
+  it("rejects bracketed IPv6 in v1", () => {
+    expect(() => normalizeHostname("[::1]")).toThrow(InvalidHostnameError);
+  });
+
+  it("error message names the bad entry", () => {
+    try {
+      normalizeHostname("bad value");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidHostnameError);
+      expect((e as Error).message).toContain("bad value");
+    }
+  });
+});
+
+describe("extractHostname", () => {
+  it("returns lowercase hostname for https URLs", () => {
+    expect(extractHostname("https://Example.COM/path?q=1")).toBe("example.com");
+  });
+
+  it("returns lowercase hostname for http URLs", () => {
+    expect(extractHostname("http://app.example.com")).toBe("app.example.com");
+  });
+
+  it("strips trailing dot", () => {
+    expect(extractHostname("https://example.com./")).toBe("example.com");
+  });
+
+  it("returns null for null input", () => {
+    expect(extractHostname(null)).toBeNull();
+  });
+
+  it("returns null for about:blank", () => {
+    expect(extractHostname("about:blank")).toBeNull();
+  });
+
+  it("returns null for data: URLs", () => {
+    expect(extractHostname("data:text/html,<p>x</p>")).toBeNull();
+  });
+
+  it("returns null for file: URLs", () => {
+    expect(extractHostname("file:///tmp/foo.html")).toBeNull();
+  });
+
+  it("returns null for javascript: URLs", () => {
+    expect(extractHostname("javascript:alert(1)")).toBeNull();
+  });
+
+  it("returns null for malformed URLs", () => {
+    expect(extractHostname("not a url")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(extractHostname("")).toBeNull();
   });
 });

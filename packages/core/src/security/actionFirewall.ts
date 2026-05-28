@@ -137,3 +137,52 @@ function hasSensitiveAutocomplete(autocomplete: string | null): boolean {
   const tokens = autocomplete.toLowerCase().split(/\s+/);
   return tokens.some((token) => SENSITIVE_AUTOCOMPLETE_TOKENS.has(token));
 }
+
+export class InvalidHostnameError extends Error {
+  constructor(input: string, reason: string) {
+    super(`Invalid hostname "${input}": ${reason}`);
+    this.name = "InvalidHostnameError";
+  }
+}
+
+const HOSTNAME_DISALLOWED_CHARS = /[\s/:*]/;
+
+export function normalizeHostname(input: string): string {
+  if (typeof input !== "string") {
+    throw new InvalidHostnameError(String(input), "not a string");
+  }
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    throw new InvalidHostnameError(input, "empty");
+  }
+  if (HOSTNAME_DISALLOWED_CHARS.test(trimmed)) {
+    throw new InvalidHostnameError(input, "contains whitespace, '/', ':', or '*'");
+  }
+  if (trimmed.startsWith("[") || trimmed.endsWith("]")) {
+    throw new InvalidHostnameError(input, "bracketed IPv6 is not supported");
+  }
+  let withoutTrailingDot = trimmed;
+  if (withoutTrailingDot.endsWith(".")) {
+    withoutTrailingDot = withoutTrailingDot.slice(0, -1);
+  }
+  if (withoutTrailingDot.length === 0) {
+    throw new InvalidHostnameError(input, "empty after trimming trailing dot");
+  }
+  return withoutTrailingDot.toLowerCase();
+}
+
+export function extractHostname(url: string | null): string | null {
+  if (url === null || url === undefined) return null;
+  if (typeof url !== "string" || url.length === 0) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  let host = parsed.hostname.toLowerCase();
+  if (host.endsWith(".")) host = host.slice(0, -1);
+  if (host.length === 0) return null;
+  return host;
+}
