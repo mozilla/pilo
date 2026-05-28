@@ -178,7 +178,7 @@ Two new fields in the `action` category:
 | `trusted_hostnames` | `string[]` | `[]`    | Hostnames where the action firewall is bypassed for fills and submissions. WARNING: on listed hosts, page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data. |
 | `unsafe_mode`       | `boolean`  | `false` | Disables the action firewall entirely. WARNING: web page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.       |
 
-The field parser for `trusted_hostnames` applies `normalizeHostname` to each entry. A bad entry surfaces at config load (during `pilo config set`, `pilo config show`, or `pilo run` startup), naming the invalid value.
+Hostname validation runs at `WebAgent` construction (synchronously, before any agent iteration). A bad entry surfaces at `pilo run` startup, naming the invalid value. (The CLI's generic `pilo config set` path does not currently parse `string[]` values into arrays — a pre-existing limitation shared by other array-typed config fields like `pw_cdp_endpoints` — so per-set validation is not added here.)
 
 ### `packages/core/src/config/commander.ts` — extended
 
@@ -273,7 +273,7 @@ Documentation is the compensating control for the silent-observability decision 
 
 ## Error handling
 
-- **Invalid hostname at config load** — `normalizeHostname` throws `InvalidHostnameError` with a message naming the bad entry. CLI surfaces the message and exits non-zero before the agent runs.
+- **Invalid hostname at agent construction** — `normalizeHostname` throws `InvalidHostnameError` with a message naming the bad entry. CLI surfaces the message and exits non-zero before the agent runs.
 - **`browser.getUrl()` failure** — treated as `pageHostname = null`. Bypass cannot apply; existing structural rules run as today.
 - **Form action URL resolution failure** — treated as `null` hostname for that action. Bypass cannot apply for that submission; falls through to structural rules.
 - **Both `unsafeMode` and `trustedHostnames` set** — `unsafeMode` short-circuits first; `trustedHostnames` is moot.
