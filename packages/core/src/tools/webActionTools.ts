@@ -87,6 +87,8 @@ async function assessFormSubmissionForAction(
     );
     if (!form) return null;
 
+    // TODO(firewall-bypass): replace with real pageHostname + context.firewall
+    // once webActionTools is plumbed in Task 5 of the firewall-bypass plan.
     const assessment = assessFormSubmission({
       form,
       approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
@@ -231,6 +233,8 @@ export function createWebActionTools(context: WebActionContext) {
         try {
           const metadata = await context.browser.getFieldMetadata(ref);
           const userApproved = Boolean(context.approvedRefs?.has(ref));
+          // TODO(firewall-bypass): replace with real pageHostname + context.firewall
+          // once webActionTools is plumbed in Task 5 of the firewall-bypass plan.
           const assessment = assessFill({
             field: metadata,
             source: userApproved ? "user-approved" : "agent",
