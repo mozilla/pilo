@@ -14,6 +14,10 @@ export type {
   PlaywrightBrowserOptions,
   ExtendedPlaywrightBrowserOptions,
 } from "./browser/playwrightBrowser.js";
+export { BiDiBrowser } from "./browser/bidiBrowser.js";
+export type { BiDiBrowserOptions } from "./browser/bidiBrowser.js";
+export { FoxcloudBrowser } from "./browser/foxcloudBrowser.js";
+export type { FoxcloudBrowserOptions } from "./browser/foxcloudBrowser.js";
 export { ChalkConsoleLogger } from "./loggers/chalkConsole.js";
 
 // Additional loggers (not in core.ts re-exports)
@@ -40,6 +44,7 @@ export {
   DEFAULTS,
   PROVIDERS,
   BROWSERS,
+  PLAYWRIGHT_BROWSERS,
   REASONING_LEVELS,
   LOGGERS,
   getSchemaField,

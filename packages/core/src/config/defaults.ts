@@ -23,7 +23,17 @@ export const PROVIDERS = [
 ] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
-export const BROWSERS = ["firefox", "chrome", "chromium", "safari", "webkit", "edge"] as const;
+export const PLAYWRIGHT_BROWSERS = [
+  "firefox",
+  "chrome",
+  "chromium",
+  "safari",
+  "webkit",
+  "edge",
+] as const;
+export type PlaywrightBrowser = (typeof PLAYWRIGHT_BROWSERS)[number];
+
+export const BROWSERS = [...PLAYWRIGHT_BROWSERS, "bidi", "foxcloud"] as const;
 export type Browser = (typeof BROWSERS)[number];
 
 export const REASONING_LEVELS = ["none", "low", "medium", "high"] as const;
@@ -70,6 +80,9 @@ export interface PiloConfig {
 
   // Browser Configuration
   browser?: Browser;
+  bidi_url?: string;
+  foxcloud_url?: string;
+  foxcloud_proxy_url?: string;
   channel?: string;
   executable_path?: string;
   headless?: boolean;
@@ -139,6 +152,9 @@ export interface PiloConfigResolved {
 
   // Browser Configuration
   browser: Browser;
+  bidi_url?: string;
+  foxcloud_url?: string;
+  foxcloud_proxy_url?: string;
   channel?: string;
   executable_path?: string;
   headless: boolean;
@@ -314,6 +330,30 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "name",
     env: ["PILO_BROWSER"],
     description: "Browser to use",
+    category: "browser",
+  },
+  bidi_url: {
+    type: "string",
+    cli: "--bidi-url",
+    placeholder: "url",
+    env: ["PILO_BIDI_URL"],
+    description: "WebSocket URL for BiDi browser (use with --browser bidi)",
+    category: "browser",
+  },
+  foxcloud_url: {
+    type: "string",
+    cli: "--foxcloud-url",
+    placeholder: "url",
+    env: ["PILO_FOXCLOUD_URL"],
+    description: "foxcloud broker URL (use with --browser foxcloud)",
+    category: "browser",
+  },
+  foxcloud_proxy_url: {
+    type: "string",
+    cli: "--foxcloud-proxy-url",
+    placeholder: "url",
+    env: ["PILO_FOXCLOUD_PROXY_URL"],
+    description: "HTTP proxy URL for foxcloud Firefox instances",
     category: "browser",
   },
   channel: {

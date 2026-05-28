@@ -47,6 +47,7 @@ vi.mock("pilo-core", () => {
       timeoutMultiplier: overrides?.timeoutMultiplier ?? 2,
     })),
     SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
+    PLAYWRIGHT_BROWSERS: ["firefox", "chrome", "chromium", "safari", "webkit", "edge"],
   };
 });
 

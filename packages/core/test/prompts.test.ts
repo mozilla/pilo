@@ -244,6 +244,27 @@ describe("prompts", () => {
     it("should not include webSearch when built without it", () => {
       expect(actionLoopSystemPrompt).not.toContain("webSearch(");
     });
+
+    it("should include DATA GROUNDING rule in Core Rules", () => {
+      expect(actionLoopSystemPrompt).toContain("DATA GROUNDING");
+      expect(actionLoopSystemPrompt).toContain("Do not use training knowledge to fill gaps");
+      // Rule is always present, even without guardrails, so it should be numbered 7.
+      expect(actionLoopSystemPrompt).toContain("7. DATA GROUNDING");
+    });
+
+    it("should include pre-completion verification checklist before done()", () => {
+      expect(actionLoopSystemPrompt).toContain("**Before calling done():**");
+      expect(actionLoopSystemPrompt).toContain("Re-read the user's task");
+      expect(actionLoopSystemPrompt).toContain(
+        "every value in your answer must appear in a page snapshot",
+      );
+      expect(actionLoopSystemPrompt).toContain("call abort()");
+      // Checklist must appear before the existing "When using done():" block.
+      const beforeIdx = actionLoopSystemPrompt.indexOf("**Before calling done():**");
+      const whenIdx = actionLoopSystemPrompt.indexOf("**When using done():**");
+      expect(beforeIdx).toBeGreaterThan(-1);
+      expect(whenIdx).toBeGreaterThan(beforeIdx);
+    });
   });
 
   describe("buildActionLoopSystemPrompt", () => {
@@ -271,6 +292,20 @@ describe("prompts", () => {
 
       expect(prompt).toContain("GUARDRAIL COMPLIANCE");
       expect(prompt).toContain("webSearch(");
+    });
+
+    it("should number guardrails rule as 8 when DATA GROUNDING is present", () => {
+      const prompt = buildActionLoopSystemPrompt(true, false);
+
+      expect(prompt).toContain("7. DATA GROUNDING");
+      expect(prompt).toContain("8. ALL actions MUST comply with provided guardrails");
+    });
+
+    it("should keep DATA GROUNDING and verification checklist when guardrails are enabled", () => {
+      const prompt = buildActionLoopSystemPrompt(true, false);
+
+      expect(prompt).toContain("DATA GROUNDING");
+      expect(prompt).toContain("**Before calling done():**");
     });
   });
 
