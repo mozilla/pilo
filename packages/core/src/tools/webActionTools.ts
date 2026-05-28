@@ -13,7 +13,16 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
-import { assessFill, assessFormSubmission } from "../security/actionFirewall.js";
+import {
+  assessFill,
+  assessFormSubmission,
+  extractHostname,
+  type FirewallConfig,
+} from "../security/actionFirewall.js";
+import type {
+  FirewallBlockedNonInteractiveEventData,
+  FirewallRemediation,
+} from "../events.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -29,6 +38,8 @@ interface WebActionContext {
   approvedRefs?: ReadonlySet<string>;
   agentFilledRefs: Set<string>;
   operationalRefs: Set<string>;
+  firewall: FirewallConfig;
+  interactive: boolean;
 }
 
 /**
@@ -50,6 +61,54 @@ type ActionResult = {
 };
 
 const EMPTY_APPROVED_REFS = new Set<string>();
+
+function buildRemediations(blockedHostnames: string[]): FirewallRemediation[] {
+  const uniqueHosts = Array.from(
+    new Set(blockedHostnames.filter((h): h is string => Boolean(h))),
+  );
+  return [
+    {
+      kind: "add-trusted-hostnames",
+      hostnames: uniqueHosts,
+      description:
+        uniqueHosts.length > 0
+          ? `Add ${uniqueHosts.join(", ")} to trusted_hostnames to allow this action on this site.`
+          : "Add the page hostname to trusted_hostnames to allow this action on this site.",
+    },
+    {
+      kind: "enable-interactive-mode",
+      description:
+        "Run in interactive mode by providing a UserDataCallback so the agent can ask the user to approve sensitive fields per-action via request_user_data.",
+    },
+    {
+      kind: "enable-unsafe-mode",
+      description:
+        "Set unsafe_mode=true to disable the action firewall entirely. WARNING: prompt injection from page content can then drive the agent to submit any field, including personal and credential data, to attacker-controlled forms.",
+    },
+  ];
+}
+
+function emitNonInteractiveBlock(
+  context: WebActionContext,
+  kind: "freeform-fill" | "form-submission",
+  reason: string,
+  pageHostname: string | null,
+  formActionHostnames: string[],
+): void {
+  if (context.interactive) return;
+  const hostsForRemediation =
+    pageHostname === null ? formActionHostnames : [pageHostname, ...formActionHostnames];
+  const data: FirewallBlockedNonInteractiveEventData = {
+    timestamp: Date.now(),
+    iterationId: "",
+    reason,
+    kind,
+    pageHostname,
+    formActionHostnames,
+    remediations: buildRemediations(hostsForRemediation),
+  };
+  context.eventEmitter.emit(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, data);
+}
 
 function failedActionResult(
   action: string,
@@ -81,24 +140,37 @@ async function assessFormSubmissionForAction(
   ref: string,
 ): Promise<ActionResult | null> {
   try {
-    const form = await context.browser.getFormSubmissionContext(
-      ref,
-      action === PageAction.Click ? "click" : "enter",
-    );
+    const [form, pageUrl] = await Promise.all([
+      context.browser.getFormSubmissionContext(
+        ref,
+        action === PageAction.Click ? "click" : "enter",
+      ),
+      context.browser.getUrl(),
+    ]);
     if (!form) return null;
+    const pageHostname = extractHostname(pageUrl);
+    const formActionHostnames = [
+      extractHostname(form.actionUrl),
+      extractHostname(form.submitterActionUrl),
+    ].filter((h): h is string => h !== null);
 
-    // TODO(firewall-bypass): replace with real pageHostname + context.firewall
-    // once webActionTools is plumbed in Task 5 of the firewall-bypass plan.
     const assessment = assessFormSubmission({
       form,
       approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
       agentFilledRefs: context.agentFilledRefs,
       operationalRefs: context.operationalRefs,
-      pageHostname: null,
-      firewall: { trustedHostnames: new Set(), unsafeMode: false },
+      pageHostname,
+      firewall: context.firewall,
     });
 
     if (!assessment.allowed) {
+      emitNonInteractiveBlock(
+        context,
+        "form-submission",
+        assessment.reason,
+        pageHostname,
+        formActionHostnames,
+      );
       return failedActionResult(action, assessment.reason, context, ref);
     }
   } catch (error) {
@@ -208,6 +280,12 @@ export function createWebActionTools(context: WebActionContext) {
   if (!context.agentFilledRefs || !context.operationalRefs) {
     throw new Error("Web action provenance tracking sets are required");
   }
+  if (!context.firewall) {
+    throw new Error("FirewallConfig is required on WebActionContext");
+  }
+  if (typeof context.interactive !== "boolean") {
+    throw new Error("interactive flag is required on WebActionContext");
+  }
 
   return {
     click: tool({
@@ -231,18 +309,27 @@ export function createWebActionTools(context: WebActionContext) {
       }),
       execute: async ({ ref, value }) => {
         try {
-          const metadata = await context.browser.getFieldMetadata(ref);
+          const [metadata, pageUrl] = await Promise.all([
+            context.browser.getFieldMetadata(ref),
+            context.browser.getUrl(),
+          ]);
+          const pageHostname = extractHostname(pageUrl);
           const userApproved = Boolean(context.approvedRefs?.has(ref));
-          // TODO(firewall-bypass): replace with real pageHostname + context.firewall
-          // once webActionTools is plumbed in Task 5 of the firewall-bypass plan.
           const assessment = assessFill({
             field: metadata,
             source: userApproved ? "user-approved" : "agent",
-            pageHostname: null,
-            firewall: { trustedHostnames: new Set(), unsafeMode: false },
+            pageHostname,
+            firewall: context.firewall,
           });
 
           if (!assessment.allowed) {
+            emitNonInteractiveBlock(
+              context,
+              "freeform-fill",
+              assessment.reason,
+              pageHostname,
+              [],
+            );
             return failedActionResult(PageAction.Fill, assessment.reason, context, ref);
           }
 

@@ -141,6 +141,8 @@ describe("Web Action Tools", () => {
       abortSignal: undefined,
       agentFilledRefs: new Set<string>(),
       operationalRefs: new Set<string>(),
+      firewall: { trustedHostnames: new Set<string>(), unsafeMode: false },
+      interactive: false,
     };
 
     tools = createWebActionTools(context);
@@ -1000,6 +1002,152 @@ describe("Web Action Tools", () => {
 
       expect(performActionSpy).toHaveBeenCalledWith("input1", PageAction.Fill, longText);
       expect(result.value).toBe(longText);
+    });
+  });
+
+  describe("firewall bypass and remediation", () => {
+    it("trustedHostnames allows freeform fill on a trusted page", async () => {
+      mockBrowser.url = "https://example.com/page";
+      mockBrowser.fieldMetadata.set("ref-1", {
+        ref: "ref-1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "comment",
+        label: "Comment",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: null,
+        formAction: null,
+        formMethod: null,
+      });
+      const performSpy = vi.spyOn(mockBrowser, "performAction");
+      const trustedContext = {
+        ...context,
+        firewall: { trustedHostnames: new Set(["example.com"]), unsafeMode: false },
+      };
+      const trustedTools: any = createWebActionTools(trustedContext);
+
+      const result = await trustedTools.fill.execute({ ref: "ref-1", value: "hi" });
+      expect(result.success).toBe(true);
+      expect(performSpy).toHaveBeenCalled();
+    });
+
+    it("unsafeMode allows fill of any field on any page", async () => {
+      mockBrowser.url = "https://attacker.com/";
+      mockBrowser.fieldMetadata.set("ref-1", {
+        ref: "ref-1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "comment",
+        label: "Comment",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: null,
+        formAction: null,
+        formMethod: null,
+      });
+      const performSpy = vi.spyOn(mockBrowser, "performAction");
+      const unsafeContext = {
+        ...context,
+        firewall: { trustedHostnames: new Set<string>(), unsafeMode: true },
+      };
+      const unsafeTools: any = createWebActionTools(unsafeContext);
+
+      const result = await unsafeTools.fill.execute({ ref: "ref-1", value: "hi" });
+      expect(result.success).toBe(true);
+      expect(performSpy).toHaveBeenCalled();
+    });
+
+    it("emits FIREWALL_BLOCKED_NON_INTERACTIVE on fill block when interactive=false", async () => {
+      mockBrowser.url = "https://untrusted.com/";
+      mockBrowser.fieldMetadata.set("ref-1", {
+        ref: "ref-1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "comment",
+        label: "Comment",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: null,
+        formAction: null,
+        formMethod: null,
+      });
+      const performSpy = vi.spyOn(mockBrowser, "performAction");
+      const events: unknown[] = [];
+      eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) =>
+        events.push(data),
+      );
+
+      const result = await tools.fill.execute({ ref: "ref-1", value: "hi" });
+      expect(result.success).toBe(false);
+      expect(performSpy).not.toHaveBeenCalled();
+      expect(events).toHaveLength(1);
+      const data = events[0] as {
+        kind: string;
+        pageHostname: string | null;
+        remediations: Array<{ kind: string }>;
+      };
+      expect(data.kind).toBe("freeform-fill");
+      expect(data.pageHostname).toBe("untrusted.com");
+      expect(data.remediations.map((r) => r.kind).sort()).toEqual(
+        ["add-trusted-hostnames", "enable-interactive-mode", "enable-unsafe-mode"].sort(),
+      );
+    });
+
+    it("does NOT emit FIREWALL_BLOCKED_NON_INTERACTIVE when interactive=true", async () => {
+      mockBrowser.url = "https://untrusted.com/";
+      mockBrowser.fieldMetadata.set("ref-1", {
+        ref: "ref-1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "comment",
+        label: "Comment",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: null,
+        formAction: null,
+        formMethod: null,
+      });
+      const events: unknown[] = [];
+      eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) =>
+        events.push(data),
+      );
+      const interactiveContext = { ...context, interactive: true };
+      const interactiveTools: any = createWebActionTools(interactiveContext);
+
+      const result = await interactiveTools.fill.execute({ ref: "ref-1", value: "hi" });
+      expect(result.success).toBe(false);
+      expect(events).toHaveLength(0);
+    });
+
+    it("model-visible error string does not include unsafe_mode or trusted_hostnames", async () => {
+      mockBrowser.url = "https://untrusted.com/";
+      mockBrowser.fieldMetadata.set("ref-1", {
+        ref: "ref-1",
+        tagName: "textarea",
+        inputType: null,
+        role: null,
+        name: "comment",
+        label: "Comment",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: null,
+        formAction: null,
+        formMethod: null,
+      });
+      const result = await tools.fill.execute({ ref: "ref-1", value: "hi" });
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).not.toMatch(/unsafe_mode|trusted_hostnames|untrusted\.com/);
     });
   });
 });
