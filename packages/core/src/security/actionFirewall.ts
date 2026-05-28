@@ -12,6 +12,11 @@ export type ActionFirewallResult =
   | { allowed: true; operational?: boolean }
   | { allowed: false; reason: string; isRecoverable: true };
 
+export interface FirewallConfig {
+  trustedHostnames: ReadonlySet<string>;
+  unsafeMode: boolean;
+}
+
 const OPERATIONAL_INPUT_TYPES = new Set([
   "search",
   "number",
@@ -85,7 +90,20 @@ const SENSITIVE_AUTOCOMPLETE_TOKENS = new Set([
 export function assessFill(input: {
   field: FieldMetadata;
   source: FillSource;
+  pageHostname: string | null;
+  firewall: FirewallConfig;
 }): ActionFirewallResult {
+  if (input.firewall.unsafeMode) {
+    return { allowed: true };
+  }
+
+  if (
+    input.pageHostname !== null &&
+    input.firewall.trustedHostnames.has(input.pageHostname)
+  ) {
+    return { allowed: true };
+  }
+
   if (input.source === "user-approved") {
     return { allowed: true };
   }
@@ -106,7 +124,30 @@ export function assessFormSubmission(input: {
   approvedRefs: ReadonlySet<string>;
   agentFilledRefs: ReadonlySet<string>;
   operationalRefs: ReadonlySet<string>;
+  pageHostname: string | null;
+  firewall: FirewallConfig;
 }): ActionFirewallResult {
+  if (input.firewall.unsafeMode) {
+    return { allowed: true };
+  }
+
+  if (input.pageHostname !== null && input.firewall.trustedHostnames.has(input.pageHostname)) {
+    const formActionHost = extractHostname(input.form.actionUrl);
+    const submitterActionHost = extractHostname(input.form.submitterActionUrl);
+
+    const formActionTrusted =
+      formActionHost !== null && input.firewall.trustedHostnames.has(formActionHost);
+
+    const submitterTrusted =
+      input.form.submitterActionUrl === null
+        ? true
+        : submitterActionHost !== null && input.firewall.trustedHostnames.has(submitterActionHost);
+
+    if (formActionTrusted && submitterTrusted) {
+      return { allowed: true };
+    }
+  }
+
   for (const field of input.form.fields) {
     if (!field.ref || !input.agentFilledRefs.has(field.ref)) continue;
     if (input.approvedRefs.has(field.ref) || input.operationalRefs.has(field.ref)) continue;

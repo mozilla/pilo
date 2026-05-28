@@ -488,6 +488,7 @@ export class ExtensionBrowser implements AriaBrowser {
               submitterRef,
               formId: form.id || null,
               actionUrl: form.action || null,
+              submitterActionUrl: null,
               method: form.method?.toLowerCase() || null,
               fields,
             },

@@ -84,6 +84,7 @@ export interface FormSubmissionContext {
   submitterRef: string;
   formId: string | null;
   actionUrl: string | null;
+  submitterActionUrl: string | null;
   method: string | null;
   fields: FormFieldState[];
 }

@@ -92,6 +92,8 @@ async function assessFormSubmissionForAction(
       approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
       agentFilledRefs: context.agentFilledRefs,
       operationalRefs: context.operationalRefs,
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     if (!assessment.allowed) {
@@ -232,6 +234,8 @@ export function createWebActionTools(context: WebActionContext) {
           const assessment = assessFill({
             field: metadata,
             source: userApproved ? "user-approved" : "agent",
+            pageHostname: null,
+            firewall: { trustedHostnames: new Set(), unsafeMode: false },
           });
 
           if (!assessment.allowed) {

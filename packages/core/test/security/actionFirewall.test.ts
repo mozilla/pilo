@@ -8,6 +8,7 @@ import {
   InvalidHostnameError,
   SECURITY_BLOCKED_UNAUTHORIZED_FILL,
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
+  type FirewallConfig,
 } from "../../src/security/actionFirewall.js";
 
 function field(overrides: Partial<FieldMetadata> = {}): FieldMetadata {
@@ -33,6 +34,7 @@ function form(overrides: Partial<FormSubmissionContext> = {}): FormSubmissionCon
     submitterRef: "E9",
     formId: "form-1",
     actionUrl: "https://example.com/submit",
+    submitterActionUrl: null,
     method: "post",
     fields: [],
     ...overrides,
@@ -44,6 +46,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ inputType: "search", label: "Search products" }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(true);
@@ -55,6 +59,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ label: "Message" }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -66,6 +72,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ inputType: "text", label: "Search products", placeholder: "Search" }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -75,6 +83,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ tagName: "textarea", inputType: null, role: "searchbox" }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -84,6 +94,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ inputType: "url", autocomplete: "url" }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -93,6 +105,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ inputType: "url", autocomplete: null }),
       source: "agent",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -104,6 +118,8 @@ describe("actionFirewall", () => {
     const result = assessFill({
       field: field({ label: "Message" }),
       source: "user-approved",
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(true);
@@ -125,6 +141,8 @@ describe("actionFirewall", () => {
       approvedRefs: new Set(),
       agentFilledRefs: new Set(["E1"]),
       operationalRefs: new Set(),
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(false);
@@ -156,6 +174,8 @@ describe("actionFirewall", () => {
       approvedRefs: new Set(["E2"]),
       agentFilledRefs: new Set(["E1", "E2"]),
       operationalRefs: new Set(["E1"]),
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
     expect(result.allowed).toBe(true);
@@ -264,5 +284,178 @@ describe("extractHostname", () => {
 
   it("returns null for empty string", () => {
     expect(extractHostname("")).toBeNull();
+  });
+});
+
+const freeformField: FieldMetadata = {
+  ref: "ref-1",
+  tagName: "textarea",
+  inputType: null,
+  role: null,
+  name: "comment",
+  label: "Comment",
+  placeholder: null,
+  autocomplete: null,
+  isContentEditable: false,
+  formId: null,
+  formAction: null,
+  formMethod: null,
+};
+
+function withTrusted(hosts: string[]): FirewallConfig {
+  return { trustedHostnames: new Set(hosts), unsafeMode: false };
+}
+
+const unsafeFirewall: FirewallConfig = {
+  trustedHostnames: new Set<string>(),
+  unsafeMode: true,
+};
+
+describe("assessFill bypass branches", () => {
+  it("unsafeMode allows any field regardless of source", () => {
+    const result = assessFill({
+      field: freeformField,
+      source: "agent",
+      pageHostname: null,
+      firewall: unsafeFirewall,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("trusted page hostname allows freeform fill", () => {
+    const result = assessFill({
+      field: freeformField,
+      source: "agent",
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("untrusted page hostname falls through to existing rules and blocks freeform", () => {
+    const result = assessFill({
+      field: freeformField,
+      source: "agent",
+      pageHostname: "attacker.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("pageHostname=null never bypasses", () => {
+    const result = assessFill({
+      field: freeformField,
+      source: "agent",
+      pageHostname: null,
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+});
+
+const baseForm: FormSubmissionContext = {
+  submitterRef: "submit-1",
+  formId: null,
+  actionUrl: "https://example.com/submit",
+  submitterActionUrl: null,
+  method: "post",
+  fields: [
+    {
+      ref: "ref-1",
+      name: "comment",
+      tagName: "textarea",
+      inputType: null,
+      autocomplete: null,
+    },
+  ],
+};
+
+describe("assessFormSubmission bypass branches", () => {
+  it("unsafeMode allows any form", () => {
+    const result = assessFormSubmission({
+      form: baseForm,
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "attacker.com",
+      firewall: unsafeFirewall,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("trusted page + trusted form action allows submission", () => {
+    const result = assessFormSubmission({
+      form: baseForm,
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("trusted page + untrusted form action falls through and blocks", () => {
+    const result = assessFormSubmission({
+      form: { ...baseForm, actionUrl: "https://attacker.com/exfil" },
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("trusted page + null form action hostname falls through", () => {
+    const result = assessFormSubmission({
+      form: { ...baseForm, actionUrl: "about:blank" },
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("untrusted page + trusted form action falls through", () => {
+    const result = assessFormSubmission({
+      form: baseForm,
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "attacker.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("checks submitter action URL when present", () => {
+    const result = assessFormSubmission({
+      form: {
+        ...baseForm,
+        actionUrl: "https://example.com/normal",
+        submitterActionUrl: "https://attacker.com/override",
+      },
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["ref-1"]),
+      operationalRefs: new Set(),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("falls through (no bypass) when nothing is agent-filled but submitter is untrusted", () => {
+    const result = assessFormSubmission({
+      form: { ...baseForm, actionUrl: "https://attacker.com/exfil" },
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(),
+      operationalRefs: new Set(),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com"]),
+    });
+    expect(result.allowed).toBe(true); // existing rule: no agent-filled => allowed
   });
 });

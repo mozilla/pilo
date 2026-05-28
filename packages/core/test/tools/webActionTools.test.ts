@@ -634,6 +634,7 @@ describe("Web Action Tools", () => {
         submitterRef: "submit1",
         formId: "contact",
         actionUrl: "https://example.com/contact",
+        submitterActionUrl: null,
         method: "post",
         fields: [
           {
@@ -666,6 +667,7 @@ describe("Web Action Tools", () => {
         submitterRef: "submit1",
         formId: "search",
         actionUrl: "https://example.com/search",
+        submitterActionUrl: null,
         method: "get",
         fields: [
           {
@@ -702,6 +704,7 @@ describe("Web Action Tools", () => {
         submitterRef: "input1",
         formId: "contact",
         actionUrl: "https://example.com/contact",
+        submitterActionUrl: null,
         method: "post",
         fields: [
           {
