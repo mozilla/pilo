@@ -112,6 +112,8 @@ export interface PiloConfig {
 
   // Action Configuration
   action_timeout_ms?: number;
+  trusted_hostnames?: string[];
+  unsafe_mode?: boolean;
 
   // Search Configuration
   search_provider?: SearchProviderName;
@@ -181,6 +183,8 @@ export interface PiloConfigResolved {
 
   // Action Configuration
   action_timeout_ms: number;
+  trusted_hostnames: string[];
+  unsafe_mode: boolean;
 
   // Search Configuration
   search_provider: SearchProviderName;
@@ -587,6 +591,25 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Timeout for page load and element actions in milliseconds",
     category: "action",
   },
+  trusted_hostnames: {
+    default: [],
+    type: "string[]",
+    cli: "--trusted-hostnames",
+    placeholder: "host1,host2,...",
+    env: ["PILO_TRUSTED_HOSTNAMES"],
+    description:
+      "Comma-separated hostnames where the action firewall is bypassed for fills and submissions. WARNING: on listed hosts, prompt injection from page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data.",
+    category: "action",
+  },
+  unsafe_mode: {
+    default: false,
+    type: "boolean",
+    cli: "--unsafe",
+    env: ["PILO_UNSAFE_MODE"],
+    description:
+      "Disables the action firewall entirely. WARNING: prompt injection from page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.",
+    category: "action",
+  },
 
   // Search Configuration
   search_provider: {
@@ -663,6 +686,8 @@ function buildDefaults(): PiloConfigResolved {
     "navigation_max_attempts",
     "navigation_timeout_multiplier",
     "action_timeout_ms",
+    "trusted_hostnames",
+    "unsafe_mode",
     "search_provider",
   ];
 
