@@ -1091,13 +1091,22 @@ describe("Web Action Tools", () => {
       const data = events[0] as {
         kind: string;
         pageHostname: string | null;
-        remediations: Array<{ kind: string }>;
+        formActionHostnames: string[];
+        reason: string;
+        timestamp: number;
+        remediations: Array<{ kind: string; hostnames?: string[]; description: string }>;
       };
       expect(data.kind).toBe("freeform-fill");
       expect(data.pageHostname).toBe("untrusted.com");
+      expect(data.formActionHostnames).toEqual([]);
+      expect(typeof data.reason).toBe("string");
+      expect(data.reason.length).toBeGreaterThan(0);
+      expect(typeof data.timestamp).toBe("number");
       expect(data.remediations.map((r) => r.kind).sort()).toEqual(
         ["add-trusted-hostnames", "enable-interactive-mode", "enable-unsafe-mode"].sort(),
       );
+      const trusted = data.remediations.find((r) => r.kind === "add-trusted-hostnames");
+      expect(trusted?.hostnames).toEqual(["untrusted.com"]);
     });
 
     it("does NOT emit FIREWALL_BLOCKED_NON_INTERACTIVE when interactive=true", async () => {
