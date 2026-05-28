@@ -3368,6 +3368,117 @@
       ],
       "type": "object"
     },
+    "FirewallBlockedNonInteractiveEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "formActionHostnames": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "freeform-fill",
+            "form-submission"
+          ],
+          "type": "string"
+        },
+        "pageHostname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "remediations": {
+          "items": {
+            "$ref": "#/definitions/FirewallRemediation"
+          },
+          "type": "array"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "formActionHostnames",
+        "iterationId",
+        "kind",
+        "pageHostname",
+        "reason",
+        "remediations",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "FirewallRemediation": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "hostnames": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "add-trusted-hostnames",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hostnames",
+            "description"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "enable-interactive-mode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "description"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "enable-unsafe-mode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "description"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "FormFieldRequest": {
       "additionalProperties": false,
       "description": "A single form field the agent needs data for.",
@@ -4648,6 +4759,23 @@
             },
             "type": {
               "const": "interactive:form_data:error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/FirewallBlockedNonInteractiveEventData"
+            },
+            "type": {
+              "const": "firewall:blocked_non_interactive",
               "type": "string"
             }
           },
