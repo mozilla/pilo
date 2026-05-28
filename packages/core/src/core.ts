@@ -66,6 +66,9 @@ export {
   NoStartingUrlError,
 } from "./errors.js";
 
+// Action firewall helpers (for CLI-side validation at config-set time)
+export { normalizeHostname, InvalidHostnameError } from "./security/actionFirewall.js";
+
 // Navigation retry configuration
 export type { NavigationRetryConfig } from "./browser/navigationRetry.js";
 export { calculateTimeout, DEFAULT_NAVIGATION_RETRY_CONFIG } from "./browser/navigationRetry.js";
