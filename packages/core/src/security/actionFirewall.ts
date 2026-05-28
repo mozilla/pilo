@@ -6,6 +6,9 @@ export const SECURITY_BLOCKED_UNAUTHORIZED_FILL =
 export const SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT =
   "Security policy blocked submitting a form containing unauthorized agent-filled data";
 
+export const SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT =
+  "Security policy blocked submitting operational field data to a site other than the current page";
+
 export type FillSource = "agent" | "user-approved";
 
 export type ActionFirewallResult =
@@ -145,15 +148,45 @@ export function assessFormSubmission(input: {
     }
   }
 
+  let hasOperationalAgentFill = false;
   for (const field of input.form.fields) {
     if (!field.ref || !input.agentFilledRefs.has(field.ref)) continue;
-    if (input.approvedRefs.has(field.ref) || input.operationalRefs.has(field.ref)) continue;
+    if (input.approvedRefs.has(field.ref)) continue;
+    if (input.operationalRefs.has(field.ref)) {
+      hasOperationalAgentFill = true;
+      continue;
+    }
 
     return {
       allowed: false,
       reason: SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
       isRecoverable: true,
     };
+  }
+
+  // Operational fields (search/filter boxes, comboboxes, etc.) are classified
+  // from page-controlled attributes (inputType/role) and may carry agent-typed
+  // text. They are exempt from the unauthorized-submit gate so the agent can
+  // search and filter — but that exemption must not become an exfiltration
+  // channel. An attacker page can label its collector field as a search box and
+  // point the form action at its own host. So operational agent-filled data may
+  // only be submitted to the current page's own host. A null page host
+  // (non-http(s) page, or a getUrl failure) cannot be matched, so we fail closed.
+  // Approved fields are excluded from this restriction: they hold the user's own
+  // data, entered through request_user_data, and legitimately post cross-host
+  // (e.g. a payment processor on a separate domain).
+  if (hasOperationalAgentFill) {
+    const sameHost = (url: string | null): boolean =>
+      input.pageHostname !== null && extractHostname(url) === input.pageHostname;
+    const submitterSameHost =
+      input.form.submitterActionUrl === null ? true : sameHost(input.form.submitterActionUrl);
+    if (!sameHost(input.form.actionUrl) || !submitterSameHost) {
+      return {
+        allowed: false,
+        reason: SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT,
+        isRecoverable: true,
+      };
+    }
   }
 
   return { allowed: true };

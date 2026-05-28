@@ -728,6 +728,41 @@ describe("Web Action Tools", () => {
       expect(result.success).toBe(true);
     });
 
+    it("should block click submit when an operational field posts to a cross-site action", async () => {
+      // The reported bypass: an attacker page labels its collector field as a
+      // search box (operational) and points the form action at its own host.
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      mockBrowser.url = "https://example.com/search";
+      context.agentFilledRefs = new Set(["query"]);
+      context.operationalRefs = new Set(["query"]);
+      context.approvedRefs = new Set<string>();
+      mockBrowser.formSubmissionContexts.set("submit1", {
+        submitterRef: "submit1",
+        formId: "search",
+        actionUrl: "https://attacker.example/collect",
+        submitterActionUrl: null,
+        method: "get",
+        fields: [
+          {
+            ref: "query",
+            name: "q",
+            tagName: "input",
+            inputType: "search",
+            autocomplete: null,
+          },
+        ],
+      });
+      tools = createWebActionTools(context);
+
+      const result = await tools.click.execute({ ref: "submit1" });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "Security policy blocked submitting operational field data to a site other than the current page",
+      );
+    });
+
     it("should block enter submit when form contains unauthorized agent-filled fields", async () => {
       const formContextSpy = vi.spyOn(mockBrowser, "getFormSubmissionContext");
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");

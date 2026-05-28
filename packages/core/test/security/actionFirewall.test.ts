@@ -8,6 +8,7 @@ import {
   InvalidHostnameError,
   SECURITY_BLOCKED_UNAUTHORIZED_FILL,
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
+  SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT,
   type FirewallConfig,
 } from "../../src/security/actionFirewall.js";
 
@@ -154,6 +155,8 @@ describe("actionFirewall", () => {
   it("allows submitting forms when agent-filled fields are approved or operational", () => {
     const result = assessFormSubmission({
       form: form({
+        // form() defaults actionUrl to https://example.com/submit, so the
+        // operational field submits same-site as the page below.
         fields: [
           {
             ref: "E1",
@@ -174,7 +177,7 @@ describe("actionFirewall", () => {
       approvedRefs: new Set(["E2"]),
       agentFilledRefs: new Set(["E1", "E2"]),
       operationalRefs: new Set(["E1"]),
-      pageHostname: null,
+      pageHostname: "example.com",
       firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
@@ -457,5 +460,118 @@ describe("assessFormSubmission bypass branches", () => {
       firewall: withTrusted(["example.com"]),
     });
     expect(result.allowed).toBe(true); // existing rule: no agent-filled => allowed
+  });
+});
+
+describe("assessFormSubmission same-site operational restriction", () => {
+  const operationalForm = (overrides: Partial<FormSubmissionContext> = {}): FormSubmissionContext =>
+    form({
+      fields: [{ ref: "E1", name: "q", tagName: "input", inputType: "search", autocomplete: null }],
+      ...overrides,
+    });
+
+  it("allows operational agent-filled submission to a same-site form action", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({ actionUrl: "https://example.com/search" }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: "example.com",
+      firewall: withTrusted([]),
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks operational agent-filled submission to a cross-site form action", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({ actionUrl: "https://attacker.example/collect" }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: "example.com",
+      firewall: withTrusted([]),
+    });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error("Expected cross-site operational submit to be blocked");
+    expect(result.reason).toBe(SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT);
+    // Error must not echo the attempted field value or its content.
+    expect(result.reason).not.toContain("q");
+  });
+
+  it("blocks operational submission when the submitter formaction overrides cross-site", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({
+        actionUrl: "https://example.com/search",
+        submitterActionUrl: "https://attacker.example/collect",
+      }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: "example.com",
+      firewall: withTrusted([]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("blocks operational submission when the page hostname is unknown (fail closed)", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({ actionUrl: "https://example.com/search" }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: null,
+      firewall: withTrusted([]),
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("does not host-restrict user-approved (non-operational) submissions", () => {
+    // Approved fields are filled with the user's data via request_user_data and
+    // are never tracked as agent-filled, so they keep submitting cross-site
+    // (e.g. a payment processor on a separate domain). The user authorized them.
+    const result = assessFormSubmission({
+      form: form({
+        actionUrl: "https://payments.example.net/charge",
+        fields: [
+          {
+            ref: "E2",
+            name: "card",
+            tagName: "input",
+            inputType: "text",
+            autocomplete: "cc-number",
+          },
+        ],
+      }),
+      approvedRefs: new Set(["E2"]),
+      agentFilledRefs: new Set(),
+      operationalRefs: new Set(),
+      pageHostname: "shop.example.com",
+      firewall: withTrusted([]),
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("allows operational cross-site submission when unsafeMode is on", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({ actionUrl: "https://attacker.example/collect" }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: "example.com",
+      firewall: unsafeFirewall,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("allows operational cross-host submission when both page and action hosts are trusted", () => {
+    const result = assessFormSubmission({
+      form: operationalForm({ actionUrl: "https://api.example.com/search" }),
+      approvedRefs: new Set(),
+      agentFilledRefs: new Set(["E1"]),
+      operationalRefs: new Set(["E1"]),
+      pageHostname: "example.com",
+      firewall: withTrusted(["example.com", "api.example.com"]),
+    });
+    expect(result.allowed).toBe(true);
   });
 });
