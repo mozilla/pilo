@@ -60,10 +60,7 @@ import {
   SpanName,
   recordSanitizedException,
 } from "./telemetry/tracing.js";
-import {
-  normalizeHostname,
-  type FirewallConfig,
-} from "./security/actionFirewall.js";
+import { normalizeHostname, type FirewallConfig } from "./security/actionFirewall.js";
 
 // === Type Definitions ===
 

@@ -930,19 +930,11 @@ export class PlaywrightBrowser implements AriaBrowser {
             }));
 
           const submitterActionUrl = (() => {
-            if (
-              !(el instanceof HTMLButtonElement) &&
-              !(el instanceof HTMLInputElement)
-            )
+            if (!(el instanceof HTMLButtonElement) && !(el instanceof HTMLInputElement))
               return null;
-            if (
-              el instanceof HTMLInputElement &&
-              el.type !== "submit" &&
-              el.type !== "image"
-            )
+            if (el instanceof HTMLInputElement && el.type !== "submit" && el.type !== "image")
               return null;
-            if (el instanceof HTMLButtonElement && el.type !== "submit")
-              return null;
+            if (el instanceof HTMLButtonElement && el.type !== "submit") return null;
             if (!el.hasAttribute("formaction")) return null;
             return el.formAction || null;
           })();

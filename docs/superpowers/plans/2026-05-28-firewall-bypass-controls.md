@@ -14,30 +14,31 @@
 
 ## File Structure
 
-| Action | Path | Responsibility |
-|---|---|---|
-| Modify | `packages/core/src/security/actionFirewall.ts` | `FirewallConfig` type, `normalizeHostname`, `extractHostname`, `InvalidHostnameError`, bypass branches in `assessFill`/`assessFormSubmission` |
-| Modify | `packages/core/src/browser/ariaBrowser.ts` | Add `submitterActionUrl` to `FormSubmissionContext` |
-| Modify | `packages/core/src/browser/playwrightBrowser.ts` | Resolve and return `submitterActionUrl` |
-| Modify | `packages/core/src/events.ts` | Add `FIREWALL_BLOCKED_NON_INTERACTIVE` event type + data type |
-| Modify | `packages/core/src/tools/webActionTools.ts` | Extend `WebActionContext` with `firewall` and `interactive`; query page hostname; pass to firewall; emit non-interactive event on block |
-| Modify | `packages/core/src/webAgent.ts` | Add `trustedHostnames` / `unsafeMode` options; build frozen `FirewallConfig`; thread `interactive` into tool context |
-| Modify | `packages/core/src/config/defaults.ts` | New `trusted_hostnames` (string[]) and `unsafe_mode` (boolean) fields with warning descriptions |
-| Modify | `packages/core/src/config/commander.ts` | (No code change expected — `addConfigOptions` already handles `string[]` and `boolean` types automatically) |
-| Modify | `packages/core/src/config/env.ts` | (No code change expected — generic env coercion handles both new fields) |
-| Modify | `packages/cli/src/commands/run.ts` | Pass `trustedHostnames` / `unsafeMode` from merged config into `WebAgent`; subscribe to `FIREWALL_BLOCKED_NON_INTERACTIVE` and print remediation footer |
-| Modify | `packages/core/src/index.ts` and `packages/core/src/core.ts` | Re-export `InvalidHostnameError` if it needs to be caught by callers |
-| Create | `packages/core/test/security/actionFirewall.test.ts` | Add pure tests for normalization + bypass logic (file already exists per prior plan; new test cases appended) |
-| Modify | `packages/core/test/tools/webActionTools.test.ts` | Tool-level tests for bypass and remediation event |
-| Modify | `packages/core/test/playwrightBrowser.test.ts` | Test that `submitterActionUrl` is resolved and returned |
-| Modify | `packages/core/test/webAgent.test.ts` | Integration tests for option plumbing and end-to-end bypass behavior |
-| Modify | `README.md` (root) | Add "Security model" subsection |
+| Action | Path                                                         | Responsibility                                                                                                                                          |
+| ------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Modify | `packages/core/src/security/actionFirewall.ts`               | `FirewallConfig` type, `normalizeHostname`, `extractHostname`, `InvalidHostnameError`, bypass branches in `assessFill`/`assessFormSubmission`           |
+| Modify | `packages/core/src/browser/ariaBrowser.ts`                   | Add `submitterActionUrl` to `FormSubmissionContext`                                                                                                     |
+| Modify | `packages/core/src/browser/playwrightBrowser.ts`             | Resolve and return `submitterActionUrl`                                                                                                                 |
+| Modify | `packages/core/src/events.ts`                                | Add `FIREWALL_BLOCKED_NON_INTERACTIVE` event type + data type                                                                                           |
+| Modify | `packages/core/src/tools/webActionTools.ts`                  | Extend `WebActionContext` with `firewall` and `interactive`; query page hostname; pass to firewall; emit non-interactive event on block                 |
+| Modify | `packages/core/src/webAgent.ts`                              | Add `trustedHostnames` / `unsafeMode` options; build frozen `FirewallConfig`; thread `interactive` into tool context                                    |
+| Modify | `packages/core/src/config/defaults.ts`                       | New `trusted_hostnames` (string[]) and `unsafe_mode` (boolean) fields with warning descriptions                                                         |
+| Modify | `packages/core/src/config/commander.ts`                      | (No code change expected — `addConfigOptions` already handles `string[]` and `boolean` types automatically)                                             |
+| Modify | `packages/core/src/config/env.ts`                            | (No code change expected — generic env coercion handles both new fields)                                                                                |
+| Modify | `packages/cli/src/commands/run.ts`                           | Pass `trustedHostnames` / `unsafeMode` from merged config into `WebAgent`; subscribe to `FIREWALL_BLOCKED_NON_INTERACTIVE` and print remediation footer |
+| Modify | `packages/core/src/index.ts` and `packages/core/src/core.ts` | Re-export `InvalidHostnameError` if it needs to be caught by callers                                                                                    |
+| Create | `packages/core/test/security/actionFirewall.test.ts`         | Add pure tests for normalization + bypass logic (file already exists per prior plan; new test cases appended)                                           |
+| Modify | `packages/core/test/tools/webActionTools.test.ts`            | Tool-level tests for bypass and remediation event                                                                                                       |
+| Modify | `packages/core/test/playwrightBrowser.test.ts`               | Test that `submitterActionUrl` is resolved and returned                                                                                                 |
+| Modify | `packages/core/test/webAgent.test.ts`                        | Integration tests for option plumbing and end-to-end bypass behavior                                                                                    |
+| Modify | `README.md` (root)                                           | Add "Security model" subsection                                                                                                                         |
 
 ---
 
 ## Task 1: Hostname normalization and extraction helpers
 
 **Files:**
+
 - Modify: `packages/core/src/security/actionFirewall.ts`
 - Test: `packages/core/test/security/actionFirewall.test.ts`
 
@@ -237,6 +238,7 @@ git commit -m "feat(core): add hostname normalization and extraction helpers"
 ## Task 2: FirewallConfig type and bypass branches
 
 **Files:**
+
 - Modify: `packages/core/src/security/actionFirewall.ts`
 - Modify: `packages/core/test/security/actionFirewall.test.ts`
 - Modify (consumer): `packages/core/src/tools/webActionTools.ts` (compile-fix only)
@@ -251,10 +253,7 @@ import {
   assessFormSubmission,
   type FirewallConfig,
 } from "../../src/security/actionFirewall.js";
-import type {
-  FieldMetadata,
-  FormSubmissionContext,
-} from "../../src/browser/ariaBrowser.js";
+import type { FieldMetadata, FormSubmissionContext } from "../../src/browser/ariaBrowser.js";
 
 const freeformField: FieldMetadata = {
   ref: "ref-1",
@@ -594,10 +593,7 @@ export function assessFill(input: {
   if (input.firewall.unsafeMode) {
     return { allowed: true };
   }
-  if (
-    input.pageHostname !== null &&
-    input.firewall.trustedHostnames.has(input.pageHostname)
-  ) {
+  if (input.pageHostname !== null && input.firewall.trustedHostnames.has(input.pageHostname)) {
     return { allowed: true };
   }
 
@@ -774,6 +770,7 @@ git commit -m "feat(core): add FirewallConfig and bypass branches to action fire
 ## Task 3: Add `submitterActionUrl` to FormSubmissionContext
 
 **Files:**
+
 - Modify: `packages/core/src/browser/ariaBrowser.ts`
 - Modify: `packages/core/src/browser/playwrightBrowser.ts`
 - Modify: `packages/core/test/playwrightBrowser.test.ts`
@@ -880,6 +877,7 @@ git commit -m "feat(core): expose submitter formaction override on FormSubmissio
 ## Task 4: Add `FIREWALL_BLOCKED_NON_INTERACTIVE` event type
 
 **Files:**
+
 - Modify: `packages/core/src/events.ts`
 
 - [ ] **Step 1: Add the event type enum value**
@@ -940,6 +938,7 @@ git commit -m "feat(core): add FIREWALL_BLOCKED_NON_INTERACTIVE event type"
 ## Task 5: Plumb `firewall` and `interactive` into webActionTools and emit the event
 
 **Files:**
+
 - Modify: `packages/core/src/tools/webActionTools.ts`
 - Modify: `packages/core/test/tools/webActionTools.test.ts`
 
@@ -1052,7 +1051,9 @@ describe("webActionTools firewall bypass and remediation", () => {
     });
     const eventEmitter = new WebAgentEventEmitter();
     const events: unknown[] = [];
-    eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) => events.push(data));
+    eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) =>
+      events.push(data),
+    );
 
     const tools = createWebActionTools({
       browser,
@@ -1101,7 +1102,9 @@ describe("webActionTools firewall bypass and remediation", () => {
     });
     const eventEmitter = new WebAgentEventEmitter();
     const events: unknown[] = [];
-    eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) => events.push(data));
+    eventEmitter.on(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data) =>
+      events.push(data),
+    );
 
     const tools = createWebActionTools({
       browser,
@@ -1175,10 +1178,7 @@ import {
   extractHostname,
   type FirewallConfig,
 } from "../security/actionFirewall.js";
-import type {
-  FirewallBlockedNonInteractiveEventData,
-  FirewallRemediation,
-} from "../events.js";
+import type { FirewallBlockedNonInteractiveEventData, FirewallRemediation } from "../events.js";
 ```
 
 Replace the existing import line that brought in `assessFill, assessFormSubmission` with this combined import.
@@ -1383,6 +1383,7 @@ git commit -m "feat(core): plumb FirewallConfig and interactive flag into web ac
 ## Task 6: WebAgent option additions and FirewallConfig construction
 
 **Files:**
+
 - Modify: `packages/core/src/webAgent.ts`
 - Modify: `packages/core/test/webAgent.test.ts`
 
@@ -1411,7 +1412,6 @@ describe("WebAgent firewall options", () => {
   it("interactive flag is set from onUserDataRequired presence", async () => {
     // Setup an agent without onUserDataRequired. Trigger a firewall-blocked fill.
     // Assert: FIREWALL_BLOCKED_NON_INTERACTIVE is emitted.
-
     // Setup another agent with a stub onUserDataRequired. Trigger a firewall-blocked fill.
     // Assert: FIREWALL_BLOCKED_NON_INTERACTIVE is NOT emitted.
   });
@@ -1436,10 +1436,7 @@ In `packages/core/src/webAgent.ts`:
 3a. Add imports (top of file):
 
 ```ts
-import {
-  normalizeHostname,
-  type FirewallConfig,
-} from "./security/actionFirewall.js";
+import { normalizeHostname, type FirewallConfig } from "./security/actionFirewall.js";
 ```
 
 3b. Extend `WebAgentOptions` (around line 66). Add two new fields with TSDoc warnings:
@@ -1529,6 +1526,7 @@ git commit -m "feat(core): add trustedHostnames and unsafeMode to WebAgentOption
 ## Task 7: Config defaults — `trusted_hostnames` and `unsafe_mode`
 
 **Files:**
+
 - Modify: `packages/core/src/config/defaults.ts`
 - Modify: `packages/core/test/config/*.test.ts` (add tests next to existing config tests)
 
@@ -1641,6 +1639,7 @@ git commit -m "feat(core): add trusted_hostnames and unsafe_mode config fields"
 ## Task 8: CLI + env wiring (verify no code changes needed)
 
 **Files:**
+
 - Verify: `packages/core/src/config/commander.ts`
 - Verify: `packages/core/src/config/env.ts`
 - Modify: `packages/core/test/config/` (add CLI + env tests if not present)
@@ -1738,6 +1737,7 @@ git commit -m "test(core): verify CLI flags and env vars for firewall config"
 ## Task 9: CLI consumer — pass config to WebAgent and print remediation footer
 
 **Files:**
+
 - Modify: `packages/cli/src/commands/run.ts`
 - Test: `packages/cli/test/commands/run.test.ts` (if test pattern exists; otherwise add a minimal unit test for the footer printer)
 
@@ -1890,6 +1890,7 @@ git commit -m "feat(cli): wire firewall config and print non-interactive remedia
 ## Task 10: Documentation — TSDoc and README
 
 **Files:**
+
 - Modify: `README.md` (root)
 - Verify TSDoc already added in Task 6 (`packages/core/src/webAgent.ts`)
 
@@ -1899,7 +1900,7 @@ Locate the existing top-level sections in `README.md`. Add a new subsection — 
 
 Append this subsection (adapt heading level to match the surrounding doc):
 
-```markdown
+````markdown
 ## Security model
 
 Pilo treats every web page as untrusted input. By default, the **action firewall** prevents the agent from filling freeform form fields (textareas, contact-info inputs, password fields, etc.) and from submitting any form containing agent-filled values that the user did not explicitly approve. This is the structural defense against prompt-injection attacks where a page tries to coax the agent into exfiltrating data via a form.
@@ -1913,6 +1914,7 @@ A list of hostnames on which the firewall is bypassed for fills and submissions.
 ```bash
 pilo config set trusted_hostnames example.com,app.example.com
 ```
+````
 
 WARNING: on listed hosts, prompt injection from page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data.
 
@@ -1935,7 +1937,8 @@ When the firewall blocks a fill or submission and the agent is not running in in
 - Enable `unsafe_mode` (with the data-protection warning above).
 
 The footer is shown only to the user; the model that drives the agent never sees these remediation suggestions, so prompt-injected page content cannot ask the user to enable the bypasses.
-```
+
+````
 
 - [ ] **Step 2: Verify TSDoc was added in Task 6**
 
@@ -1950,7 +1953,7 @@ If the TSDoc is missing or incomplete, add it now (copy from Task 6 Step 3b).
 ```bash
 git add README.md packages/core/src/webAgent.ts
 git commit -m "docs: document action firewall and bypass controls"
-```
+````
 
 ---
 

@@ -613,8 +613,7 @@ describe("printFirewallRemediation", () => {
         {
           kind: "add-trusted-hostnames",
           hostnames: ["untrusted.com"],
-          description:
-            "Add untrusted.com to trusted_hostnames to allow this action on this site.",
+          description: "Add untrusted.com to trusted_hostnames to allow this action on this site.",
         },
         {
           kind: "enable-interactive-mode",

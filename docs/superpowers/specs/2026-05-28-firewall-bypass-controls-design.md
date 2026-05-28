@@ -173,10 +173,10 @@ At task start, WebAgent constructs a frozen `FirewallConfig`:
 
 Two new fields in the `action` category:
 
-| Key | Type | Default | Description (short form) |
-|---|---|---|---|
-| `trusted_hostnames` | `string[]` | `[]` | Hostnames where the action firewall is bypassed for fills and submissions. WARNING: on listed hosts, page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data. |
-| `unsafe_mode` | `boolean` | `false` | Disables the action firewall entirely. WARNING: web page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments. |
+| Key                 | Type       | Default | Description (short form)                                                                                                                                                                                                                                             |
+| ------------------- | ---------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trusted_hostnames` | `string[]` | `[]`    | Hostnames where the action firewall is bypassed for fills and submissions. WARNING: on listed hosts, page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data. |
+| `unsafe_mode`       | `boolean`  | `false` | Disables the action firewall entirely. WARNING: web page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.       |
 
 The field parser for `trusted_hostnames` applies `normalizeHostname` to each entry. A bad entry surfaces at config load (during `pilo config set`, `pilo config show`, or `pilo run` startup), naming the invalid value.
 
@@ -214,10 +214,10 @@ A `FIREWALL_BLOCKED_NON_INTERACTIVE` event is emitted on the `WebAgentEventEmitt
 
 ```ts
 interface FirewallBlockedNonInteractiveEventData {
-  reason: string;                             // policy reason (no field values)
+  reason: string; // policy reason (no field values)
   kind: "freeform-fill" | "form-submission";
   pageHostname: string | null;
-  formActionHostnames: string[];              // empty for fills
+  formActionHostnames: string[]; // empty for fills
   remediations: FirewallRemediation[];
 }
 

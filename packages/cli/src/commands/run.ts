@@ -285,12 +285,9 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       });
     }
 
-    eventEmitter.onEvent(
-      WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
-      (data: unknown) => {
-        printFirewallRemediation(data as FirewallBlockedNonInteractiveEventData);
-      },
-    );
+    eventEmitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data: unknown) => {
+      printFirewallRemediation(data as FirewallBlockedNonInteractiveEventData);
+    });
 
     // Create WebAgent
     const webAgent = new WebAgent(browser, {

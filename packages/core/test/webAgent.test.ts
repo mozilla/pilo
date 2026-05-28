@@ -3986,31 +3986,34 @@ describe("WebAgent firewall options", () => {
 
   it("throws InvalidHostnameError when trustedHostnames contains an invalid entry", () => {
     const browser = new MockBrowser();
-    expect(() =>
-      new WebAgent(browser, {
-        providerConfig: { model: mockProvider },
-        trustedHostnames: ["bad value"],
-      }),
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          trustedHostnames: ["bad value"],
+        }),
     ).toThrow(InvalidHostnameError);
   });
 
   it("normalizes trustedHostnames at construction", () => {
     const browser = new MockBrowser();
-    expect(() =>
-      new WebAgent(browser, {
-        providerConfig: { model: mockProvider },
-        trustedHostnames: ["Example.COM", "app.example.com."],
-      }),
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          trustedHostnames: ["Example.COM", "app.example.com."],
+        }),
     ).not.toThrow();
   });
 
   it("accepts unsafeMode true", () => {
     const browser = new MockBrowser();
-    expect(() =>
-      new WebAgent(browser, {
-        providerConfig: { model: mockProvider },
-        unsafeMode: true,
-      }),
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          unsafeMode: true,
+        }),
     ).not.toThrow();
   });
 });

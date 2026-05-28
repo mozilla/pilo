@@ -97,10 +97,7 @@ export function assessFill(input: {
     return { allowed: true };
   }
 
-  if (
-    input.pageHostname !== null &&
-    input.firewall.trustedHostnames.has(input.pageHostname)
-  ) {
+  if (input.pageHostname !== null && input.firewall.trustedHostnames.has(input.pageHostname)) {
     return { allowed: true };
   }
 

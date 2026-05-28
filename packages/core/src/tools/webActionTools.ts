@@ -19,10 +19,7 @@ import {
   extractHostname,
   type FirewallConfig,
 } from "../security/actionFirewall.js";
-import type {
-  FirewallBlockedNonInteractiveEventData,
-  FirewallRemediation,
-} from "../events.js";
+import type { FirewallBlockedNonInteractiveEventData, FirewallRemediation } from "../events.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -63,9 +60,7 @@ type ActionResult = {
 const EMPTY_APPROVED_REFS = new Set<string>();
 
 function buildRemediations(blockedHostnames: string[]): FirewallRemediation[] {
-  const uniqueHosts = Array.from(
-    new Set(blockedHostnames.filter((h): h is string => Boolean(h))),
-  );
+  const uniqueHosts = Array.from(new Set(blockedHostnames.filter((h): h is string => Boolean(h))));
   return [
     {
       kind: "add-trusted-hostnames",
@@ -323,13 +318,7 @@ export function createWebActionTools(context: WebActionContext) {
           });
 
           if (!assessment.allowed) {
-            emitNonInteractiveBlock(
-              context,
-              "freeform-fill",
-              assessment.reason,
-              pageHostname,
-              [],
-            );
+            emitNonInteractiveBlock(context, "freeform-fill", assessment.reason, pageHostname, []);
             return failedActionResult(PageAction.Fill, assessment.reason, context, ref);
           }
 
