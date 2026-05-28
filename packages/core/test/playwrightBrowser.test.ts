@@ -889,6 +889,51 @@ describe("PlaywrightBrowser", () => {
           "Failed to get form submission context: Execution context was destroyed",
         );
       });
+
+      it("returns submitterActionUrl from the evaluate result", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          evaluate: vi.fn().mockResolvedValue({
+            submitterRef: "btn",
+            formId: null,
+            actionUrl: "https://example.com/normal",
+            submitterActionUrl: "https://override.example.com/special",
+            method: "post",
+            fields: [],
+          }),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        const ctx = await browser.getFormSubmissionContext("btn", "click");
+        expect(ctx).not.toBeNull();
+        expect(ctx!.actionUrl).toBe("https://example.com/normal");
+        expect(ctx!.submitterActionUrl).toBe("https://override.example.com/special");
+      });
+
+      it("returns null submitterActionUrl when the evaluate result has none", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          evaluate: vi.fn().mockResolvedValue({
+            submitterRef: "btn",
+            formId: null,
+            actionUrl: "https://example.com/normal",
+            submitterActionUrl: null,
+            method: "post",
+            fields: [],
+          }),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        const ctx = await browser.getFormSubmissionContext("btn", "click");
+        expect(ctx).not.toBeNull();
+        expect(ctx!.submitterActionUrl).toBeNull();
+      });
     });
   });
 
