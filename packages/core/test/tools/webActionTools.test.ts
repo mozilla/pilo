@@ -107,6 +107,10 @@ class MockBrowser implements AriaBrowser {
     return this.formSubmissionContexts.get(ref) ?? null;
   }
 
+  async getRefIdentity(_ref: string): Promise<{ role: string; name: string } | null> {
+    return null;
+  }
+
   async waitForLoadState(): Promise<void> {}
 
   async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
@@ -303,6 +307,34 @@ describe("Web Action Tools", () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(new Error("Network error"));
 
       await expect(tools.click.execute({ ref: "btn1" })).rejects.toThrow("Network error");
+    });
+
+    it("should capture target identity from the browser and include it in the result", async () => {
+      vi.spyOn(mockBrowser, "getRefIdentity").mockResolvedValueOnce({
+        role: "button",
+        name: "Submit",
+      });
+
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result).toEqual({
+        success: true,
+        action: "click",
+        ref: "btn1",
+        targetIdentity: { role: "button", name: "Submit" },
+      });
+    });
+
+    it("should omit targetIdentity when the browser returns null", async () => {
+      vi.spyOn(mockBrowser, "getRefIdentity").mockResolvedValueOnce(null);
+
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result).toEqual({
+        success: true,
+        action: "click",
+        ref: "btn1",
+      });
     });
   });
 
@@ -820,12 +852,30 @@ describe("Web Action Tools", () => {
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_EXTRACTED, {
         extractedData: "Extracted data: Important info",
       });
-      expect(result).toEqual({
-        success: true,
-        action: "extract",
-        description: "Get important info",
-        extractedData: "Extracted data: Important info",
-      });
+      expect(result.success).toBe(true);
+      expect((result as any).action).toBe("extract");
+      expect((result as any).description).toBe("Get important info");
+      expect((result as any).extractedData).toContain("Extracted data: Important info");
+    });
+
+    it('wraps extractedData in <EXTERNAL-CONTENT label="extract-result"> with safety warning', async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Hello from the page",
+      } as any);
+
+      const result = await tools.extract.execute({ description: "what's on the page?" });
+
+      // Wrapper structure present
+      const extracted = (result as any).extractedData as string;
+      expect(extracted).toMatch(
+        /<EXTERNAL-CONTENT label="extract-result">[\s\S]*<\/EXTERNAL-CONTENT>/,
+      );
+      // Payload preserved (inside the wrap)
+      expect(extracted).toContain("Hello from the page");
+      // Warning appears AFTER the closing tag, not just anywhere in the string.
+      const closeIdx = extracted.indexOf("</EXTERNAL-CONTENT>");
+      const warnIdx = extracted.indexOf("**IMPORTANT:**", closeIdx);
+      expect(warnIdx).toBeGreaterThan(closeIdx);
     });
 
     it("should handle abort signal in extract", async () => {

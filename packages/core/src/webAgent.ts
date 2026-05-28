@@ -9,7 +9,7 @@
 
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
-import { AriaBrowser } from "./browser/ariaBrowser.js";
+import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
 import {
   BrowserReconnectedEventData,
   CdpEndpointConnectedEventData,
@@ -251,6 +251,15 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+
+  // Actions where same-action-same-value repetition is legitimate workflow
+  // (e.g. scrolling an infinite feed, waiting for a slow page) rather than a
+  // stuck-loop signal. The detector skips these entirely and resets state so
+  // a real loop interrupted by a scroll doesn't compound across the gap.
+  private static readonly REPETITION_EXEMPT_ACTIONS: ReadonlySet<string> = new Set<string>([
+    PageAction.Scroll,
+    PageAction.Wait,
+  ]);
 
   constructor(
     private browser: AriaBrowser,
@@ -751,6 +760,10 @@ export class WebAgent {
    * Truncate old external content in messages to keep context size down.
    * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
    * while preserving the tag structure and warning.
+   *
+   * Walks both `role: "user"` messages (text + multimodal) and `role: "tool"`
+   * messages (whose `tool-result` `output` value is a structured object that
+   * may contain wrapped external content in nested string fields).
    */
   private truncateOldExternalContent(): void {
     const clipExternalContent = (text: string): string =>
@@ -758,6 +771,26 @@ export class WebAgent {
         /(<EXTERNAL-CONTENT[\s\S]*?>)\n[\s\S]*?\n(<\/EXTERNAL-CONTENT>)/g,
         "$1\n> [clipped for brevity]\n$2",
       );
+
+    // Recursively walk a tool-result output value, returning a new value with
+    // any string fields containing <EXTERNAL-CONTENT> blocks clipped. Non-string
+    // primitives (booleans, numbers, null, undefined) are returned unchanged.
+    const clipInValue = (value: unknown): unknown => {
+      if (typeof value === "string") {
+        return value.includes("<EXTERNAL-CONTENT") ? clipExternalContent(value) : value;
+      }
+      if (Array.isArray(value)) {
+        return value.map(clipInValue);
+      }
+      if (value && typeof value === "object") {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+          out[k] = clipInValue(v);
+        }
+        return out;
+      }
+      return value;
+    };
 
     this.messages = this.messages.map((msg) => {
       if (msg.role === "user") {
@@ -781,6 +814,23 @@ export class WebAgent {
           };
         }
       }
+
+      // Tool-result messages: wrapped external content may live inside the
+      // structured `output` value (e.g. extract.extractedData,
+      // tabstack_extract_markdown.content). Recursively clip any wrapped
+      // strings while leaving the surrounding structure intact.
+      if (msg.role === "tool" && Array.isArray(msg.content)) {
+        return {
+          ...msg,
+          content: msg.content.map((part: any) => {
+            if (part.type === "tool-result" && part.output !== undefined) {
+              return { ...part, output: clipInValue(part.output) };
+            }
+            return part;
+          }),
+        };
+      }
+
       return msg;
     });
   }
@@ -1167,6 +1217,15 @@ export class WebAgent {
     actionExecuted: boolean;
     error?: TaskError;
   } | null {
+    // Skip exempt actions entirely, and reset state so an in-progress repeat
+    // count doesn't carry across them (an exempt action between two clicks
+    // is treated as progress, not as a transparent gap).
+    if (WebAgent.REPETITION_EXEMPT_ACTIONS.has(actionOutput.action)) {
+      executionState.actionRepeatCount = 0;
+      executionState.lastAction = undefined;
+      return null;
+    }
+
     // Define explicit thresholds for warning and abort
     const REPETITION_WARNING_THRESHOLD = this.maxRepeatedActions + 1;
     const REPETITION_ABORT_THRESHOLD = this.maxRepeatedActions + 2;
@@ -1174,8 +1233,8 @@ export class WebAgent {
     // Create signature for current action
     const currentActionSignature = this.createActionSignature(
       actionOutput.action,
-      actionOutput.ref,
       actionOutput.value,
+      actionOutput.targetIdentity,
     );
 
     // Check if this is the same action as the last one
@@ -1518,10 +1577,29 @@ export class WebAgent {
   // === Helper Methods ===
 
   /**
-   * Create a signature for an action to track repetitions
+   * Build a repetition-signature for an action. The element ref is
+   * deliberately excluded because refs are regenerated every snapshot — a
+   * logical "click Submit" gets a new ref each turn, so including it would
+   * make near-duplicate actions hash differently and bypass the detector.
+   * Element identity (role + accessible name) is folded in when present so
+   * ref-only actions like `click` don't collapse different logical targets
+   * (e.g. "click Next" vs "click Submit") onto the same signature.
+   * Value is normalized (lowercase + trim) so cosmetic input variation
+   * doesn't reset the counter on the same logical action.
    */
-  private createActionSignature(action: string, ref?: string, value?: string | number): string {
-    return `${action}:${ref || ""}:${value || ""}`;
+  private createActionSignature(
+    action: string,
+    value?: string | number,
+    identity?: { role: string; name: string },
+  ): string {
+    const normalizedValue = String(value ?? "")
+      .toLowerCase()
+      .trim();
+    if (identity) {
+      const normalizedName = identity.name.toLowerCase().trim();
+      return `${action}:${identity.role}:${normalizedName}:${normalizedValue}`;
+    }
+    return `${action}:${normalizedValue}`;
   }
 
   /**
