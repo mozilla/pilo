@@ -438,6 +438,12 @@ export function createWebActionTools(context: WebActionContext) {
             extractedData: JSON.stringify(object),
           });
 
+          // `data` is intentionally NOT wrapped in <EXTERNAL-CONTENT> tags
+          // because it's a structured object whose shape is constrained by the
+          // caller-supplied outputSchema (same rationale as
+          // tabstack_extract_json). String values nested inside `data` remain
+          // attacker-controllable — see issue #456 for the residual-risk
+          // discussion. Possible follow-up: per-leaf wrapping or taint tracking.
           return {
             success: true,
             action: "extract",
