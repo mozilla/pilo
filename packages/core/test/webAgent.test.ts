@@ -3136,7 +3136,7 @@ describe("WebAgent", () => {
     });
   });
 
-  describe("snapshot truncation", () => {
+  describe("history trimming", () => {
     it("buildStepErrorFeedbackPrompt output starts with STEP_ERROR_FEEDBACK_PREFIX", () => {
       const out = buildStepErrorFeedbackPrompt("boom", false, false, false);
       expect(out.startsWith(STEP_ERROR_FEEDBACK_PREFIX)).toBe(true);
@@ -3481,7 +3481,7 @@ describe("WebAgent", () => {
 
       // Invoke the private truncator directly — matches how other tests in
       // this file already use bracket-access on private members.
-      (webAgent as any).truncateOldExternalContent();
+      (webAgent as any).trimOldHistory();
 
       const messages = (webAgent as any).messages;
       const toolMsg = messages[messages.length - 1];

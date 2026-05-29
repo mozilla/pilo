@@ -760,15 +760,13 @@ export class WebAgent {
   }
 
   /**
-   * Truncate old external content in messages to keep context size down.
-   * Replaces the body of all EXTERNAL-CONTENT blocks with "[clipped for brevity]"
-   * while preserving the tag structure and warning.
+   * Trim old history: clip <EXTERNAL-CONTENT> bodies, old assistant tool-call
+   * inputs, old tool-result outputs, and aggregate older feedback messages.
+   * Runs once at the top of `addPageSnapshot`.
    *
-   * Walks both `role: "user"` messages (text + multimodal) and `role: "tool"`
-   * messages (whose `tool-result` `output` value is a structured object that
-   * may contain wrapped external content in nested string fields).
+   * For now this is a rename — additional passes are added in later tasks.
    */
-  private truncateOldExternalContent(): void {
+  private trimOldHistory(): void {
     const clipExternalContent = (text: string): string =>
       text.replace(
         /(<EXTERNAL-CONTENT[\s\S]*?>)\n[\s\S]*?\n(<\/EXTERNAL-CONTENT>)/g,
@@ -843,7 +841,7 @@ export class WebAgent {
    */
   private async addPageSnapshot(): Promise<void> {
     // First, truncate old snapshots to keep context size manageable
-    this.truncateOldExternalContent();
+    this.trimOldHistory();
 
     const currentUrl = await this.browser.getUrl();
     const currentPageSnapshot = await this.browser.getTreeWithRefs();
