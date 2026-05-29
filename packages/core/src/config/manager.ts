@@ -1,5 +1,5 @@
 /**
- * Config Manager (Node.js only - uses fs, path, os, dotenv)
+ * Config Manager (Node.js only - uses fs, path, os)
  */
 
 // Build-time flag: replaced with `true` by the production build step.
@@ -14,7 +14,6 @@ export function isProduction(): boolean {
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { config as loadDotenv } from "dotenv";
 
 import { DEFAULTS, type PiloConfig, type PiloConfigResolved } from "./defaults.js";
 import { parseEnvConfig } from "./env.js";
@@ -63,7 +62,7 @@ export class ConfigManager {
 
     // Dev mode: load local .env file and include env vars.
     try {
-      loadDotenv({ path: ".env", quiet: true });
+      process.loadEnvFile(".env");
     } catch {
       // Ignore if .env doesn't exist
     }

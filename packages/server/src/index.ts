@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./loadEnv.js";
 import { initTelemetry } from "./telemetry.js";
 
 // Initialize OTel SDK before app creation
