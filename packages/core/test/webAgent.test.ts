@@ -4654,6 +4654,30 @@ describe("WebAgent", () => {
       await agent.close();
     });
 
+    it("clamps maxActionsPerStep below 1 to 1 without crashing on an empty slice", async () => {
+      const { agent, logger } = makeBatchAgent(0);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          toolResult("click", { action: "click", ref: "btn1", isTerminal: false }),
+          fill(1),
+        ]),
+      );
+      mockStreamText.mockReturnValueOnce(doneTurn());
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("clamp test", { startingUrl: "https://example.com" });
+
+      // Clamped to 1: processes the first tool, drops the rest — no crash.
+      expect(result.success).toBe(true);
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 1,
+        batchStoppedBy: "completed",
+      });
+      await agent.close();
+    });
+
     it("at the default of 1, processes only the first result and drops the rest", async () => {
       // Default agent (maxActionsPerStep = 1) but provider returns two tools.
       const emitter = new WebAgentEventEmitter();

@@ -287,7 +287,12 @@ export class WebAgent {
     this.maxTotalErrors = options.maxTotalErrors ?? defaults.max_total_errors;
     this.maxValidationAttempts = options.maxValidationAttempts ?? defaults.max_validation_attempts;
     this.maxRepeatedActions = options.maxRepeatedActions ?? defaults.max_repeated_actions;
-    this.maxActionsPerStep = options.maxActionsPerStep ?? defaults.max_actions_per_step;
+    // Clamp to a sane integer ≥ 1: a value of 0/negative/NaN would make the
+    // processing loop's slice empty and crash the drop path (toProcess[0]).
+    const requestedMaxActions = options.maxActionsPerStep ?? defaults.max_actions_per_step;
+    this.maxActionsPerStep = Number.isFinite(requestedMaxActions)
+      ? Math.max(1, Math.floor(requestedMaxActions))
+      : 1;
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
@@ -1106,6 +1111,11 @@ export class WebAgent {
     // browser. Process up to maxActionsPerStep of them in order; results beyond
     // the cap already executed but are dropped from processing (this reproduces
     // the historical single-action behavior when the cap is 1).
+    let actionsProcessed = 0;
+    let anyPageChanged = false;
+    let lastNonTerminalOutput: any = null;
+    let batchStoppedBy: "terminal" | "error" | "completed" = "completed";
+
     const toProcess = aiResponse.toolResults.slice(0, this.maxActionsPerStep);
     if (aiResponse.toolResults.length > toProcess.length) {
       const droppedTools = aiResponse.toolResults
@@ -1121,12 +1131,11 @@ export class WebAgent {
         droppedTools,
         keptTool: toProcess[0].toolName,
       });
+      // Dropped actions already executed (eager AI SDK) and any of them may have
+      // navigated/changed the page. Force a snapshot refresh next turn so we
+      // don't run against stale refs even if the processed actions were no-refresh.
+      anyPageChanged = true;
     }
-
-    let actionsProcessed = 0;
-    let anyPageChanged = false;
-    let lastNonTerminalOutput: any = null;
-    let batchStoppedBy: "terminal" | "error" | "completed" = "completed";
 
     try {
       for (const tr of toProcess) {

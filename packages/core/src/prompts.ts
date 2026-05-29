@@ -222,6 +222,30 @@ Use valid JSON format for all arguments.
 CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool call multiple times.
 `.trim();
 
+/**
+ * Actions the model may batch (before a single trailing page-changing action)
+ * when `maxActionsPerStep > 1` — they mutate form state without navigating or
+ * invalidating other refs. Single source of truth for both the prompt guidance
+ * below and the `isBatchTerminating` classifier (re-exported from
+ * `tools/webActionTools.ts`). Defined here because the prompt is the consumer
+ * and `prompts.ts` already owns tool-facing metadata (TOOL_STRINGS).
+ */
+export const SAFE_TO_BATCH_ACTIONS: ReadonlySet<string> = new Set([
+  "fill",
+  "select",
+  "check",
+  "uncheck",
+  "focus",
+]);
+
+/**
+ * True when an action ends a batch — i.e. it is page-changing, terminal, or
+ * unrecognized. Unknown action names default to terminating (fail safe).
+ */
+export function isBatchTerminating(action: string): boolean {
+  return !SAFE_TO_BATCH_ACTIONS.has(action);
+}
+
 /** Tool calling instruction when batching is enabled (up to N tools per turn). */
 const batchingToolCallInstruction = (maxActionsPerStep: number): string =>
   `
@@ -231,7 +255,7 @@ boxes). Any page-changing action — click, enter, goto, back, forward, scroll, 
 extract, done, abort — MUST be the LAST call in the turn, or the only call. Actions placed
 after a page-changing call run against a stale page and will fail.
 
-Safe to batch together (before any page-changing action): fill, select, check, uncheck, focus.
+Safe to batch together (before any page-changing action): ${[...SAFE_TO_BATCH_ACTIONS].join(", ")}.
 Must be last or alone: everything else.
 
 Use valid JSON format for all arguments. Do not call the same tool with identical arguments more than once.

@@ -291,7 +291,11 @@ export interface ToolDropDebugEventData extends WebAgentEventData {
   keptTool: string;
 }
 
-/** Emitted after a multi-action turn is processed (when maxActionsPerStep > 1). */
+/**
+ * Emitted after each action turn is processed, reporting how many of the
+ * returned tool calls were processed and why processing stopped. Fires on every
+ * turn (including the single-action default), so consumers can rely on it.
+ */
 export interface BatchDebugEventData extends WebAgentEventData {
   /** Number of tool calls the model returned this turn. */
   actionsRequested: number;
