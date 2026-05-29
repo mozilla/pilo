@@ -5,6 +5,7 @@ import {
   assessFormSubmission,
   normalizeHostname,
   extractHostname,
+  withTrustedStartHost,
   InvalidHostnameError,
   SECURITY_BLOCKED_UNAUTHORIZED_FILL,
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
@@ -245,6 +246,47 @@ describe("normalizeHostname", () => {
       expect(e).toBeInstanceOf(InvalidHostnameError);
       expect((e as Error).message).toContain("bad value");
     }
+  });
+});
+
+describe("withTrustedStartHost", () => {
+  const base: FirewallConfig = { trustedHostnames: new Set(["already.com"]), unsafeMode: false };
+
+  it("adds the start URL's host to the trusted set", () => {
+    const result = withTrustedStartHost(base, "https://github.com/signup");
+    expect(result.trustedHostnames.has("github.com")).toBe(true);
+  });
+
+  it("preserves existing trusted hosts and unsafeMode", () => {
+    const result = withTrustedStartHost(
+      { trustedHostnames: new Set(["already.com"]), unsafeMode: true },
+      "https://github.com/",
+    );
+    expect(result.trustedHostnames.has("already.com")).toBe(true);
+    expect(result.unsafeMode).toBe(true);
+  });
+
+  it("lowercases the host (via extractHostname)", () => {
+    const result = withTrustedStartHost(base, "https://GitHub.COM/x");
+    expect(result.trustedHostnames.has("github.com")).toBe(true);
+  });
+
+  it("does not mutate the input firewall", () => {
+    withTrustedStartHost(base, "https://github.com/");
+    expect(base.trustedHostnames.has("github.com")).toBe(false);
+  });
+
+  it("returns the firewall unchanged for a null start URL", () => {
+    expect(withTrustedStartHost(base, null)).toBe(base);
+  });
+
+  it("returns the firewall unchanged for a non-http(s) start URL", () => {
+    expect(withTrustedStartHost(base, "about:blank")).toBe(base);
+    expect(withTrustedStartHost(base, "file:///tmp/x.html")).toBe(base);
+  });
+
+  it("returns the firewall unchanged when the host is already trusted", () => {
+    expect(withTrustedStartHost(base, "https://already.com/path")).toBe(base);
   });
 });
 

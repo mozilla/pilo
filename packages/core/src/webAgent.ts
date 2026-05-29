@@ -60,7 +60,11 @@ import {
   SpanName,
   recordSanitizedException,
 } from "./telemetry/tracing.js";
-import { normalizeHostname, type FirewallConfig } from "./security/actionFirewall.js";
+import {
+  normalizeHostname,
+  withTrustedStartHost,
+  type FirewallConfig,
+} from "./security/actionFirewall.js";
 
 // === Type Definitions ===
 
@@ -251,6 +255,11 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+  // Host of the caller-provided start URL (options.startingUrl), captured at
+  // execute() time. Trusted by the firewall — navigating somewhere the caller
+  // explicitly named is consent to interact with that host. NOT set from the
+  // planner-chosen URL, which is model-influenced and must not grant trust.
+  private callerStartHostUrl: string | null = null;
 
   // Actions where same-action-same-value repetition is legitimate workflow
   // (e.g. scrolling an infinite feed, waiting for a slow page) rather than a
@@ -344,6 +353,10 @@ export class WebAgent {
         try {
           // 1. Validate input parameters (let validation errors throw)
           this.validateTaskAndOptions(task, options);
+
+          // Capture only the caller-provided start URL (not the planner's choice)
+          // so the firewall can trust that host for fills/submissions.
+          this.callerStartHostUrl = options.startingUrl ?? null;
 
           // 2. Initialize browser and internal state
           await this.initializeBrowserAndState(task, options);
@@ -447,7 +460,7 @@ export class WebAgent {
       approvedRefs: approvedRefs ?? undefined,
       agentFilledRefs,
       operationalRefs,
-      firewall: this.firewall,
+      firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
     });
 

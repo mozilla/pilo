@@ -242,6 +242,29 @@ export function normalizeHostname(input: string): string {
   return withoutTrailingDot.toLowerCase();
 }
 
+/**
+ * Return a FirewallConfig with the start URL's host added to the trusted set.
+ *
+ * Used to trust the hostname of a caller-provided start URL: navigating somewhere
+ * the caller explicitly named is treated as consent to interact with that host's
+ * forms. Only call this with a caller-supplied URL — never a planner-chosen or
+ * agent-navigated URL, which are model/page-influenced and must not grant trust.
+ *
+ * Non-http(s) or unparseable URLs (null host) leave the firewall unchanged, as
+ * does a host that is already trusted. The input is never mutated.
+ */
+export function withTrustedStartHost(
+  firewall: FirewallConfig,
+  startUrl: string | null,
+): FirewallConfig {
+  const host = extractHostname(startUrl);
+  if (host === null || firewall.trustedHostnames.has(host)) return firewall;
+  return Object.freeze({
+    trustedHostnames: new Set([...firewall.trustedHostnames, host]),
+    unsafeMode: firewall.unsafeMode,
+  });
+}
+
 export function extractHostname(url: string | null): string | null {
   if (url === null || url === undefined) return null;
   if (typeof url !== "string" || url.length === 0) return null;
