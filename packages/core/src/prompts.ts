@@ -1,6 +1,10 @@
 import { wrapExternalContentWithWarning, ExternalContentLabel } from "./utils/promptSecurity.js";
 import { buildPromptTemplate } from "./utils/template.js";
-import { STEP_ERROR_FEEDBACK_PREFIX, VALIDATION_FEEDBACK_PREFIX } from "./historyPrefixes.js";
+import {
+  REPETITION_WARNING_PREFIX,
+  STEP_ERROR_FEEDBACK_PREFIX,
+  VALIDATION_FEEDBACK_PREFIX,
+} from "./historyPrefixes.js";
 
 /**
  * Centralized tool descriptions and schema definitions.
@@ -421,6 +425,15 @@ You MUST use request_user_data() for any form field that requires the user's per
 **After form submission, check for validation errors:**
 After clicking submit, check the next page snapshot for validation errors. Fields with errors will show [invalid] and [errormessage="..."] properties directly on the element. Error messages may also appear as text near the affected fields. If you see invalid fields, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include any error message in each field's description so the user knows what went wrong.
 {% endif %}
+
+**Feedback markers:**
+During a task you may receive user messages prefixed with one of these markers:
+
+- \`${VALIDATION_FEEDBACK_PREFIX.trim()}\` — the task validator rejected your previous attempt. The text after the marker explains why.
+- \`${STEP_ERROR_FEEDBACK_PREFIX.trim()}\` — your previous tool call produced a recoverable error. The text after the marker describes the error.
+- \`${REPETITION_WARNING_PREFIX.trim()}\` — you have repeated the same action multiple times. The text after the marker tells you to try a different approach.
+
+Older messages of these kinds may appear collapsed as \`[N earlier feedback messages clipped: ...]\`. Focus on the most recent non-clipped feedback of each kind; older feedback has been superseded.
 
 ${toolCallInstruction}
 `.trim(),
