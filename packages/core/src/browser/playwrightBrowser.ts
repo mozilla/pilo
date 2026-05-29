@@ -784,9 +784,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     const locator = this.page.locator(`[data-pilo-ref="${ref}"]`);
     const count = await locator.count();
 
-    if (count === 0) {
-      throw new InvalidRefException(ref);
-    }
+    if (count === 1) return locator;
 
     if (count > 1) {
       // This shouldn't happen with data-pilo-ref, but let's be defensive
@@ -796,7 +794,60 @@ export class PlaywrightBrowser implements AriaBrowser {
       );
     }
 
-    return locator;
+    // count === 0: the attribute is gone (commonly stripped by React reconciliation
+    // after our snapshot set it). Fall back to the JS-side __piloRefMap which holds
+    // direct Element references that survive attribute strips. We re-attach the
+    // attribute so the subsequent locator query (and any future lookup in this
+    // iteration) finds the element via the existing selector path.
+    //
+    // The ownerDocument check restricts recovery to the main frame's document.
+    // Same-origin iframe elements may be in __piloRefMap (the snapshot walks them
+    // inline) but cannot be located by page.locator(...) — that searches the main
+    // frame only. Recovering them would push the failure to click time as an
+    // opaque locator timeout instead of an immediate InvalidRefException.
+    const reattached = await this.page.evaluate((r) => {
+      const map = (globalThis as { __piloRefMap?: Map<string, Element> }).__piloRefMap;
+      const el = map?.get(r);
+      if (!el || !el.isConnected || el.ownerDocument !== document) return false;
+      el.setAttribute("data-pilo-ref", r);
+      return true;
+    }, ref);
+
+    if (!reattached) throw new InvalidRefException(ref);
+
+    // Re-validate the post-recovery locator with the same count() check the
+    // happy path uses. Guards against a race where another reconciliation
+    // pass strips the attribute again, or where setAttribute somehow lands
+    // on multiple elements — both turn into the same loud failure as today.
+    const recoveredLocator = this.page.locator(`[data-pilo-ref="${ref}"]`);
+    const recoveredCount = await recoveredLocator.count();
+    if (recoveredCount === 1) return recoveredLocator;
+    if (recoveredCount > 1) {
+      throw new InvalidRefException(
+        ref,
+        `Multiple elements found with reference '${ref}'. This may indicate a page structure issue.`,
+      );
+    }
+    throw new InvalidRefException(ref);
+  }
+
+  async getRefIdentity(ref: string): Promise<{ role: string; name: string } | null> {
+    if (!this.page) return null;
+    try {
+      return await this.page.evaluate(
+        (refArg) =>
+          (
+            globalThis as unknown as {
+              __piloIdentityMap?: Map<string, { role: string; name: string }>;
+            }
+          ).__piloIdentityMap?.get(refArg) ?? null,
+        ref,
+      );
+    } catch {
+      // The page may have navigated or torn down the identity map. Identity
+      // is advisory for repetition detection — log nothing, just bail out.
+      return null;
+    }
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {

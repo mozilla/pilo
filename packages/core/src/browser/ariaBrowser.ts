@@ -162,6 +162,14 @@ export interface AriaBrowser {
   performAction(ref: string, action: PageAction, value?: string): Promise<void>;
 
   /**
+   * Look up element identity (role + accessible name) for a ref from the
+   * most recent ariaTree snapshot. Returns null if the ref is unknown.
+   * Used by the repetition detector to distinguish logical targets when
+   * the ref string itself churns between snapshots.
+   */
+  getRefIdentity(ref: string): Promise<{ role: string; name: string } | null>;
+
+  /**
    * Waits for a specific load state of the page
    * @param state The load state to wait for
    * @param options Additional options like timeout

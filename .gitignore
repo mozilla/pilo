@@ -7,6 +7,7 @@ dist
 scripts/docker-build.sh
 debug
 coverage
+.smoke-eval-output
 
 # Auto-generated files
 packages/core/src/browser/ariaTree/bundle.ts

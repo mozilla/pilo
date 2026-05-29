@@ -69,22 +69,52 @@ describe("Tabstack Tools", () => {
       };
       vi.mocked(mockClient.extract.markdown).mockResolvedValue(sdkResult);
 
-      const result = await tools.tabstack_extract_markdown.execute!(
+      const result = (await tools.tabstack_extract_markdown.execute!(
         { url: "https://example.com" },
         toolCallOptions,
-      );
+      )) as {
+        success: boolean;
+        action: string;
+        url: string;
+        content: string;
+        metadata: unknown;
+      };
 
       expect(mockClient.extract.markdown).toHaveBeenCalledWith({
         url: "https://example.com",
         metadata: true,
       });
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         success: true,
         action: "tabstack_extract_markdown",
         url: "https://example.com",
-        content: "# Hello",
         metadata: { title: "Hello" },
       });
+      // Content is wrapped (asserted in detail below); the raw payload is preserved.
+      expect(result.content).toContain("# Hello");
+    });
+
+    it('wraps content in <EXTERNAL-CONTENT label="tabstack-content"> with safety warning', async () => {
+      vi.mocked(mockClient.extract.markdown).mockResolvedValue({
+        url: "https://example.com",
+        content: "raw page content from tabstack",
+        metadata: { title: "Example" },
+      });
+
+      const result = (await tools.tabstack_extract_markdown.execute!(
+        { url: "https://example.com" },
+        toolCallOptions,
+      )) as { success: boolean; content: string };
+
+      expect(result.success).toBe(true);
+      expect(result.content).toMatch(
+        /<EXTERNAL-CONTENT label="tabstack-content">[\s\S]*<\/EXTERNAL-CONTENT>/,
+      );
+      expect(result.content).toContain("raw page content from tabstack");
+      // Warning appears AFTER the closing tag, not just anywhere in the string.
+      const closeIdx = result.content.indexOf("</EXTERNAL-CONTENT>");
+      const warnIdx = result.content.indexOf("**IMPORTANT:**", closeIdx);
+      expect(warnIdx).toBeGreaterThan(closeIdx);
     });
 
     it("should emit events on success", async () => {

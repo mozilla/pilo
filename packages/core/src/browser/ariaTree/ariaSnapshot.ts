@@ -48,6 +48,11 @@ export function generateAndRenderAriaTree(root: Element, counter?: RefCounter): 
   // that strip data-pilo-ref attributes, e.g. React reconciliation)
   (globalThis as any).__piloRefMap = new Map<string, Element>();
 
+  // Initialize identity map for ref -> {role, name} lookup. Used by the
+  // repetition detector to distinguish logical click targets when refs
+  // themselves churn between snapshots.
+  (globalThis as any).__piloIdentityMap = new Map<string, { role: string; name: string }>();
+
   const ariaTree = generateAriaTree(root);
   return renderAriaTree(ariaTree, refCounter);
 }
@@ -493,6 +498,13 @@ function renderAriaTree(root: AriaNode, counter: RefCounter): string {
       if (ariaNode.element) {
         (globalThis as any).__piloRefMap?.set(ref, ariaNode.element);
       }
+      // Capture role + accessible name for the repetition detector. Stored
+      // separately from refMap so consumers that only need identity don't
+      // have to re-walk the DOM.
+      (globalThis as any).__piloIdentityMap?.set(ref, {
+        role: String(ariaNode.role),
+        name: ariaNode.name ?? "",
+      });
     }
 
     const escapedKey = indent + "- " + yamlEscapeKeyIfNeeded(key);

@@ -13,6 +13,7 @@ import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
 import { generateTextWithRetry, generateObjectWithRetry } from "../utils/retry.js";
+import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -43,6 +44,11 @@ type ActionResult = {
   value?: string | number;
   error?: string;
   isRecoverable?: boolean;
+  // Snapshot-time role + accessible name for the targeted element. Optional
+  // (only populated when a ref is provided and the browser can resolve it).
+  // Used by the repetition detector to distinguish logical targets even
+  // when ref strings churn between snapshots.
+  targetIdentity?: { role: string; name: string };
 };
 
 /**
@@ -82,6 +88,17 @@ async function performActionWithValidation(
           value,
         });
 
+        // Capture target identity BEFORE the action runs — the snapshot's
+        // identity map is the basis for the ref the LLM emitted, and the
+        // action itself may invalidate the ref by causing navigation or DOM
+        // teardown. Identity is advisory; null means we just won't fold it
+        // into the repetition signature for this turn.
+        let targetIdentity: { role: string; name: string } | undefined;
+        if (ref) {
+          const id = await context.browser.getRefIdentity(ref);
+          if (id) targetIdentity = id;
+        }
+
         // Perform the action
         await context.browser.performAction(ref || "", action, value);
 
@@ -97,6 +114,7 @@ async function performActionWithValidation(
           action,
           ...(ref && { ref }),
           ...(value !== undefined && { value }),
+          ...(targetIdentity && { targetIdentity }),
         };
       } catch (error) {
         // For browser exceptions, emit failure with error details and return error info
@@ -455,7 +473,10 @@ export function createWebActionTools(context: WebActionContext) {
           success: true,
           action: "extract",
           description,
-          extractedData: extractResponse.text,
+          extractedData: wrapExternalContentWithWarning(
+            extractResponse.text,
+            ExternalContentLabel.ExtractResult,
+          ),
         };
       },
     }),

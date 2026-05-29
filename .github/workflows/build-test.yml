@@ -356,3 +356,108 @@ jobs:
           path: packages/extension/test-results/
           retention-days: 30
           if-no-files-found: ignore
+
+  smoke-eval:
+    name: Smoke eval (Pilo agent on example.com)
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    # id-token: write is required if/when this job is switched to Workload
+    # Identity Federation (see the auth step below).
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core build
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/core/dist
+            packages/core/src/browser/ariaTree/bundle.ts
+          key: ${{ runner.os }}-core-dist-${{ github.sha }}
+
+      - name: Build CLI
+        run: pnpm --filter pilo-cli run build
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          set -euo pipefail
+          version=$(jq -re '.dependencies["playwright"] // empty' package.json)
+          if [ -z "$version" ]; then
+            echo "Error: playwright dependency not found in root package.json" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # GCP auth for Vertex AI (Gemini). Default path uses a service-account
+      # JSON secret; once Workload Identity Federation is provisioned for
+      # nonprod Vertex access, swap `credentials_json` for the WIF inputs
+      # shown in the commented block below.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SMOKE_EVAL_SA_KEY }}
+          # workload_identity_provider: ${{ vars.GCP_SMOKE_EVAL_WIF_PROVIDER }}
+          # service_account: ${{ vars.GCP_SMOKE_EVAL_SERVICE_ACCOUNT }}
+
+      - name: Run smoke eval
+        env:
+          GOOGLE_CLOUD_PROJECT: moz-fx-tabs-nonprod
+          GOOGLE_CLOUD_REGION: us-central1
+          SMOKE_EVAL_PROVIDER: vertex
+          SMOKE_EVAL_MODEL: gemini-2.5-flash
+          SMOKE_EVAL_TIMEOUT_MS: "180000"
+        run: pnpm smoke-eval
+
+      - name: Upload smoke-eval log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-eval-log
+          path: .smoke-eval-output/
+          retention-days: 14
+          if-no-files-found: warn

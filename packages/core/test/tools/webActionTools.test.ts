@@ -6,6 +6,10 @@ import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
 import { generateTextWithRetry, generateObjectWithRetry } from "../../src/utils/retry.js";
+import {
+  wrapExternalContentWithWarning,
+  ExternalContentLabel,
+} from "../../src/utils/promptSecurity.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -77,6 +81,10 @@ class MockBrowser implements AriaBrowser {
 
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {
     // Mock implementation - can be configured to throw errors for testing
+  }
+
+  async getRefIdentity(_ref: string): Promise<{ role: string; name: string } | null> {
+    return null;
   }
 
   async waitForLoadState(): Promise<void> {}
@@ -276,6 +284,34 @@ describe("Web Action Tools", () => {
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(new Error("Network error"));
 
       await expect(tools.click.execute({ ref: "btn1" })).rejects.toThrow("Network error");
+    });
+
+    it("should capture target identity from the browser and include it in the result", async () => {
+      vi.spyOn(mockBrowser, "getRefIdentity").mockResolvedValueOnce({
+        role: "button",
+        name: "Submit",
+      });
+
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result).toEqual({
+        success: true,
+        action: "click",
+        ref: "btn1",
+        targetIdentity: { role: "button", name: "Submit" },
+      });
+    });
+
+    it("should omit targetIdentity when the browser returns null", async () => {
+      vi.spyOn(mockBrowser, "getRefIdentity").mockResolvedValueOnce(null);
+
+      const result = await tools.click.execute({ ref: "btn1" });
+
+      expect(result).toEqual({
+        success: true,
+        action: "click",
+        ref: "btn1",
+      });
     });
   });
 
@@ -620,12 +656,30 @@ describe("Web Action Tools", () => {
       expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_EXTRACTED, {
         extractedData: "Extracted data: Important info",
       });
-      expect(result).toEqual({
-        success: true,
-        action: "extract",
-        description: "Get important info",
-        extractedData: "Extracted data: Important info",
-      });
+      expect(result.success).toBe(true);
+      expect((result as any).action).toBe("extract");
+      expect((result as any).description).toBe("Get important info");
+      expect((result as any).extractedData).toContain("Extracted data: Important info");
+    });
+
+    it('wraps extractedData in <EXTERNAL-CONTENT label="extract-result"> with safety warning', async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Hello from the page",
+      } as any);
+
+      const result = await tools.extract.execute({ description: "what's on the page?" });
+
+      // Wrapper structure present
+      const extracted = (result as any).extractedData as string;
+      expect(extracted).toMatch(
+        /<EXTERNAL-CONTENT label="extract-result">[\s\S]*<\/EXTERNAL-CONTENT>/,
+      );
+      // Payload preserved (inside the wrap)
+      expect(extracted).toContain("Hello from the page");
+      // Warning appears AFTER the closing tag, not just anywhere in the string.
+      const closeIdx = extracted.indexOf("</EXTERNAL-CONTENT>");
+      const warnIdx = extracted.indexOf("**IMPORTANT:**", closeIdx);
+      expect(warnIdx).toBeGreaterThan(closeIdx);
     });
 
     it("should handle abort signal in extract", async () => {
@@ -742,7 +796,10 @@ describe("Web Action Tools", () => {
         success: true,
         action: "extract",
         description: "product details",
-        extractedData: "markdown extracted",
+        extractedData: wrapExternalContentWithWarning(
+          "markdown extracted",
+          ExternalContentLabel.ExtractResult,
+        ),
       });
       expect((result as any).data).toBeUndefined();
     });
@@ -762,7 +819,10 @@ describe("Web Action Tools", () => {
         success: true,
         action: "extract",
         description: "Get info",
-        extractedData: "markdown extracted",
+        extractedData: wrapExternalContentWithWarning(
+          "markdown extracted",
+          ExternalContentLabel.ExtractResult,
+        ),
       });
       // The markdown branch returns `extractedData`, not `data`.
       expect((result as any).data).toBeUndefined();
