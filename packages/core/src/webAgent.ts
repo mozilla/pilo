@@ -895,6 +895,46 @@ export class WebAgent {
       };
     });
 
+    // Pass 3.5: Drop fully-clipped messages that are before the boundary.
+    // After passes 1-3, messages before the boundary have had their EXTERNAL-CONTENT
+    // replaced with "[clipped for brevity]" and their tool-call inputs / tool-result
+    // outputs replaced with {clipped:true}. Retaining those stub messages contributes
+    // no semantic information yet inflates the message count and token estimate without
+    // bound. Dropping them keeps the history size plateaued at O(KEEP_LAST) rather than
+    // O(total iterations).
+    //
+    // Feedback messages are intentionally excluded here — they are handled by pass 4.
+    if (boundary !== -1) {
+      const isFeedbackMessage = (msg: (typeof this.messages)[0]): boolean => {
+        if (msg.role !== "user" || typeof msg.content !== "string") return false;
+        return (
+          msg.content.startsWith(VALIDATION_FEEDBACK_PREFIX) ||
+          msg.content.startsWith(STEP_ERROR_FEEDBACK_PREFIX) ||
+          msg.content.startsWith(REPETITION_WARNING_PREFIX)
+        );
+      };
+      const isFullyClipped = (msg: (typeof this.messages)[0]): boolean => {
+        if (msg.role === "user" && typeof msg.content === "string") {
+          return msg.content.includes("> [clipped for brevity]");
+        }
+        if (msg.role === "assistant" && Array.isArray(msg.content)) {
+          const toolCalls = (msg.content as any[]).filter((p) => p.type === "tool-call");
+          return toolCalls.length > 0 && toolCalls.every((p) => p.input?.clipped === true);
+        }
+        if (msg.role === "tool" && Array.isArray(msg.content)) {
+          const toolResults = (msg.content as any[]).filter((p) => p.type === "tool-result");
+          return toolResults.length > 0 && toolResults.every((p) => p.output?.clipped === true);
+        }
+        return false;
+      };
+      this.messages = this.messages.filter((msg, idx) => {
+        if (idx < 2) return true; // always keep system + task
+        if (idx >= boundary) return true; // keep messages at/after boundary
+        if (isFeedbackMessage(msg)) return true; // handled by pass 4
+        return !isFullyClipped(msg); // drop fully-clipped stubs
+      });
+    }
+
     // Pass 4: Feedback aggregation.
     //
     // Algorithm:

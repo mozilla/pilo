@@ -3506,7 +3506,7 @@ describe("WebAgent", () => {
       expect(output.action).toBe("extract");
     });
 
-    it("clips old assistant tool-call inputs beyond keep-last-5 boundary", () => {
+    it("clips and drops old assistant tool-call inputs beyond keep-last-5 boundary", () => {
       const buildAssistantToolCall = (i: number) => ({
         role: "assistant" as const,
         content: [
@@ -3519,7 +3519,7 @@ describe("WebAgent", () => {
         ],
       });
 
-      // 8 assistant messages — oldest 3 should be clipped, newest 5 preserved
+      // 8 assistant messages — oldest 3 are clipped then dropped by pass 3.5, newest 5 preserved
       const msgs = [
         { role: "system" as const, content: "sys" },
         { role: "user" as const, content: "task" },
@@ -3534,23 +3534,18 @@ describe("WebAgent", () => {
       expect(out[0]).toEqual({ role: "system", content: "sys" });
       expect(out[1]).toEqual({ role: "user", content: "task" });
 
-      // out[2..4] are the 3 oldest assistant messages — should be clipped
-      for (let i = 2; i <= 4; i++) {
-        const part = out[i].content[0];
-        expect(part.type).toBe("tool-call");
-        expect(part.toolCallId).toBe(`call-${i - 2}`);
-        expect(part.toolName).toBe("click");
-        expect(part.input).toEqual({ clipped: true });
-      }
+      // Oldest 3 assistant messages (call-0, call-1, call-2) are fully clipped by pass 2
+      // then dropped by pass 3.5 — only the 5 newest survive.
+      expect(out.length).toBe(7); // sys + task + 5 newest assistant messages
 
-      // out[5..9] are the 5 newest assistant messages — should be untouched
-      for (let i = 5; i <= 9; i++) {
+      // out[2..6] are the 5 newest assistant messages — should be untouched
+      for (let i = 2; i <= 6; i++) {
         const part = out[i].content[0];
-        expect(part.input).toEqual({ ref: `node-${i - 2}`, value: null });
+        expect(part.input).toEqual({ ref: `node-${i + 1}`, value: null }); // call-3..call-7
       }
     });
 
-    it("clips paired tool-result outputs for clipped assistant tool-calls (pairing preserved)", () => {
+    it("clips and drops paired tool-result outputs for clipped assistant tool-calls (pairing preserved)", () => {
       const pair = (i: number) => [
         {
           role: "assistant" as const,
@@ -3602,20 +3597,20 @@ describe("WebAgent", () => {
         }
       }
 
-      // Oldest 3 pairs (call-0, call-1, call-2): both clipped.
+      // Oldest 3 pairs (call-0, call-1, call-2): clipped by passes 2+3 then dropped by pass 3.5.
       for (const id of ["call-0", "call-1", "call-2"]) {
-        expect(toolCalls.get(id)).toEqual({ clipped: true });
-        expect(toolResults.get(id)).toEqual({ clipped: true });
+        expect(toolCalls.has(id)).toBe(false);
+        expect(toolResults.has(id)).toBe(false);
       }
-      // Newest 5 pairs (call-3..call-7): untouched.
+      // Newest 5 pairs (call-3..call-7): untouched and present.
       for (let i = 3; i <= 7; i++) {
         expect(toolCalls.get(`call-${i}`)).toEqual({ ref: `node-${i}` });
         expect(toolResults.get(`call-${i}`)).toEqual({ success: true, data: `result-${i}` });
       }
 
-      // Both maps should have entries for all 8 toolCallIds (no messages dropped, no duplicates).
-      expect(toolCalls.size).toBe(8);
-      expect(toolResults.size).toBe(8);
+      // Only 5 pairs remain (oldest 3 dropped by pass 3.5).
+      expect(toolCalls.size).toBe(5);
+      expect(toolResults.size).toBe(5);
 
       // No orphans: every tool-result has a matching tool-call.
       for (const id of toolResults.keys()) {
@@ -3789,6 +3784,71 @@ describe("WebAgent", () => {
       expect(events[0].estimatedTokens).toBeGreaterThan(0);
       expect(events[0].messageCount).toBe(3); // sys, task, new snapshot
       expect(events[0].iterationId).toBeDefined();
+    });
+
+    it("history size plateaus rather than growing linearly across many iterations", () => {
+      (webAgent as any).messages = [
+        { role: "system" as const, content: "sys" },
+        { role: "user" as const, content: "task" },
+      ];
+
+      const tokens: number[] = [];
+      const counts: number[] = [];
+
+      for (let iter = 0; iter < 50; iter++) {
+        // Simulate one iteration: snapshot, assistant tool-call, tool-result.
+        (webAgent as any).messages.push({
+          role: "user" as const,
+          content: `<EXTERNAL-CONTENT label="page-snapshot">\n${"x".repeat(2000)}\n</EXTERNAL-CONTENT>`,
+        });
+        (webAgent as any).messages.push({
+          role: "assistant" as const,
+          content: [
+            {
+              type: "tool-call" as const,
+              toolCallId: `c-${iter}`,
+              toolName: "click",
+              input: { ref: `n-${iter}`, padding: "y".repeat(200) },
+            },
+          ],
+        });
+        (webAgent as any).messages.push({
+          role: "tool" as const,
+          content: [
+            {
+              type: "tool-result" as const,
+              toolCallId: `c-${iter}`,
+              toolName: "click",
+              output: { success: true, payload: "z".repeat(300) },
+            },
+          ],
+        });
+        // Occasional feedback to exercise pass 4.
+        if (iter % 7 === 0) {
+          (webAgent as any).messages.push({
+            role: "user" as const,
+            content: `${VALIDATION_FEEDBACK_PREFIX}rejected at ${iter}`,
+          });
+        }
+
+        (webAgent as any).trimOldHistory();
+        tokens.push((webAgent as any).estimateHistoryTokens());
+        counts.push((webAgent as any).messages.length);
+      }
+
+      // After iteration ~10, growth should plateau. Compare the average of
+      // iterations 30..49 vs 10..29 — they should be within 25% of each other,
+      // NOT 3-5x larger.
+      const avg = (xs: number[], start: number, end: number) =>
+        xs.slice(start, end).reduce((a, b) => a + b, 0) / (end - start);
+      const earlyTokens = avg(tokens, 10, 30);
+      const lateTokens = avg(tokens, 30, 50);
+      const earlyCount = avg(counts, 10, 30);
+      const lateCount = avg(counts, 30, 50);
+
+      // Allow 25% wiggle. If clipping is broken, this ratio will be 2x or more.
+      expect(lateTokens / earlyTokens).toBeLessThan(1.25);
+      expect(lateCount / earlyCount).toBeLessThan(1.25);
     });
   });
 
