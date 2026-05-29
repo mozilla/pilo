@@ -61,6 +61,14 @@ import {
   recordSanitizedException,
 } from "./telemetry/tracing.js";
 
+// === Sentinel Prefixes (imported from historyPrefixes.ts and re-exported for consumers) ===
+import {
+  STEP_ERROR_FEEDBACK_PREFIX,
+  VALIDATION_FEEDBACK_PREFIX,
+  REPETITION_WARNING_PREFIX,
+} from "./historyPrefixes.js";
+export { STEP_ERROR_FEEDBACK_PREFIX, VALIDATION_FEEDBACK_PREFIX, REPETITION_WARNING_PREFIX };
+
 // === Type Definitions ===
 
 export interface WebAgentOptions {
@@ -1232,7 +1240,7 @@ export class WebAgent {
       if (executionState.actionRepeatCount > this.maxRepeatedActions) {
         // First time over limit: add warning message
         if (executionState.actionRepeatCount === REPETITION_WARNING_THRESHOLD) {
-          const warningMessage = `You have repeated the same action (${actionOutput.action}) ${executionState.actionRepeatCount} times. Please try a different approach or action to make progress on the task.`;
+          const warningMessage = `${REPETITION_WARNING_PREFIX}You have repeated the same action (${actionOutput.action}) ${executionState.actionRepeatCount} times. Please try a different approach or action to make progress on the task.`;
           this.messages.push({ role: "user", content: warningMessage });
 
           // Emit warning event

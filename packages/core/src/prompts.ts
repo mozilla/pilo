@@ -1,5 +1,6 @@
 import { wrapExternalContentWithWarning, ExternalContentLabel } from "./utils/promptSecurity.js";
 import { buildPromptTemplate } from "./utils/template.js";
+import { STEP_ERROR_FEEDBACK_PREFIX, VALIDATION_FEEDBACK_PREFIX } from "./historyPrefixes.js";
 
 /**
  * Centralized tool descriptions and schema definitions.
@@ -567,6 +568,7 @@ export const buildStepErrorFeedbackPrompt = (
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
 ) =>
+  STEP_ERROR_FEEDBACK_PREFIX +
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
@@ -648,6 +650,7 @@ export const buildValidationFeedbackPrompt = (
   taskAssessment: string,
   feedback: string | null,
 ): string =>
+  VALIDATION_FEEDBACK_PREFIX +
   taskValidationFeedbackTemplate({
     attemptNumber,
     taskAssessment: wrapExternalContentWithWarning(

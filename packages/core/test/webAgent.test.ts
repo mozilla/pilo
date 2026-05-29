@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
+import {
+  WebAgent,
+  WebAgentOptions,
+  STEP_ERROR_FEEDBACK_PREFIX,
+  VALIDATION_FEEDBACK_PREFIX,
+  REPETITION_WARNING_PREFIX,
+} from "../src/webAgent.js";
 import { AriaBrowser, PageAction } from "../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
@@ -10,6 +16,7 @@ import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
 } from "../src/utils/promptSecurity.js";
+import { buildStepErrorFeedbackPrompt } from "../src/prompts.js";
 
 // Mock the AI module
 vi.mock("ai", () => ({
@@ -2627,8 +2634,10 @@ describe("WebAgent", () => {
 
       expect(feedbackMessage).toBeDefined();
 
-      // Verify the format matches our prompt template
-      expect(feedbackMessage?.content).toMatch(/^## Task Incomplete - Attempt 1/);
+      // Verify the format matches our prompt template (content starts with VALIDATION_FEEDBACK_PREFIX then the template)
+      expect(feedbackMessage?.content).toMatch(
+        /^\[VALIDATION-FEEDBACK\]\n## Task Incomplete - Attempt 1/,
+      );
       expect(feedbackMessage?.content).toContain("The answer lacks required details");
       // Feedback line and payload are both present; payload is wrapped in an
       // EXTERNAL-CONTENT block, so the literal text follows the `**Feedback:**`
@@ -3128,6 +3137,24 @@ describe("WebAgent", () => {
   });
 
   describe("snapshot truncation", () => {
+    it("buildStepErrorFeedbackPrompt output starts with STEP_ERROR_FEEDBACK_PREFIX", () => {
+      const out = buildStepErrorFeedbackPrompt("boom", false, false, false);
+      expect(out.startsWith(STEP_ERROR_FEEDBACK_PREFIX)).toBe(true);
+    });
+
+    it("STEP_ERROR_FEEDBACK_PREFIX, VALIDATION_FEEDBACK_PREFIX, REPETITION_WARNING_PREFIX are all distinct anchored strings", () => {
+      const prefixes = [
+        STEP_ERROR_FEEDBACK_PREFIX,
+        VALIDATION_FEEDBACK_PREFIX,
+        REPETITION_WARNING_PREFIX,
+      ];
+      for (const p of prefixes) {
+        expect(p.startsWith("[")).toBe(true);
+        expect(p.endsWith("]\n")).toBe(true);
+      }
+      expect(new Set(prefixes).size).toBe(3);
+    });
+
     it("should truncate old snapshots to keep context size down", async () => {
       // Plan with URL
       mockGenerateTextWithRetry.mockResolvedValueOnce({
