@@ -894,6 +894,87 @@ export class WebAgent {
         }),
       };
     });
+
+    // Pass 4: Feedback aggregation.
+    //
+    // Algorithm:
+    //  1. Walk messages right-to-left. For each kind (validation / step-error / repetition),
+    //     find the first (i.e. most-recent) one. Those are protected.
+    //  2. Any other feedback messages are eligible for aggregation.
+    //  3. Walk left-to-right, find consecutive runs of eligible messages (no non-feedback
+    //     messages between them), collapse each run into one placeholder at the position
+    //     of the first message in the run.
+    type FeedbackKind = "validation" | "step-error" | "repetition";
+    const PREFIX_KIND: Array<[string, FeedbackKind]> = [
+      [VALIDATION_FEEDBACK_PREFIX, "validation"],
+      [STEP_ERROR_FEEDBACK_PREFIX, "step-error"],
+      [REPETITION_WARNING_PREFIX, "repetition"],
+    ];
+
+    const detectFeedbackKind = (msg: any): FeedbackKind | null => {
+      if (msg.role !== "user" || typeof msg.content !== "string") return null;
+      for (const [prefix, kind] of PREFIX_KIND) {
+        if (msg.content.startsWith(prefix)) return kind;
+      }
+      return null;
+    };
+
+    // Pass 4a: find most-recent index per kind.
+    const mostRecentByKind: Partial<Record<FeedbackKind, number>> = {};
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const kind = detectFeedbackKind(this.messages[i]);
+      if (kind && mostRecentByKind[kind] === undefined) {
+        mostRecentByKind[kind] = i;
+      }
+    }
+
+    // Pass 4b: mark eligible indices.
+    const eligibleForAggregation = new Set<number>();
+    for (let i = 0; i < this.messages.length; i++) {
+      const kind = detectFeedbackKind(this.messages[i]);
+      if (kind && mostRecentByKind[kind] !== i) {
+        eligibleForAggregation.add(i);
+      }
+    }
+
+    // Pass 4c: collapse consecutive runs of eligible indices.
+    if (eligibleForAggregation.size > 0) {
+      const next: typeof this.messages = [];
+      const counts: Record<FeedbackKind, number> = {
+        validation: 0,
+        "step-error": 0,
+        repetition: 0,
+      };
+      const pluralize = (label: string, count: number) =>
+        `${count} ${label}${count === 1 ? "" : "s"}`;
+      const flushRun = () => {
+        const n = counts.validation + counts["step-error"] + counts.repetition;
+        if (n === 0) return;
+        next.push({
+          role: "user",
+          content:
+            `[${n} earlier feedback messages clipped: ` +
+            `${pluralize("validation rejection", counts.validation)}, ` +
+            `${pluralize("step error", counts["step-error"])}, ` +
+            `${pluralize("repeat warning", counts.repetition)}]`,
+        });
+        counts.validation = 0;
+        counts["step-error"] = 0;
+        counts.repetition = 0;
+      };
+
+      for (let i = 0; i < this.messages.length; i++) {
+        if (eligibleForAggregation.has(i)) {
+          const kind = detectFeedbackKind(this.messages[i])!;
+          counts[kind]++;
+          continue;
+        }
+        flushRun();
+        next.push(this.messages[i]);
+      }
+      flushRun();
+      this.messages = next;
+    }
   }
 
   /**

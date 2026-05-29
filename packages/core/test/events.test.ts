@@ -12,7 +12,6 @@ import {
   ActionResultEventData,
   TaskValidationEventData,
   StatusMessageEventData,
-  HistorySizeDebugEventData,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -221,7 +220,12 @@ describe("WebAgentEventEmitter", () => {
         },
         {
           type: WebAgentEventType.SYSTEM_DEBUG_HISTORY_SIZE,
-          data: { timestamp: Date.now(), iterationId: "test-1", estimatedTokens: 0, messageCount: 0 },
+          data: {
+            timestamp: Date.now(),
+            iterationId: "test-1",
+            estimatedTokens: 0,
+            messageCount: 0,
+          },
         },
         {
           type: WebAgentEventType.AGENT_WAITING,

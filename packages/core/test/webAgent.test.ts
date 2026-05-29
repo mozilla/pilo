@@ -3622,6 +3622,120 @@ describe("WebAgent", () => {
         expect(toolCalls.has(id)).toBe(true);
       }
     });
+
+    it("aggregates older feedback (single kind, consecutive run), preserves most recent", () => {
+      const fb = (kind: string, n: number) => ({
+        role: "user" as const,
+        content: `${kind}message ${n}`,
+      });
+      (webAgent as any).messages = [
+        { role: "system", content: "sys" },
+        { role: "user", content: "task" },
+        fb(VALIDATION_FEEDBACK_PREFIX, 1),
+        fb(VALIDATION_FEEDBACK_PREFIX, 2),
+        fb(VALIDATION_FEEDBACK_PREFIX, 3),
+      ];
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+
+      expect(out.length).toBe(4); // sys, task, placeholder, most-recent
+      expect(out[2].content).toMatch(
+        /\[2 earlier feedback messages clipped: 2 validation rejections, 0 step errors, 0 repeat warnings\]/,
+      );
+      expect(out[3].content).toBe(`${VALIDATION_FEEDBACK_PREFIX}message 3`);
+    });
+
+    it("aggregates older feedback (mixed kinds in one run), preserves most recent of each kind", () => {
+      const m = (prefix: string, n: number) => ({
+        role: "user" as const,
+        content: `${prefix}msg ${n}`,
+      });
+      (webAgent as any).messages = [
+        { role: "system", content: "sys" },
+        { role: "user", content: "task" },
+        m(VALIDATION_FEEDBACK_PREFIX, 1),
+        m(STEP_ERROR_FEEDBACK_PREFIX, 2),
+        m(VALIDATION_FEEDBACK_PREFIX, 3),
+        m(STEP_ERROR_FEEDBACK_PREFIX, 4),
+      ];
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+
+      // Expect: sys, task, placeholder(for msg 1+2), msg 3 (most-recent validation), msg 4 (most-recent step-error)
+      expect(out.length).toBe(5);
+      expect(out[2].content).toMatch(
+        /\[2 earlier feedback messages clipped: 1 validation rejection, 1 step error, 0 repeat warnings\]/,
+      );
+      expect(out[3].content).toBe(`${VALIDATION_FEEDBACK_PREFIX}msg 3`);
+      expect(out[4].content).toBe(`${STEP_ERROR_FEEDBACK_PREFIX}msg 4`);
+    });
+
+    it("preserves most recent of each kind across non-consecutive runs", () => {
+      const m = (prefix: string, n: number) => ({
+        role: "user" as const,
+        content: `${prefix}msg ${n}`,
+      });
+      const snapshot = {
+        role: "user" as const,
+        content: '<EXTERNAL-CONTENT label="page-snapshot">\n...\n</EXTERNAL-CONTENT>',
+      };
+      (webAgent as any).messages = [
+        { role: "system", content: "sys" },
+        { role: "user", content: "task" },
+        m(VALIDATION_FEEDBACK_PREFIX, 1), // older — should be aggregated
+        snapshot,
+        m(VALIDATION_FEEDBACK_PREFIX, 2), // older — should be aggregated
+        m(VALIDATION_FEEDBACK_PREFIX, 3), // most-recent — preserved
+      ];
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+
+      // The most-recent validation feedback must be present verbatim.
+      const preserved = out.find((mm: any) => mm.content === `${VALIDATION_FEEDBACK_PREFIX}msg 3`);
+      expect(preserved).toBeDefined();
+
+      // Two placeholders, one for each aggregation run (msg 1 alone; msg 2 alone).
+      const placeholders = out.filter(
+        (mm: any) =>
+          typeof mm.content === "string" &&
+          mm.content.startsWith("[") &&
+          mm.content.includes("earlier feedback messages clipped"),
+      );
+      expect(placeholders.length).toBe(2);
+    });
+
+    it("preserves a single feedback message of any kind (most-recent by definition)", () => {
+      (webAgent as any).messages = [
+        { role: "system", content: "sys" },
+        { role: "user", content: "task" },
+        { role: "user", content: `${REPETITION_WARNING_PREFIX}repeat warning` },
+      ];
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+      expect(out[2].content).toBe(`${REPETITION_WARNING_PREFIX}repeat warning`);
+    });
+
+    it("checkAndHandleRepeatedAction's warningMessage is prefixed with REPETITION_WARNING_PREFIX", () => {
+      // Behavioral test for Task 2's repetition-warning insertion site.
+      // Set up state so calling checkAndHandleRepeatedAction triggers the warning push.
+      const startCount = (webAgent as any).messages.length;
+      const execState = {
+        lastAction: "click:", // signature for { action: "click", value: null } via createActionSignature
+        actionRepeatCount: (webAgent as any).maxRepeatedActions, // already at the limit
+        validationAttempts: 0,
+      };
+      const actionOutput = { action: "click", ref: "node-1", value: null };
+
+      (webAgent as any).checkAndHandleRepeatedAction(actionOutput, execState);
+
+      const pushed = (webAgent as any).messages[startCount];
+      expect(typeof pushed.content).toBe("string");
+      expect((pushed.content as string).startsWith(REPETITION_WARNING_PREFIX)).toBe(true);
+    });
   });
 
   describe("cleanup", () => {
