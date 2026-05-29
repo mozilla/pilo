@@ -307,6 +307,13 @@ describe("prompts", () => {
       expect(prompt).toContain("DATA GROUNDING");
       expect(prompt).toContain("**Before calling done():**");
     });
+
+    it("includes the revise_plan guidance only when hasReplanning is true", () => {
+      const off = buildActionLoopSystemPrompt(false, false, false, false, false, false);
+      const on = buildActionLoopSystemPrompt(false, false, false, false, false, true);
+      expect(off).not.toContain("revise_plan()");
+      expect(on).toContain("revise_plan()");
+    });
   });
 
   describe("buildTaskAndPlanPrompt", () => {

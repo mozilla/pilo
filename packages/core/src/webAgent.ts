@@ -346,7 +346,6 @@ export class WebAgent {
 
     // Forward-reference reads: these fields are used in Task 7 (revise_plan tool registration
     // and handler). The reads here satisfy noUnusedLocals until that wiring lands.
-    void this.enableReplanning;
     void this.planRevisionCount;
     void this.lastRevisionReason;
   }
@@ -1801,6 +1800,7 @@ export class WebAgent {
       hasTabstack,
       hasStartingUrl,
       hasInteractive,
+      this.enableReplanning,
     );
 
     this.messages = [
