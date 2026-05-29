@@ -12,6 +12,7 @@ import {
   ActionResultEventData,
   TaskValidationEventData,
   StatusMessageEventData,
+  HistorySizeDebugEventData,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -136,6 +137,7 @@ describe("WebAgentEventEmitter", () => {
         "system:debug_compression",
         "system:debug_message",
         "system:debug_tool_drop",
+        "system:debug_history_size",
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
@@ -216,6 +218,10 @@ describe("WebAgentEventEmitter", () => {
         {
           type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE,
           data: { timestamp: Date.now(), iterationId: "test-1", messages: [] },
+        },
+        {
+          type: WebAgentEventType.SYSTEM_DEBUG_HISTORY_SIZE,
+          data: { timestamp: Date.now(), iterationId: "test-1", estimatedTokens: 0, messageCount: 0 },
         },
         {
           type: WebAgentEventType.AGENT_WAITING,
