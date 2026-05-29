@@ -66,6 +66,9 @@ import {
   type FirewallConfig,
 } from "./security/actionFirewall.js";
 
+/** Maximum number of times the agent may call revise_plan in a single task. */
+export const MAX_PLAN_REVISIONS = 3;
+
 // === Type Definitions ===
 
 export interface WebAgentOptions {
@@ -75,6 +78,8 @@ export interface WebAgentOptions {
   debug?: boolean;
   /** Whether to use vision capabilities */
   vision?: boolean;
+  /** Allow mid-task plan revision via the revise_plan tool (default false) */
+  enableReplanning?: boolean;
   /** Maximum iterations for task completion */
   maxIterations?: number;
   /** Maximum consecutive errors before failing */
@@ -226,6 +231,8 @@ export class WebAgent {
   private systemPrompt: string = "";
   private successCriteria: string = "";
   private actionItems?: string[];
+  private planRevisionCount: number = 0;
+  private lastRevisionReason: string = "";
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
@@ -241,6 +248,7 @@ export class WebAgent {
   private readonly providerConfig: ProviderConfig;
   private readonly debug: boolean;
   private readonly vision: boolean;
+  private readonly enableReplanning: boolean;
   private readonly maxIterations: number;
   private readonly maxConsecutiveErrors: number;
   private readonly maxTotalErrors: number;
@@ -279,6 +287,7 @@ export class WebAgent {
     this.providerConfig = options.providerConfig;
     this.debug = options.debug ?? false;
     this.vision = options.vision ?? false;
+    this.enableReplanning = options.enableReplanning ?? false;
     this.maxIterations = options.maxIterations ?? defaults.max_iterations;
     this.maxConsecutiveErrors = options.maxConsecutiveErrors ?? defaults.max_consecutive_errors;
     this.maxTotalErrors = options.maxTotalErrors ?? defaults.max_total_errors;
@@ -334,6 +343,12 @@ export class WebAgent {
         this.emit(WebAgentEventType.CDP_ENDPOINT_CYCLE, data);
       };
     }
+
+    // Forward-reference reads: these fields are used in Task 7 (revise_plan tool registration
+    // and handler). The reads here satisfy noUnusedLocals until that wiring lands.
+    void this.enableReplanning;
+    void this.planRevisionCount;
+    void this.lastRevisionReason;
   }
 
   /**
@@ -1847,6 +1862,8 @@ export class WebAgent {
     this.systemPrompt = "";
     this.successCriteria = "";
     this.actionItems = undefined;
+    this.planRevisionCount = 0;
+    this.lastRevisionReason = "";
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;
