@@ -15,6 +15,13 @@ import { BrowserException } from "../errors.js";
 import { generateTextWithRetry } from "../utils/retry.js";
 import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
 import {
+  assessFill,
+  assessFormSubmission,
+  extractHostname,
+  type FirewallConfig,
+} from "../security/actionFirewall.js";
+import type { FirewallBlockedNonInteractiveEventData, FirewallRemediation } from "../events.js";
+import {
   withSpan,
   SpanStatusCode,
   SpanName,
@@ -26,6 +33,11 @@ interface WebActionContext {
   eventEmitter: WebAgentEventEmitter;
   providerConfig: ProviderConfig;
   abortSignal?: AbortSignal;
+  approvedRefs?: ReadonlySet<string>;
+  agentFilledRefs: Set<string>;
+  operationalRefs: Set<string>;
+  firewall: FirewallConfig;
+  interactive: boolean;
 }
 
 /**
@@ -50,6 +62,127 @@ type ActionResult = {
   // when ref strings churn between snapshots.
   targetIdentity?: { role: string; name: string };
 };
+
+const EMPTY_APPROVED_REFS = new Set<string>();
+
+function buildRemediations(blockedHostnames: string[]): FirewallRemediation[] {
+  const uniqueHosts = Array.from(new Set(blockedHostnames.filter((h): h is string => Boolean(h))));
+  return [
+    {
+      kind: "add-trusted-hostnames",
+      hostnames: uniqueHosts,
+      description:
+        uniqueHosts.length > 0
+          ? `Add ${uniqueHosts.join(", ")} to trusted_hostnames to allow this action on this site.`
+          : "Add the page hostname to trusted_hostnames to allow this action on this site.",
+    },
+    {
+      kind: "enable-interactive-mode",
+      description:
+        "Run in interactive mode by providing a UserDataCallback so the agent can ask the user to approve sensitive fields per-action via request_user_data.",
+    },
+    {
+      kind: "enable-unsafe-mode",
+      description:
+        "Set unsafe_mode=true to disable the action firewall entirely. WARNING: prompt injection from page content can then drive the agent to submit any field, including personal and credential data, to attacker-controlled forms.",
+    },
+  ];
+}
+
+function emitNonInteractiveBlock(
+  context: WebActionContext,
+  kind: "freeform-fill" | "form-submission",
+  reason: string,
+  pageHostname: string | null,
+  formActionHostnames: string[],
+): void {
+  if (context.interactive) return;
+  const hostsForRemediation =
+    pageHostname === null ? formActionHostnames : [pageHostname, ...formActionHostnames];
+  const data: FirewallBlockedNonInteractiveEventData = {
+    timestamp: Date.now(),
+    iterationId: "",
+    reason,
+    kind,
+    pageHostname,
+    formActionHostnames,
+    remediations: buildRemediations(hostsForRemediation),
+  };
+  context.eventEmitter.emit(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, data);
+}
+
+function failedActionResult(
+  action: string,
+  error: string,
+  context: WebActionContext,
+  ref?: string,
+  value?: string | number,
+): ActionResult {
+  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+    success: false,
+    action,
+    error,
+    isRecoverable: true,
+  });
+
+  return {
+    success: false,
+    action,
+    ...(ref && { ref }),
+    ...(value !== undefined && { value }),
+    error,
+    isRecoverable: true,
+  };
+}
+
+async function assessFormSubmissionForAction(
+  action: PageAction.Click | PageAction.Enter,
+  context: WebActionContext,
+  ref: string,
+): Promise<ActionResult | null> {
+  try {
+    const [form, pageUrl] = await Promise.all([
+      context.browser.getFormSubmissionContext(
+        ref,
+        action === PageAction.Click ? "click" : "enter",
+      ),
+      context.browser.getUrl(),
+    ]);
+    if (!form) return null;
+    const pageHostname = extractHostname(pageUrl);
+    const formActionHostnames = [
+      extractHostname(form.actionUrl),
+      extractHostname(form.submitterActionUrl),
+    ].filter((h): h is string => h !== null);
+
+    const assessment = assessFormSubmission({
+      form,
+      approvedRefs: context.approvedRefs ?? EMPTY_APPROVED_REFS,
+      agentFilledRefs: context.agentFilledRefs,
+      operationalRefs: context.operationalRefs,
+      pageHostname,
+      firewall: context.firewall,
+    });
+
+    if (!assessment.allowed) {
+      emitNonInteractiveBlock(
+        context,
+        "form-submission",
+        assessment.reason,
+        pageHostname,
+        formActionHostnames,
+      );
+      return failedActionResult(action, assessment.reason, context, ref);
+    }
+  } catch (error) {
+    if (error instanceof BrowserException) {
+      return failedActionResult(action, error.message, context, ref);
+    }
+    throw error;
+  }
+
+  return null;
+}
 
 /**
  * Helper function to perform an action with full error handling and logging
@@ -157,6 +290,16 @@ async function performActionWithValidation(
 }
 
 export function createWebActionTools(context: WebActionContext) {
+  if (!context.agentFilledRefs || !context.operationalRefs) {
+    throw new Error("Web action provenance tracking sets are required");
+  }
+  if (!context.firewall) {
+    throw new Error("FirewallConfig is required on WebActionContext");
+  }
+  if (typeof context.interactive !== "boolean") {
+    throw new Error("interactive flag is required on WebActionContext");
+  }
+
   return {
     click: tool({
       description: TOOL_STRINGS.webActions.click.description,
@@ -164,6 +307,9 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        const blocked = await assessFormSubmissionForAction(PageAction.Click, context, ref);
+        if (blocked) return blocked;
+
         return await performActionWithValidation(PageAction.Click, context, ref);
       },
     }),
@@ -175,7 +321,39 @@ export function createWebActionTools(context: WebActionContext) {
         value: z.string().describe(TOOL_STRINGS.webActions.common.textValue),
       }),
       execute: async ({ ref, value }) => {
-        return await performActionWithValidation(PageAction.Fill, context, ref, value);
+        try {
+          const [metadata, pageUrl] = await Promise.all([
+            context.browser.getFieldMetadata(ref),
+            context.browser.getUrl(),
+          ]);
+          const pageHostname = extractHostname(pageUrl);
+          const userApproved = Boolean(context.approvedRefs?.has(ref));
+          const assessment = assessFill({
+            field: metadata,
+            source: userApproved ? "user-approved" : "agent",
+            pageHostname,
+            firewall: context.firewall,
+          });
+
+          if (!assessment.allowed) {
+            emitNonInteractiveBlock(context, "freeform-fill", assessment.reason, pageHostname, []);
+            return failedActionResult(PageAction.Fill, assessment.reason, context, ref);
+          }
+
+          const result = await performActionWithValidation(PageAction.Fill, context, ref, value);
+          if (result.success && !userApproved) {
+            context.agentFilledRefs.add(ref);
+            if (assessment.operational) {
+              context.operationalRefs.add(ref);
+            }
+          }
+          return result;
+        } catch (error) {
+          if (error instanceof BrowserException) {
+            return failedActionResult(PageAction.Fill, error.message, context, ref);
+          }
+          throw error;
+        }
       },
     }),
 
@@ -236,6 +414,9 @@ export function createWebActionTools(context: WebActionContext) {
         ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
       }),
       execute: async ({ ref }) => {
+        const blocked = await assessFormSubmissionForAction(PageAction.Enter, context, ref);
+        if (blocked) return blocked;
+
         return await performActionWithValidation(PageAction.Enter, context, ref);
       },
     }),

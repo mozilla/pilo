@@ -113,6 +113,25 @@ describe("CLI Utils", () => {
       expect(parseConfigValue("sk-test123")).toBe("sk-test123");
       expect(parseConfigValue("")).toBe("");
     });
+
+    it("should CSV-split values for known string[] keys", () => {
+      expect(parseConfigValue("a.com,b.com", "trusted_hostnames")).toEqual(["a.com", "b.com"]);
+      expect(parseConfigValue("a.com", "trusted_hostnames")).toEqual(["a.com"]);
+      expect(parseConfigValue(" a.com , b.com ", "trusted_hostnames")).toEqual(["a.com", "b.com"]);
+      expect(parseConfigValue("", "trusted_hostnames")).toEqual([]);
+    });
+
+    it("should CSV-split values for pw_cdp_endpoints (regression for pre-existing bug)", () => {
+      expect(parseConfigValue("ws://a:9222,ws://b:9222", "pw_cdp_endpoints" as any)).toEqual([
+        "ws://a:9222",
+        "ws://b:9222",
+      ]);
+    });
+
+    it("should still coerce booleans/numbers when key is omitted", () => {
+      expect(parseConfigValue("true")).toBe(true);
+      expect(parseConfigValue("42")).toBe(42);
+    });
   });
 
   describe("getPackageInfo", () => {

@@ -44,7 +44,7 @@ import { SearchService } from "./search/searchService.js";
 import { createPlanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { createTabstackTools } from "./tools/tabstackTools.js";
-import { createInteractiveTools, ApprovedRefs, FILL_GATE_ERROR } from "./tools/interactiveTools.js";
+import { createInteractiveTools, ApprovedRefs } from "./tools/interactiveTools.js";
 import { createTabstackClient } from "./tabstack/client.js";
 import type { UserDataCallback } from "./types/interactive.js";
 import { nanoid } from "nanoid";
@@ -60,6 +60,11 @@ import {
   SpanName,
   recordSanitizedException,
 } from "./telemetry/tracing.js";
+import {
+  normalizeHostname,
+  withTrustedStartHost,
+  type FirewallConfig,
+} from "./security/actionFirewall.js";
 
 // === Type Definitions ===
 
@@ -100,6 +105,26 @@ export interface WebAgentOptions {
   onUserDataRequired?: UserDataCallback;
   /** Correlation ID for this task, propagated to logs and traces. */
   taskId?: string;
+  /**
+   * Hostnames where the action firewall is bypassed for fills and submissions.
+   *
+   * @warning On listed hosts, prompt injection from page content can drive the
+   * agent to fill and submit any field, including personal and credential data.
+   * Use only for sites you fully trust to receive your data. The bypass applies
+   * only when the current page hostname AND every form-action hostname (the
+   * form's `action` plus any submitter `formaction` override) are all in this
+   * list.
+   */
+  trustedHostnames?: readonly string[];
+  /**
+   * Disables the action firewall entirely.
+   *
+   * @warning When true, prompt injection from page content can cause the agent
+   * to submit your data, including credentials, personal information, and
+   * conversation context, to attacker-controlled forms. Only enable for
+   * trusted, controlled environments.
+   */
+  unsafeMode?: boolean;
 }
 
 export interface ExecuteOptions {
@@ -229,6 +254,12 @@ export class WebAgent {
   private readonly tabstackApiUrl: string | undefined;
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
+  private readonly firewall: FirewallConfig;
+  // Host of the caller-provided start URL (options.startingUrl), captured at
+  // execute() time. Trusted by the firewall — navigating somewhere the caller
+  // explicitly named is consent to interact with that host. NOT set from the
+  // planner-chosen URL, which is model-influenced and must not grant trust.
+  private callerStartHostUrl: string | null = null;
 
   // Actions where same-action-same-value repetition is legitimate workflow
   // (e.g. scrolling an infinite feed, waiting for a slow page) rather than a
@@ -262,6 +293,10 @@ export class WebAgent {
     this.tabstackApiUrl = options.tabstackApiUrl;
     this.onUserDataRequired = options.onUserDataRequired;
     this.taskId = options.taskId;
+    this.firewall = Object.freeze({
+      trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
+      unsafeMode: Boolean(options.unsafeMode),
+    });
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -318,6 +353,10 @@ export class WebAgent {
         try {
           // 1. Validate input parameters (let validation errors throw)
           this.validateTaskAndOptions(task, options);
+
+          // Capture only the caller-provided start URL (not the planner's choice)
+          // so the firewall can trust that host for fills/submissions.
+          this.callerStartHostUrl = options.startingUrl ?? null;
 
           // 2. Initialize browser and internal state
           await this.initializeBrowserAndState(task, options);
@@ -397,12 +436,32 @@ export class WebAgent {
     task: string,
     executionState: ExecutionState,
   ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+    // Only include interactive tools if a callback is provided
+    let interactiveToolSet: Record<string, any> = {};
+    let approvedRefs: ApprovedRefs | null = null;
+    const agentFilledRefs = new Set<string>();
+    const operationalRefs = new Set<string>();
+    if (this.onUserDataRequired) {
+      const result = createInteractiveTools({
+        callback: this.onUserDataRequired,
+        browser: this.browser,
+        eventEmitter: this.eventEmitter,
+      });
+      interactiveToolSet = result.tools;
+      approvedRefs = result.approvedRefs;
+    }
+
     // Setup tools once
     const webActionTools = createWebActionTools({
       browser: this.browser,
       eventEmitter: this.eventEmitter,
       providerConfig: this.providerConfig,
       abortSignal: this.abortSignal,
+      approvedRefs: approvedRefs ?? undefined,
+      agentFilledRefs,
+      operationalRefs,
+      firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
+      interactive: Boolean(this.onUserDataRequired),
     });
 
     // Only include search tools if a search service was created
@@ -417,51 +476,6 @@ export class WebAgent {
           eventEmitter: this.eventEmitter,
         })
       : {};
-
-    // Only include interactive tools if a callback is provided
-    let interactiveToolSet: Record<string, any> = {};
-    let approvedRefs: ApprovedRefs | null = null;
-    if (this.onUserDataRequired) {
-      const result = createInteractiveTools({
-        callback: this.onUserDataRequired,
-        browser: this.browser,
-        eventEmitter: this.eventEmitter,
-      });
-      interactiveToolSet = result.tools;
-      approvedRefs = result.approvedRefs;
-    }
-
-    // When interactive mode is on, gate fill/select/check to require approved refs.
-    // On first unapproved attempt, return an error. If the agent retries the same ref
-    // (indicating it's a navigation/search field, not a user-data form field), allow it
-    // through on the second attempt to avoid a deadlock.
-    if (approvedRefs) {
-      const warnedRefs = new Set<string>();
-      const gatedActions = ["fill", "select", "check"] as const;
-      for (const actionName of gatedActions) {
-        const originalTool = webActionTools[actionName];
-        if (originalTool) {
-          const originalExecute = originalTool.execute!;
-          (originalTool as any).execute = async (args: any, options: any) => {
-            if (args.ref && !approvedRefs!.has(args.ref)) {
-              if (!warnedRefs.has(args.ref)) {
-                // First attempt: warn and block
-                warnedRefs.add(args.ref);
-                return {
-                  success: false,
-                  action: actionName,
-                  ref: args.ref,
-                  error: FILL_GATE_ERROR,
-                  isRecoverable: true,
-                };
-              }
-              // Second attempt: agent confirmed this is a navigation/search field, allow it
-            }
-            return originalExecute(args, options);
-          };
-        }
-      }
-    }
 
     // Merge all tools
     const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...interactiveToolSet };
@@ -516,9 +530,13 @@ export class WebAgent {
           if (needsPageSnapshot) {
             // Clear approved refs when page changes: ARIA refs reset on each snapshot,
             // so old ref strings may now point to different DOM elements.
+            // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
+            // so a blocked submit retry remains tied to the same agent-filled refs.
             if (approvedRefs) {
               approvedRefs.clear();
             }
+            agentFilledRefs.clear();
+            operationalRefs.clear();
             await this.addPageSnapshot();
           }
 
@@ -1120,8 +1138,7 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
-    // Determine if page changed (most actions change the page, except extract and webSearch)
-    const pageChanged = actionOutput.action !== "extract" && actionOutput.action !== "webSearch";
+    const pageChanged = WebAgent.shouldRefreshPageSnapshotAfterAction(actionOutput.action);
 
     // Check for terminal actions
     if (actionOutput.isTerminal) {
@@ -1187,6 +1204,15 @@ export class WebAgent {
       pageChanged,
       actionExecuted: true,
     };
+  }
+
+  // Fill keeps the current snapshot so refs and agent-filled provenance remain
+  // valid for a following submit check. This trades off immediate visibility
+  // into dynamic validation UI until a later action refreshes the snapshot.
+  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set(["extract", "webSearch", "fill"]);
+
+  private static shouldRefreshPageSnapshotAfterAction(action: string): boolean {
+    return !WebAgent.ACTIONS_WITHOUT_PAGE_REFRESH.has(action);
   }
 
   /**

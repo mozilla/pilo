@@ -190,6 +190,8 @@ describe("ConfigManager", () => {
         "navigation_max_attempts",
         "navigation_timeout_multiplier",
         "action_timeout_ms",
+        "trusted_hostnames",
+        "unsafe_mode",
         "search_provider",
         "parallel_api_key",
         "tabstack_api_key",

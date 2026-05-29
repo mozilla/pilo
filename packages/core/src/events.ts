@@ -52,6 +52,9 @@ export enum WebAgentEventType {
   // Interactive mode events
   INTERACTIVE_FORM_DATA_REQUEST = "interactive:form_data:request",
   INTERACTIVE_FORM_DATA_ERROR = "interactive:form_data:error",
+
+  // Firewall events
+  FIREWALL_BLOCKED_NON_INTERACTIVE = "firewall:blocked_non_interactive",
 }
 
 /**
@@ -363,6 +366,19 @@ export interface InteractiveFormDataErrorEventData extends WebAgentEventData {
   fieldErrors: Record<string, string>;
 }
 
+export type FirewallRemediation =
+  | { kind: "add-trusted-hostnames"; hostnames: string[]; description: string }
+  | { kind: "enable-interactive-mode"; description: string }
+  | { kind: "enable-unsafe-mode"; description: string };
+
+export interface FirewallBlockedNonInteractiveEventData extends WebAgentEventData {
+  reason: string;
+  kind: "freeform-fill" | "form-submission";
+  pageHostname: string | null;
+  formActionHostnames: string[];
+  remediations: FirewallRemediation[];
+}
+
 /**
  * Union type of all event data types
  */
@@ -405,6 +421,10 @@ export type WebAgentEvent =
   | {
       type: WebAgentEventType.INTERACTIVE_FORM_DATA_ERROR;
       data: InteractiveFormDataErrorEventData;
+    }
+  | {
+      type: WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE;
+      data: FirewallBlockedNonInteractiveEventData;
     };
 
 // ============================================================================
