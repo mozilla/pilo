@@ -174,6 +174,42 @@ pilo run --browser bidi --bidi-url "ws://127.0.0.1:9222/session" "what's the wea
 - 📝 **Rich Context**: Pass structured data to help with form filling and complex tasks
 - ☁️ **Tabstack API Integration**: Extract markdown, structured JSON, or AI-transformed data from any URL using [Tabstack](https://tabstack.ai) cloud tools — especially useful for PDFs which browsers cannot read directly
 
+## Security Model
+
+Pilo treats every web page as untrusted input. By default, an **action firewall** prevents the agent from filling freeform form fields (textareas, contact-info inputs, password fields, etc.) and from submitting any form containing agent-filled values that the user did not explicitly approve. This is the structural defense against prompt-injection attacks where a page tries to coax the agent into exfiltrating data through a form.
+
+Two caller-supplied controls relax this protection. Both are off by default. **Enabling either weakens the firewall's data-protection guarantees.**
+
+### `trusted_hostnames`
+
+A list of hostnames on which the firewall is bypassed for fills and submissions. The bypass applies only when the current page hostname **and every form-action hostname** (the form's `action` plus any submitter `formaction` override) are all in the list.
+
+```bash
+pilo config set trusted_hostnames example.com,app.example.com
+```
+
+WARNING: on listed hosts, prompt injection from page content can drive the agent to fill and submit any field, including personal and credential data. Use only for sites you fully trust to receive your data.
+
+### `unsafe_mode`
+
+A global firewall disable. When enabled, neither the fill gate nor the submit gate applies, regardless of page or form-action hostname.
+
+```bash
+pilo config set unsafe_mode true
+```
+
+WARNING: prompt injection from page content can then cause the agent to submit your data, including credentials, personal information, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.
+
+### Remediation when a block fires
+
+When the firewall blocks a fill or submission and the agent is not running in interactive mode (no `UserDataCallback`), the CLI prints a footer listing the three ways the user can enable the workflow:
+
+- Add the involved hostnames to `trusted_hostnames`.
+- Run in interactive mode so the agent can request per-field approval through `request_user_data`.
+- Enable `unsafe_mode` (with the data-protection warning above).
+
+The footer is shown only to the user; the model that drives the agent never sees these remediation suggestions, so prompt-injected page content cannot ask the user to enable the bypasses.
+
 ## Configuration
 
 Pilo supports multiple AI providers and stores configuration globally at `~/.config/pilo/config.json` (XDG standard; `%APPDATA%/pilo/config.json` on Windows).

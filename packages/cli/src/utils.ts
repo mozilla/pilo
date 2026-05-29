@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { BROWSERS } from "pilo-core";
+import { BROWSERS, FIELDS, type PiloConfig } from "pilo-core";
 
 /**
  * CLI-specific utilities and helpers
@@ -101,7 +101,15 @@ export function parseConfigKeyValue(keyValue: string): { key: string; value: str
 /**
  * Parse configuration value to appropriate type
  */
-export function parseConfigValue(value: string): any {
+export function parseConfigValue(value: string, key?: keyof PiloConfig): any {
+  // When the field type is known and is string[], CSV-split the value.
+  if (key && FIELDS[key]?.type === "string[]") {
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   // Parse boolean values
   if (value === "true") return true;
   if (value === "false") return false;

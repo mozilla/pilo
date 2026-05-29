@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ExtensionBrowser } from "../src/background/ExtensionBrowser";
 import browser from "webextension-polyfill";
+import { BrowserActionException, InvalidRefException } from "pilo-core/core";
 
 vi.mock("webextension-polyfill", () => ({
   default: {
@@ -92,6 +93,86 @@ describe("ExtensionBrowser", () => {
       ).resolves.not.toThrow();
 
       expect(browser.scripting.executeScript).toHaveBeenCalled();
+    });
+  });
+
+  describe("metadata error handling", () => {
+    it("should translate missing field metadata refs into InvalidRefException", async () => {
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([
+        {
+          result: {
+            success: false,
+            error: "Element with ref missing-input not found in DOM",
+            errorType: "invalid-ref",
+          },
+        } as any,
+      ]);
+
+      await expect(extensionBrowser.getFieldMetadata("missing-input")).rejects.toThrow(
+        InvalidRefException,
+      );
+    });
+
+    it("should translate missing form submission refs into InvalidRefException", async () => {
+      vi.mocked(browser.scripting.executeScript).mockResolvedValue([
+        {
+          result: {
+            success: false,
+            error: "Element with ref missing-submit not found in DOM",
+            errorType: "invalid-ref",
+          },
+        } as any,
+      ]);
+
+      await expect(extensionBrowser.getFormSubmissionContext("missing-submit")).rejects.toThrow(
+        InvalidRefException,
+      );
+    });
+
+    it("should wrap field metadata script failures in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockRejectedValueOnce(new Error("Cannot access contents of url"));
+
+      const error = await extensionBrowser.getFieldMetadata("input1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain(
+        "Failed to get field metadata: Cannot access contents of url",
+      );
+    });
+
+    it("should wrap empty field metadata script results in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockResolvedValueOnce([]);
+
+      const error = await extensionBrowser.getFieldMetadata("input1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain("Failed to get field metadata: script returned no result");
+    });
+
+    it("should wrap form submission script failures in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockRejectedValueOnce(new Error("Cannot access contents of url"));
+
+      const error = await extensionBrowser.getFormSubmissionContext("submit1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain(
+        "Failed to get form submission context: Cannot access contents of url",
+      );
+    });
+
+    it("should wrap empty form submission script results in BrowserActionException", async () => {
+      vi.mocked(browser.scripting.executeScript)
+        .mockResolvedValueOnce([{ result: true } as any])
+        .mockResolvedValueOnce([]);
+
+      const error = await extensionBrowser.getFormSubmissionContext("submit1").catch((err) => err);
+      expect(error).toBeInstanceOf(BrowserActionException);
+      expect(error.message).toContain(
+        "Failed to get form submission context: script returned no result",
+      );
     });
   });
 });

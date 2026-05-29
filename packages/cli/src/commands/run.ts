@@ -14,7 +14,13 @@ import {
   MetricsCollector,
   SecretsRedactor,
 } from "pilo-core";
-import type { Logger, UserDataCallback, UserDataRequest, UserDataResponse } from "pilo-core";
+import type {
+  Logger,
+  UserDataCallback,
+  UserDataRequest,
+  UserDataResponse,
+  FirewallBlockedNonInteractiveEventData,
+} from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -306,6 +312,10 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       });
     }
 
+    eventEmitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data: unknown) => {
+      printFirewallRemediation(data as FirewallBlockedNonInteractiveEventData);
+    });
+
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
@@ -321,6 +331,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       searchApiKey: cfg.parallel_api_key,
       tabstackApiKey: options.tabstackApiKey ?? cfg.tabstack_api_key,
       tabstackApiUrl: options.tabstackApiUrl ?? cfg.tabstack_api_url,
+      trustedHostnames: options.trustedHostnames ?? cfg.trusted_hostnames,
+      unsafeMode: options.unsafe ?? cfg.unsafe_mode,
       providerConfig,
       logger,
       eventEmitter,
@@ -338,5 +350,42 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
   } catch (error) {
     console.error(chalk.red.bold("\n❌ Error:"), chalk.whiteBright(error));
     process.exit(1);
+  }
+}
+
+export function printFirewallRemediation(data: FirewallBlockedNonInteractiveEventData): void {
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(chalk.yellow.bold("Pilo: an action was blocked by the prompt-injection firewall."));
+  lines.push(chalk.yellow(`Reason: ${data.reason}`));
+
+  const involvedHosts = Array.from(
+    new Set(
+      [data.pageHostname, ...data.formActionHostnames].filter((h): h is string => Boolean(h)),
+    ),
+  );
+  if (involvedHosts.length > 0) {
+    lines.push(chalk.yellow(`Hostnames involved: ${involvedHosts.join(", ")}`));
+  }
+
+  lines.push(chalk.yellow("To allow this action, you can:"));
+  for (const r of data.remediations) {
+    if (r.kind === "add-trusted-hostnames") {
+      const cmd =
+        r.hostnames.length > 0
+          ? `pilo config set trusted_hostnames ${r.hostnames.join(",")}`
+          : "pilo config set trusted_hostnames <host>";
+      lines.push(`  - ${r.description}`);
+      lines.push(`    Run: ${chalk.cyan(cmd)}`);
+    } else if (r.kind === "enable-interactive-mode") {
+      lines.push(`  - ${r.description}`);
+    } else if (r.kind === "enable-unsafe-mode") {
+      lines.push(`  - ${r.description}`);
+      lines.push(`    Run: ${chalk.cyan("pilo config set unsafe_mode true")}`);
+    }
+  }
+
+  for (const line of lines) {
+    console.warn(line);
   }
 }

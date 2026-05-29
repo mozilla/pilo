@@ -1,5 +1,13 @@
 import TurndownService from "turndown";
-import { AriaBrowser, PageAction, LoadState, TemporaryTab } from "./ariaBrowser.js";
+import {
+  AriaBrowser,
+  PageAction,
+  LoadState,
+  TemporaryTab,
+  type FieldMetadata,
+  type FormSubmissionContext,
+  type FormSubmissionTrigger,
+} from "./ariaBrowser.js";
 import { BiDiConnection } from "./bidiConnection.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
 import { BrowserActionException, InvalidRefException } from "../errors.js";
@@ -261,6 +269,41 @@ export class BiDiBrowser implements AriaBrowser {
         throw error;
       }
     });
+  }
+
+  // Action-firewall introspection. NOT yet implemented for the BiDi backend —
+  // porting PlaywrightBrowser's in-page field/form logic is a follow-up and is
+  // untestable without a live BiDi session. Until then these are deliberately
+  // fail-safe, never fail-open:
+  //   - getFieldMetadata reports a generic freeform text input, so the firewall
+  //     classifies every BiDi-driven fill as non-operational and blocks it on
+  //     untrusted pages (it is allowed on caller-trusted hosts, where the
+  //     firewall bypasses field classification anyway).
+  //   - getFormSubmissionContext returns null, so no submitter context is
+  //     produced. This cannot weaken protection because no agent-filled freeform
+  //     value reaches a field on an untrusted page in the first place.
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    return {
+      ref,
+      tagName: "input",
+      inputType: "text",
+      role: null,
+      name: null,
+      label: null,
+      placeholder: null,
+      autocomplete: null,
+      isContentEditable: false,
+      formId: null,
+      formAction: null,
+      formMethod: null,
+    };
+  }
+
+  async getFormSubmissionContext(
+    _ref: string,
+    _trigger?: FormSubmissionTrigger,
+  ): Promise<FormSubmissionContext | null> {
+    return null;
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
