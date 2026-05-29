@@ -12,6 +12,7 @@ import {
   ActionResultEventData,
   TaskValidationEventData,
   StatusMessageEventData,
+  PlanRevisedEventData,
 } from "../src/events.js";
 
 describe("WebAgentEventEmitter", () => {
@@ -128,6 +129,7 @@ describe("WebAgentEventEmitter", () => {
         "agent:processing",
         "agent:status",
         "agent:waiting",
+        "plan:revised",
         "browser:action_started",
         "browser:action_completed",
         "browser:navigated",
@@ -484,6 +486,25 @@ describe("WebAgentEventEmitter", () => {
       // Note: successListener may not be called if errorListener throws first
       // This is expected EventEmitter behavior
     });
+  });
+
+  it("should emit and listen to PLAN_REVISED events", () => {
+    const listener = vi.fn();
+    const eventData: PlanRevisedEventData = {
+      timestamp: Date.now(),
+      iterationId: "test-id",
+      iteration: 4,
+      reason: "Site moved; switching source",
+      newPlan: "1. Go to new site\n2. Extract data",
+      newSuccessCriteria: "Data from the new site",
+      newActionItems: ["Open new site", "Extract data"],
+    };
+
+    emitter.onEvent(WebAgentEventType.PLAN_REVISED, listener);
+    emitter.emitEvent({ type: WebAgentEventType.PLAN_REVISED, data: eventData });
+
+    expect(listener).toHaveBeenCalledWith(eventData);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   describe("Memory management", () => {

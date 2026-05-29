@@ -30,6 +30,9 @@ export enum WebAgentEventType {
   AGENT_STATUS = "agent:status",
   AGENT_WAITING = "agent:waiting",
 
+  // Planning
+  PLAN_REVISED = "plan:revised",
+
   // Browser operations
   BROWSER_ACTION_STARTED = "browser:action_started",
   BROWSER_ACTION_COMPLETED = "browser:action_completed",
@@ -341,6 +344,22 @@ export interface StatusMessageEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data when the agent revises its plan mid-task via revise_plan.
+ */
+export interface PlanRevisedEventData extends WebAgentEventData {
+  /** Loop iteration index at which the revision happened */
+  iteration: number;
+  /** Brief explanation the agent gave for the revision */
+  reason: string;
+  /** The updated plan (Markdown) */
+  newPlan: string;
+  /** The updated success criteria, if the agent revised it */
+  newSuccessCriteria?: string;
+  /** The updated 3-6-word action item labels, if the agent revised them */
+  newActionItems?: string[];
+}
+
+/**
  * Event data when the agent requests user data for form fields
  */
 export interface InteractiveFormDataRequestEventData extends WebAgentEventData {
@@ -400,6 +419,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.AGENT_PROCESSING; data: ProcessingEventData }
   | { type: WebAgentEventType.AGENT_STATUS; data: StatusMessageEventData }
   | { type: WebAgentEventType.AGENT_WAITING; data: WaitingEventData }
+  | { type: WebAgentEventType.PLAN_REVISED; data: PlanRevisedEventData }
   | { type: WebAgentEventType.BROWSER_ACTION_STARTED; data: ActionExecutionEventData }
   | { type: WebAgentEventType.BROWSER_ACTION_COMPLETED; data: ActionResultEventData }
   | { type: WebAgentEventType.BROWSER_NAVIGATED; data: PageNavigationEventData }
