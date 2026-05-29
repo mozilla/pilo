@@ -1,10 +1,22 @@
 # Notes — multi-action per turn (#438)
 
-## Session state (as of plan completion)
+## Session state (execution complete)
 
 - Worktree: `.claude/worktrees/438-multi-action-per-turn/`, branch `worktree-438-multi-action-per-turn`, off origin/main @ a26880e.
-- Baseline: 1324 tests green (core 741).
-- Phase: spec ✓, research ✓, plan ✓. **Awaiting approval to execute.** PR 1 of 2 (per-action repetition rework is PR 2).
+- Baseline: 1324 tests green (core 741). After: **1338 green** (core 755, cli 221, server 96, extension 266), typecheck + format + check:schemas clean.
+- Phase: spec ✓, research ✓, plan ✓, **execute ✓ (3 phases committed)**. Next: `pr`. PR 1 of 2 (per-action repetition rework is PR 2).
+
+### Commits
+
+- `e419814` Phase 1: maxActionsPerStep option, config, safe-batch classifier (+14 classifier/config tests context)
+- `6353005` Phase 2: prompt batching guidance parameterized on maxActionsPerStep (+6 prompt tests)
+- `f156df2` Phase 3: unified processing loop + SYSTEM_DEBUG_BATCH telemetry (+6 batch scenarios)
+
+### Execution adaptations (vs plan)
+
+- **`noUnusedLocals`** forced the `toolChoice` flip into Phase 1 (planned for Phase 2) so the field had a real use.
+- Updated three **structural-guard tests** that enumerate config keys / event types: `config.test.ts` (+`max_actions_per_step`), `events.test.ts` (+`system:debug_batch`). Legit sync updates, not weakening.
+- **Schema**: `packages/core/schemas/` is `.prettierignore`d (prettier diverges from ts-json-schema-generator). Regenerate with `pnpm --filter pilo-core generate:schemas` ONLY — never prettier it. Committed the regenerated `webagent-event.json`.
 
 ## Load-bearing discoveries (read before resuming)
 
