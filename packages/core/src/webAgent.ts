@@ -840,7 +840,7 @@ export class WebAgent {
    * Add page snapshot to the conversation
    */
   private async addPageSnapshot(): Promise<void> {
-    // First, truncate old snapshots to keep context size manageable
+    // Trim history (clip old snapshots; future tasks add tool-call/result/feedback passes) before pushing the new snapshot
     this.trimOldHistory();
 
     const currentUrl = await this.browser.getUrl();
