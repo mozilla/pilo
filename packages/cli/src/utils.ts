@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { FIELDS, type PiloConfig } from "pilo-core";
+import { BROWSERS, FIELDS, type PiloConfig } from "pilo-core";
 
 /**
  * CLI-specific utilities and helpers
@@ -48,15 +48,14 @@ export function getPackageInfo(): { version: string; name: string; description: 
  * Validate browser option
  */
 export function validateBrowser(browser: string): boolean {
-  const validBrowsers = ["firefox", "chrome", "chromium", "safari", "webkit", "edge"];
-  return validBrowsers.includes(browser);
+  return (BROWSERS as readonly string[]).includes(browser);
 }
 
 /**
  * Get list of valid browsers
  */
 export function getValidBrowsers(): string[] {
-  return ["firefox", "chrome", "chromium", "safari", "webkit", "edge"];
+  return [...BROWSERS];
 }
 
 /**

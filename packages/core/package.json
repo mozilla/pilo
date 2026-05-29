@@ -48,6 +48,7 @@
     "ollama-ai-provider-v2": "^3.5.0",
     "playwright": "1.60.0",
     "turndown": "^7.2.2",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
@@ -63,6 +64,7 @@
     "@types/jsdom": "^28.0.1",
     "@types/node": "^25.7.0",
     "@types/turndown": "^5.0.6",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.6",
     "esbuild": "^0.28.0",
     "jsdom": "^29.0.2",

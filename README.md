@@ -143,6 +143,26 @@ try {
 }
 ```
 
+### WebDriver BiDi (experimental)
+
+Pilo can connect directly to any browser that supports the [WebDriver BiDi](https://w3c.github.io/webdriver-bidi/) protocol, without requiring Playwright. This is distinct from Pilo's `--channel moz-firefox` option, which uses BiDi _through_ Playwright — the `--browser bidi` mode speaks the BiDi protocol directly over WebSocket with no Playwright dependency in the chain.
+
+Start Firefox with remote debugging enabled:
+
+```bash
+# Headless
+firefox --remote-debugging-port 9222 --headless --no-remote --profile "$(mktemp -d)"
+
+# Visible (watch the agent work)
+firefox --remote-debugging-port 9222 --no-remote --profile "$(mktemp -d)"
+```
+
+Then point Pilo at it:
+
+```bash
+pilo run --browser bidi --bidi-url "ws://127.0.0.1:9222/session" "what's the weather in Tokyo?"
+```
+
 ## Features
 
 - 🤖 **Natural Language Control**: Just describe what you want to do in plain English
