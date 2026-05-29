@@ -41,6 +41,7 @@ export enum WebAgentEventType {
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
   SYSTEM_DEBUG_TOOL_DROP = "system:debug_tool_drop",
+  SYSTEM_DEBUG_BATCH = "system:debug_batch",
 
   // CDP endpoint failover
   CDP_ENDPOINT_CONNECTED = "cdp:endpoint_connected",
@@ -290,6 +291,16 @@ export interface ToolDropDebugEventData extends WebAgentEventData {
   keptTool: string;
 }
 
+/** Emitted after a multi-action turn is processed (when maxActionsPerStep > 1). */
+export interface BatchDebugEventData extends WebAgentEventData {
+  /** Number of tool calls the model returned this turn. */
+  actionsRequested: number;
+  /** Number of those the loop processed before stopping. */
+  actionsProcessed: number;
+  /** Why processing stopped: hit a terminal action, an error, or ran the whole batch. */
+  batchStoppedBy: "terminal" | "error" | "completed";
+}
+
 /**
  * Event data for waiting notifications
  */
@@ -411,6 +422,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP; data: ToolDropDebugEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_BATCH; data: BatchDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }

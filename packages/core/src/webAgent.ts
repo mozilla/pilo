@@ -559,9 +559,10 @@ export class WebAgent {
               return { flow: "break" as const };
             }
 
-            // Update state for successful action
+            // Update state for successful action(s). A batched turn may have
+            // executed several actions; count them all.
             if (result.actionExecuted) {
-              executionState.actionCount++;
+              executionState.actionCount += result.actionsProcessed ?? 1;
             }
 
             return { flow: "next" as const, needsPageSnapshot: result.pageChanged };
@@ -962,6 +963,7 @@ export class WebAgent {
     finalAnswer: string | null;
     pageChanged: boolean;
     actionExecuted: boolean;
+    actionsProcessed: number;
     error?: TaskError;
   }> {
     // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
@@ -1092,125 +1094,173 @@ export class WebAgent {
     // Process tool results
     if (!aiResponse?.toolResults?.length) {
       console.error("[WebAgent] No tools called in action generation");
-      throw new ToolExecutionError(
-        "You must use exactly one tool. Please use one of the available tools.",
-        {
-          action: "none",
-        },
-      );
+      const message =
+        this.maxActionsPerStep > 1
+          ? "You must use at least one tool. Please use one of the available tools."
+          : "You must use exactly one tool. Please use one of the available tools.";
+      throw new ToolExecutionError(message, { action: "none" });
     }
 
-    // The system prompt instructs the model to call exactly one tool per turn,
-    // but providers occasionally return more (especially on retries or with
-    // certain models). Warn + emit a debug event so the drop is observable
-    // instead of silently lost.
-    if (aiResponse.toolResults.length > 1) {
-      const keptTool = aiResponse.toolResults[0].toolName;
-      const droppedTools = aiResponse.toolResults.slice(1).map((r: any) => r.toolName);
+    // The AI SDK executes every returned tool's `execute` fn before toolResults
+    // resolves, so by now all returned actions have already run against the
+    // browser. Process up to maxActionsPerStep of them in order; results beyond
+    // the cap already executed but are dropped from processing (this reproduces
+    // the historical single-action behavior when the cap is 1).
+    const toProcess = aiResponse.toolResults.slice(0, this.maxActionsPerStep);
+    if (aiResponse.toolResults.length > toProcess.length) {
+      const droppedTools = aiResponse.toolResults
+        .slice(toProcess.length)
+        .map((r: any) => r.toolName);
       console.warn(
         `[WebAgent] Provider returned ${aiResponse.toolResults.length} tool calls in one turn; ` +
-          `keeping '${keptTool}', dropping: ${droppedTools.join(", ")}`,
+          `processing ${toProcess.length}, dropping: ${droppedTools.join(", ")}`,
       );
       this.emit(WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP, {
         iterationId: this.currentIterationId,
         droppedCount: droppedTools.length,
         droppedTools,
-        keptTool,
+        keptTool: toProcess[0].toolName,
       });
     }
 
-    const toolResult = aiResponse.toolResults[0];
-    const actionOutput = toolResult.output as any;
+    let actionsProcessed = 0;
+    let anyPageChanged = false;
+    let lastNonTerminalOutput: any = null;
+    let batchStoppedBy: "terminal" | "error" | "completed" = "completed";
 
-    if (!actionOutput) {
-      throw new Error("Tool execution failed: missing output property.");
-    }
-
-    // Check if the tool returned an error
-    // The tool output structure is guaranteed to have:
-    // - success: boolean
-    // - error?: string (present when success is false)
-    // - isRecoverable?: boolean (present for browser errors)
-    if (!actionOutput.success && actionOutput.error) {
-      // For recoverable tool errors, throw ToolExecutionError
-      // This special error type indicates the error is already in the tool result,
-      // so we don't need to add it as a separate user message
-      if (actionOutput.isRecoverable) {
-        throw new ToolExecutionError(actionOutput.error, {
-          action: actionOutput.action,
-          ref: actionOutput.ref,
-          output: actionOutput, // Store the full output for debugging
-        });
-      }
-      // For non-recoverable errors, throw regular error
-      throw new Error(actionOutput.error);
-    }
-
-    const pageChanged = WebAgent.shouldRefreshPageSnapshotAfterAction(actionOutput.action);
-
-    // Check for terminal actions
-    if (actionOutput.isTerminal) {
-      if (actionOutput.action === "done") {
-        // Validate the task completion before accepting it
-        const validationResult = await this.validateTaskCompletion(
-          task,
-          actionOutput.result,
-          executionState,
-        );
-
-        // Check if validation passed
-        if (validationResult.isAccepted) {
-          return {
-            isTerminal: true,
-            success: true,
-            finalAnswer: actionOutput.result,
-            pageChanged: false,
-            actionExecuted: true,
-          };
-        } else {
-          // Validation failed - the feedback has been added to messages
-          // Don't add a new page snapshot, let the agent respond to feedback
-          return {
-            isTerminal: false,
-            success: false,
-            finalAnswer: null,
-            pageChanged: false, // Keep false to avoid new snapshot
-            actionExecuted: false, // Don't count as action since we're retrying
-          };
+    try {
+      for (const tr of toProcess) {
+        const actionOutput = tr.output as any;
+        if (!actionOutput) {
+          throw new Error("Tool execution failed: missing output property.");
         }
-      } else if (actionOutput.action === "abort") {
-        // Emit TASK_ABORTED event
-        this.emit(WebAgentEventType.TASK_ABORTED, {
-          reason: actionOutput.reason,
-          finalAnswer: `Aborted: ${actionOutput.reason}`,
-          iterationId: this.currentIterationId,
-        });
 
-        const message = `Aborted: ${actionOutput.reason}`;
-        return {
-          isTerminal: true,
-          success: false,
-          finalAnswer: message,
-          pageChanged: false,
-          actionExecuted: true,
-          error: { code: TaskErrorCode.TASK_ABORTED, message },
-        };
+        // Error result → throw, matching the single-action path. Earlier
+        // successful actions are already in this.messages (appended from
+        // response.messages above), so the model sees them next turn.
+        // The error string is already in the tool result the LLM sees, so for
+        // recoverable errors we throw ToolExecutionError (no duplicate message).
+        if (!actionOutput.success && actionOutput.error) {
+          batchStoppedBy = "error";
+          if (actionOutput.isRecoverable) {
+            throw new ToolExecutionError(actionOutput.error, {
+              action: actionOutput.action,
+              ref: actionOutput.ref,
+              output: actionOutput,
+            });
+          }
+          throw new Error(actionOutput.error);
+        }
+
+        // Terminal action (done/abort) — handle and return. Any later results
+        // in the batch already executed but are irrelevant to the outcome.
+        if (actionOutput.isTerminal) {
+          batchStoppedBy = "terminal";
+          actionsProcessed++;
+          const terminal = await this.handleTerminalAction(actionOutput, task, executionState);
+          return { ...terminal, actionsProcessed };
+        }
+
+        // Regular action: count it and track whether a snapshot refresh is
+        // needed afterward (ACTIONS_WITHOUT_PAGE_REFRESH are exempt).
+        actionsProcessed++;
+        lastNonTerminalOutput = actionOutput;
+        if (WebAgent.shouldRefreshPageSnapshotAfterAction(actionOutput.action)) {
+          anyPageChanged = true;
+        }
+      }
+    } finally {
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_BATCH, {
+        iterationId: this.currentIterationId,
+        actionsRequested: aiResponse.toolResults.length,
+        actionsProcessed,
+        batchStoppedBy,
+      });
+    }
+
+    // Check for repeated actions on the last non-terminal action of the batch.
+    // (Per-action repetition tracking is deferred — see issue #438 PR 2.)
+    if (lastNonTerminalOutput) {
+      const repetitionResult = this.checkAndHandleRepeatedAction(
+        lastNonTerminalOutput,
+        executionState,
+      );
+      if (repetitionResult) {
+        return { ...repetitionResult, actionsProcessed };
       }
     }
 
-    // Check for repeated actions on non-terminal actions
-    const repetitionResult = this.checkAndHandleRepeatedAction(actionOutput, executionState);
-    if (repetitionResult) {
-      return repetitionResult; // Early return if intervention needed
-    }
-
-    // Regular action executed successfully
+    // Regular action(s) executed successfully
     return {
       isTerminal: false,
       success: false,
       finalAnswer: null,
-      pageChanged,
+      pageChanged: anyPageChanged,
+      actionExecuted: actionsProcessed > 0,
+      actionsProcessed,
+    };
+  }
+
+  /**
+   * Handle a terminal action (done/abort) from a turn: validates a `done`
+   * result and returns the appropriate turn outcome, or emits TASK_ABORTED for
+   * an `abort`. Extracted so the processing loop can invoke it on whichever
+   * action in a batch is terminal. Only `done` and `abort` set isTerminal.
+   */
+  private async handleTerminalAction(
+    actionOutput: any,
+    task: string,
+    executionState: ExecutionState,
+  ): Promise<{
+    isTerminal: boolean;
+    success: boolean;
+    finalAnswer: string | null;
+    pageChanged: boolean;
+    actionExecuted: boolean;
+    error?: TaskError;
+  }> {
+    if (actionOutput.action === "done") {
+      // Validate the task completion before accepting it
+      const validationResult = await this.validateTaskCompletion(
+        task,
+        actionOutput.result,
+        executionState,
+      );
+
+      if (validationResult.isAccepted) {
+        return {
+          isTerminal: true,
+          success: true,
+          finalAnswer: actionOutput.result,
+          pageChanged: false,
+          actionExecuted: true,
+        };
+      }
+      // Validation failed - the feedback has been added to messages.
+      // Don't add a new page snapshot, let the agent respond to feedback.
+      return {
+        isTerminal: false,
+        success: false,
+        finalAnswer: null,
+        pageChanged: false,
+        actionExecuted: false,
+      };
+    }
+
+    // abort
+    this.emit(WebAgentEventType.TASK_ABORTED, {
+      reason: actionOutput.reason,
+      finalAnswer: `Aborted: ${actionOutput.reason}`,
+      iterationId: this.currentIterationId,
+    });
+    const message = `Aborted: ${actionOutput.reason}`;
+    return {
+      isTerminal: true,
+      success: false,
+      finalAnswer: message,
+      pageChanged: false,
       actionExecuted: true,
+      error: { code: TaskErrorCode.TASK_ABORTED, message },
     };
   }
 

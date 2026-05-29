@@ -3227,6 +3227,43 @@
       ],
       "description": "Top-level discriminated union of every event a `/v1/automate` SSE client can receive on the wire. Composes  {@link  WebAgentEvent }  (agent-loop events emitted via  {@link  WebAgentEventEmitter } ) with the stream-wrapper events (`complete`, `done`, `error`) emitted by the HTTP route handler after the agent returns.\n\nThis is the authoritative source-of-truth for downstream SDK generation. Its JSON Schema export (`schemas/automate-stream-event.json`) is consumed by tabs-api to type `/v1/automate`'s SSE response in `@tabstack/sdk`."
     },
+    "BatchDebugEventData": {
+      "additionalProperties": false,
+      "description": "Emitted after a multi-action turn is processed (when maxActionsPerStep > 1).",
+      "properties": {
+        "actionsProcessed": {
+          "description": "Number of those the loop processed before stopping.",
+          "type": "number"
+        },
+        "actionsRequested": {
+          "description": "Number of tool calls the model returned this turn.",
+          "type": "number"
+        },
+        "batchStoppedBy": {
+          "description": "Why processing stopped: hit a terminal action, an error, or ran the whole batch.",
+          "enum": [
+            "terminal",
+            "error",
+            "completed"
+          ],
+          "type": "string"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "actionsProcessed",
+        "actionsRequested",
+        "batchStoppedBy",
+        "iterationId",
+        "timestamp"
+      ],
+      "type": "object"
+    },
     "BrowserReconnectedEventData": {
       "additionalProperties": false,
       "description": "Event data when the browser reconnects after a mid-task disconnect",
@@ -4674,6 +4711,23 @@
             },
             "type": {
               "const": "system:debug_tool_drop",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/BatchDebugEventData"
+            },
+            "type": {
+              "const": "system:debug_batch",
               "type": "string"
             }
           },

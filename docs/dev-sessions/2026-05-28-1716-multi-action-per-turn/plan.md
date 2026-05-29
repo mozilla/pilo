@@ -381,14 +381,15 @@ if (result.actionExecuted) {
 
 **Verification — automated:**
 
-- [ ] `pnpm --filter pilo-core test` passes (6 new scenarios green; all 741 existing green, none modified)
-- [ ] `pnpm typecheck` passes
-- [ ] `pnpm format:check` passes
-- [ ] `pnpm check` passes (full)
+- [x] `pnpm --filter pilo-core test` passes (755; 6 new batch scenarios green, events-enum + config-schema sync tests updated)
+- [x] `pnpm typecheck` passes
+- [x] `pnpm format:check` passes
+- [x] `pnpm check` passes (full: core 755, cli 221, server 96, extension 266)
+- [x] `pnpm --filter pilo-core check:schemas` passes (regenerated `webagent-event.json` with `system:debug_batch`; schemas are `.prettierignore`d — no prettier)
 
 **Verification — manual:**
 
-- [ ] Re-read the diff of `generateAndProcessAction`: at `maxActionsPerStep:1`, `slice(0,1)` + drop-emit + single-result processing is behaviorally identical to the original
+- [x] At `maxActionsPerStep:1`, `slice(0,1)` + drop-emit + single-result processing is behaviorally identical to the original — proven by regression scenario 6 (default agent, `[click, fill]` → processes click only, emits `SYSTEM_DEBUG_TOOL_DROP` for fill) plus all 741 pre-existing core tests still green, none modified
 
 ---
 

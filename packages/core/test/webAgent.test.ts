@@ -4467,6 +4467,229 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("click");
     });
   });
+
+  describe("action batching (maxActionsPerStep > 1)", () => {
+    // Build an agent with batching enabled and its own logger so we can read
+    // the SYSTEM_DEBUG_BATCH telemetry it emits.
+    function makeBatchAgent(maxActionsPerStep: number) {
+      const emitter = new WebAgentEventEmitter();
+      const logger = new MockLogger();
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        maxIterations: 10,
+        maxConsecutiveErrors: 5,
+        maxTotalErrors: 15,
+        guardrails: null,
+        eventEmitter: emitter,
+        logger,
+        maxActionsPerStep,
+      });
+      return { agent, logger };
+    }
+
+    function toolResult(toolName: string, output: any, n = 1) {
+      return { type: "tool-result", toolCallId: `${toolName}_${n}`, toolName, input: {}, output };
+    }
+
+    function actionTurn(toolResults: any[]) {
+      return createMockStreamResponse({
+        text: "acting",
+        toolResults,
+        response: { messages: [{ role: "assistant", content: "acting" }] },
+      }) as any;
+    }
+
+    function mockPlan() {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "done", plan: "1. fill form" },
+            output: { successCriteria: "done", plan: "1. fill form" },
+          },
+        ],
+      } as any);
+    }
+
+    function doneTurn(result = "All done") {
+      return actionTurn([toolResult("done", { action: "done", result, isTerminal: true })]);
+    }
+
+    const fill = (n: number) =>
+      toolResult(
+        "fill",
+        { action: "fill", ref: `input${n}`, value: `v${n}`, isTerminal: false },
+        n,
+      );
+
+    function batchEvents(logger: MockLogger) {
+      return logger.events.filter((e) => e.type === WebAgentEventType.SYSTEM_DEBUG_BATCH);
+    }
+
+    it("processes a 3-fill batch in one turn (completed)", async () => {
+      const { agent, logger } = makeBatchAgent(3);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(actionTurn([fill(1), fill(2), fill(3)]));
+      mockStreamText.mockReturnValueOnce(doneTurn());
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("fill the form", {
+        startingUrl: "https://example.com",
+      });
+
+      const batch = batchEvents(logger);
+      expect(batch[0].data).toMatchObject({
+        actionsRequested: 3,
+        actionsProcessed: 3,
+        batchStoppedBy: "completed",
+      });
+      // The fill turn counts 3 actions; the terminal done turn doesn't increment.
+      expect(result.stats.actions).toBe(3);
+      await agent.close();
+    });
+
+    it("processes fill + enter (page-changer last) without stopping early", async () => {
+      const { agent, logger } = makeBatchAgent(3);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          fill(1),
+          toolResult("enter", { action: "enter", ref: "input1", isTerminal: false }),
+        ]),
+      );
+      mockStreamText.mockReturnValueOnce(doneTurn());
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await agent.execute("fill and submit", { startingUrl: "https://example.com" });
+
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 2,
+        batchStoppedBy: "completed",
+      });
+      await agent.close();
+    });
+
+    it("stops the batch at a terminal done and validates it", async () => {
+      const { agent, logger } = makeBatchAgent(3);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          fill(1),
+          toolResult("done", { action: "done", result: "ok", isTerminal: true }),
+        ]),
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("fill then done", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("ok");
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 2,
+        batchStoppedBy: "terminal",
+      });
+      await agent.close();
+    });
+
+    it("stops the batch at a recoverable error", async () => {
+      const { agent, logger } = makeBatchAgent(3);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          fill(1),
+          toolResult(
+            "fill",
+            {
+              action: "fill",
+              ref: "input2",
+              success: false,
+              error: "Invalid element reference",
+              isRecoverable: true,
+            },
+            2,
+          ),
+        ]),
+      );
+      // After the recoverable error the loop retries; let it finish with done.
+      mockStreamText.mockReturnValueOnce(doneTurn());
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await agent.execute("fill with stale ref", { startingUrl: "https://example.com" });
+
+      // Only the first fill was counted as processed; the error stopped the batch.
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 1,
+        batchStoppedBy: "error",
+      });
+      await agent.close();
+    });
+
+    it("ignores actions after a done that is not last in the batch", async () => {
+      const { agent, logger } = makeBatchAgent(3);
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          toolResult("done", { action: "done", result: "early", isTerminal: true }),
+          fill(1),
+        ]),
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("done first", { startingUrl: "https://example.com" });
+
+      expect(result.finalAnswer).toBe("early");
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 1,
+        batchStoppedBy: "terminal",
+      });
+      await agent.close();
+    });
+
+    it("at the default of 1, processes only the first result and drops the rest", async () => {
+      // Default agent (maxActionsPerStep = 1) but provider returns two tools.
+      const emitter = new WebAgentEventEmitter();
+      const logger = new MockLogger();
+      const agent = new WebAgent(mockBrowser, {
+        providerConfig: { model: mockProvider },
+        maxIterations: 10,
+        maxConsecutiveErrors: 5,
+        maxTotalErrors: 15,
+        guardrails: null,
+        eventEmitter: emitter,
+        logger,
+        // maxActionsPerStep omitted -> default 1
+      });
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(
+        actionTurn([
+          toolResult("click", { action: "click", ref: "btn1", isTerminal: false }),
+          fill(1),
+        ]),
+      );
+      mockStreamText.mockReturnValueOnce(doneTurn());
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await agent.execute("click then stray fill", { startingUrl: "https://example.com" });
+
+      const drop = logger.events.filter((e) => e.type === WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP);
+      expect(drop[0].data).toMatchObject({ droppedTools: ["fill"], keptTool: "click" });
+      expect(batchEvents(logger)[0].data).toMatchObject({
+        actionsRequested: 2,
+        actionsProcessed: 1,
+        batchStoppedBy: "completed",
+      });
+      await agent.close();
+    });
+  });
 });
 
 describe("WebAgent firewall options", () => {

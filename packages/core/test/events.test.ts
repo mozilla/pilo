@@ -136,6 +136,7 @@ describe("WebAgentEventEmitter", () => {
         "system:debug_compression",
         "system:debug_message",
         "system:debug_tool_drop",
+        "system:debug_batch",
         "cdp:endpoint_connected",
         "cdp:endpoint_cycle",
         "browser:reconnected",
