@@ -3549,6 +3549,75 @@ describe("WebAgent", () => {
         expect(part.input).toEqual({ ref: `node-${i - 2}`, value: null });
       }
     });
+
+    it("clips paired tool-result outputs for clipped assistant tool-calls (pairing preserved)", () => {
+      const pair = (i: number) => [
+        {
+          role: "assistant" as const,
+          content: [
+            {
+              type: "tool-call" as const,
+              toolCallId: `call-${i}`,
+              toolName: "click",
+              input: { ref: `node-${i}` },
+            },
+          ],
+        },
+        {
+          role: "tool" as const,
+          content: [
+            {
+              type: "tool-result" as const,
+              toolCallId: `call-${i}`,
+              toolName: "click",
+              output: { success: true, data: `result-${i}` },
+            },
+          ],
+        },
+      ];
+
+      const msgs = [
+        { role: "system" as const, content: "sys" },
+        { role: "user" as const, content: "task" },
+        ...Array.from({ length: 8 }, (_, i) => pair(i)).flat(),
+      ];
+      (webAgent as any).messages = msgs;
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+
+      // Build maps of toolCallId -> input/output for easy lookup
+      const toolResults = new Map<string, any>();
+      const toolCalls = new Map<string, any>();
+      for (const m of out) {
+        if (m.role === "assistant" && Array.isArray(m.content)) {
+          for (const p of m.content) {
+            if (p.type === "tool-call") toolCalls.set(p.toolCallId, p.input);
+          }
+        }
+        if (m.role === "tool" && Array.isArray(m.content)) {
+          for (const p of m.content) {
+            if (p.type === "tool-result") toolResults.set(p.toolCallId, p.output);
+          }
+        }
+      }
+
+      // Oldest 3 pairs (call-0, call-1, call-2): both clipped.
+      for (const id of ["call-0", "call-1", "call-2"]) {
+        expect(toolCalls.get(id)).toEqual({ clipped: true });
+        expect(toolResults.get(id)).toEqual({ clipped: true });
+      }
+      // Newest 5 pairs (call-3..call-7): untouched.
+      for (let i = 3; i <= 7; i++) {
+        expect(toolCalls.get(`call-${i}`)).toEqual({ ref: `node-${i}` });
+        expect(toolResults.get(`call-${i}`)).toEqual({ success: true, data: `result-${i}` });
+      }
+
+      // No orphans: every tool-result has a matching tool-call.
+      for (const id of toolResults.keys()) {
+        expect(toolCalls.has(id)).toBe(true);
+      }
+    });
   });
 
   describe("cleanup", () => {

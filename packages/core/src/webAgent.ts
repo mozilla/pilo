@@ -855,7 +855,8 @@ export class WebAgent {
       return msg;
     });
 
-    // Pass 2: Clip old assistant tool-call inputs.
+    // Pass 2: Clip old assistant tool-call inputs, and collect clipped toolCallIds for pass 3.
+    const clippedToolCallIds = new Set<string>();
     this.messages = this.messages.map((msg, idx) => {
       if (msg.role !== "assistant") return msg;
       if (PROTECTED_INDICES.has(idx)) return msg;
@@ -866,9 +867,28 @@ export class WebAgent {
         ...msg,
         content: msg.content
           .filter((part: any) => part.type !== "text") // strip stray text parts (preserve reasoning parts)
-          .map((part: any) =>
-            part.type === "tool-call" ? { ...part, input: { clipped: true } } : part,
-          ),
+          .map((part: any) => {
+            if (part.type === "tool-call") {
+              clippedToolCallIds.add(part.toolCallId);
+              return { ...part, input: { clipped: true } };
+            }
+            return part;
+          }),
+      };
+    });
+
+    // Pass 3: Clip tool-result outputs whose toolCallId matches a clipped tool-call.
+    this.messages = this.messages.map((msg) => {
+      if (msg.role !== "tool") return msg;
+      if (!Array.isArray(msg.content)) return msg;
+      return {
+        ...msg,
+        content: msg.content.map((part: any) => {
+          if (part.type === "tool-result" && clippedToolCallIds.has(part.toolCallId)) {
+            return { ...part, output: { clipped: true } };
+          }
+          return part;
+        }),
       };
     });
   }
