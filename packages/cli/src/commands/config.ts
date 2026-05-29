@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { existsSync } from "fs";
-import { config, getAIProviderInfo } from "pilo-core";
+import { config, getAIProviderInfo, normalizeHostname } from "pilo-core";
 import { getPackageInfo, parseConfigValue } from "../utils.js";
 
 /**
@@ -180,9 +180,13 @@ function getConfigurationValue(key: string): void {
  */
 function setConfigurationValue(key: string, value: string): void {
   try {
-    const parsedValue = parseConfigValue(value);
+    let parsedValue = parseConfigValue(value, key as any);
+    if (key === "trusted_hostnames" && Array.isArray(parsedValue)) {
+      parsedValue = parsedValue.map((h: string) => normalizeHostname(h));
+    }
     config.set(key as any, parsedValue);
-    console.log(chalk.green(`✅ Set ${key} = ${value}`));
+    const displayValue = Array.isArray(parsedValue) ? parsedValue.join(",") : value;
+    console.log(chalk.green(`✅ Set ${key} = ${displayValue}`));
   } catch (error) {
     console.error(chalk.red("❌ Error:"), error instanceof Error ? error.message : String(error));
     console.log(chalk.gray("Example: pilo config set browser chrome"));

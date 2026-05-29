@@ -141,6 +141,7 @@ describe("WebAgentEventEmitter", () => {
         "browser:reconnected",
         "interactive:form_data:request",
         "interactive:form_data:error",
+        "firewall:blocked_non_interactive",
       ];
 
       const actualEventTypes = Object.values(WebAgentEventType);

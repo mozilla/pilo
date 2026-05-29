@@ -22,6 +22,9 @@ import {
   FindElementsOptions,
   FindElementsMatch,
   FindElementsResult,
+  FieldMetadata,
+  FormSubmissionTrigger,
+  FormSubmissionContext,
 } from "./ariaBrowser.js";
 import { PlaywrightBlocker } from "@ghostery/adblocker-playwright";
 import fetch from "cross-fetch";
@@ -847,6 +850,210 @@ export class PlaywrightBrowser implements AriaBrowser {
       // The page may have navigated or torn down the identity map. Identity
       // is advisory for repetition detection — log nothing, just bail out.
       return null;
+    }
+  }
+
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    const locator = await this.validateElementRef(ref);
+
+    try {
+      return await locator.evaluate((element, elementRef): FieldMetadata => {
+        const el = element as HTMLElement;
+        const input = el instanceof HTMLInputElement ? el : null;
+        const form = getElementForm(el);
+
+        return {
+          ref: elementRef,
+          tagName: el.tagName.toLowerCase(),
+          inputType: input?.type?.toLowerCase() ?? null,
+          role: el.getAttribute("role"),
+          name: getElementName(el),
+          label: getElementLabel(el),
+          placeholder: getElementPlaceholder(el),
+          autocomplete: getElementAutocomplete(el),
+          isContentEditable: el.isContentEditable,
+          formId: form?.id || null,
+          formAction: form?.action || null,
+          formMethod: form?.method?.toLowerCase() || null,
+        };
+
+        function getElementForm(node: HTMLElement): HTMLFormElement | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement ||
+            node instanceof HTMLButtonElement
+          ) {
+            return node.form;
+          }
+          return node.closest("form");
+        }
+
+        function getElementName(node: HTMLElement): string | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement ||
+            node instanceof HTMLButtonElement
+          ) {
+            return node.name || null;
+          }
+          return node.getAttribute("name");
+        }
+
+        function getElementLabel(node: HTMLElement): string | null {
+          const ariaLabel = node.getAttribute("aria-label");
+          if (ariaLabel?.trim()) return ariaLabel.trim();
+
+          const labelledBy = node.getAttribute("aria-labelledby");
+          if (labelledBy) {
+            const text = labelledBy
+              .split(/\s+/)
+              .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || "")
+              .filter(Boolean)
+              .join(" ");
+            if (text) return text;
+          }
+
+          if ("labels" in node) {
+            const labels = (node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
+              .labels;
+            const text = Array.from(labels || [])
+              .map((label) => label.textContent?.trim() || "")
+              .filter(Boolean)
+              .join(" ");
+            if (text) return text;
+          }
+
+          return null;
+        }
+
+        function getElementPlaceholder(node: HTMLElement): string | null {
+          if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+            return node.placeholder || null;
+          }
+          return null;
+        }
+
+        function getElementAutocomplete(node: HTMLElement): string | null {
+          if (
+            node instanceof HTMLInputElement ||
+            node instanceof HTMLTextAreaElement ||
+            node instanceof HTMLSelectElement
+          ) {
+            return node.autocomplete || null;
+          }
+          return null;
+        }
+      }, ref);
+    } catch (error) {
+      throw new BrowserActionException(
+        "getFieldMetadata",
+        `Failed to get field metadata: ${error instanceof Error ? error.message : String(error)}`,
+        { ref, originalError: error },
+      );
+    }
+  }
+
+  async getFormSubmissionContext(
+    ref: string,
+    trigger: FormSubmissionTrigger = "click",
+  ): Promise<FormSubmissionContext | null> {
+    const locator = await this.validateElementRef(ref);
+
+    try {
+      return await locator.evaluate(
+        (element, { submitterRef, trigger }): FormSubmissionContext | null => {
+          const el = element as HTMLElement;
+          if (!canSubmitForm(el, trigger)) return null;
+
+          const form = getSubmissionForm(el);
+          if (!form) return null;
+
+          const fields = Array.from(form.elements)
+            .filter(
+              (field): field is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+                field instanceof HTMLInputElement ||
+                field instanceof HTMLTextAreaElement ||
+                field instanceof HTMLSelectElement,
+            )
+            .filter((field) => !field.disabled)
+            .map((field) => ({
+              ref: field.getAttribute("data-pilo-ref"),
+              name: field.name || null,
+              tagName: field.tagName.toLowerCase(),
+              inputType: field instanceof HTMLInputElement ? field.type.toLowerCase() : null,
+              autocomplete: "autocomplete" in field ? field.autocomplete || null : null,
+            }));
+
+          const submitterActionUrl = (() => {
+            if (!(el instanceof HTMLButtonElement) && !(el instanceof HTMLInputElement))
+              return null;
+            if (el instanceof HTMLInputElement && el.type !== "submit" && el.type !== "image")
+              return null;
+            if (el instanceof HTMLButtonElement && el.type !== "submit") return null;
+            if (!el.hasAttribute("formaction")) return null;
+            return el.formAction || null;
+          })();
+
+          return {
+            submitterRef,
+            formId: form.id || null,
+            actionUrl: form.action || null,
+            submitterActionUrl,
+            method: form.method?.toLowerCase() || null,
+            fields,
+          };
+
+          function getSubmissionForm(node: HTMLElement): HTMLFormElement | null {
+            if (
+              node instanceof HTMLButtonElement ||
+              node instanceof HTMLInputElement ||
+              node instanceof HTMLTextAreaElement ||
+              node instanceof HTMLSelectElement
+            ) {
+              return node.form;
+            }
+            return node.closest("form");
+          }
+
+          function canSubmitForm(node: HTMLElement, submitTrigger: FormSubmissionTrigger): boolean {
+            if (submitTrigger === "click") {
+              if (node instanceof HTMLButtonElement) {
+                return node.type === "submit";
+              }
+              if (node instanceof HTMLInputElement) {
+                return node.type === "submit" || node.type === "image";
+              }
+              return false;
+            }
+
+            if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
+              return false;
+            if (!(node instanceof HTMLInputElement)) return false;
+            return ![
+              "button",
+              "checkbox",
+              "color",
+              "file",
+              "hidden",
+              "radio",
+              "range",
+              "reset",
+              "submit",
+            ].includes(node.type);
+          }
+        },
+        { submitterRef: ref, trigger },
+      );
+    } catch (error) {
+      throw new BrowserActionException(
+        "getFormSubmissionContext",
+        `Failed to get form submission context: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { ref, trigger, originalError: error },
+      );
     }
   }
 

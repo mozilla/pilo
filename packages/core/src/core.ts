@@ -13,6 +13,9 @@ export type {
   FindElementsOptions,
   FindElementsMatch,
   FindElementsResult,
+  FieldMetadata,
+  FormSubmissionContext,
+  FormSubmissionTrigger,
 } from "./browser/ariaBrowser.js";
 export { PageAction, LoadState } from "./browser/ariaBrowser.js";
 export type { TaskExecutionResult, TaskError, WebAgentOptions } from "./webAgent.js";
@@ -43,6 +46,8 @@ export type {
   ValidationErrorEventData,
   InteractiveFormDataRequestEventData,
   InteractiveFormDataErrorEventData,
+  FirewallBlockedNonInteractiveEventData,
+  FirewallRemediation,
   AutomateStreamEvent,
   StreamCompleteEventData,
   StreamDoneEventData,
@@ -60,10 +65,15 @@ export type { Action, TaskValidationResult } from "./schemas.js";
 export {
   RecoverableError,
   BrowserException,
+  BrowserActionException,
+  InvalidRefException,
   NavigationTimeoutException,
   PlanningError,
   NoStartingUrlError,
 } from "./errors.js";
+
+// Action firewall helpers (for CLI-side validation at config-set time)
+export { normalizeHostname, InvalidHostnameError } from "./security/actionFirewall.js";
 
 // Navigation retry configuration
 export type { NavigationRetryConfig } from "./browser/navigationRetry.js";

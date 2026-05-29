@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
-import { AriaBrowser, PageAction } from "../src/browser/ariaBrowser.js";
+import { InvalidHostnameError } from "../src/security/actionFirewall.js";
+import {
+  AriaBrowser,
+  FieldMetadata,
+  FormSubmissionTrigger,
+  FormSubmissionContext,
+  PageAction,
+} from "../src/browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
@@ -156,6 +163,8 @@ class MockBrowser implements AriaBrowser {
     </div>
   `;
   private markdown = "# Mock Page\nContent here";
+  fieldMetadata = new Map<string, FieldMetadata>();
+  formSubmissionContexts = new Map<string, FormSubmissionContext | null>();
 
   async start(): Promise<void> {}
   async shutdown(): Promise<void> {}
@@ -194,6 +203,32 @@ class MockBrowser implements AriaBrowser {
   }
 
   async performAction(_ref: string, _action: PageAction, _value?: string): Promise<void> {}
+
+  async getFieldMetadata(ref: string): Promise<FieldMetadata> {
+    return (
+      this.fieldMetadata.get(ref) ?? {
+        ref,
+        tagName: "input",
+        inputType: "search",
+        role: "searchbox",
+        name: "q",
+        label: "Search",
+        placeholder: "Search",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "search-form",
+        formAction: "https://example.com/search",
+        formMethod: "get",
+      }
+    );
+  }
+
+  async getFormSubmissionContext(
+    ref: string,
+    _trigger?: FormSubmissionTrigger,
+  ): Promise<FormSubmissionContext | null> {
+    return this.formSubmissionContexts.get(ref) ?? null;
+  }
 
   async getRefIdentity(_ref: string): Promise<{ role: string; name: string } | null> {
     return null;
@@ -885,6 +920,77 @@ describe("WebAgent", () => {
         (e) => e.type === WebAgentEventType.BROWSER_NAVIGATED,
       );
       expect(navigatedEvent?.data.url).toBe(startingUrl);
+    });
+
+    it("should keep the same snapshot after fill so form refs remain valid for submit", async () => {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Fill then submit",
+              plan: "1. Fill the form\n2. Submit the form",
+            },
+          },
+        ],
+      } as any);
+
+      const snapshotSpy = vi.spyOn(mockBrowser, "getTreeWithRefs");
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Fill",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "fill_1",
+              toolName: "fill",
+              input: { ref: "input1", value: "context" },
+              output: {
+                success: true,
+                action: "fill",
+                ref: "input1",
+                value: "context",
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Fill" }],
+          },
+        }) as any,
+      );
+
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: {
+                success: true,
+                action: "done",
+                result: "Complete",
+                isTerminal: true,
+              },
+            },
+          ],
+          response: {
+            messages: [{ role: "assistant", content: "Done" }],
+          },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Fill then submit", { startingUrl: "https://example.com" });
+
+      expect(snapshotSpy).toHaveBeenCalledTimes(1);
     });
 
     it("should pass webSearchEnabled to planning prompt when search provider is set", async () => {
@@ -4376,5 +4482,47 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
       expect(result.finalAnswer).toContain("click");
     });
+  });
+});
+
+describe("WebAgent firewall options", () => {
+  let mockProvider: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProvider = { specificationVersion: "v1" } as unknown as any;
+  });
+
+  it("throws InvalidHostnameError when trustedHostnames contains an invalid entry", () => {
+    const browser = new MockBrowser();
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          trustedHostnames: ["bad value"],
+        }),
+    ).toThrow(InvalidHostnameError);
+  });
+
+  it("normalizes trustedHostnames at construction", () => {
+    const browser = new MockBrowser();
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          trustedHostnames: ["Example.COM", "app.example.com."],
+        }),
+    ).not.toThrow();
+  });
+
+  it("accepts unsafeMode true", () => {
+    const browser = new MockBrowser();
+    expect(
+      () =>
+        new WebAgent(browser, {
+          providerConfig: { model: mockProvider },
+          unsafeMode: true,
+        }),
+    ).not.toThrow();
   });
 });

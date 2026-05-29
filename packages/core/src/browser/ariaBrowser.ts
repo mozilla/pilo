@@ -119,6 +119,40 @@ export interface TemporaryTab {
   waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
 }
 
+export interface FieldMetadata {
+  ref: string;
+  tagName: string;
+  inputType: string | null;
+  role: string | null;
+  name: string | null;
+  label: string | null;
+  placeholder: string | null;
+  autocomplete: string | null;
+  isContentEditable: boolean;
+  formId: string | null;
+  formAction: string | null;
+  formMethod: string | null;
+}
+
+export interface FormFieldState {
+  ref: string | null;
+  name: string | null;
+  tagName: string;
+  inputType: string | null;
+  autocomplete: string | null;
+}
+
+export interface FormSubmissionContext {
+  submitterRef: string;
+  formId: string | null;
+  actionUrl: string | null;
+  submitterActionUrl: string | null;
+  method: string | null;
+  fields: FormFieldState[];
+}
+
+export type FormSubmissionTrigger = "click" | "enter";
+
 export interface AriaBrowser {
   /** The name of the browser being used */
   browserName: string;
@@ -160,6 +194,15 @@ export interface AriaBrowser {
    * @param value Optional value for actions like typing
    */
   performAction(ref: string, action: PageAction, value?: string): Promise<void>;
+
+  /** Returns structural metadata for an element ref used in form/action policy checks. */
+  getFieldMetadata(ref: string): Promise<FieldMetadata>;
+
+  /** Returns the form that would be submitted by activating this ref, if any. */
+  getFormSubmissionContext(
+    ref: string,
+    trigger?: FormSubmissionTrigger,
+  ): Promise<FormSubmissionContext | null>;
 
   /**
    * Look up element identity (role + accessible name) for a ref from the

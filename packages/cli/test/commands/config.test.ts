@@ -174,6 +174,26 @@ describe("CLI Config Command (subcommands)", () => {
 
       expect(mockExit).toHaveBeenCalledWith(1);
     });
+
+    it("should parse trusted_hostnames as an array and persist normalized entries", async () => {
+      const cmd = getCommand();
+      await cmd.parseAsync(["set", "trusted_hostnames", "Example.COM,app.example.com."], {
+        from: "user",
+      });
+
+      expect(mockConfig.set).toHaveBeenCalledWith("trusted_hostnames", [
+        "example.com",
+        "app.example.com",
+      ]);
+    });
+
+    it("should exit(1) on invalid hostname in trusted_hostnames", async () => {
+      const cmd = getCommand();
+      await cmd.parseAsync(["set", "trusted_hostnames", "good.com,bad value"], { from: "user" });
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockConfig.set).not.toHaveBeenCalledWith("trusted_hostnames", expect.anything());
+    });
   });
 
   // -------------------------------------------------------------------------
