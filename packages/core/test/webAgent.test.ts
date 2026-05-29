@@ -3613,6 +3613,10 @@ describe("WebAgent", () => {
         expect(toolResults.get(`call-${i}`)).toEqual({ success: true, data: `result-${i}` });
       }
 
+      // Both maps should have entries for all 8 toolCallIds (no messages dropped, no duplicates).
+      expect(toolCalls.size).toBe(8);
+      expect(toolResults.size).toBe(8);
+
       // No orphans: every tool-result has a matching tool-call.
       for (const id of toolResults.keys()) {
         expect(toolCalls.has(id)).toBe(true);

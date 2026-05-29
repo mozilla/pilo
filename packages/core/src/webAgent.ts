@@ -878,6 +878,9 @@ export class WebAgent {
     });
 
     // Pass 3: Clip tool-result outputs whose toolCallId matches a clipped tool-call.
+    // Note: pass 1 may have already done partial string-level EXTERNAL-CONTENT clipping
+    // inside `output`; pass 3 wholesale replaces `output` for clipped pairs and supersedes
+    // that partial clipping for old messages.
     this.messages = this.messages.map((msg) => {
       if (msg.role !== "tool") return msg;
       if (!Array.isArray(msg.content)) return msg;
