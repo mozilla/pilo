@@ -3505,6 +3505,50 @@ describe("WebAgent", () => {
       expect(output.success).toBe(true);
       expect(output.action).toBe("extract");
     });
+
+    it("clips old assistant tool-call inputs beyond keep-last-5 boundary", () => {
+      const buildAssistantToolCall = (i: number) => ({
+        role: "assistant" as const,
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: `call-${i}`,
+            toolName: "click",
+            input: { ref: `node-${i}`, value: null },
+          },
+        ],
+      });
+
+      // 8 assistant messages — oldest 3 should be clipped, newest 5 preserved
+      const msgs = [
+        { role: "system" as const, content: "sys" },
+        { role: "user" as const, content: "task" },
+        ...Array.from({ length: 8 }, (_, i) => buildAssistantToolCall(i)),
+      ];
+      (webAgent as any).messages = msgs;
+
+      (webAgent as any).trimOldHistory();
+
+      const out = (webAgent as any).messages as any[];
+      // messages[0..1] untouched
+      expect(out[0]).toEqual({ role: "system", content: "sys" });
+      expect(out[1]).toEqual({ role: "user", content: "task" });
+
+      // out[2..4] are the 3 oldest assistant messages — should be clipped
+      for (let i = 2; i <= 4; i++) {
+        const part = out[i].content[0];
+        expect(part.type).toBe("tool-call");
+        expect(part.toolCallId).toBe(`call-${i - 2}`);
+        expect(part.toolName).toBe("click");
+        expect(part.input).toEqual({ clipped: true });
+      }
+
+      // out[5..9] are the 5 newest assistant messages — should be untouched
+      for (let i = 5; i <= 9; i++) {
+        const part = out[i].content[0];
+        expect(part.input).toEqual({ ref: `node-${i - 2}`, value: null });
+      }
+    });
   });
 
   describe("cleanup", () => {

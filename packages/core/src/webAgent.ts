@@ -69,6 +69,9 @@ import {
 } from "./historyPrefixes.js";
 export { STEP_ERROR_FEEDBACK_PREFIX, VALIDATION_FEEDBACK_PREFIX, REPETITION_WARNING_PREFIX };
 
+/** Number of most-recent assistant turns whose tool-call/tool-result content is preserved unclipped. */
+const HISTORY_CLIP_KEEP_LAST = 5;
+
 // === Type Definitions ===
 
 export interface WebAgentOptions {
@@ -793,6 +796,23 @@ export class WebAgent {
       return value;
     };
 
+    // Compute keep-last boundary: index of the 5th-most-recent assistant message.
+    // Messages at index < boundary are eligible for clipping. If fewer than
+    // HISTORY_CLIP_KEEP_LAST assistant messages exist, boundary is -1 (nothing clipped).
+    let assistantSeen = 0;
+    let boundary = -1;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (this.messages[i].role === "assistant") {
+        assistantSeen++;
+        if (assistantSeen === HISTORY_CLIP_KEEP_LAST) {
+          boundary = i;
+          break;
+        }
+      }
+    }
+    // Index 0 (system) and 1 (task+plan) are unconditionally protected.
+    const PROTECTED_INDICES = new Set([0, 1]);
+
     this.messages = this.messages.map((msg) => {
       if (msg.role === "user") {
         // Handle text-only messages
@@ -833,6 +853,23 @@ export class WebAgent {
       }
 
       return msg;
+    });
+
+    // Pass 2: Clip old assistant tool-call inputs.
+    this.messages = this.messages.map((msg, idx) => {
+      if (msg.role !== "assistant") return msg;
+      if (PROTECTED_INDICES.has(idx)) return msg;
+      if (boundary === -1 || idx >= boundary) return msg;
+      if (!Array.isArray(msg.content)) return msg;
+
+      return {
+        ...msg,
+        content: msg.content
+          .filter((part: any) => part.type !== "text") // strip stray reasoning text
+          .map((part: any) =>
+            part.type === "tool-call" ? { ...part, input: { clipped: true } } : part,
+          ),
+      };
     });
   }
 
