@@ -109,6 +109,14 @@ export const TOOL_STRINGS = {
         "Create a step-by-step plan for completing the task, MUST be formatted as VALID Markdown",
       url: "The best starting URL for the task",
     },
+    revise_plan: {
+      description:
+        "Update your task plan when your understanding of the task has materially changed " +
+        "(e.g., a constraint emerged, the original approach won't work, or you discovered a " +
+        "better path). Provide the revised plan as Markdown. Use sparingly — only when the " +
+        "original plan is misleading or incomplete, not for minor tactical changes.",
+      reason: "Brief explanation of why the plan needed revision",
+    },
   },
 
   /**

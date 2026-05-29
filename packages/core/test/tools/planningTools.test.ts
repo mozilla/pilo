@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createPlanningTools } from "../../src/tools/planningTools.js";
+import { createPlanningTools, createReplanningTools } from "../../src/tools/planningTools.js";
 import { z } from "zod";
 import type { ModelMessage } from "ai";
 
@@ -316,6 +316,48 @@ describe("Planning Tools", () => {
 
       expect(result).toEqual(input);
       expect(result.actionItems).toBeUndefined();
+    });
+  });
+
+  describe("createReplanningTools", () => {
+    it("should expose a revise_plan tool", () => {
+      const tools = createReplanningTools();
+      expect(tools.revise_plan).toBeDefined();
+    });
+
+    it("should echo inputs tagged with the action name", async () => {
+      const tools = createReplanningTools();
+      const result = await tools.revise_plan.execute!(
+        {
+          revisedPlan: "1. New plan",
+          reason: "Original approach blocked",
+          revisedSuccessCriteria: "New criteria",
+          revisedActionItems: ["Step one", "Step two"],
+        },
+        {} as any,
+      );
+      expect(result).toEqual({
+        success: true,
+        action: "revise_plan",
+        revisedPlan: "1. New plan",
+        reason: "Original approach blocked",
+        revisedSuccessCriteria: "New criteria",
+        revisedActionItems: ["Step one", "Step two"],
+      });
+    });
+
+    it("should omit optional fields when not provided", async () => {
+      const tools = createReplanningTools();
+      const result = await tools.revise_plan.execute!(
+        { revisedPlan: "1. New plan", reason: "Constraint emerged" },
+        {} as any,
+      );
+      expect(result).toEqual({
+        success: true,
+        action: "revise_plan",
+        revisedPlan: "1. New plan",
+        reason: "Constraint emerged",
+      });
     });
   });
 });
