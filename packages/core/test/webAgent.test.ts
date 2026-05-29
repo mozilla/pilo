@@ -3736,6 +3736,37 @@ describe("WebAgent", () => {
       expect(typeof pushed.content).toBe("string");
       expect((pushed.content as string).startsWith(REPETITION_WARNING_PREFIX)).toBe(true);
     });
+
+    it("never modifies messages[0] (system) or messages[1] (task+plan), even on long histories", () => {
+      const sysMsg = { role: "system" as const, content: "you are a web agent" };
+      const taskMsg = {
+        role: "user" as const,
+        content: "task: do the thing\n\nplan: step 1, step 2",
+      };
+      const buildAssistant = (i: number) => ({
+        role: "assistant" as const,
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: `c-${i}`,
+            toolName: "click",
+            input: { ref: `n-${i}` },
+          },
+        ],
+      });
+
+      (webAgent as any).messages = [
+        sysMsg,
+        taskMsg,
+        ...Array.from({ length: 20 }, (_, i) => buildAssistant(i)),
+      ];
+
+      (webAgent as any).trimOldHistory();
+      const out = (webAgent as any).messages as any[];
+
+      expect(out[0]).toEqual(sysMsg);
+      expect(out[1]).toEqual(taskMsg);
+    });
   });
 
   describe("cleanup", () => {
