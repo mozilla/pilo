@@ -3767,6 +3767,29 @@ describe("WebAgent", () => {
       expect(out[0]).toEqual(sysMsg);
       expect(out[1]).toEqual(taskMsg);
     });
+
+    it("emits SYSTEM_DEBUG_HISTORY_SIZE per snapshot push with non-zero estimated tokens", async () => {
+      const events: any[] = [];
+      eventEmitter.on(WebAgentEventType.SYSTEM_DEBUG_HISTORY_SIZE, (data: any) => {
+        events.push(data);
+      });
+
+      // Pre-populate some history so the metric isn't 0.
+      (webAgent as any).messages = [
+        { role: "system", content: "you are an agent" },
+        { role: "user", content: "do the thing".repeat(50) }, // ~600 chars
+      ];
+
+      // Drive addPageSnapshot directly. The browser + provider should already be mocked
+      // via beforeEach in this test suite — use the same patterns that other addPageSnapshot
+      // or snapshot-related tests in this file use.
+      await (webAgent as any).addPageSnapshot();
+
+      expect(events.length).toBe(1);
+      expect(events[0].estimatedTokens).toBeGreaterThan(0);
+      expect(events[0].messageCount).toBe(3); // sys, task, new snapshot
+      expect(events[0].iterationId).toBeDefined();
+    });
   });
 
   describe("cleanup", () => {

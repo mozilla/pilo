@@ -978,6 +978,35 @@ export class WebAgent {
   }
 
   /**
+   * Crude token estimator for telemetry. Sums character lengths of text content
+   * across all messages (treating images as ~1000 tokens) and divides by 4.
+   * Not precise; intended for trend analysis only.
+   */
+  private estimateHistoryTokens(): number {
+    const IMAGE_TOKEN_ESTIMATE = 1000;
+    let chars = 0;
+    let imageCount = 0;
+    for (const msg of this.messages) {
+      if (typeof msg.content === "string") {
+        chars += msg.content.length;
+      } else if (Array.isArray(msg.content)) {
+        for (const part of msg.content as any[]) {
+          if (part.type === "text" && typeof part.text === "string") {
+            chars += part.text.length;
+          } else if (part.type === "image") {
+            imageCount++;
+          } else if (part.type === "tool-call") {
+            chars += JSON.stringify(part.input ?? {}).length;
+          } else if (part.type === "tool-result") {
+            chars += JSON.stringify(part.output ?? {}).length;
+          }
+        }
+      }
+    }
+    return Math.ceil(chars / 4) + imageCount * IMAGE_TOKEN_ESTIMATE;
+  }
+
+  /**
    * Add page snapshot to the conversation
    */
   private async addPageSnapshot(): Promise<void> {
@@ -1069,6 +1098,12 @@ export class WebAgent {
       // Text-only mode
       this.messages.push({ role: "user", content: snapshotMessage });
     }
+
+    this.emit(WebAgentEventType.SYSTEM_DEBUG_HISTORY_SIZE, {
+      iterationId: this.currentIterationId,
+      estimatedTokens: this.estimateHistoryTokens(),
+      messageCount: this.messages.length,
+    });
   }
 
   /**
