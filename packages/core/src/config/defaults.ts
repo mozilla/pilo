@@ -101,6 +101,7 @@ export interface PiloConfig {
   // Agent Configuration
   debug?: boolean;
   vision?: boolean;
+  enable_replanning?: boolean;
   max_iterations?: number;
   max_validation_attempts?: number;
   max_repeated_actions?: number;
@@ -175,6 +176,7 @@ export interface PiloConfigResolved {
   // Agent Configuration
   debug: boolean;
   vision: boolean;
+  enable_replanning: boolean;
   max_iterations: number;
   max_validation_attempts: number;
   max_repeated_actions: number;
@@ -466,6 +468,14 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Enable vision capabilities to include screenshots",
     category: "agent",
   },
+  enable_replanning: {
+    default: false,
+    type: "boolean",
+    cli: "--enable-replanning",
+    env: ["PILO_ENABLE_REPLANNING"],
+    description: "Allow the agent to revise its plan mid-task via revise_plan",
+    category: "agent",
+  },
   max_iterations: {
     default: 50,
     type: "number",
@@ -714,6 +724,7 @@ function buildDefaults(): PiloConfigResolved {
     "metrics_incremental",
     "debug",
     "vision",
+    "enable_replanning",
     "max_iterations",
     "max_validation_attempts",
     "max_repeated_actions",

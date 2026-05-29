@@ -171,6 +171,7 @@ describe("ConfigManager", () => {
         "metrics_incremental",
         "debug",
         "vision",
+        "enable_replanning",
         "max_iterations",
         "max_validation_attempts",
         "max_repeated_actions",
@@ -212,6 +213,12 @@ describe("ConfigManager", () => {
           `CONFIG_SCHEMA key "${key}" not in PiloConfig`,
         ).toBe(true);
       }
+    });
+  });
+
+  describe("enable_replanning default", () => {
+    it("defaults enable_replanning to false", () => {
+      expect(DEFAULTS.enable_replanning).toBe(false);
     });
   });
 
