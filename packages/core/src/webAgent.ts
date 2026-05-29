@@ -751,6 +751,7 @@ export class WebAgent {
       Boolean(this.guardrails),
       this.searchProvider !== "none",
       Boolean(this.tabstackApiKey),
+      this.maxActionsPerStep,
     );
     this.messages.push({ role: "user", content: errorFeedback });
   }
@@ -888,6 +889,7 @@ export class WebAgent {
       currentPageInfo.url,
       compressedSnapshot,
       this.vision,
+      this.maxActionsPerStep,
     );
 
     // Handle vision mode with screenshots
@@ -1792,6 +1794,7 @@ export class WebAgent {
       hasTabstack,
       hasStartingUrl,
       hasInteractive,
+      this.maxActionsPerStep,
     );
 
     this.messages = [

@@ -307,6 +307,51 @@ describe("prompts", () => {
       expect(prompt).toContain("DATA GROUNDING");
       expect(prompt).toContain("**Before calling done():**");
     });
+
+    it("renders batching guidance when maxActionsPerStep > 1", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, 3);
+
+      expect(prompt).toMatch(/up to 3 tools/i);
+      expect(prompt).toMatch(/Safe to batch together/i);
+      expect(prompt).not.toContain("Execute EXACTLY ONE tool per turn");
+      expect(prompt).not.toContain("You MUST use exactly one tool with the required parameters");
+    });
+
+    it("renders single-tool instruction when maxActionsPerStep === 1", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, 1);
+
+      expect(prompt).toContain("Execute EXACTLY ONE tool per turn");
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
+      expect(prompt).not.toMatch(/Safe to batch together/i);
+    });
+  });
+
+  describe("buildStepErrorFeedbackPrompt batching", () => {
+    it("renders batching guidance when maxActionsPerStep > 1", () => {
+      const prompt = buildStepErrorFeedbackPrompt("oops", false, false, false, 3);
+      expect(prompt).toMatch(/up to 3 tools/i);
+      expect(prompt).not.toContain("You MUST use exactly one tool with the required parameters");
+    });
+
+    it("keeps single-tool instruction at default", () => {
+      const prompt = buildStepErrorFeedbackPrompt("oops");
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
+      expect(prompt).not.toMatch(/Safe to batch together/i);
+    });
+  });
+
+  describe("buildPageSnapshotPrompt batching", () => {
+    it("renders batching guidance when maxActionsPerStep > 1", () => {
+      const prompt = buildPageSnapshotPrompt("Title", "https://e.com", "tree", false, 3);
+      expect(prompt).toMatch(/up to 3 tools/i);
+      expect(prompt).not.toContain("You MUST use exactly one tool with the required parameters");
+    });
+
+    it("keeps single-tool instruction at default", () => {
+      const prompt = buildPageSnapshotPrompt("Title", "https://e.com", "tree");
+      expect(prompt).toContain("You MUST use exactly one tool with the required parameters");
+      expect(prompt).not.toMatch(/Safe to batch together/i);
+    });
   });
 
   describe("buildTaskAndPlanPrompt", () => {

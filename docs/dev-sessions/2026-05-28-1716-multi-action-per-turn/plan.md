@@ -219,14 +219,16 @@ it("renders single-tool instruction when maxActionsPerStep === 1", () => {
 
 **Verification — automated:**
 
-- [ ] `pnpm --filter pilo-core test` passes (new prompt tests green; existing prompt text tests still green)
-- [ ] `pnpm typecheck` passes
-- [ ] `pnpm format:check` passes
+- [x] `pnpm --filter pilo-core test` passes (749 pass; 6 new prompt tests green, existing prompt tests unchanged)
+- [x] `pnpm typecheck` passes
+- [x] `pnpm format:check` passes
 
 **Verification — manual:**
 
-- [ ] Eyeball a rendered action-loop prompt at `maxActionsPerStep:3` — batching guidance reads coherently, page-changer-last rule is clear
-- [ ] Rendered prompt at default (1) still says "exactly ONE" and contains no batching text
+- [x] Eyeball a rendered action-loop prompt at `maxActionsPerStep:3` — Core Rule #2, CRITICAL line, and batching block all render coherently with the page-changer-last rule (verified via render)
+- [x] Rendered prompt at default (1) still says "exactly ONE" and contains no batching text (existing `actionLoopSystemPrompt` describe block asserts this)
+
+> **Note:** the `toolChoice` flip listed in this phase's Files already landed in Phase 1 (see Phase 1 adaptation). Phase 2 is the prompt-guidance work only.
 
 ---
 

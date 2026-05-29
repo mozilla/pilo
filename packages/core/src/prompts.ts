@@ -215,12 +215,31 @@ function buildToolExamples(
   return lines.join("\n");
 }
 
-/** Standard tool calling instruction. */
+/** Standard tool calling instruction (one tool per turn). */
 const toolCallInstruction = `
 You MUST use exactly one tool with the required parameters.
 Use valid JSON format for all arguments.
 CRITICAL: Use each tool exactly ONCE. Do not repeat or duplicate the same tool call multiple times.
 `.trim();
+
+/** Tool calling instruction when batching is enabled (up to N tools per turn). */
+const batchingToolCallInstruction = (maxActionsPerStep: number): string =>
+  `
+You may call up to ${maxActionsPerStep} tools in one turn, but ONLY for related actions that
+do not change the page (filling several fields of the same form, focusing inputs, checking
+boxes). Any page-changing action — click, enter, goto, back, forward, scroll, webSearch,
+extract, done, abort — MUST be the LAST call in the turn, or the only call. Actions placed
+after a page-changing call run against a stale page and will fail.
+
+Safe to batch together (before any page-changing action): fill, select, check, uncheck, focus.
+Must be last or alone: everything else.
+
+Use valid JSON format for all arguments. Do not call the same tool with identical arguments more than once.
+`.trim();
+
+/** Instruction text for the action loop, parameterized on the per-turn action cap. */
+const toolCallInstructionFor = (maxActionsPerStep: number): string =>
+  maxActionsPerStep > 1 ? batchingToolCallInstruction(maxActionsPerStep) : toolCallInstruction;
 
 /**
  * Base planning prompt content - shared across all planning prompt variants.
@@ -328,7 +347,7 @@ Analyze the current page state and determine your next action based on previous 
 
 **Core Rules:**
 1. Use element refs from page snapshot. They are found in square brackets: [ref=${TOOL_STRINGS.webActions.common.elementRefExample}].
-2. Execute EXACTLY ONE tool per turn
+{% if maxActionsPerStep > 1 %}2. You may batch up to {{ maxActionsPerStep }} safe actions per turn; any page-changing action must be the last call{% else %}2. Execute EXACTLY ONE tool per turn{% endif %}
 3. Complete planned steps before using done()
 4. done() provides your final answer to the user
 5. goto() only accepts URLs from earlier in conversation
@@ -336,7 +355,7 @@ Analyze the current page state and determine your next action based on previous 
 7. DATA GROUNDING: Every value in your done() result and your reasoning must come from the page snapshot, a tool result, or the task input. Do not use training knowledge to fill gaps. If you cannot verify a value from the current session, say so explicitly.
 {% if hasGuardrails %}8. ALL actions MUST comply with provided guardrails{% endif %}
 
-**CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:
+{% if maxActionsPerStep > 1 %}**CRITICAL:** Use 1–{{ maxActionsPerStep }} tools per turn, with any page-changing action last. Choose:{% else %}**CRITICAL:** You MUST use exactly ONE tool with valid arguments EVERY turn. Choose:{% endif %}
 - done(result) if task is complete
 - abort(reason) if task cannot be completed due to site issues, blocking, or missing data
 - Appropriate action tool if work remains
@@ -421,7 +440,7 @@ You MUST use request_user_data() for any form field that requires the user's per
 After clicking submit, check the next page snapshot for validation errors. Fields with errors will show [invalid] and [errormessage="..."] properties directly on the element. Error messages may also appear as text near the affected fields. If you see invalid fields, call request_user_data again immediately with reason "validation_error" for the affected fields only. Include any error message in each field's description so the user knows what went wrong.
 {% endif %}
 
-${toolCallInstruction}
+{{ toolCallInstruction }}
 `.trim(),
 );
 
@@ -432,6 +451,7 @@ const buildActionLoopSystemPrompt = (
   hasTabstack: boolean = false,
   hasStartingUrl: boolean = false,
   hasInteractive: boolean = false,
+  maxActionsPerStep: number = 1,
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -439,6 +459,8 @@ const buildActionLoopSystemPrompt = (
     hasTabstack,
     hasStartingUrl,
     hasInteractive,
+    maxActionsPerStep,
+    toolCallInstruction: toolCallInstructionFor(maxActionsPerStep),
     toolExamples: buildToolExamples(hasWebSearch, hasTabstack, hasInteractive),
     currentDate: getCurrentFormattedDate(),
   });
@@ -515,7 +537,7 @@ This shows the complete current page content.{% if hasScreenshot %} A labeled sc
 {% if hasScreenshot %}- Use the labeled screenshot to visually locate interactive elements and match them to [ref=E###] IDs in the tree{% endif %}
 - Follow all guardrails
 
-${toolCallInstruction}
+{{ toolCallInstruction }}
 `.trim(),
 );
 
@@ -524,6 +546,7 @@ export const buildPageSnapshotPrompt = (
   url: string,
   snapshot: string,
   hasScreenshot: boolean = false,
+  maxActionsPerStep: number = 1,
 ) => {
   const pageContent = `Title: ${title}\nURL: ${url}\n\n${snapshot}`;
   return pageSnapshotTemplate({
@@ -532,6 +555,7 @@ export const buildPageSnapshotPrompt = (
       ExternalContentLabel.PageSnapshot,
     ),
     hasScreenshot,
+    toolCallInstruction: toolCallInstructionFor(maxActionsPerStep),
     currentDate: getCurrentFormattedDate(),
   });
 };
@@ -557,7 +581,7 @@ CRITICAL: ALL TOOL CALLS MUST COMPLY WITH THE PROVIDED GUARDRAILS
 **Available Tools:**
 {{ toolExamples }}
 
-${toolCallInstruction}
+{{ toolCallInstruction }}
 `.trim(),
 );
 
@@ -566,10 +590,12 @@ export const buildStepErrorFeedbackPrompt = (
   hasGuardrails: boolean = false,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
+  maxActionsPerStep: number = 1,
 ) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
+    toolCallInstruction: toolCallInstructionFor(maxActionsPerStep),
     toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
   });
 
