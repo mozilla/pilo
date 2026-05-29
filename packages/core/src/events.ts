@@ -41,6 +41,7 @@ export enum WebAgentEventType {
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
   SYSTEM_DEBUG_TOOL_DROP = "system:debug_tool_drop",
+  SYSTEM_DEBUG_HISTORY_SIZE = "system:debug_history_size",
 
   // CDP endpoint failover
   CDP_ENDPOINT_CONNECTED = "cdp:endpoint_connected",
@@ -288,6 +289,16 @@ export interface ToolDropDebugEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data emitted once per iteration with estimated history size.
+ * `estimatedTokens` is a crude `~chars / 4` heuristic and is intended for
+ * telemetry trend analysis, not precise accounting.
+ */
+export interface HistorySizeDebugEventData extends WebAgentEventData {
+  estimatedTokens: number;
+  messageCount: number;
+}
+
+/**
  * Event data for waiting notifications
  */
 export interface WaitingEventData extends WebAgentEventData {
@@ -395,6 +406,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP; data: ToolDropDebugEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_HISTORY_SIZE; data: HistorySizeDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }
