@@ -865,7 +865,7 @@ export class WebAgent {
       return {
         ...msg,
         content: msg.content
-          .filter((part: any) => part.type !== "text") // strip stray reasoning text
+          .filter((part: any) => part.type !== "text") // strip stray text parts (preserve reasoning parts)
           .map((part: any) =>
             part.type === "tool-call" ? { ...part, input: { clipped: true } } : part,
           ),
