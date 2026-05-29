@@ -344,10 +344,6 @@ export class WebAgent {
       };
     }
 
-    // Forward-reference reads: these fields are used in Task 7 (revise_plan tool registration
-    // and handler). The reads here satisfy noUnusedLocals until that wiring lands.
-    void this.planRevisionCount;
-    void this.lastRevisionReason;
   }
 
   /**
@@ -1358,6 +1354,7 @@ export class WebAgent {
             this.successCriteria,
             finalAnswer,
             conversationHistory,
+            this.planRevisionCount > 0 ? { reason: this.lastRevisionReason } : undefined,
           );
 
           // Call validation tool

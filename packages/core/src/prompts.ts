@@ -606,6 +606,11 @@ Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Result: {{ finalAnswer }}
+{% if planRevision %}
+
+⚠️ The agent revised its plan and/or success criteria mid-task. Reason given: "{{ planRevisionReason }}".
+Evaluate the result against the success criteria above, but be alert to the possibility that the criteria were weakened to make completion easier. If the revision appears to have dropped a core requirement of the original task, rate accordingly.
+{% endif %}
 
 Evaluation approach:
 1. Compare the result against the success criteria defined above
@@ -635,6 +640,7 @@ export const buildTaskValidationPrompt = (
   successCriteria: string,
   finalAnswer: string,
   conversationHistory: string,
+  planRevision?: { reason: string },
 ): string =>
   taskValidationTemplate({
     task,
@@ -642,6 +648,8 @@ export const buildTaskValidationPrompt = (
     finalAnswer,
     conversationHistory,
     currentDate: getCurrentFormattedDate(),
+    planRevision: Boolean(planRevision),
+    planRevisionReason: planRevision?.reason ?? "",
   });
 
 /**

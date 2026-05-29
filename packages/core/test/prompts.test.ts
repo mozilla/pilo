@@ -648,6 +648,19 @@ describe("prompts", () => {
       expect(prompt).toContain('Find "best price" for product & purchase');
       expect(prompt).toContain("Found item for $29.99 & completed checkout");
     });
+
+    it("omits the revision caution when no revision occurred", () => {
+      const prompt = buildTaskValidationPrompt("task", "criteria", "answer", "history");
+      expect(prompt).not.toContain("revised its plan");
+    });
+
+    it("includes the revision caution and reason when a revision occurred", () => {
+      const prompt = buildTaskValidationPrompt("task", "criteria", "answer", "history", {
+        reason: "Original site was paywalled",
+      });
+      expect(prompt).toContain("revised its plan");
+      expect(prompt).toContain("Original site was paywalled");
+    });
   });
 
   describe("buildValidationFeedbackPrompt", () => {
