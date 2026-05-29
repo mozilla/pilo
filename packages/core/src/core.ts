@@ -105,6 +105,7 @@ export const DEFAULT_BYPASS_CSP = _defaults.bypass_csp;
 export const DEFAULT_MAX_ITERATIONS = _defaults.max_iterations;
 export const DEFAULT_MAX_VALIDATION_ATTEMPTS = _defaults.max_validation_attempts;
 export const DEFAULT_MAX_REPEATED_ACTIONS = _defaults.max_repeated_actions;
+export const DEFAULT_MAX_ACTIONS_PER_STEP = _defaults.max_actions_per_step;
 export const DEFAULT_MAX_CONSECUTIVE_ERRORS = _defaults.max_consecutive_errors;
 export const DEFAULT_MAX_TOTAL_ERRORS = _defaults.max_total_errors;
 export const DEFAULT_INITIAL_NAVIGATION_RETRIES = _defaults.initial_navigation_retries;

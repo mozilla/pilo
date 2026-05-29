@@ -91,6 +91,8 @@ export interface WebAgentOptions {
   maxValidationAttempts?: number;
   /** Maximum times an action can be repeated before warning/aborting */
   maxRepeatedActions?: number;
+  /** Maximum tool calls the agent may batch in one turn (default 1 = one action per turn) */
+  maxActionsPerStep?: number;
   /** Number of times to retry initial navigation with browser restart (0 = no retries, default: 1) */
   initialNavigationRetries?: number;
   /** Search provider to use for web search (default: from config, typically "none") */
@@ -246,6 +248,7 @@ export class WebAgent {
   private readonly maxTotalErrors: number;
   private readonly maxValidationAttempts: number;
   private readonly maxRepeatedActions: number;
+  private readonly maxActionsPerStep: number;
   private readonly initialNavigationRetries: number;
   private readonly guardrails: string | null;
   private readonly searchProvider: SearchProviderName;
@@ -284,6 +287,7 @@ export class WebAgent {
     this.maxTotalErrors = options.maxTotalErrors ?? defaults.max_total_errors;
     this.maxValidationAttempts = options.maxValidationAttempts ?? defaults.max_validation_attempts;
     this.maxRepeatedActions = options.maxRepeatedActions ?? defaults.max_repeated_actions;
+    this.maxActionsPerStep = options.maxActionsPerStep ?? defaults.max_actions_per_step;
     this.initialNavigationRetries =
       options.initialNavigationRetries ?? defaults.initial_navigation_retries;
     this.guardrails = options.guardrails ?? null;
@@ -978,7 +982,9 @@ export class WebAgent {
             system: this.systemPrompt,
             messages: this.messages,
             tools: webActionTools,
-            toolChoice: "required",
+            // When batching is enabled, let the model emit several tool calls;
+            // otherwise require exactly one (historical behavior).
+            toolChoice: this.maxActionsPerStep > 1 ? "auto" : "required",
             maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
             abortSignal: this.abortSignal,
           });

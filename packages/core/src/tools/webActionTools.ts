@@ -185,6 +185,28 @@ async function assessFormSubmissionForAction(
 }
 
 /**
+ * Actions that mutate form state without navigating or invalidating other refs.
+ * When `maxActionsPerStep > 1`, the model may batch these before a single
+ * trailing page-changing action. Single source of truth shared by the prompt
+ * guidance (which actions are "safe to batch") and any batch logic.
+ */
+export const SAFE_TO_BATCH_ACTIONS: ReadonlySet<string> = new Set([
+  "fill",
+  "select",
+  "check",
+  "uncheck",
+  "focus",
+]);
+
+/**
+ * True when an action ends a batch — i.e. it is page-changing, terminal, or
+ * unrecognized. Unknown action names default to terminating (fail safe).
+ */
+export function isBatchTerminating(action: string): boolean {
+  return !SAFE_TO_BATCH_ACTIONS.has(action);
+}
+
+/**
  * Helper function to perform an action with full error handling and logging
  * Handles browser exceptions and converts them to recoverable errors for the agent
  *

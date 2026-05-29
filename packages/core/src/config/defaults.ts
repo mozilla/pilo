@@ -104,6 +104,7 @@ export interface PiloConfig {
   max_iterations?: number;
   max_validation_attempts?: number;
   max_repeated_actions?: number;
+  max_actions_per_step?: number;
   max_consecutive_errors?: number;
   max_total_errors?: number;
   initial_navigation_retries?: number;
@@ -178,6 +179,7 @@ export interface PiloConfigResolved {
   max_iterations: number;
   max_validation_attempts: number;
   max_repeated_actions: number;
+  max_actions_per_step: number;
   max_consecutive_errors: number;
   max_total_errors: number;
   initial_navigation_retries: number;
@@ -491,6 +493,15 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "n",
     env: ["PILO_MAX_REPEATED_ACTIONS"],
     description: "Maximum times an action can be repeated before warning",
+    category: "agent",
+  },
+  max_actions_per_step: {
+    default: 1,
+    type: "number",
+    cli: "--max-actions-per-step",
+    placeholder: "n",
+    env: ["PILO_MAX_ACTIONS_PER_STEP"],
+    description: "Maximum tool calls the agent may batch in one turn (1 = one action per turn)",
     category: "agent",
   },
   max_consecutive_errors: {
