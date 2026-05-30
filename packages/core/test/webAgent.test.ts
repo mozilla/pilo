@@ -4467,6 +4467,158 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("click");
     });
   });
+
+  describe("revise_plan", () => {
+    let agent: WebAgent;
+    let logger: MockLogger;
+    let emitter: WebAgentEventEmitter;
+    let browser: MockBrowser;
+
+    function queuePlan() {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Find the answer", plan: "1. Original plan" },
+            output: { successCriteria: "Find the answer", plan: "1. Original plan" },
+          },
+        ],
+      } as any);
+    }
+
+    function reviseAction(input: {
+      revisedPlan: string;
+      reason: string;
+      revisedSuccessCriteria?: string;
+      revisedActionItems?: string[];
+    }) {
+      return createMockStreamResponse({
+        text: "Revising",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "revise_1",
+            toolName: "revise_plan",
+            input,
+            output: { success: true, action: "revise_plan", ...input },
+          },
+        ],
+      });
+    }
+
+    function doneAction(result: string) {
+      return createMockStreamResponse({
+        text: "Done",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "done_1",
+            toolName: "done",
+            input: { result },
+            output: { action: "done", result, isTerminal: true, success: true },
+          },
+        ],
+      });
+    }
+
+    beforeEach(() => {
+      browser = new MockBrowser();
+      browser.setUrl("https://example.com");
+      logger = new MockLogger();
+      emitter = new WebAgentEventEmitter();
+      agent = new WebAgent(browser, {
+        providerConfig: { model: mockProvider },
+        maxIterations: 10,
+        eventEmitter: emitter,
+        logger,
+        enableReplanning: true,
+      });
+    });
+
+    afterEach(async () => {
+      await agent.close();
+    });
+
+    it("applies a single revision: updates plan, emits PLAN_REVISED, appends a note", async () => {
+      queuePlan();
+      mockStreamText
+        .mockReturnValueOnce(
+          reviseAction({
+            revisedPlan: "1. Revised plan",
+            reason: "Original site moved",
+            revisedSuccessCriteria: "Answer from the new site",
+          }),
+        )
+        .mockReturnValueOnce(doneAction("final answer"));
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("find the answer", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+
+      const revisedEvents = logger
+        .getEvents()
+        .filter((e) => e.type === WebAgentEventType.PLAN_REVISED);
+      expect(revisedEvents).toHaveLength(1);
+      expect(revisedEvents[0].data.reason).toBe("Original site moved");
+      expect(revisedEvents[0].data.newPlan).toBe("1. Revised plan");
+      expect(revisedEvents[0].data.newSuccessCriteria).toBe("Answer from the new site");
+
+      // The revised plan reached the validator via the live success-criteria field.
+      const validatorPrompt = mockGenerateTextWithRetry.mock.calls.at(-1)![0].prompt as string;
+      expect(validatorPrompt).toContain("Answer from the new site");
+      expect(validatorPrompt).toContain("revised its plan");
+    });
+
+    it("enforces the hard cap: a 4th revision is rejected and does not emit", async () => {
+      queuePlan();
+      for (let i = 0; i < 4; i++) {
+        mockStreamText.mockReturnValueOnce(
+          reviseAction({ revisedPlan: `1. Plan v${i + 1}`, reason: `reason ${i + 1}` }),
+        );
+      }
+      mockStreamText.mockReturnValueOnce(doneAction("final answer"));
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await agent.execute("find the answer", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(true);
+      const revisedEvents = logger
+        .getEvents()
+        .filter((e) => e.type === WebAgentEventType.PLAN_REVISED);
+      expect(revisedEvents).toHaveLength(3); // capped at MAX_PLAN_REVISIONS
+
+      // The rejected 4th revision pushes a soft-cap user message the model sees
+      // on its next turn; it appears in the messages passed to a later streamText call.
+      const allMessages = mockStreamText.mock.calls.flatMap((c: any) => c[0].messages ?? []);
+      const rejection = allMessages.find(
+        (m: any) => typeof m.content === "string" && m.content.includes("[Plan revision rejected]"),
+      );
+      expect(rejection).toBeDefined();
+    });
+
+    it("omits the revise_plan tool when enableReplanning is false", async () => {
+      const offAgent = new WebAgent(new MockBrowser(), {
+        providerConfig: { model: mockProvider },
+        maxIterations: 10,
+        eventEmitter: new WebAgentEventEmitter(),
+        logger: new MockLogger(),
+        enableReplanning: false,
+      });
+      queuePlan();
+      mockStreamText.mockReturnValueOnce(doneAction("final answer"));
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await offAgent.execute("find the answer", { startingUrl: "https://example.com" });
+
+      const toolsArg = mockStreamText.mock.calls[0][0].tools!;
+      expect(Object.keys(toolsArg)).not.toContain("revise_plan");
+      await offAgent.close();
+    });
+  });
 });
 
 describe("WebAgent firewall options", () => {

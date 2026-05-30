@@ -41,7 +41,7 @@ import {
 import { createWebActionTools } from "./tools/webActionTools.js";
 import { createSearchTools } from "./tools/searchTools.js";
 import { SearchService } from "./search/searchService.js";
-import { createPlanningTools } from "./tools/planningTools.js";
+import { createPlanningTools, createReplanningTools } from "./tools/planningTools.js";
 import { createValidationTools } from "./tools/validationTools.js";
 import { createTabstackTools } from "./tools/tabstackTools.js";
 import { createInteractiveTools, ApprovedRefs } from "./tools/interactiveTools.js";
@@ -276,6 +276,7 @@ export class WebAgent {
   private static readonly REPETITION_EXEMPT_ACTIONS: ReadonlySet<string> = new Set<string>([
     PageAction.Scroll,
     PageAction.Wait,
+    "revise_plan",
   ]);
 
   constructor(
@@ -487,8 +488,17 @@ export class WebAgent {
         })
       : {};
 
+    // Only include the replanning tool if mid-task plan revision is enabled
+    const replanningTools = this.enableReplanning ? createReplanningTools() : {};
+
     // Merge all tools
-    const allTools = { ...webActionTools, ...searchTools, ...tabstackTools, ...interactiveToolSet };
+    const allTools = {
+      ...webActionTools,
+      ...searchTools,
+      ...tabstackTools,
+      ...interactiveToolSet,
+      ...replanningTools,
+    };
 
     // Skip the first page snapshot when starting on about:blank (e.g., search-first flow).
     // The empty page has no useful elements and the snapshot prompt causes the model
@@ -1148,6 +1158,53 @@ export class WebAgent {
       throw new Error(actionOutput.error);
     }
 
+    // Mid-task plan revision. The revise_plan tool is a pure echo; all effects
+    // happen here so they run under the test harness (which mocks streamText).
+    // The assistant tool-call message has already been appended above.
+    if (actionOutput.action === "revise_plan") {
+      if (this.planRevisionCount >= MAX_PLAN_REVISIONS) {
+        // Soft cap: refuse further revisions without erroring the task. The model
+        // sees this on its next turn, like the repeated-action warning.
+        this.messages.push({
+          role: "user",
+          content:
+            `[Plan revision rejected] You have already revised the plan ${MAX_PLAN_REVISIONS} ` +
+            `times, the maximum. Proceed with the current plan, or call done()/abort().`,
+        });
+      } else {
+        this.plan = actionOutput.revisedPlan;
+        if (actionOutput.revisedSuccessCriteria) {
+          this.successCriteria = actionOutput.revisedSuccessCriteria;
+        }
+        if (actionOutput.revisedActionItems) {
+          this.actionItems = actionOutput.revisedActionItems;
+        }
+        this.lastRevisionReason = actionOutput.reason;
+        this.planRevisionCount++;
+
+        this.emit(WebAgentEventType.PLAN_REVISED, {
+          iteration: executionState.currentIteration,
+          reason: actionOutput.reason,
+          newPlan: actionOutput.revisedPlan,
+          ...(actionOutput.revisedSuccessCriteria && {
+            newSuccessCriteria: actionOutput.revisedSuccessCriteria,
+          }),
+          ...(actionOutput.revisedActionItems && {
+            newActionItems: actionOutput.revisedActionItems,
+          }),
+          iterationId: this.currentIterationId,
+        });
+
+        this.messages.push({
+          role: "user",
+          content:
+            `[Plan revised at iteration ${executionState.currentIteration}]\n` +
+            `Reason: ${actionOutput.reason}\n` +
+            `Updated plan:\n${actionOutput.revisedPlan}`,
+        });
+      }
+    }
+
     const pageChanged = WebAgent.shouldRefreshPageSnapshotAfterAction(actionOutput.action);
 
     // Check for terminal actions
@@ -1219,7 +1276,12 @@ export class WebAgent {
   // Fill keeps the current snapshot so refs and agent-filled provenance remain
   // valid for a following submit check. This trades off immediate visibility
   // into dynamic validation UI until a later action refreshes the snapshot.
-  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set(["extract", "webSearch", "fill"]);
+  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set([
+    "extract",
+    "webSearch",
+    "fill",
+    "revise_plan",
+  ]);
 
   private static shouldRefreshPageSnapshotAfterAction(action: string): boolean {
     return !WebAgent.ACTIONS_WITHOUT_PAGE_REFRESH.has(action);
