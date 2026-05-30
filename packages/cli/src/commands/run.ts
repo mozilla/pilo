@@ -320,6 +320,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
       vision: options.vision ?? cfg.vision,
+      enableReplanning: options.enableReplanning ?? cfg.enable_replanning,
       guardrails: options.guardrails ?? cfg.guardrails,
       maxIterations: options.maxIterations ?? cfg.max_iterations,
       maxValidationAttempts: options.maxValidationAttempts ?? cfg.max_validation_attempts,
