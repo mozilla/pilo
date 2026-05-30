@@ -3425,6 +3425,31 @@
       ],
       "type": "object"
     },
+    "HistorySizeDebugEventData": {
+      "additionalProperties": false,
+      "description": "Event data emitted once per iteration with estimated history size. `estimatedTokens` is a crude `~chars / 4` heuristic and is intended for telemetry trend analysis, not precise accounting.",
+      "properties": {
+        "estimatedTokens": {
+          "type": "number"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "messageCount": {
+          "type": "number"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "estimatedTokens",
+        "iterationId",
+        "messageCount",
+        "timestamp"
+      ],
+      "type": "object"
+    },
     "InteractiveFormDataErrorEventData": {
       "additionalProperties": false,
       "description": "Event data when form validation fails and the agent re-requests data. Carries both the error context and the fields that need new values. Callers respond to this the same way as a request event.",
@@ -4563,6 +4588,23 @@
             },
             "type": {
               "const": "system:debug_tool_drop",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/HistorySizeDebugEventData"
+            },
+            "type": {
+              "const": "system:debug_history_size",
               "type": "string"
             }
           },
