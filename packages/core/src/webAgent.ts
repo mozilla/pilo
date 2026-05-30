@@ -344,7 +344,6 @@ export class WebAgent {
         this.emit(WebAgentEventType.CDP_ENDPOINT_CYCLE, data);
       };
     }
-
   }
 
   /**
