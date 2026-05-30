@@ -3671,6 +3671,49 @@
       ],
       "type": "object"
     },
+    "PlanRevisedEventData": {
+      "additionalProperties": false,
+      "description": "Event data when the agent revises its plan mid-task via revise_plan.",
+      "properties": {
+        "iteration": {
+          "description": "Loop iteration index at which the revision happened",
+          "type": "number"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "newActionItems": {
+          "description": "The updated 3-6-word action item labels, if the agent revised them",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "newPlan": {
+          "description": "The updated plan (Markdown)",
+          "type": "string"
+        },
+        "newSuccessCriteria": {
+          "description": "The updated success criteria, if the agent revised it",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Brief explanation the agent gave for the revision",
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "iteration",
+        "iterationId",
+        "newPlan",
+        "reason",
+        "timestamp"
+      ],
+      "type": "object"
+    },
     "ProcessingEventData": {
       "additionalProperties": false,
       "description": "Event data for when the agent is waiting for model generation",
@@ -4538,6 +4581,23 @@
             },
             "type": {
               "const": "agent:waiting",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/PlanRevisedEventData"
+            },
+            "type": {
+              "const": "plan:revised",
               "type": "string"
             }
           },
