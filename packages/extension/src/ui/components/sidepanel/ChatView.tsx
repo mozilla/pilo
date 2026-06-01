@@ -349,9 +349,21 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
       // tweaks (ie clean and clear presentation to the user). It could be that
       // once we add status events in, we should drop the number back down.
       const messagePromise = browser.runtime.sendMessage(message);
-      const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Background script timeout")), 600000), // 10 mins
-      );
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(async () => {
+          // Cancel the still-running background task so the provider request is
+          // aborted instead of left running after the UI gives up waiting.
+          try {
+            await browser.runtime.sendMessage({
+              type: "cancelTask",
+              tabId: currentTab.id,
+            } satisfies CancelTaskMessage);
+          } catch (cancelError) {
+            console.error("Failed to cancel timed out task:", cancelError);
+          }
+          reject(new Error("Background script timeout"));
+        }, 600000); // 10 mins
+      });
 
       let response: ExecuteTaskResponse;
       try {
