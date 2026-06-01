@@ -2874,6 +2874,12 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
       expect(result.validationOutcome).toBe("accepted");
+
+      const completeEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_COMPLETED,
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.data.validationOutcome).toBe("accepted");
     });
 
     it("should set validationOutcome to 'force-accepted' when validator rejects to max attempts", async () => {
@@ -2964,6 +2970,12 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
       expect(result.validationOutcome).toBe("force-accepted");
+
+      const completeEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_COMPLETED,
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.data.validationOutcome).toBe("force-accepted");
     });
 
     it("should set validationOutcome to 'force-accepted' when validation errors to max attempts", async () => {
@@ -3054,6 +3066,12 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
       expect(result.validationOutcome).toBe("force-accepted");
+
+      const completeEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_COMPLETED,
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.data.validationOutcome).toBe("force-accepted");
     });
 
     it("should leave validationOutcome undefined when task fails before done()", async () => {
@@ -3111,6 +3129,12 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(false);
       expect(result.validationOutcome).toBeUndefined();
+
+      const completeEvent = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.TASK_COMPLETED,
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.data.validationOutcome).toBeUndefined();
     });
   });
 

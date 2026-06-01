@@ -1901,6 +1901,9 @@ export class WebAgent {
     this.emit(WebAgentEventType.TASK_COMPLETED, {
       success: executionOutcome.success,
       finalAnswer: executionOutcome.finalAnswer,
+      ...(executionOutcome.validationOutcome && {
+        validationOutcome: executionOutcome.validationOutcome,
+      }),
     });
 
     return {
