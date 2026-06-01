@@ -64,6 +64,10 @@ Execute a web automation task using natural language.
   "maxIterations": "number (optional)",
   "maxValidationAttempts": "number (optional)",
 
+  // Action firewall overrides
+  "trustedHostnames": "array of strings (optional)",
+  "unsafeMode": "boolean (optional)",
+
   // Proxy configuration overrides
   "proxy": "string (optional)",
   "proxyUsername": "string (optional)",
