@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi, type MockedFunction } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import ChatView, {
   shouldDisplayError,
   formatBrowserAction,
@@ -161,6 +161,35 @@ describe("ChatView", () => {
     expect(screen.getByText("What can I help with?")).toBeInTheDocument();
     // Description text
     expect(screen.getByText(/Enter an instruction/)).toBeInTheDocument();
+  });
+
+  describe("Response timeout", () => {
+    it("cancels the background task when waiting for executeTask times out", async () => {
+      vi.useFakeTimers();
+      vi.mocked(browser.runtime.sendMessage)
+        // executeTask never resolves -> the timeout wins the race
+        .mockImplementationOnce(() => new Promise(() => {}))
+        // cancelTask sent on timeout
+        .mockResolvedValueOnce({ success: true, message: "Cancelled 1 running task(s)" });
+
+      render(<ChatView {...defaultProps} />);
+
+      const input = screen.getByTestId("task-input");
+      fireEvent.change(input, { target: { value: "Run a slow task" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await vi.advanceTimersByTimeAsync(600000);
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "cancelTask",
+        tabId: 1,
+      });
+      const resultCall = mockAddMessage.mock.calls.find((call) => call[0] === "result");
+      expect(resultCall).toBeDefined();
+      expect(resultCall?.[1]).toContain("Background script timeout");
+
+      vi.useRealTimers();
+    });
   });
 
   describe("Message Ordering", () => {

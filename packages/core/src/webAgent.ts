@@ -125,6 +125,8 @@ export interface WebAgentOptions {
    * trusted, controlled environments.
    */
   unsafeMode?: boolean;
+  /** Timeout for LLM provider calls in milliseconds (default: from config) */
+  llmProviderTimeoutMs?: number;
 }
 
 export interface ExecuteOptions {
@@ -264,6 +266,7 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+  private readonly llmProviderTimeoutMs: number;
   // Host of the caller-provided start URL (options.startingUrl), captured at
   // execute() time. Trusted by the firewall — navigating somewhere the caller
   // explicitly named is consent to interact with that host. NOT set from the
@@ -306,6 +309,7 @@ export class WebAgent {
       trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
       unsafeMode: Boolean(options.unsafeMode),
     });
+    this.llmProviderTimeoutMs = options.llmProviderTimeoutMs ?? defaults.llm_provider_timeout_ms;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -476,6 +480,7 @@ export class WebAgent {
       operationalRefs,
       firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
+      llmProviderTimeoutMs: this.llmProviderTimeoutMs,
     });
 
     // Only include search tools if a search service was created
@@ -1002,6 +1007,7 @@ export class WebAgent {
             toolChoice: "required",
             maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
             abortSignal: this.abortSignal,
+            timeout: this.llmProviderTimeoutMs,
           });
 
           // Process the full stream to capture reasoning before tool execution
@@ -1551,6 +1557,8 @@ export class WebAgent {
               tools: planningTools,
               toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
               maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
+              abortSignal: this.abortSignal,
+              timeout: this.llmProviderTimeoutMs,
             },
             {
               maxAttempts: 3,

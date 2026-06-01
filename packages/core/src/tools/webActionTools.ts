@@ -38,6 +38,8 @@ interface WebActionContext {
   operationalRefs: Set<string>;
   firewall: FirewallConfig;
   interactive: boolean;
+  /** Timeout for LLM provider calls in milliseconds (used by extract). */
+  llmProviderTimeoutMs?: number;
 }
 
 /**
@@ -577,6 +579,7 @@ export function createWebActionTools(context: WebActionContext) {
             prompt,
             maxOutputTokens: 5000,
             abortSignal: context.abortSignal,
+            timeout: context.llmProviderTimeoutMs,
           },
           {
             maxAttempts: 3,

@@ -155,6 +155,7 @@ describe("ConfigManager", () => {
         "ollama_base_url",
         "openai_compatible_base_url",
         "openai_compatible_name",
+        "llm_provider_timeout_ms",
         "browser",
         "bidi_url",
         "foxcloud_url",
@@ -239,6 +240,8 @@ describe("ConfigManager", () => {
       expect(DEFAULTS.browser).toBe("firefox");
       expect(DEFAULTS.headless).toBe(false);
       expect(DEFAULTS.max_iterations).toBe(50);
+      expect(DEFAULTS.llm_provider_timeout_ms).toBe(120000);
+      expect(typeof DEFAULTS.llm_provider_timeout_ms).toBe("number");
     });
 
     it("should preserve user-provided CLI options", () => {

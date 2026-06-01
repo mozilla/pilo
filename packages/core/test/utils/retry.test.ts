@@ -34,6 +34,55 @@ describe("generateTextWithRetry", () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
+  it("passes the default LLM provider timeout to generateText", async () => {
+    mockGenerateText.mockResolvedValueOnce({ text: "Success", toolResults: [] });
+
+    await generateTextWithRetry({
+      prompt: "test",
+      model: "test-model",
+    });
+
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeout: 120000,
+      }),
+    );
+  });
+
+  it("preserves an explicit generateText timeout", async () => {
+    mockGenerateText.mockResolvedValueOnce({ text: "Success", toolResults: [] });
+
+    await generateTextWithRetry({
+      prompt: "test",
+      model: "test-model",
+      timeout: { totalMs: 45000 },
+    } as any);
+
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeout: { totalMs: 45000 },
+      }),
+    );
+  });
+
+  it("preserves an existing abort signal when applying the default timeout", async () => {
+    const controller = new AbortController();
+    mockGenerateText.mockResolvedValueOnce({ text: "Success", toolResults: [] });
+
+    await generateTextWithRetry({
+      prompt: "test",
+      model: "test-model",
+      abortSignal: controller.signal,
+    });
+
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        abortSignal: controller.signal,
+        timeout: 120000,
+      }),
+    );
+  });
+
   it("should retry on transient error and succeed", async () => {
     const expectedResult = {
       text: "Success",

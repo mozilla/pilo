@@ -288,6 +288,7 @@ describe("WebAgent", () => {
   let eventEmitter: WebAgentEventEmitter;
   let webAgent: WebAgent;
   let mockProvider: LanguageModel;
+  let options: WebAgentOptions;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -299,7 +300,7 @@ describe("WebAgent", () => {
     eventEmitter = new WebAgentEventEmitter();
     mockProvider = { specificationVersion: "v1" } as unknown as LanguageModel;
 
-    const options: WebAgentOptions = {
+    options = {
       providerConfig: { model: mockProvider },
       debug: false,
       vision: false,
@@ -604,6 +605,89 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(false);
       expect(result.finalAnswer).toBe("Task aborted by user");
+    });
+  });
+
+  describe("llm provider timeout", () => {
+    // Set up a minimal successful run: plan -> done -> validation.
+    function mockPlanThenDone(): void {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. do it" },
+            output: { successCriteria: "Done", plan: "1. do it" },
+          },
+        ],
+      } as any);
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Done" },
+              output: { action: "done", result: "Done", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Task complete" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Done", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+    }
+
+    it("passes the execute abort signal to planning", async () => {
+      const controller = new AbortController();
+      mockPlanThenDone();
+
+      await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        abortSignal: controller.signal,
+      });
+
+      // Planning is the first generateTextWithRetry call.
+      expect(mockGenerateTextWithRetry.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ abortSignal: controller.signal }),
+      );
+    });
+
+    it("passes the default LLM provider timeout to action generation", async () => {
+      mockPlanThenDone();
+
+      await webAgent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 120000 }));
+    });
+
+    it("allows callers to override the LLM provider timeout", async () => {
+      const agent = new WebAgent(mockBrowser, { ...options, llmProviderTimeoutMs: 45000 });
+      mockPlanThenDone();
+
+      await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 45000 }));
+
+      await agent.close();
     });
   });
 
