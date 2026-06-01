@@ -676,9 +676,7 @@ describe("WebAgent", () => {
 
       await webAgent.execute("test task", { startingUrl: "https://example.com" });
 
-      expect(mockStreamText).toHaveBeenCalledWith(
-        expect.objectContaining({ timeout: 120000 }),
-      );
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 120000 }));
     });
 
     it("allows callers to override the LLM provider timeout", async () => {
@@ -687,9 +685,7 @@ describe("WebAgent", () => {
 
       await agent.execute("test task", { startingUrl: "https://example.com" });
 
-      expect(mockStreamText).toHaveBeenCalledWith(
-        expect.objectContaining({ timeout: 45000 }),
-      );
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 45000 }));
 
       await agent.close();
     });
