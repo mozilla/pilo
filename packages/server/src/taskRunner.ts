@@ -58,6 +58,10 @@ export interface PiloTaskRequest {
   maxIterations?: number;
   maxValidationAttempts?: number;
 
+  // Action firewall overrides
+  trustedHostnames?: string[];
+  unsafeMode?: boolean;
+
   // Proxy configuration overrides
   proxy?: string;
   proxyUsername?: string;
@@ -343,6 +347,8 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     vision: body.vision ?? serverConfig.vision,
     maxIterations: body.maxIterations ?? serverConfig.max_iterations,
     maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
+    trustedHostnames: body.trustedHostnames ?? serverConfig.trusted_hostnames,
+    unsafeMode: body.unsafeMode ?? serverConfig.unsafe_mode,
     guardrails: body.guardrails,
     searchProvider: body.searchProvider ?? serverConfig.search_provider,
     searchApiKey: serverConfig.parallel_api_key,

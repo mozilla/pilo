@@ -357,6 +357,25 @@ describe("taskRunner", () => {
       );
     });
 
+    it("should pass trustedHostnames and unsafeMode to WebAgent constructor", async () => {
+      await runTask({
+        body: {
+          task: "submit the form",
+          trustedHostnames: ["example.com", "app.example.com"],
+          unsafeMode: true,
+        },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trustedHostnames: ["example.com", "app.example.com"],
+          unsafeMode: true,
+        }),
+      );
+    });
+
     it("should not throw when agent.close fails", async () => {
       mockClose = vi.fn().mockRejectedValue(new Error("close failed"));
 
