@@ -77,6 +77,7 @@ export interface PiloConfig {
   openai_compatible_base_url?: string;
   openai_compatible_name?: string;
   reasoning_effort?: ReasoningLevel;
+  llm_provider_timeout_ms?: number;
 
   // Browser Configuration
   browser?: Browser;
@@ -151,6 +152,7 @@ export interface PiloConfigResolved {
   openai_compatible_base_url?: string;
   openai_compatible_name?: string;
   reasoning_effort: ReasoningLevel;
+  llm_provider_timeout_ms: number;
 
   // Browser Configuration
   browser: Browser;
@@ -321,6 +323,15 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "level",
     env: ["PILO_REASONING_EFFORT"],
     description: "Reasoning effort level",
+    category: "ai",
+  },
+  llm_provider_timeout_ms: {
+    default: 120000,
+    type: "number",
+    cli: "--llm-provider-timeout-ms",
+    placeholder: "ms",
+    env: ["PILO_LLM_PROVIDER_TIMEOUT_MS"],
+    description: "Timeout for LLM provider calls in milliseconds",
     category: "ai",
   },
 
@@ -706,6 +717,7 @@ function buildDefaults(): PiloConfigResolved {
   const requiredFields: (keyof PiloConfigResolved)[] = [
     "provider",
     "reasoning_effort",
+    "llm_provider_timeout_ms",
     "browser",
     "headless",
     "block_ads",
