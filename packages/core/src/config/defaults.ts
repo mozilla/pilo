@@ -325,6 +325,10 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     description: "Reasoning effort level",
     category: "ai",
   },
+  // Default 120000 is ~2x the observed p99 of the `pilo.ai.generate` span in
+  // Cloud Trace (prod p99 ~61s, nonprod p99 ~39s across ~8.7k calls, 2026-05);
+  // only ~0.05-0.37% of calls exceed it, and those are stuck/degraded calls
+  // where abort-and-retry is preferable. Tunable per deploy via env/config.
   llm_provider_timeout_ms: {
     default: 120000,
     type: "number",
