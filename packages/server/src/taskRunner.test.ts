@@ -31,6 +31,7 @@ vi.mock("pilo-core", () => {
         openai_api_key: "sk-test123",
         browser: "firefox",
         headless: true,
+        llm_provider_timeout_ms: 90000,
       })),
     },
     createAIProvider: vi.fn(() => ({})),
@@ -373,6 +374,30 @@ describe("taskRunner", () => {
           trustedHostnames: ["example.com", "app.example.com"],
           unsafeMode: true,
         }),
+      );
+    });
+
+    it("passes the configured llm provider timeout to WebAgent", async () => {
+      await runTask({
+        body: { task: "test" },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ llmProviderTimeoutMs: 90000 }),
+      );
+    });
+
+    it("lets the request body override the llm provider timeout", async () => {
+      await runTask({
+        body: { task: "test", llmProviderTimeoutMs: 45000 },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ llmProviderTimeoutMs: 45000 }),
       );
     });
 
