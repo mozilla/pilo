@@ -933,6 +933,27 @@ describe("Web Action Tools", () => {
         expect.any(Object),
       );
     });
+
+    it("passes abort signal and configured timeout to extract generation", async () => {
+      const controller = new AbortController();
+      context.abortSignal = controller.signal;
+      context.llmProviderTimeoutMs = 45000;
+      tools = createWebActionTools(context);
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "extracted",
+      } as any);
+
+      await tools.extract.execute({ description: "Extract page data" });
+
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          abortSignal: controller.signal,
+          timeout: 45000,
+        }),
+        expect.any(Object),
+      );
+    });
   });
 
   describe("Terminal Actions", () => {

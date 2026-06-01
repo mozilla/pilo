@@ -480,6 +480,7 @@ export class WebAgent {
       operationalRefs,
       firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
+      llmProviderTimeoutMs: this.llmProviderTimeoutMs,
     });
 
     // Only include search tools if a search service was created
