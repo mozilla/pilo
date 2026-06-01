@@ -12,7 +12,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
-import { PlanningError } from "../src/errors.js";
+import { PlanningError, BrowserDisconnectedError } from "../src/errors.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
@@ -1407,6 +1407,115 @@ describe("WebAgent", () => {
       );
 
       warnSpy.mockRestore();
+    });
+  });
+
+  describe("browser disconnect classification", () => {
+    it("getCurrentPageInfo throws BrowserDisconnectedError when browser unavailable and no page cached", async () => {
+      mockBrowser.getTitle = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      mockBrowser.getUrl = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      (webAgent as any).currentPage = { url: "", title: "" };
+
+      await expect((webAgent as any).getCurrentPageInfo()).rejects.toBeInstanceOf(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("updatePageState throws BrowserDisconnectedError when browser unavailable and no page cached", async () => {
+      mockBrowser.getTitle = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      mockBrowser.getUrl = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      (webAgent as any).currentPage = { url: "", title: "" };
+
+      await expect((webAgent as any).updatePageState()).rejects.toBeInstanceOf(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("getCurrentPageInfo returns cached page info without throwing when browser unavailable but page cached", async () => {
+      mockBrowser.getTitle = vi.fn().mockRejectedValue(new Error("transient"));
+      mockBrowser.getUrl = vi.fn().mockRejectedValue(new Error("transient"));
+      (webAgent as any).currentPage = { url: "https://example.com", title: "Cached" };
+
+      await expect((webAgent as any).getCurrentPageInfo()).resolves.toEqual({
+        url: "https://example.com",
+        title: "Cached",
+      });
+    });
+
+    it("recovers via handleBrowserDisconnect when the first page snapshot hits a disconnect", async () => {
+      // Planning phase
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Test", plan: "1. Test" },
+            output: { successCriteria: "Test", plan: "1. Test" },
+          },
+        ],
+      } as any);
+
+      // First snapshot disconnects; subsequent snapshots succeed (post-reconnect).
+      vi.spyOn(mockBrowser, "getTreeWithRefs")
+        .mockRejectedValueOnce(
+          new BrowserDisconnectedError(
+            "page.evaluate: Execution context was destroyed, most likely because of a navigation",
+          ),
+        )
+        .mockResolvedValue(`<div><button [ref=btn1]>Click me</button></div>`);
+
+      const reconnectSpy = vi.spyOn(webAgent as any, "handleBrowserDisconnect");
+
+      // After reconnect, finish the task.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Recovered and completed" },
+              output: { action: "done", result: "Recovered and completed", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Task complete" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Recovered and completed", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Find something", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(reconnectSpy).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Recovered and completed");
     });
   });
 

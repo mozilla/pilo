@@ -540,22 +540,26 @@ export class WebAgent {
             currentIteration: executionState.currentIteration,
           });
 
-          // Add page snapshot if needed
-          if (needsPageSnapshot) {
-            // Clear approved refs when page changes: ARIA refs reset on each snapshot,
-            // so old ref strings may now point to different DOM elements.
-            // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
-            // so a blocked submit retry remains tied to the same agent-filled refs.
-            if (approvedRefs) {
-              approvedRefs.clear();
-            }
-            agentFilledRefs.clear();
-            operationalRefs.clear();
-            await this.addPageSnapshot();
-          }
-
-          // Single try-catch for ALL iteration logic
+          // Single try-catch for ALL iteration logic, including the page snapshot.
+          // The snapshot lives inside the try so a mid-snapshot browser disconnect
+          // (e.g. getTreeWithRefs/getCurrentPageInfo throwing BrowserDisconnectedError
+          // after a navigation destroys the page) is routed through
+          // handleBrowserDisconnect rather than escaping runMainLoop as a hard failure.
           try {
+            // Add page snapshot if needed
+            if (needsPageSnapshot) {
+              // Clear approved refs when page changes: ARIA refs reset on each snapshot,
+              // so old ref strings may now point to different DOM elements.
+              // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
+              // so a blocked submit retry remains tied to the same agent-filled refs.
+              if (approvedRefs) {
+                approvedRefs.clear();
+              }
+              agentFilledRefs.clear();
+              operationalRefs.clear();
+              await this.addPageSnapshot();
+            }
+
             const result = await this.generateAndProcessAction(task, allTools, executionState);
 
             // Reset error counter on success
@@ -1828,10 +1832,15 @@ export class WebAgent {
         url,
       });
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Use cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Use cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (!this.currentPage.url) {
-        throw new Error("Browser disconnected or page unavailable");
+        throw new BrowserDisconnectedError(
+          error instanceof Error ? error.message : "page state unavailable",
+        );
       }
     }
   }
@@ -1843,12 +1852,17 @@ export class WebAgent {
       this.currentPage = { title, url };
       return { title, url };
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Return cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Return cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (this.currentPage.url) {
         return this.currentPage;
       }
-      throw new Error("Browser disconnected or page unavailable");
+      throw new BrowserDisconnectedError(
+        error instanceof Error ? error.message : "page state unavailable",
+      );
     }
   }
 
