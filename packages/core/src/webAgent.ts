@@ -991,9 +991,11 @@ export class WebAgent {
             system: this.systemPrompt,
             messages: this.messages,
             tools: webActionTools,
-            // When batching is enabled, let the model emit several tool calls;
-            // otherwise require exactly one (historical behavior).
-            toolChoice: this.maxActionsPerStep > 1 ? "auto" : "required",
+            // Always require a tool call. "required" forces the model to call at
+            // least one tool while still allowing several in one turn (batching),
+            // whereas "auto" lets the model return zero tools — which, on hard
+            // tasks, cascades into consecutive-error aborts (observed at eval).
+            toolChoice: "required",
             maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
             abortSignal: this.abortSignal,
           });
