@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@types/jsdom": "^28.0.1",
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^25.7.0",
     "@types/turndown": "^5.0.6",
     "@types/ws": "^8.18.1",
@@ -68,7 +68,7 @@
     "esbuild": "^0.28.0",
     "jsdom": "^29.0.2",
     "ts-json-schema-generator": "2.9.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   }
