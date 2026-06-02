@@ -32,6 +32,7 @@ vi.mock("pilo-core", () => {
         browser: "firefox",
         headless: true,
         llm_provider_timeout_ms: 90000,
+        upload_allowed_paths: [],
       })),
     },
     createAIProvider: vi.fn(() => ({})),

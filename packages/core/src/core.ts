@@ -7,6 +7,7 @@
 export { WebAgent } from "./webAgent.js";
 export type {
   AriaBrowser,
+  FileUploadConfig,
   FieldMetadata,
   FormSubmissionContext,
   FormSubmissionTrigger,

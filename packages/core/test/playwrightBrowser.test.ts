@@ -6,6 +6,9 @@ import {
   BrowserActionException,
   BrowserDisconnectedError,
 } from "../src/errors.js";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 
 // Must be at the top level so Vitest hoists it before any imports resolve.
 // Only replaces connectOverCDP; all other playwright exports remain real.
@@ -743,6 +746,7 @@ describe("PlaywrightBrowser", () => {
           PageAction.Click,
           PageAction.Hover,
           PageAction.Fill,
+          PageAction.UploadFile,
           PageAction.Focus,
           PageAction.Check,
           PageAction.Uncheck,
@@ -831,6 +835,120 @@ describe("PlaywrightBrowser", () => {
         await expect(browser.performAction("ref1", PageAction.Fill)).rejects.toThrow(
           "Value required for fill action",
         );
+      });
+
+      it("should upload a file to a direct file input", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
+          evaluate: vi.fn().mockResolvedValue(true),
+          setInputFiles: vi.fn().mockResolvedValue(undefined),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+        vi.spyOn(browser as any, "resolveAllowedUploadPath").mockResolvedValue(
+          "C:\\fixtures\\sample.pdf",
+        );
+
+        await browser.performAction("file1", PageAction.UploadFile, "C:\\fixtures\\sample.pdf");
+
+        expect(mockLocator.setInputFiles).toHaveBeenCalledWith("C:\\fixtures\\sample.pdf", {
+          timeout: 30000,
+        });
+      });
+
+      it("should resolve a nested file input when the ref points to a container", async () => {
+        const nestedFileInput = {
+          count: vi.fn().mockResolvedValue(1),
+          setInputFiles: vi.fn().mockResolvedValue(undefined),
+        };
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
+          evaluate: vi.fn().mockResolvedValue(false),
+          locator: vi.fn().mockReturnValue({
+            first: vi.fn().mockReturnValue(nestedFileInput),
+          }),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+        vi.spyOn(browser as any, "resolveAllowedUploadPath").mockResolvedValue(
+          "C:\\fixtures\\sample.png",
+        );
+
+        await browser.performAction(
+          "container1",
+          PageAction.UploadFile,
+          "C:\\fixtures\\sample.png",
+        );
+
+        expect(mockLocator.locator).toHaveBeenCalledWith('input[type="file"]');
+        expect(nestedFileInput.setInputFiles).toHaveBeenCalledWith("C:\\fixtures\\sample.png", {
+          timeout: 30000,
+        });
+      });
+
+      it("should throw upload_target_not_file_input when no file input can be resolved", async () => {
+        const nestedFileInput = {
+          count: vi.fn().mockResolvedValue(0),
+        };
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
+          evaluate: vi.fn().mockResolvedValue(false),
+          locator: vi.fn().mockReturnValue({
+            first: vi.fn().mockReturnValue(nestedFileInput),
+          }),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+        vi.spyOn(browser as any, "resolveAllowedUploadPath").mockResolvedValue(
+          "C:\\fixtures\\sample.pdf",
+        );
+
+        await expect(
+          browser.performAction("container1", PageAction.UploadFile, "C:\\fixtures\\sample.pdf"),
+        ).rejects.toThrow("upload_target_not_file_input");
+      });
+
+      it("should reject upload paths outside the allowlist", async () => {
+        const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pilo-upload-allowed-"));
+        const otherRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pilo-upload-other-"));
+        try {
+          const filePath = path.join(otherRoot, "sample.txt");
+          await fs.writeFile(filePath, "sample");
+          const uploadBrowser = new PlaywrightBrowser({
+            allowFileUpload: { allowedPaths: [tempRoot] },
+          });
+
+          await expect((uploadBrowser as any).resolveAllowedUploadPath(filePath)).rejects.toThrow(
+            "upload_path_not_allowed",
+          );
+        } finally {
+          await fs.rm(tempRoot, { recursive: true, force: true });
+          await fs.rm(otherRoot, { recursive: true, force: true });
+        }
+      });
+
+      it("should reject directory upload paths as non-files", async () => {
+        const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pilo-upload-allowed-"));
+        try {
+          const uploadBrowser = new PlaywrightBrowser({
+            allowFileUpload: { allowedPaths: [tempRoot] },
+          });
+
+          await expect((uploadBrowser as any).resolveAllowedUploadPath(tempRoot)).rejects.toThrow(
+            "upload_path_not_file",
+          );
+        } finally {
+          await fs.rm(tempRoot, { recursive: true, force: true });
+        }
       });
 
       it("should throw BrowserActionException for missing value in Select action", async () => {

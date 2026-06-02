@@ -21,6 +21,15 @@ describe("CLI: firewall flags", () => {
     expect(opts.unsafe).toBe(true);
   });
 
+  it("parses --upload-allowed-paths as comma-separated list", () => {
+    const cmd = new Command().exitOverride();
+    addConfigOptions(cmd);
+    cmd.action(() => {});
+    cmd.parse(["node", "test", "--upload-allowed-paths", "/tmp/a,/tmp/b"]);
+    const opts = cmd.opts();
+    expect(opts.uploadAllowedPaths).toEqual(["/tmp/a", "/tmp/b"]);
+  });
+
   it("does not set firewall opts when flags omitted", () => {
     const cmd = new Command().exitOverride();
     addConfigOptions(cmd);
@@ -29,5 +38,6 @@ describe("CLI: firewall flags", () => {
     const opts = cmd.opts();
     expect(opts.trustedHostnames).toBeUndefined();
     expect(opts.unsafe).toBeUndefined();
+    expect(opts.uploadAllowedPaths).toBeUndefined();
   });
 });

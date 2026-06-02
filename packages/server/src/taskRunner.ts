@@ -12,7 +12,7 @@ import {
   SEARCH_PROVIDERS,
   PLAYWRIGHT_BROWSERS,
 } from "pilo-core";
-import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
+import type { FileUploadConfig, TaskExecutionResult, UserDataCallback } from "pilo-core";
 import { StreamLogger } from "./StreamLogger.js";
 import { config } from "./config.js";
 
@@ -62,6 +62,7 @@ export interface PiloTaskRequest {
   // Action firewall overrides
   trustedHostnames?: string[];
   unsafeMode?: boolean;
+  uploadAllowedPaths?: string[];
 
   // Proxy configuration overrides
   proxy?: string;
@@ -312,6 +313,9 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       `Server only supports Playwright browsers (${PLAYWRIGHT_BROWSERS.join(", ")}), got "${browserName}"`,
     );
   }
+  const uploadAllowedPaths = body.uploadAllowedPaths ?? serverConfig.upload_allowed_paths;
+  const allowFileUpload: false | FileUploadConfig =
+    uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
 
   const browserConfig = {
     browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
@@ -334,6 +338,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,
     proxyPassword: body.proxyPassword ?? serverConfig.proxy_password,
     actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
+    allowFileUpload,
     navigationRetry: createNavigationRetryConfig({
       baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
       maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
@@ -350,6 +355,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
     trustedHostnames: body.trustedHostnames ?? serverConfig.trusted_hostnames,
     unsafeMode: body.unsafeMode ?? serverConfig.unsafe_mode,
+    allowFileUpload,
     llmProviderTimeoutMs: body.llmProviderTimeoutMs ?? serverConfig.llm_provider_timeout_ms,
     guardrails: body.guardrails,
     searchProvider: body.searchProvider ?? serverConfig.search_provider,

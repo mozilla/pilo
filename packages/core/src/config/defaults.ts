@@ -128,6 +128,7 @@ export interface PiloConfig {
   action_timeout_ms?: number;
   trusted_hostnames?: string[];
   unsafe_mode?: boolean;
+  upload_allowed_paths?: string[];
 
   // Search Configuration
   search_provider?: SearchProviderName;
@@ -203,6 +204,7 @@ export interface PiloConfigResolved {
   action_timeout_ms: number;
   trusted_hostnames: string[];
   unsafe_mode: boolean;
+  upload_allowed_paths: string[];
 
   // Search Configuration
   search_provider: SearchProviderName;
@@ -665,6 +667,16 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
       "Disables the action firewall entirely. WARNING: prompt injection from page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.",
     category: "action",
   },
+  upload_allowed_paths: {
+    default: [],
+    type: "string[]",
+    cli: "--upload-allowed-paths",
+    placeholder: "path1,path2,...",
+    env: ["PILO_UPLOAD_ALLOWED_PATHS"],
+    description:
+      "Comma-separated local filesystem roots where upload_file may read files. Empty means file upload is disabled.",
+    category: "action",
+  },
 
   // Search Configuration
   search_provider: {
@@ -744,6 +756,7 @@ function buildDefaults(): PiloConfigResolved {
     "action_timeout_ms",
     "trusted_hostnames",
     "unsafe_mode",
+    "upload_allowed_paths",
     "search_provider",
   ];
 
