@@ -1,5 +1,14 @@
 # Notes — multi-action per turn (#438)
 
+## Eval-driven course correction (post-PR)
+
+Ran the partial WebVoyager suite via `evals/partial/...` branches (config default temporarily = 5).
+
+- **Run #1 (toolChoice "auto"): 50% (15/30)** — 8/15 failures were a zero-tool cascade: `"auto"` let the model return no tools on hard tasks → repeated "at least one tool" errors → `maxConsecutiveErrors` abort.
+- **Fix:** `toolChoice: "required"` always (forces ≥1 tool, still allows several). Committed `536284f` on the PR branch.
+- **Run #2 (toolChoice "required"): 80% (24/30)** — 0 cascades. Remaining 6 failures all environmental/known-hard. Batching real: ~15% of 221 turns emitted >1 tool → ~24% fewer round-trips on this suite (form-density-dependent; not the 2–3× headline). `maxActionsPerStep=5` correctness-neutral.
+- **Lesson:** the issue's suggested `"auto"` flip was wrong; evals caught it. The `superpowers:receiving-code-review` instinct (verify, don't blindly implement) applied to the _issue spec_ itself.
+
 ## Session state (execution complete)
 
 - Worktree: `.claude/worktrees/438-multi-action-per-turn/`, branch `worktree-438-multi-action-per-turn`, off origin/main @ a26880e.

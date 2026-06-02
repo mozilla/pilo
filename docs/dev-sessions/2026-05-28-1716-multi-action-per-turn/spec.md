@@ -22,7 +22,7 @@ Action tools: `click, fill, select, hover, check, uncheck, focus, enter, wait, s
 ## Desired end state
 
 - New option `WebAgentOptions.maxActionsPerStep?: number`, default **1** (exact current behavior preserved). Recommended production value 3.
-- When `maxActionsPerStep > 1`: `toolChoice: "auto"` (so the model may emit several tool calls) and the prompt invites batching up to N. When `=== 1`: `toolChoice: "required"` and the "exactly one tool" prompt, unchanged.
+- `toolChoice` stays `"required"` in all modes. The prompt invites batching ("up to N") when `maxActionsPerStep > 1`; at `=== 1` it renders the "exactly one tool" instruction. **(Revised post-eval — see "Eval findings". The original design flipped to `"auto"` when batching, but that let the model return zero tools and cascade into consecutive-error aborts. `"required"` forces ≥1 tool while still permitting several per turn.)**
 - **Unified processing loop.** Because execution is eager (all returned tools already ran), the loop's job is to _process_ the executed results in order and produce one aggregated turn-result. Take `toProcess = toolResults.slice(0, maxActionsPerStep)`; for any results beyond the cap, keep the existing `SYSTEM_DEBUG_TOOL_DROP` emit. When `maxActionsPerStep === 1` this reduces to today's exact behavior (process `[0]`, drop+emit the rest). Process `toProcess` in order, **stopping at the first terminal action or the first error**:
   - Regular (non-terminal, success) action → count it; track `pageChanged ||= (action !== "extract" && action !== "webSearch")`.
   - Terminal (`done`/`abort`) → run existing terminal handling (validation / abort) and return; ignore any later results (they executed but are irrelevant).
@@ -30,7 +30,7 @@ Action tools: `click, fill, select, hover, check, uncheck, focus, enter, wait, s
 - **Safety comes from the prompt, not the loop.** The classifier `isBatchTerminating()` is only used in the _prompt guidance_ framing (which actions to put last) and is not a code gate on execution. Safe-to-batch (model is told these may precede others): `fill, select, check, uncheck, focus`. Page-changing / must-be-last: everything else. If the model mis-orders and a later action runs against a changed page, it typically returns a recoverable error (stale ref) → fed back → model retries.
 - Refs are stable across actions the model batches _only if_ no page-changer precedes them — which the prompt enforces by ordering, not the code.
 - Repetition check unchanged in shape: called once on the **last processed non-terminal action** (current call site `webAgent.ts:1177`). Per-action tracking deferred to PR 2.
-- Zero-tool case: keep throwing, but soften the message wording when `maxActionsPerStep > 1` (e.g. "You must use at least one tool"). With `toolChoice:"auto"` some providers may return zero tools more often; the existing recoverable feedback path handles it.
+- Zero-tool case: keep throwing, but soften the message wording when `maxActionsPerStep > 1` (e.g. "You must use at least one tool"). With `toolChoice:"required"` zero-tool is rare (provider edge case), same as today's default path.
 - System prompt updated to describe batching (see Patterns), parameterized on `maxActionsPerStep`.
 - Telemetry via a **new** `SYSTEM_DEBUG_BATCH` event (mirroring `SYSTEM_DEBUG_TOOL_DROP`) emitted after the processing loop: `{ iterationId, actionsRequested: number (= toolResults.length), actionsProcessed: number, batchStoppedBy: "terminal" | "error" | "completed" }`. (The issue proposed putting these on `AI_GENERATION`, but that event fires _before_ tool processing — `webAgent.ts:1050` — so `actionsProcessed`/`batchStoppedBy` aren't known there. A dedicated post-processing event is the correct home.)
 - Expose via the existing config schema (`config/defaults.ts`): add `max_actions_per_step` (default 1) which auto-generates the `--max-actions-per-step` CLI flag + `PILO_MAX_ACTIONS_PER_STEP` env var, matching the `max_iterations`/`max_repeated_actions` pattern. Wire `cfg.max_actions_per_step` into the CLI's `new WebAgent(...)` call (`cli/src/commands/run.ts:310-318`). This makes the latency eval runnable. (Server wiring deferred — see NOT doing.)
@@ -49,7 +49,7 @@ Action tools: `click, fill, select, hover, check, uncheck, focus, enter, wait, s
 - **Decision:** Unify the processing loop around `toolResults.slice(0, maxActionsPerStep)` rather than branching on `maxActionsPerStep > 1`. Keep the `SYSTEM_DEBUG_TOOL_DROP` emit for results beyond the cap.
   - **Why:** When `maxActionsPerStep === 1`, `slice(0,1)` + drop-emit reproduces today's exact behavior — no separate default code path to keep in sync.
   - **Rejected:** A parallel `if (maxActionsPerStep>1)` block duplicating terminal/error/repetition handling.
-- **Decision:** Default `maxActionsPerStep = 1`; new behavior gated entirely on `> 1` (only changes `toolChoice` and prompt wording).
+- **Decision:** Default `maxActionsPerStep = 1`; new behavior gated entirely on `> 1` (only changes the prompt wording — `toolChoice` is `"required"` either way).
   - **Why:** Backwards-compat and easy rollback, per the issue's feature-flag guidance.
 - **Decision:** Repetition detector left as-is; called once on the **last processed non-terminal action** (current call site `webAgent.ts:1177` preserved).
   - **Why:** Per-action repetition tracking is a separable refactor (deferred to PR 2). Default path unchanged; batched path degrades gracefully (slightly weaker coverage, not incorrect).
@@ -72,6 +72,19 @@ Action tools: `click, fill, select, hover, check, uncheck, focus, enter, wait, s
 - **Provider-specific tuning** or per-provider default `maxActionsPerStep` values.
 - **Changing default behavior** — default stays 1; no existing test should change its expectations.
 - **The manual latency eval itself** — that's a real-provider run for Les to execute (the CLI flag enables it); not something this session validates in CI.
+
+## Eval findings (partial WebVoyager suite, pilo-evals-judge)
+
+Run via `evals/partial/...` branches with the config default raised to 5 (throwaway commit). Two runs:
+
+| Run          | toolChoice (batch path) | Pass rate       | Zero-tool cascades   |
+| ------------ | ----------------------- | --------------- | -------------------- |
+| #1 (`9qmv6`) | `"auto"`                | 50% (15/30)     | **8 of 15 failures** |
+| #2 (`lzq6d`) | `"required"`            | **80% (24/30)** | **0**                |
+
+- **The `"auto"` flip was a regression.** With `"auto"`, the model returned zero tool calls on hard tasks (Google Flights, Maps, Apple, GitHub, Huggingface), repeatedly tripping the zero-tool error until `maxConsecutiveErrors` aborted the task. `"required"` (forces ≥1 tool, still allows several) eliminated all 8 cascades. → drove the `toolChoice: "required"` decision above.
+- **Batching genuinely occurs under `"required"`:** across 221 turns, ~15% emitted >1 tool (18×2, 3×3, 3×4, 8×5, 1×9-capped-to-5) → ~24% fewer LLM round-trips on this suite; tokens down 28% (partly from removing the cascade-retry loops). The 2–3× headline is form-density-specific; WebVoyager is search/navigate-heavy, so the win here is modest but real.
+- **`maxActionsPerStep=5` is correctness-neutral here.** Remaining 6 failures at 80% are environmental/known-hard (3 bot-detection, 1 render, 1 Booking date-picker, 1 stale-ref) — none batching-caused. The cap was exercised (8 turns at 5; one 9-tool turn capped to 5, exercising the drop→force-snapshot path).
 
 ## Open questions
 
