@@ -24,8 +24,8 @@ importers:
         specifier: ^2.0.47
         version: 2.0.47(zod@4.3.6)
       '@ghostery/adblocker-playwright':
-        specifier: ^2.17.0
-        version: 2.17.0(playwright@1.60.0)
+        specifier: ^2.17.3
+        version: 2.17.3(playwright@1.60.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
         version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
@@ -146,8 +146,8 @@ importers:
         specifier: ^2.0.47
         version: 2.0.47(zod@4.3.6)
       '@ghostery/adblocker-playwright':
-        specifier: ^2.17.0
-        version: 2.17.0(playwright@1.60.0)
+        specifier: ^2.17.3
+        version: 2.17.3(playwright@1.60.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
         version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
@@ -984,8 +984,8 @@ packages:
   '@ghostery/adblocker-extended-selectors@2.17.3':
     resolution: {integrity: sha512-LlKTpvD8mscNb6NXPJ0yqLv4qvMP9ZRf33HNuQvQxY+nf4nU+ipYjhoNjvPrKAIrvHtIT4DhE+FeD4pAtp5GXQ==}
 
-  '@ghostery/adblocker-playwright@2.17.0':
-    resolution: {integrity: sha512-pDt91Kxi5GCRB3KbKE317Y432kCAXIbbpykL2Ip5Q4QC5l0UeUB3kXfiBDbCtk/rhHPJCtIIJ+7By853zSzKOg==}
+  '@ghostery/adblocker-playwright@2.17.3':
+    resolution: {integrity: sha512-kjgGr6zpbmS28qvbtUCwHFMuFwuvrM35/jm7sE8qVhW9Xa+a0awMrMvLNd/JFD+eckC+sMpSFQ1B/nhIWQABRA==}
     peerDependencies:
       playwright: ^1.x
 
@@ -4355,11 +4355,11 @@ packages:
     resolution: {integrity: sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==}
     engines: {node: '>=14.0.0'}
 
-  tldts-core@7.4.0:
-    resolution: {integrity: sha512-/mb9kRld+x1sIMXxWNOAp5m6C+D4GrAORWlJkOJ5dElvxdN1eutz/o7qHLp9gFvDF4Y3/L2xeScoxz6AbEo8rQ==}
+  tldts-core@7.4.2:
+    resolution: {integrity: sha512-nwEyF4vl4RSJjwSjBUmOSxc3BFPoIFdlRthJ6e+5v9P3bHNsoD06UjuqMUspqp7vsEZ1beaHi1km+optiE17yA==}
 
-  tldts-experimental@7.4.0:
-    resolution: {integrity: sha512-F/xMOEOBEadHoaap73sz2utvE0vAvKv3h/a5vZYt3zLrJY51sGYIifbV2x8KNhENaU6xrTevydtVZjEr1iAfKQ==}
+  tldts-experimental@7.4.2:
+    resolution: {integrity: sha512-z2Lk9PdA6eiK4NrBqq3nTFpg0t22yhYvG4ggwB/sjdvEftRMerlAANoQnFBgOWqR1LVpjTmPF5egtKhCc1HDBg==}
 
   tldts@7.0.30:
     resolution: {integrity: sha512-ELrFxuqsDdHUwoh0XxDbxuLD3Wnz49Z57IFvTtvWy1hJdcMZjXLIuonjilCiWHlT2GbE4Wlv1wKVTzDFnXH1aw==}
@@ -5246,12 +5246,12 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.17.3': {}
 
-  '@ghostery/adblocker-playwright@2.17.0(playwright@1.60.0)':
+  '@ghostery/adblocker-playwright@2.17.3(playwright@1.60.0)':
     dependencies:
       '@ghostery/adblocker': 2.17.3
       '@ghostery/adblocker-content': 2.17.3
       playwright: 1.60.0
-      tldts-experimental: 7.4.0
+      tldts-experimental: 7.4.2
 
   '@ghostery/adblocker@2.17.3':
     dependencies:
@@ -5261,11 +5261,11 @@ snapshots:
       '@remusao/guess-url-type': 2.1.0
       '@remusao/small': 2.1.0
       '@remusao/smaz': 2.2.0
-      tldts-experimental: 7.4.0
+      tldts-experimental: 7.4.2
 
   '@ghostery/url-parser@1.3.1':
     dependencies:
-      tldts-experimental: 7.4.0
+      tldts-experimental: 7.4.2
 
   '@grpc/grpc-js@1.14.4':
     dependencies:
@@ -8586,15 +8586,15 @@ snapshots:
 
   tinyrainbow@3.1.0: {}
 
-  tldts-core@7.4.0: {}
+  tldts-core@7.4.2: {}
 
-  tldts-experimental@7.4.0:
+  tldts-experimental@7.4.2:
     dependencies:
-      tldts-core: 7.4.0
+      tldts-core: 7.4.2
 
   tldts@7.0.30:
     dependencies:
-      tldts-core: 7.4.0
+      tldts-core: 7.4.2
 
   tmp@0.2.5: {}
 
