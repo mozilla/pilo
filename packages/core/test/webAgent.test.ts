@@ -2003,13 +2003,17 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
 
-      // Check that error event was emitted
+      // Check that a tool-execution error event was emitted (NOT an AI
+      // generation error — the model generation succeeded; tool execution failed)
       const errorEvent = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+        (e) => e.type === WebAgentEventType.TOOL_EXECUTION_ERROR,
       );
       expect(errorEvent).toBeDefined();
       expect(errorEvent?.data.error).toContain("You must use exactly one tool");
-      expect(errorEvent?.data.isToolError).toBe(true); // Should be marked as tool error for UI filtering
+      // It must NOT be reported as an AI generation error
+      expect(
+        mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION_ERROR),
+      ).toBeUndefined();
     });
 
     it("should handle tool result without output property", async () => {

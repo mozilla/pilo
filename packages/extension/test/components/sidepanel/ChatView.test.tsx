@@ -629,13 +629,13 @@ describe("ChatView", () => {
         expect(result).toBe(true);
       });
 
-      it("should hide AI generation errors marked as tool errors", () => {
-        // Arrange: Test AI error that is a tool error (agent will handle)
+      it("should hide tool execution errors (agent will retry)", () => {
+        // Arrange: Tool execution errors are recoverable retries
         const event = {
-          type: "ai:generation:error" as const,
+          type: "tool:execution:error" as const,
           data: {
             error: "You must use exactly one tool",
-            isToolError: true,
+            action: "click",
           },
           timestamp: Date.now(),
         };
@@ -803,7 +803,7 @@ describe("ChatView", () => {
         );
       });
 
-      it("should not add error message for AI tool errors", () => {
+      it("should not add error message for tool execution errors", () => {
         // Arrange: Set currentTaskId before rendering
         mockCurrentTaskId = "task-789";
         render(<ChatView {...defaultProps} />);
@@ -816,10 +816,10 @@ describe("ChatView", () => {
           mockAddListener.mock.calls.length - 1
         ][0] as (message: unknown) => void;
 
-        // Act: Simulate AI generation error marked as tool error
-        const message = createRealtimeMessage("ai:generation:error", {
+        // Act: Simulate a recoverable tool execution error
+        const message = createRealtimeMessage("tool:execution:error", {
           error: "You must use exactly one tool",
-          isToolError: true,
+          action: "click",
         });
         registeredHandler(message);
 

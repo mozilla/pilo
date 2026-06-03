@@ -744,11 +744,12 @@ export class WebAgent {
       // Don't add a user message - the error is already in the tool result
       // The LLM will see the error in the tool output and can retry
 
-      // Still emit the error event for logging/monitoring
-      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+      // Emit a tool-execution error event (NOT an AI generation error): the
+      // model generation succeeded, but executing the tool it chose failed.
+      this.emit(WebAgentEventType.TOOL_EXECUTION_ERROR, {
         error: error.message,
+        action: error.toolName,
         iterationId: this.currentIterationId,
-        isToolError: true,
       });
 
       // Early return - no user message needed
@@ -763,7 +764,6 @@ export class WebAgent {
     this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
       error: errorMessage,
       iterationId: this.currentIterationId,
-      isToolError: false,
     });
 
     // Add error feedback to conversation for non-tool errors

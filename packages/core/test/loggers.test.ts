@@ -10,6 +10,7 @@ import type {
   TaskValidationEventData,
   AIGenerationEventData,
   AIGenerationErrorEventData,
+  ToolExecutionErrorEventData,
   PageNavigationEventData,
   AgentStepEventData,
   ReasoningEventData,
@@ -665,6 +666,27 @@ describe("ConsoleLogger", () => {
       const allOutput = mockConsole.error.mock.calls.flat().join(" ");
       expect(allOutput).toContain("❌ AI generation error:");
       expect(allOutput).toContain("API rate limit exceeded");
+    });
+
+    it("should handle TOOL_EXECUTION_ERROR events as a tool failure, not an AI error", () => {
+      const eventData: ToolExecutionErrorEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        error: "locator.click: Timeout 30000ms exceeded",
+        action: "click",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TOOL_EXECUTION_ERROR,
+        data: eventData,
+      });
+
+      expect(mockConsole.error).toHaveBeenCalled();
+      const allOutput = mockConsole.error.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Tool execution failed");
+      expect(allOutput).toContain("locator.click: Timeout 30000ms exceeded");
+      // Must NOT be mislabeled as an AI generation error
+      expect(allOutput).not.toContain("AI generation error");
     });
   });
 });
