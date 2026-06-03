@@ -12,7 +12,7 @@
     "pilo": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.4.1",
+    "@inquirer/prompts": "^8.4.3",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "pilo-core": "workspace:*",
@@ -26,8 +26,8 @@
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@types/node": "^25.7.0",
     "ollama-ai-provider-v2": "^3.5.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   }
 }

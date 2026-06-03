@@ -62,7 +62,7 @@
     "commander": "^14.0.3",
     "cross-fetch": "^4.1.0",
     "eventemitter3": "^5.0.4",
-    "liquidjs": "^10.26.0",
+    "liquidjs": "^10.27.0",
     "nanoid": "^5.1.7",
     "ollama-ai-provider-v2": "^3.5.1",
     "playwright": "1.60.0",
@@ -74,7 +74,7 @@
     "esbuild": "^0.28.0",
     "prettier": "^3.8.3",
     "tsup": "^8.3.5",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@9.0.0",
