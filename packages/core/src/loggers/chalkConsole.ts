@@ -23,6 +23,7 @@ import type {
   ValidationErrorEventData,
   AIGenerationErrorEventData,
   TaskMetricsEventData,
+  FirewallBlockedNonInteractiveEventData,
 } from "../events.js";
 import { Logger } from "./types.js";
 
@@ -89,6 +90,9 @@ export class ChalkConsoleLogger implements Logger {
     emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CONNECTED, this.handleCdpEndpointConnected);
     emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
     emitter.onEvent(WebAgentEventType.BROWSER_RECONNECTED, this.handleBrowserReconnected);
+
+    // Firewall events
+    emitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, this.handleFirewallBlocked);
   }
 
   dispose(): void {
@@ -143,6 +147,12 @@ export class ChalkConsoleLogger implements Logger {
       );
       this.emitter.offEvent(WebAgentEventType.CDP_ENDPOINT_CYCLE, this.handleCdpEndpointCycle);
       this.emitter.offEvent(WebAgentEventType.BROWSER_RECONNECTED, this.handleBrowserReconnected);
+
+      // Firewall events
+      this.emitter.offEvent(
+        WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        this.handleFirewallBlocked,
+      );
 
       // Reset emitter reference
       this.emitter = null;
@@ -388,5 +398,42 @@ export class ChalkConsoleLogger implements Logger {
         `📊 Steps: ${chalk.whiteBright(data.stepCount)} | AI Gens: ${chalk.whiteBright(data.aiGenerationCount)}${errorIndicator} | Tokens: ${chalk.whiteBright(totalTokens.toLocaleString())}`,
       ),
     );
+  };
+
+  private handleFirewallBlocked = (data: FirewallBlockedNonInteractiveEventData): void => {
+    const lines: string[] = [];
+    lines.push("");
+    lines.push(chalk.yellow.bold("Pilo: an action was blocked by the prompt-injection firewall."));
+    lines.push(chalk.yellow(`Reason: ${data.reason}`));
+
+    const involvedHosts = Array.from(
+      new Set(
+        [data.pageHostname, ...data.formActionHostnames].filter((h): h is string => Boolean(h)),
+      ),
+    );
+    if (involvedHosts.length > 0) {
+      lines.push(chalk.yellow(`Hostnames involved: ${involvedHosts.join(", ")}`));
+    }
+
+    lines.push(chalk.yellow("To allow this action, you can:"));
+    for (const r of data.remediations) {
+      if (r.kind === "add-trusted-hostnames") {
+        const cmd =
+          r.hostnames.length > 0
+            ? `pilo config set trusted_hostnames ${r.hostnames.join(",")}`
+            : "pilo config set trusted_hostnames <host>";
+        lines.push(`  - ${r.description}`);
+        lines.push(`    Run: ${chalk.cyan(cmd)}`);
+      } else if (r.kind === "enable-interactive-mode") {
+        lines.push(`  - ${r.description}`);
+      } else if (r.kind === "enable-unsafe-mode") {
+        lines.push(`  - ${r.description}`);
+        lines.push(`    Run: ${chalk.cyan("pilo config set unsafe_mode true")}`);
+      }
+    }
+
+    for (const line of lines) {
+      console.warn(line);
+    }
   };
 }
