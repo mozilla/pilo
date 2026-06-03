@@ -356,3 +356,105 @@ describe("ConfigManager - production flag behavior (dev mode default)", () => {
     vi.resetModules();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ConfigManager - .env loading (dev mode)
+// ---------------------------------------------------------------------------
+// In dev mode, getConfig() loads a local .env via process.loadEnvFile().
+// These tests pin down three behaviors:
+//   1. listSources() must load .env BEFORE reading env vars, so the
+//      "Environment Variables" view is not perpetually empty.
+//   2. The .env path is resolved against INIT_CWD (the dir the user ran the
+//      command from) when set, falling back to process.cwd(). This is needed
+//      because `pnpm pilo` runs the CLI with cwd set to the package dir.
+//   3. A missing .env (ENOENT) is ignored silently, but other errors (e.g. a
+//      malformed .env that fails to parse) are surfaced rather than swallowed.
+
+describe("ConfigManager - .env loading (dev mode)", () => {
+  it("listSources().env reflects values arriving from the .env file", async () => {
+    vi.resetModules();
+    const originalProvider = process.env.PILO_PROVIDER;
+    delete process.env.PILO_PROVIDER;
+
+    // Simulate loadEnvFile reading a .env that sets PILO_PROVIDER. The bug was
+    // that parseEnvConfig() ran before this side effect, leaving env empty.
+    const spy = vi.spyOn(process, "loadEnvFile").mockImplementation(() => {
+      process.env.PILO_PROVIDER = "openrouter";
+    });
+
+    try {
+      const { config: mgr } = await import("../src/config/manager.js");
+      const sources = mgr.listSources();
+      expect(sources.env.provider).toBe("openrouter");
+    } finally {
+      spy.mockRestore();
+      if (originalProvider === undefined) {
+        delete process.env.PILO_PROVIDER;
+      } else {
+        process.env.PILO_PROVIDER = originalProvider;
+      }
+      vi.resetModules();
+    }
+  });
+
+  it("resolves the .env path against INIT_CWD when set", async () => {
+    vi.resetModules();
+    const originalInitCwd = process.env.INIT_CWD;
+    process.env.INIT_CWD = "/fake/repo/root";
+
+    const spy = vi.spyOn(process, "loadEnvFile").mockImplementation(() => {});
+
+    try {
+      const { config: mgr } = await import("../src/config/manager.js");
+      mgr.getConfig();
+      expect(spy).toHaveBeenCalledWith("/fake/repo/root/.env");
+    } finally {
+      spy.mockRestore();
+      if (originalInitCwd === undefined) {
+        delete process.env.INIT_CWD;
+      } else {
+        process.env.INIT_CWD = originalInitCwd;
+      }
+      vi.resetModules();
+    }
+  });
+
+  it("silently ignores a missing .env (ENOENT)", async () => {
+    vi.resetModules();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loadSpy = vi.spyOn(process, "loadEnvFile").mockImplementation(() => {
+      const err = new Error("no such file") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      throw err;
+    });
+
+    try {
+      const { config: mgr } = await import("../src/config/manager.js");
+      mgr.getConfig();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      loadSpy.mockRestore();
+      warnSpy.mockRestore();
+      vi.resetModules();
+    }
+  });
+
+  it("warns when .env exists but fails to parse", async () => {
+    vi.resetModules();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loadSpy = vi.spyOn(process, "loadEnvFile").mockImplementation(() => {
+      throw new Error("malformed line in .env");
+    });
+
+    try {
+      const { config: mgr } = await import("../src/config/manager.js");
+      mgr.getConfig();
+      expect(warnSpy).toHaveBeenCalledOnce();
+      expect(warnSpy.mock.calls[0][0]).toContain("malformed line in .env");
+    } finally {
+      loadSpy.mockRestore();
+      warnSpy.mockRestore();
+      vi.resetModules();
+    }
+  });
+});
