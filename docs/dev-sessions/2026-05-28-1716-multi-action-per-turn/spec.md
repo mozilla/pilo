@@ -75,16 +75,18 @@ Action tools: `click, fill, select, hover, check, uncheck, focus, enter, wait, s
 
 ## Eval findings (partial WebVoyager suite, pilo-evals-judge)
 
-Run via `evals/partial/...` branches with the config default raised to 5 (throwaway commit). Two runs:
+Run via throwaway `evals/partial/...` branches (eval branches since deleted; GCS reports persist). Three runs:
 
-| Run          | toolChoice (batch path) | Pass rate       | Zero-tool cascades   |
-| ------------ | ----------------------- | --------------- | -------------------- |
-| #1 (`9qmv6`) | `"auto"`                | 50% (15/30)     | **8 of 15 failures** |
-| #2 (`lzq6d`) | `"required"`            | **80% (24/30)** | **0**                |
+| Run                | toolChoice   | maxActionsPerStep | Pass rate       | Zero-tool cascades   |
+| ------------------ | ------------ | ----------------- | --------------- | -------------------- |
+| #1 (`9qmv6`)       | `"auto"`     | 5                 | 50% (15/30)     | **8 of 15 failures** |
+| #2 (`lzq6d`)       | `"required"` | 5                 | **80% (24/30)** | **0**                |
+| baseline (`9xr8w`) | `"required"` | 1 (batch off)     | 63% (19/30)     | 0                    |
 
 - **The `"auto"` flip was a regression.** With `"auto"`, the model returned zero tool calls on hard tasks (Google Flights, Maps, Apple, GitHub, Huggingface), repeatedly tripping the zero-tool error until `maxConsecutiveErrors` aborted the task. `"required"` (forces ≥1 tool, still allows several) eliminated all 8 cascades. → drove the `toolChoice: "required"` decision above.
 - **Batching genuinely occurs under `"required"`:** across 221 turns, ~15% emitted >1 tool (18×2, 3×3, 3×4, 8×5, 1×9-capped-to-5) → ~24% fewer LLM round-trips on this suite; tokens down 28% (partly from removing the cascade-retry loops). The 2–3× headline is form-density-specific; WebVoyager is search/navigate-heavy, so the win here is modest but real.
-- **`maxActionsPerStep=5` is correctness-neutral here.** Remaining 6 failures at 80% are environmental/known-hard (3 bot-detection, 1 render, 1 Booking date-picker, 1 stale-ref) — none batching-caused. The cap was exercised (8 turns at 5; one 9-tool turn capped to 5, exercising the drop→force-snapshot path).
+- **Batching at 5 is correctness-neutral vs the default-1 baseline.** Batching-5 (80%) ≥ baseline (63%), but the gap is dominated by environmental noise, not batching: bot-detection failures alone were 6 (baseline) vs 3 (batching-5) — purely random CAPTCHA luck — and the specific failing tasks shuffle between runs (the signature of run-to-run flakiness). With n=1 per config we can't claim batching _improves_ accuracy; the defensible conclusion is it doesn't hurt it. The dominant failure mode in every run is environmental (bot detection / render), unrelated to this PR.
+- **`maxActionsPerStep=5` cap exercised:** 8 turns at 5; one 9-tool turn capped to 5 (exercising the drop→force-snapshot path). No correctness fallout from the aggressive cap.
 
 ## Open questions
 

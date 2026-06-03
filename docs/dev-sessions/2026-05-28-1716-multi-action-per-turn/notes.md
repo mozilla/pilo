@@ -6,7 +6,8 @@ Ran the partial WebVoyager suite via `evals/partial/...` branches (config defaul
 
 - **Run #1 (toolChoice "auto"): 50% (15/30)** — 8/15 failures were a zero-tool cascade: `"auto"` let the model return no tools on hard tasks → repeated "at least one tool" errors → `maxConsecutiveErrors` abort.
 - **Fix:** `toolChoice: "required"` always (forces ≥1 tool, still allows several). Committed `536284f` on the PR branch.
-- **Run #2 (toolChoice "required"): 80% (24/30)** — 0 cascades. Remaining 6 failures all environmental/known-hard. Batching real: ~15% of 221 turns emitted >1 tool → ~24% fewer round-trips on this suite (form-density-dependent; not the 2–3× headline). `maxActionsPerStep=5` correctness-neutral.
+- **Run #2 (toolChoice "required", max=5): 80% (24/30)** — 0 cascades. Remaining 6 failures all environmental/known-hard. Batching real: ~15% of 221 turns emitted >1 tool → ~24% fewer round-trips on this suite (form-density-dependent; not the 2–3× headline).
+- **Baseline (toolChoice "required", max=1, batch off): 63% (19/30)** — batching-5 (80%) ≥ baseline, but the gap is environmental noise (bot-detection 6 vs 3; failing tasks shuffle run-to-run). n=1 per config → defensible claim is "batching correctness-neutral," not "improves." Eval branches deleted; GCS reports persist (`9qmv6`/`lzq6d`/`9xr8w`).
 - **Lesson:** the issue's suggested `"auto"` flip was wrong; evals caught it. The `superpowers:receiving-code-review` instinct (verify, don't blindly implement) applied to the _issue spec_ itself.
 
 ## Session state (execution complete)
