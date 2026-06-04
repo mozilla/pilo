@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
+import { WebAgent, WebAgentOptions, iterateWithInactivityTimeout } from "../src/webAgent.js";
 import { InvalidHostnameError } from "../src/security/actionFirewall.js";
 import {
   AriaBrowser,
@@ -4997,5 +4997,79 @@ describe("WebAgent firewall options", () => {
           unsafeMode: true,
         }),
     ).not.toThrow();
+  });
+});
+
+describe("iterateWithInactivityTimeout", () => {
+  // Uses real timers: the helper races each next() against a real setTimeout,
+  // so a tiny timeout lets the stall fire quickly without fake-timer plumbing.
+  it("forwards every value of a stream that keeps producing", async () => {
+    async function* stream() {
+      yield 1;
+      yield 2;
+      yield 3;
+    }
+
+    const seen: number[] = [];
+    for await (const value of iterateWithInactivityTimeout(stream(), 1000)) {
+      seen.push(value);
+    }
+
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it("rejects when the stream stalls mid-iteration longer than the timeout", async () => {
+    // Yields once, then never produces another value — models a provider that
+    // sends partial data and then goes silent.
+    const stalling: AsyncIterable<number> = {
+      [Symbol.asyncIterator]() {
+        let emitted = false;
+        return {
+          next() {
+            if (!emitted) {
+              emitted = true;
+              return Promise.resolve({ value: 1, done: false });
+            }
+            return new Promise(() => {}); // never resolves
+          },
+        };
+      },
+    };
+
+    const seen: number[] = [];
+    let error: unknown;
+    try {
+      for await (const value of iterateWithInactivityTimeout(stalling, 20)) {
+        seen.push(value);
+      }
+    } catch (e) {
+      error = e;
+    }
+
+    expect(seen).toEqual([1]);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/stalled/i);
+  });
+
+  it("calls the underlying iterator's return() when it stalls out", async () => {
+    const returnSpy = vi.fn(() => Promise.resolve({ value: undefined, done: true as const }));
+    const stalling: AsyncIterable<number> = {
+      [Symbol.asyncIterator]() {
+        return {
+          next() {
+            return new Promise(() => {}); // never resolves
+          },
+          return: returnSpy,
+        };
+      },
+    };
+
+    await expect(async () => {
+      for await (const _ of iterateWithInactivityTimeout(stalling, 20)) {
+        // no-op
+      }
+    }).rejects.toThrow(/stalled/i);
+
+    expect(returnSpy).toHaveBeenCalledTimes(1);
   });
 });

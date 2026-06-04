@@ -66,6 +66,51 @@ import {
   type FirewallConfig,
 } from "./security/actionFirewall.js";
 
+/**
+ * Iterate an async iterable, bounding each step with an inactivity timeout.
+ *
+ * The AI SDK's `streamText` `timeout`/`abortSignal` bound the initial request,
+ * but consuming `fullStream` with a bare `for await` is not independently
+ * bounded: a provider that stalls mid-stream (partial data then silence, or a
+ * half-open TCP connection that never sends a FIN) can leave the iteration
+ * pending forever. This wrapper races each `next()` against `timeoutMs` so a
+ * stalled stream rejects with a descriptive error instead of hanging. The error
+ * is caught by the caller's existing try/catch and surfaced like any other
+ * generation failure. On timeout the underlying iterator's `return()` is invoked
+ * (best effort) so the stream's resources are released.
+ */
+export async function* iterateWithInactivityTimeout<T>(
+  iterable: AsyncIterable<T>,
+  timeoutMs: number,
+): AsyncGenerator<T> {
+  const iterator = iterable[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      let timer: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`LLM stream stalled: no data received for ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      });
+      let result: IteratorResult<T>;
+      try {
+        result = await Promise.race([iterator.next(), timeout]);
+      } finally {
+        clearTimeout(timer!);
+      }
+      if (result.done) {
+        return;
+      }
+      yield result.value;
+    }
+  } finally {
+    // Release the underlying stream when iteration ends early (timeout, a
+    // downstream throw, or a `break` in the consumer).
+    await iterator.return?.();
+  }
+}
+
 // === Type Definitions ===
 
 export interface WebAgentOptions {
@@ -1014,7 +1059,17 @@ export class WebAgent {
           let reasoningText = "";
           let reasoningEmitted = false;
 
-          for await (const part of streamResult.fullStream) {
+          // The `timeout`/`abortSignal` passed to streamText above bound the
+          // initial request, but the `for await` over `fullStream` is not
+          // independently bounded: if the provider stalls mid-stream (partial
+          // data then silence, or a zombie TCP connection that never sends a
+          // FIN), the iteration can hang indefinitely and freeze the agent with
+          // no error and no progress. Bound each chunk wait with an inactivity
+          // timeout so a stalled stream surfaces as an error instead.
+          for await (const part of iterateWithInactivityTimeout(
+            streamResult.fullStream,
+            this.llmProviderTimeoutMs,
+          )) {
             switch (part.type) {
               case "reasoning-start":
                 // Start accumulating reasoning
