@@ -18,6 +18,7 @@ import type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
   AIGenerationErrorEventData,
+  FirewallBlockedNonInteractiveEventData,
 } from "../events.js";
 import { Logger } from "./types.js";
 
@@ -63,6 +64,9 @@ export class ConsoleLogger implements Logger {
 
     // AI events
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+
+    // Firewall events
+    emitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, this.handleFirewallBlocked);
   }
 
   dispose(): void {
@@ -102,6 +106,12 @@ export class ConsoleLogger implements Logger {
 
       // AI events
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+
+      // Firewall events
+      this.emitter.offEvent(
+        WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        this.handleFirewallBlocked,
+      );
 
       // Reset emitter reference
       this.emitter = null;
@@ -247,5 +257,42 @@ export class ConsoleLogger implements Logger {
 
   private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
     console.error("❌ AI generation error:", data.error);
+  };
+
+  private handleFirewallBlocked = (data: FirewallBlockedNonInteractiveEventData): void => {
+    const lines: string[] = [];
+    lines.push("");
+    lines.push("Pilo: an action was blocked by the prompt-injection firewall.");
+    lines.push(`Reason: ${data.reason}`);
+
+    const involvedHosts = Array.from(
+      new Set(
+        [data.pageHostname, ...data.formActionHostnames].filter((h): h is string => Boolean(h)),
+      ),
+    );
+    if (involvedHosts.length > 0) {
+      lines.push(`Hostnames involved: ${involvedHosts.join(", ")}`);
+    }
+
+    lines.push("To allow this action, you can:");
+    for (const r of data.remediations) {
+      if (r.kind === "add-trusted-hostnames") {
+        const cmd =
+          r.hostnames.length > 0
+            ? `pilo config set trusted_hostnames ${r.hostnames.join(",")}`
+            : "pilo config set trusted_hostnames <host>";
+        lines.push(`  - ${r.description}`);
+        lines.push(`    Run: ${cmd}`);
+      } else if (r.kind === "enable-interactive-mode") {
+        lines.push(`  - ${r.description}`);
+      } else if (r.kind === "enable-unsafe-mode") {
+        lines.push(`  - ${r.description}`);
+        lines.push(`    Run: pilo config set unsafe_mode true`);
+      }
+    }
+
+    for (const line of lines) {
+      console.warn(line);
+    }
   };
 }
