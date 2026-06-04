@@ -378,6 +378,7 @@ Analyze the current page state and determine your next action based on previous 
 4. Data grounding: every value in your answer must appear in a page snapshot, a tool result, or the task input. Do NOT use general knowledge to fill gaps. If a value was not found during this session, say so explicitly rather than inventing it.
 5. Blockers vs. obstacles: if you hit an unrecoverable block (paywall, login wall, access denied, payment declined) that prevented completing a core requirement, call abort() with the reason. Temporary obstacles you handled (dismissed popups, retried errors) don't change the outcome.
 6. If anything is unverified, incomplete, or uncertain — call abort() with the reason rather than done() with an overclaiming answer.
+7. Required steps are not optional: if a required filter, criterion, or input cannot be applied — the control is missing or unavailable, or the provided value looks malformed — you MUST call abort() with the reason. Do NOT call done() with partial or unfiltered results, and do NOT silently drop the requirement.
 
 **When using done():**
 Provide your final answer:

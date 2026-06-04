@@ -190,6 +190,15 @@ describe("prompts", () => {
       expect(actionLoopSystemPrompt).toContain("Best Practices:");
     });
 
+    it("requires abort() when a required filter/criterion cannot be applied", () => {
+      // Sub-pattern A from TAB-995: when a required filter/criterion/input cannot
+      // be applied, the agent must abort() rather than done() with partial or
+      // unfiltered results.
+      expect(actionLoopSystemPrompt).toContain(
+        "Do NOT call done() with partial or unfiltered results",
+      );
+    });
+
     it("should contain required instructions", () => {
       // Verify youArePrompt content is included
       expect(actionLoopSystemPrompt).toContain(
