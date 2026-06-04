@@ -1200,7 +1200,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
               case PageAction.UploadFile: {
                 if (!value) {
-                  throw new BrowserActionException("upload_file", "upload_path_not_file");
+                  throw new BrowserActionException("upload_file", "upload_path_required");
                 }
                 const uploadPath = await this.resolveAllowedUploadPath(value);
                 const fileInput = await this.resolveFileInputLocator(locator!);

@@ -859,6 +859,24 @@ describe("PlaywrightBrowser", () => {
         });
       });
 
+      it("should report upload_path_required when upload_file has no path", async () => {
+        const mockLocator = {
+          count: vi.fn().mockResolvedValue(1),
+          scrollIntoViewIfNeeded: vi.fn(),
+        };
+        const mockPage = {
+          locator: vi.fn().mockReturnValue(mockLocator),
+        };
+        (browser as any).page = mockPage;
+
+        await expect(browser.performAction("file1", PageAction.UploadFile)).rejects.toThrow(
+          BrowserActionException,
+        );
+        await expect(browser.performAction("file1", PageAction.UploadFile)).rejects.toThrow(
+          "upload_path_required",
+        );
+      });
+
       it("should resolve a nested file input when the ref points to a container", async () => {
         const nestedFileInput = {
           count: vi.fn().mockResolvedValue(1),

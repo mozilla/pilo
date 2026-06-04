@@ -23,6 +23,12 @@ vi.mock("pilo-core", async (importOriginal) => {
     PlaywrightBrowser: vi.fn().mockImplementation(function () {
       return {};
     }),
+    BiDiBrowser: vi.fn().mockImplementation(function () {
+      return {};
+    }),
+    FoxcloudBrowser: vi.fn().mockImplementation(function () {
+      return {};
+    }),
     config: {
       get: vi.fn((key: string) => actual.DEFAULTS[key as keyof typeof actual.DEFAULTS]),
       getConfig: vi.fn(() => ({ ...actual.DEFAULTS })),
@@ -360,6 +366,54 @@ describe("CLI Run Command", () => {
       });
     });
 
+    it("should pass upload allowlist for Playwright browsers", async () => {
+      const uploadAllowedPaths = ["/tmp/pilo-uploads"];
+      mockConfig.getConfig.mockReturnValueOnce({
+        ...schemaDefaults,
+        browser: "firefox",
+        upload_allowed_paths: uploadAllowedPaths,
+      });
+
+      await command.parseAsync(["test task"], { from: "user" });
+
+      expect(mockPlaywrightBrowser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowFileUpload: { allowedPaths: uploadAllowedPaths },
+        }),
+      );
+      expect(mockWebAgent.mock.calls[0][1]).toMatchObject({
+        allowFileUpload: { allowedPaths: uploadAllowedPaths },
+      });
+    });
+
+    it("should disable file uploads for BiDi even when upload paths are configured", async () => {
+      mockConfig.getConfig.mockReturnValueOnce({
+        ...schemaDefaults,
+        browser: "bidi",
+        bidi_url: "ws://localhost:1234",
+        upload_allowed_paths: ["/tmp/pilo-uploads"],
+      });
+
+      await command.parseAsync(["test task"], { from: "user" });
+
+      expect(mockPlaywrightBrowser).not.toHaveBeenCalled();
+      expect(mockWebAgent.mock.calls[0][1]).toMatchObject({ allowFileUpload: false });
+    });
+
+    it("should disable file uploads for Foxcloud even when upload paths are configured", async () => {
+      mockConfig.getConfig.mockReturnValueOnce({
+        ...schemaDefaults,
+        browser: "foxcloud",
+        foxcloud_url: "ws://localhost:5678",
+        upload_allowed_paths: ["/tmp/pilo-uploads"],
+      });
+
+      await command.parseAsync(["test task"], { from: "user" });
+
+      expect(mockPlaywrightBrowser).not.toHaveBeenCalled();
+      expect(mockWebAgent.mock.calls[0][1]).toMatchObject({ allowFileUpload: false });
+    });
+
     it("should set up generation logging when debug flag is enabled", async () => {
       const mockFs = vi.mocked(fs);
       const mockEventEmitter = vi.mocked(WebAgentEventEmitter);
@@ -373,9 +427,12 @@ describe("CLI Run Command", () => {
       await command.parseAsync(args, { from: "user" });
 
       // Should create debug/generations directory
-      expect(mockFs.mkdirSync).toHaveBeenCalledWith(expect.stringContaining("debug/generations"), {
-        recursive: true,
-      });
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringMatching(/debug[\\/]+generations/),
+        {
+          recursive: true,
+        },
+      );
 
       // Should create event emitter and set up listener
       expect(mockEventEmitter).toHaveBeenCalled();
@@ -402,7 +459,7 @@ describe("CLI Run Command", () => {
 
       // Should write generation data to file
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringMatching(/debug\/generations\/.*\.json$/),
+        expect.stringMatching(/debug[\\/]+generations[\\/]+.*\.json$/),
         JSON.stringify(mockData, null, 2),
       );
     });

@@ -13,6 +13,7 @@ import {
   PLAYWRIGHT_BROWSERS,
 } from "pilo-core";
 import type { FileUploadConfig, TaskExecutionResult, UserDataCallback } from "pilo-core";
+import * as path from "node:path";
 import { StreamLogger } from "./StreamLogger.js";
 import { config } from "./config.js";
 
@@ -313,7 +314,10 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       `Server only supports Playwright browsers (${PLAYWRIGHT_BROWSERS.join(", ")}), got "${browserName}"`,
     );
   }
-  const uploadAllowedPaths = body.uploadAllowedPaths ?? serverConfig.upload_allowed_paths;
+  const uploadAllowedPaths = resolveServerUploadAllowedPaths(
+    serverConfig.upload_allowed_paths,
+    body.uploadAllowedPaths,
+  );
   const allowFileUpload: false | FileUploadConfig =
     uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
 
@@ -406,4 +410,29 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       });
     }
   }
+}
+
+function resolveServerUploadAllowedPaths(
+  serverAllowedPaths: readonly string[],
+  requestAllowedPaths?: readonly string[],
+): string[] {
+  if (serverAllowedPaths.length === 0) {
+    return [];
+  }
+  if (requestAllowedPaths === undefined) {
+    return [...serverAllowedPaths];
+  }
+  if (requestAllowedPaths.length === 0) {
+    return [];
+  }
+
+  const normalizedServerRoots = serverAllowedPaths.map((root) => path.resolve(root));
+  return requestAllowedPaths.flatMap((requestPath) => {
+    const normalizedRequestPath = path.resolve(requestPath);
+    const allowed = normalizedServerRoots.some((serverRoot) => {
+      const relative = path.relative(serverRoot, normalizedRequestPath);
+      return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    });
+    return allowed ? [normalizedRequestPath] : [];
+  });
 }

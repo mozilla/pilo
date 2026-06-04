@@ -128,6 +128,10 @@ export interface WebAgentOptions {
   /**
    * Enables `upload_file` only for explicitly allowlisted local paths.
    *
+   * Only PlaywrightBrowser currently implements PageAction.UploadFile. Callers
+   * using BiDi/Foxcloud should leave this disabled until those backends add
+   * concrete upload support.
+   *
    * @warning Uploaded files are read from the local filesystem. Keep this
    * disabled unless the caller controls the target page and the allowed path
    * roots.
