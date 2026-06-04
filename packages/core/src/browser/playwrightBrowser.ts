@@ -520,22 +520,12 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Connect over CDP with retry and failover.
-   *
-   * Visits every configured endpoint once per call, starting at `nextStartIndex` and
-   * wrapping with modulo. Wrapping (rather than slicing from `nextStartIndex` to the end)
-   * is what gives each `start()` a fresh attempt budget: a single-endpoint reconnect after
-   * a prior success — where `nextStartIndex` has advanced to 1 — still attempts that
-   * endpoint instead of running an empty loop and instantly failing.
-   *
-   * Each endpoint is retried up to `cdpConnectRetry.maxAttempts` times on transient
-   * connection errors (a retry is a failover-to-self), with exponential backoff + jitter
-   * between attempts. Non-connection errors (e.g. auth) throw immediately. When an
-   * endpoint's attempts are exhausted, control fails over to the next endpoint. If every
-   * endpoint is exhausted, a hard error is thrown.
-   *
-   * On success, `nextStartIndex` advances past the connected endpoint so a later restart
-   * prefers the next distinct endpoint (multi-endpoint failover semantics preserved).
+   * Connect over CDP with per-endpoint retry (exponential backoff + jitter) and failover
+   * across endpoints. The index wraps modulo from `nextStartIndex` so each call gets a
+   * fresh budget — a single-endpoint reconnect (nextStartIndex already past 0) still
+   * retries that endpoint instead of looping zero times. Non-connection errors throw
+   * immediately; on success nextStartIndex advances so a later restart prefers the next
+   * endpoint.
    */
   private async connectOverCDPWithFailover(
     connectOptions: ConnectOptions,
@@ -558,19 +548,13 @@ export class PlaywrightBrowser implements AriaBrowser {
           this.onCdpEndpointConnected?.(index + 1, total);
           return browser;
         } catch (err) {
-          // Non-connection errors (auth, malformed URL, ...) are not transient — fail fast.
           if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
-            throw err;
+            throw err; // non-connection error (auth, bad URL) — not transient
           }
-
-          const moreAttemptsOnThisEndpoint = attempt < maxAttempts;
-          if (moreAttemptsOnThisEndpoint) {
-            // Same-endpoint retry: back off, then try this endpoint again.
+          if (attempt < maxAttempts) {
             await this.delay(this.backoffDelayMs(attempt));
             continue;
           }
-
-          // Endpoint exhausted. Fail over to the next endpoint if one remains.
           if (!isLastEndpoint) {
             this.onCdpEndpointCycle?.(index + 1, err);
           }
@@ -581,10 +565,7 @@ export class PlaywrightBrowser implements AriaBrowser {
     throw new Error(`All ${total} CDP endpoint(s) failed. Giving up.`);
   }
 
-  /**
-   * Exponential backoff delay for the Nth retry, capped and jittered.
-   * `attempt` is 1-based (1 → base, 2 → 2×base, ...). Full jitter in [0, computed].
-   */
+  /** Exponential backoff with full jitter for the 1-based attempt, capped at backoffMaxMs. */
   private backoffDelayMs(attempt: number): number {
     const { backoffBaseMs, backoffMaxMs } = this.cdpConnectRetry;
     const exponential = backoffBaseMs * 2 ** (attempt - 1);
@@ -592,7 +573,6 @@ export class PlaywrightBrowser implements AriaBrowser {
     return Math.floor(Math.random() * capped);
   }
 
-  /** Promise-based delay (testable under fake timers). */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
