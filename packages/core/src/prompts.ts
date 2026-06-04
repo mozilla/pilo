@@ -621,11 +621,18 @@ Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Result: {{ finalAnswer }}
 
+Recent agent actions and observations:
+{{ wrappedConversationHistory }}
+
 Evaluation approach:
 1. Compare the result against the success criteria defined above
 2. Check if all required information is included
 3. Verify the answer meets the specified format and detail level
-4. Assess if key requirements are satisfied
+4. Review the recent agent trajectory:
+   - Was the agent making genuine progress, or repeating failed attempts?
+   - Did the agent run into blockers (errors, walls) the final answer doesn't acknowledge?
+   - Did the agent claim success but actually skip required steps?
+5. Assess if key requirements are satisfied
 
 Quality ratings:
 - **failed**: Task not completed or result doesn't address the request
@@ -654,7 +661,10 @@ export const buildTaskValidationPrompt = (
     task,
     successCriteria,
     finalAnswer,
-    conversationHistory,
+    wrappedConversationHistory: wrapExternalContentWithWarning(
+      conversationHistory,
+      ExternalContentLabel.ConversationHistory,
+    ),
     currentDate: getCurrentFormattedDate(),
   });
 

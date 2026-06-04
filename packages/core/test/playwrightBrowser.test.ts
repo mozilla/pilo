@@ -1754,4 +1754,52 @@ describe("PlaywrightBrowser", () => {
       expect(result.truncated).toBe(true);
     });
   });
+
+  describe("getTreeWithRefs frame evaluate timeout", () => {
+    let browser: PlaywrightBrowser;
+
+    beforeEach(() => {
+      // Tiny per-frame timeout so a non-responsive frame is skipped quickly under
+      // real timers (no fake-timer gymnastics around the sequential await loop).
+      browser = new PlaywrightBrowser({ browser: "chromium", ariaFrameEvaluateTimeoutMs: 20 });
+    });
+
+    it("skips a child frame whose evaluate never resolves and still returns the responsive frames", async () => {
+      const mainFrame = { evaluate: vi.fn() };
+      // Simulates a hostile/unresponsive ad iframe: evaluate never settles.
+      const hangingFrame = { evaluate: vi.fn().mockReturnValue(new Promise(() => {})) };
+      const goodFrame = {
+        evaluate: vi.fn().mockResolvedValue({ yaml: "GOOD_FRAME_YAML", counterValue: 5 }),
+      };
+      (browser as any).page = {
+        evaluate: vi.fn().mockResolvedValue({ yaml: "MAIN_YAML", counterValue: 1 }),
+        frames: vi.fn().mockReturnValue([mainFrame, hangingFrame, goodFrame]),
+        mainFrame: vi.fn().mockReturnValue(mainFrame),
+      };
+
+      const result = await browser.getTreeWithRefs();
+
+      expect(result).toContain("MAIN_YAML");
+      expect(result).toContain("GOOD_FRAME_YAML");
+      expect(hangingFrame.evaluate).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces a main-frame evaluate timeout as an error (not a disconnect)", async () => {
+      (browser as any).page = {
+        evaluate: vi.fn().mockReturnValue(new Promise(() => {})), // never resolves
+        frames: vi.fn().mockReturnValue([]),
+        mainFrame: vi.fn(),
+      };
+
+      const error = await browser.getTreeWithRefs().then(
+        () => {
+          throw new Error("expected getTreeWithRefs to reject");
+        },
+        (e) => e,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/timed out/i);
+      expect(error).not.toBeInstanceOf(BrowserDisconnectedError);
+    });
+  });
 });

@@ -82,6 +82,14 @@ export interface PlaywrightBrowserOptions {
   navigationRetry?: Partial<NavigationRetryConfig>;
   /** Timeout for page load and element actions in milliseconds (default: 30000) */
   actionTimeoutMs?: number;
+  /**
+   * Timeout for evaluating the aria-tree script in a single frame, in milliseconds
+   * (default: 5000). Bounds an otherwise unbounded Playwright `evaluate` so an
+   * unresponsive frame can't hang the snapshot. A child frame that exceeds it is skipped;
+   * a main-frame timeout surfaces as an error (the page's own document is unusable).
+   * Primarily a testability seam; rarely needs overriding in production.
+   */
+  ariaFrameEvaluateTimeoutMs?: number;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -99,6 +107,30 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
 /** Timeout per CDP endpoint connection attempt in milliseconds */
 const CDP_CONNECTION_TIMEOUT_MS = 5_000;
 
+/**
+ * Timeout for evaluating the aria-tree script in a single frame, in milliseconds.
+ *
+ * Playwright's `evaluate` has no timeout option and is not governed by
+ * `setDefaultTimeout`. A hostile or unresponsive iframe (e.g. a busy ad frame whose
+ * main thread never yields) can leave `frame.evaluate` pending forever — neither
+ * resolving nor rejecting — which hangs the page snapshot and, in turn, the whole agent.
+ * Bounding each evaluate lets us skip such a frame instead of freezing.
+ */
+const ARIA_FRAME_EVALUATE_TIMEOUT_MS = 5_000;
+
+/**
+ * Race a promise against a timeout. Rejects with `Error(message)` if `ms` elapses before
+ * `promise` settles. The timer is always cleared, so no timer handle leaks on the happy
+ * path.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer!: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
   public channel: string | undefined;
@@ -109,6 +141,9 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
+
+  // Timeout for the aria-tree evaluate in a single frame (configurable)
+  private readonly ariaFrameEvaluateTimeoutMs: number;
 
   // Navigation retry configuration
   private readonly navigationConfig: NavigationRetryConfig;
@@ -128,6 +163,10 @@ export class PlaywrightBrowser implements AriaBrowser {
 
     // Initialize action timeout from options or use default
     this.actionTimeoutMs = options.actionTimeoutMs ?? getConfigDefaults().action_timeout_ms;
+
+    // Initialize per-frame aria-tree evaluate timeout from options or use default
+    this.ariaFrameEvaluateTimeoutMs =
+      options.ariaFrameEvaluateTimeoutMs ?? ARIA_FRAME_EVALUATE_TIMEOUT_MS;
 
     // Initialize navigation retry config with defaults and overrides
     // Uses createNavigationRetryConfig which safely handles undefined values
@@ -610,21 +649,27 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   private async getTreeWithRefsImpl(): Promise<string> {
-    // Inject the ariaTree bundle and generate snapshot in the main frame
-    const mainResult = await this.page!.evaluate(
-      ({ script }) => {
-        // Idempotent injection guard
-        const win = window as any;
-        if (!win.__piloAriaTree) {
-          const fn = new Function(script);
-          fn();
-          win.__piloAriaTree = (globalThis as any).__piloAriaTree;
-        }
-        const counter = { value: 0 };
-        const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
-        return { yaml, counterValue: counter.value };
-      },
-      { script: ARIA_TREE_SCRIPT },
+    // Inject the ariaTree bundle and generate snapshot in the main frame.
+    // Bounded by a timeout so an unresponsive page can't hang the snapshot forever; a
+    // main-frame timeout is a real failure and propagates to getTreeWithRefs's wrapper.
+    const mainResult = await withTimeout(
+      this.page!.evaluate(
+        ({ script }) => {
+          // Idempotent injection guard
+          const win = window as any;
+          if (!win.__piloAriaTree) {
+            const fn = new Function(script);
+            fn();
+            win.__piloAriaTree = (globalThis as any).__piloAriaTree;
+          }
+          const counter = { value: 0 };
+          const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
+          return { yaml, counterValue: counter.value };
+        },
+        { script: ARIA_TREE_SCRIPT },
+      ),
+      this.ariaFrameEvaluateTimeoutMs,
+      `aria-tree main-frame evaluate timed out after ${this.ariaFrameEvaluateTimeoutMs}ms`,
     );
 
     // Handle cross-origin iframes via Playwright's frame API
@@ -637,29 +682,35 @@ export class PlaywrightBrowser implements AriaBrowser {
       if (frame === this.page!.mainFrame()) continue;
 
       try {
-        const frameResult = await frame.evaluate(
-          ({ script, counterStart }) => {
-            const win = window as any;
-            if (!win.__piloAriaTree) {
-              const fn = new Function(script);
-              fn();
-              win.__piloAriaTree = (globalThis as any).__piloAriaTree;
-            }
-            const counter = { value: counterStart };
-            const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
-              document.body,
-              counter,
-            );
-            return { yaml, counterValue: counter.value };
-          },
-          { script: ARIA_TREE_SCRIPT, counterStart: counter },
+        // Bounded by a timeout: a busy/unresponsive ad iframe can otherwise leave
+        // frame.evaluate pending forever (Playwright's evaluate has no timeout).
+        const frameResult = await withTimeout(
+          frame.evaluate(
+            ({ script, counterStart }) => {
+              const win = window as any;
+              if (!win.__piloAriaTree) {
+                const fn = new Function(script);
+                fn();
+                win.__piloAriaTree = (globalThis as any).__piloAriaTree;
+              }
+              const counter = { value: counterStart };
+              const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
+                document.body,
+                counter,
+              );
+              return { yaml, counterValue: counter.value };
+            },
+            { script: ARIA_TREE_SCRIPT, counterStart: counter },
+          ),
+          this.ariaFrameEvaluateTimeoutMs,
+          `aria-tree frame evaluate timed out after ${this.ariaFrameEvaluateTimeoutMs}ms`,
         );
         if (frameResult.yaml) {
           childYamls.push(frameResult.yaml);
           counter = frameResult.counterValue;
         }
       } catch {
-        // Cross-origin or detached frame, skip
+        // Cross-origin frame, detached frame, or an evaluate that timed out — skip it.
       }
     }
 

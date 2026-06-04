@@ -47,6 +47,24 @@ jobs:
             workflows:
               - '.github/workflows/**'
 
+  # Reports which secret-backed credentials are available to this run.
+  # The `secrets` context cannot be read in a job-level `if:`, so downstream
+  # jobs that need a secret gate on these outputs instead. Secrets are not
+  # passed to workflows triggered from forks or Dependabot, so the
+  # corresponding output is 'false' on those runs and the dependent job is
+  # cleanly skipped rather than hard-failing. Add one line per secret as more
+  # jobs come to need credentials.
+  check-secrets:
+    name: Check secret availability
+    runs-on: ubuntu-latest
+    outputs:
+      gcp_smoke_eval: ${{ steps.check.outputs.gcp_smoke_eval }}
+    steps:
+      - name: Check which secrets are available
+        id: check
+        run: |
+          echo "gcp_smoke_eval=${{ secrets.GCP_SMOKE_EVAL_SA_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
   setup:
     runs-on: ubuntu-latest
     needs: [detect-changes]
@@ -360,8 +378,15 @@ jobs:
   smoke-eval:
     name: Smoke eval (Pilo agent on example.com)
     runs-on: ubuntu-latest
-    needs: [detect-changes, setup]
-    if: needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.core == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    needs: [detect-changes, setup, check-secrets]
+    # Skip (rather than fail) when the GCP credentials are unavailable — e.g.
+    # on fork or Dependabot PRs, where secrets are not provided. Note `&&`
+    # binds tighter than `||`, so the change-detection clause is parenthesized.
+    if: >
+      needs.check-secrets.outputs.gcp_smoke_eval == 'true' &&
+      (needs.detect-changes.outputs.cli == 'true' ||
+      needs.detect-changes.outputs.core == 'true' ||
+      needs.detect-changes.outputs.workflows == 'true')
     # id-token: write is required if/when this job is switched to Workload
     # Identity Federation (see the auth step below).
     permissions:

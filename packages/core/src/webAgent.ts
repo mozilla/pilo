@@ -126,6 +126,8 @@ export interface WebAgentOptions {
    * trusted, controlled environments.
    */
   unsafeMode?: boolean;
+  /** Timeout for LLM provider calls in milliseconds (default: from config) */
+  llmProviderTimeoutMs?: number;
 }
 
 export interface ExecuteOptions {
@@ -162,6 +164,14 @@ export interface TaskExecutionResult {
   success: boolean;
   /** Final answer or result from the agent */
   finalAnswer: string | null;
+  /**
+   * How validation resolved when a final answer was accepted:
+   * - "accepted": validator returned complete/excellent
+   * - "force-accepted": validator never accepted but maxValidationAttempts was hit
+   * - undefined: no answer was ever accepted (task aborted, max iterations, error,
+   *   or validation rejected without reaching force-accept)
+   */
+  validationOutcome?: "accepted" | "force-accepted";
   /** Error details when success is false */
   error?: TaskError;
   /** Execution statistics */
@@ -184,6 +194,7 @@ interface ExecutionState {
   lastAction?: string;
   actionRepeatCount: number;
   validationAttempts: number;
+  validationOutcome?: "accepted" | "force-accepted";
 }
 
 interface PlanOutput {
@@ -256,6 +267,7 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+  private readonly llmProviderTimeoutMs: number;
   // Host of the caller-provided start URL (options.startingUrl), captured at
   // execute() time. Trusted by the firewall — navigating somewhere the caller
   // explicitly named is consent to interact with that host. NOT set from the
@@ -298,6 +310,7 @@ export class WebAgent {
       trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
       unsafeMode: Boolean(options.unsafeMode),
     });
+    this.llmProviderTimeoutMs = options.llmProviderTimeoutMs ?? defaults.llm_provider_timeout_ms;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -436,7 +449,12 @@ export class WebAgent {
   private async runMainLoop(
     task: string,
     executionState: ExecutionState,
-  ): Promise<{ success: boolean; finalAnswer: string | null; error?: TaskError }> {
+  ): Promise<{
+    success: boolean;
+    finalAnswer: string | null;
+    error?: TaskError;
+    validationOutcome?: "accepted" | "force-accepted";
+  }> {
     // Only include interactive tools if a callback is provided
     let interactiveToolSet: Record<string, any> = {};
     let approvedRefs: ApprovedRefs | null = null;
@@ -463,6 +481,7 @@ export class WebAgent {
       operationalRefs,
       firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
+      llmProviderTimeoutMs: this.llmProviderTimeoutMs,
     });
 
     // Inspection tools (zero-LLM page-inspection primitives) are always available.
@@ -539,22 +558,26 @@ export class WebAgent {
             currentIteration: executionState.currentIteration,
           });
 
-          // Add page snapshot if needed
-          if (needsPageSnapshot) {
-            // Clear approved refs when page changes: ARIA refs reset on each snapshot,
-            // so old ref strings may now point to different DOM elements.
-            // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
-            // so a blocked submit retry remains tied to the same agent-filled refs.
-            if (approvedRefs) {
-              approvedRefs.clear();
-            }
-            agentFilledRefs.clear();
-            operationalRefs.clear();
-            await this.addPageSnapshot();
-          }
-
-          // Single try-catch for ALL iteration logic
+          // Single try-catch for ALL iteration logic, including the page snapshot.
+          // The snapshot lives inside the try so a mid-snapshot browser disconnect
+          // (e.g. getTreeWithRefs/getCurrentPageInfo throwing BrowserDisconnectedError
+          // after a navigation destroys the page) is routed through
+          // handleBrowserDisconnect rather than escaping runMainLoop as a hard failure.
           try {
+            // Add page snapshot if needed
+            if (needsPageSnapshot) {
+              // Clear approved refs when page changes: ARIA refs reset on each snapshot,
+              // so old ref strings may now point to different DOM elements.
+              // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
+              // so a blocked submit retry remains tied to the same agent-filled refs.
+              if (approvedRefs) {
+                approvedRefs.clear();
+              }
+              agentFilledRefs.clear();
+              operationalRefs.clear();
+              await this.addPageSnapshot();
+            }
+
             const result = await this.generateAndProcessAction(task, allTools, executionState);
 
             // Reset error counter on success
@@ -565,6 +588,7 @@ export class WebAgent {
               executionState.success = result.success;
               executionState.finalAnswer = result.finalAnswer;
               executionState.error = result.error;
+              executionState.validationOutcome = result.validationOutcome;
               return { flow: "break" as const };
             }
 
@@ -662,6 +686,7 @@ export class WebAgent {
         success: executionState.success,
         finalAnswer: executionState.finalAnswer,
         error: executionState.error,
+        validationOutcome: executionState.validationOutcome,
       };
     }
 
@@ -970,6 +995,7 @@ export class WebAgent {
     pageChanged: boolean;
     actionExecuted: boolean;
     error?: TaskError;
+    validationOutcome?: "accepted" | "force-accepted";
   }> {
     // Start processing - hasScreenshot is true if we're in vision mode and just captured a screenshot
     this.emit(WebAgentEventType.AGENT_PROCESSING, {
@@ -994,6 +1020,7 @@ export class WebAgent {
             toolChoice: "required",
             maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
             abortSignal: this.abortSignal,
+            timeout: this.llmProviderTimeoutMs,
           });
 
           // Process the full stream to capture reasoning before tool execution
@@ -1171,6 +1198,7 @@ export class WebAgent {
             finalAnswer: actionOutput.result,
             pageChanged: false,
             actionExecuted: true,
+            validationOutcome: validationResult.validationOutcome,
           };
         } else {
           // Validation failed - the feedback has been added to messages
@@ -1337,7 +1365,7 @@ export class WebAgent {
     task: string,
     finalAnswer: string,
     executionState: ExecutionState,
-  ): Promise<{ isAccepted: boolean }> {
+  ): Promise<{ isAccepted: boolean; validationOutcome?: "accepted" | "force-accepted" }> {
     executionState.validationAttempts++;
 
     return withSpan(
@@ -1441,9 +1469,12 @@ export class WebAgent {
 
           span.setAttribute("pilo.validation.accepted", isAccepted || forceAccept);
 
-          return {
-            isAccepted: isAccepted || forceAccept,
-          };
+          const validationOutcome: "accepted" | "force-accepted" | undefined = isAccepted
+            ? "accepted"
+            : forceAccept
+              ? "force-accepted"
+              : undefined;
+          return { isAccepted: isAccepted || forceAccept, validationOutcome };
         } catch (error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
@@ -1453,7 +1484,7 @@ export class WebAgent {
 
           // On validation error, accept the result if we've hit max attempts
           if (executionState.validationAttempts >= this.maxValidationAttempts) {
-            return { isAccepted: true };
+            return { isAccepted: true, validationOutcome: "force-accepted" };
           }
 
           // Otherwise, continue execution
@@ -1545,6 +1576,8 @@ export class WebAgent {
               tools: planningTools,
               toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
               maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
+              abortSignal: this.abortSignal,
+              timeout: this.llmProviderTimeoutMs,
             },
             {
               maxAttempts: 3,
@@ -1826,10 +1859,15 @@ export class WebAgent {
         url,
       });
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Use cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Use cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (!this.currentPage.url) {
-        throw new Error("Browser disconnected or page unavailable");
+        throw new BrowserDisconnectedError(
+          error instanceof Error ? error.message : "page state unavailable",
+        );
       }
     }
   }
@@ -1841,12 +1879,17 @@ export class WebAgent {
       this.currentPage = { title, url };
       return { title, url };
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Return cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Return cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (this.currentPage.url) {
         return this.currentPage;
       }
-      throw new Error("Browser disconnected or page unavailable");
+      throw new BrowserDisconnectedError(
+        error instanceof Error ? error.message : "page state unavailable",
+      );
     }
   }
 
@@ -1886,7 +1929,12 @@ export class WebAgent {
   }
 
   private buildResult(
-    executionOutcome: { success: boolean; finalAnswer: string | null; error?: TaskError },
+    executionOutcome: {
+      success: boolean;
+      finalAnswer: string | null;
+      error?: TaskError;
+      validationOutcome?: "accepted" | "force-accepted";
+    },
     executionState: ExecutionState,
   ): TaskExecutionResult {
     const endTime = Date.now();
@@ -1899,6 +1947,9 @@ export class WebAgent {
     return {
       success: executionOutcome.success,
       finalAnswer: executionOutcome.finalAnswer,
+      ...(executionOutcome.validationOutcome && {
+        validationOutcome: executionOutcome.validationOutcome,
+      }),
       ...(executionOutcome.error && { error: executionOutcome.error }),
       stats: {
         iterations: executionState.currentIteration,

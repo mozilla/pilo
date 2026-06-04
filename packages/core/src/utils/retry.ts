@@ -12,6 +12,7 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
+import { getConfigDefaults } from "../config/defaults.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -222,7 +223,15 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
 ): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
   type Result = Awaited<ReturnType<typeof generateText<TOOLS>>>;
 
-  return retryDriver<Result>(() => generateText(params), {
+  // Apply the configured LLM provider timeout via the AI SDK `timeout` option
+  // unless the caller supplied an explicit timeout. The AI SDK aborts the call
+  // if it exceeds this duration (works alongside any provided abortSignal).
+  const paramsWithTimeout = {
+    ...params,
+    timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
+  };
+
+  return retryDriver<Result>(() => generateText(paramsWithTimeout), {
     ...retryOptions,
     // When the caller required a tool call, treat a tool-less response as an
     // error so the retry loop can re-prompt the model.
@@ -254,7 +263,15 @@ export async function generateObjectWithRetry(
 ): Promise<Awaited<ReturnType<typeof generateObject>>> {
   type Result = Awaited<ReturnType<typeof generateObject>>;
 
-  return retryDriver<Result>(() => generateObject(params), {
+  // Apply the configured LLM provider timeout via the AI SDK `timeout` option
+  // unless the caller supplied an explicit timeout. The AI SDK aborts the call
+  // if it exceeds this duration (works alongside any provided abortSignal).
+  const paramsWithTimeout = {
+    ...params,
+    timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
+  };
+
+  return retryDriver<Result>(() => generateObject(paramsWithTimeout), {
     ...retryOptions,
     getFinishReason: (result) => result.finishReason,
   });

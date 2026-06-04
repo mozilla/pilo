@@ -104,6 +104,7 @@ export const DEFAULT_NAVIGATION_MAX_ATTEMPTS = _defaults.navigation_max_attempts
 export const DEFAULT_NAVIGATION_TIMEOUT_MULTIPLIER = _defaults.navigation_timeout_multiplier;
 export const DEFAULT_BROWSER = _defaults.browser;
 export const DEFAULT_ACTION_TIMEOUT_MS = _defaults.action_timeout_ms;
+export const DEFAULT_LLM_PROVIDER_TIMEOUT_MS = _defaults.llm_provider_timeout_ms;
 export const DEFAULT_HEADLESS = _defaults.headless;
 export const DEFAULT_BLOCK_ADS = _defaults.block_ads;
 export const DEFAULT_BLOCK_RESOURCES = _defaults.block_resources;
