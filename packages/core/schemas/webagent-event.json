@@ -4011,6 +4011,9 @@
         "timestamp": {
           "type": "number"
         },
+        "toolExecutionErrorCount": {
+          "type": "number"
+        },
         "totalInputTokens": {
           "type": "number"
         },
@@ -4025,6 +4028,7 @@
         "iterationId",
         "stepCount",
         "timestamp",
+        "toolExecutionErrorCount",
         "totalInputTokens",
         "totalOutputTokens"
       ],
@@ -4209,6 +4213,31 @@
         "droppedTools",
         "iterationId",
         "keptTool",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "ToolExecutionErrorEventData": {
+      "additionalProperties": false,
+      "description": "Event data when a tool the model invoked fails during execution.\n\nThis is distinct from AI_GENERATION_ERROR: the model generation step succeeded (it produced a valid tool call), but executing that tool failed. For browser actions the failure is also reported via BROWSER_ACTION_COMPLETED (success: false); this event covers all recoverable tool failures, including non-browser tools (search, extract) that have no browser-action event.",
+      "properties": {
+        "action": {
+          "description": "The action/tool name that failed, when available.",
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "error",
+        "iterationId",
         "timestamp"
       ],
       "type": "object"
@@ -4427,6 +4456,23 @@
             },
             "type": {
               "const": "ai:generation:error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/ToolExecutionErrorEventData"
+            },
+            "type": {
+              "const": "tool:execution:error",
               "type": "string"
             }
           },
