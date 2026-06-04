@@ -241,6 +241,10 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
           (options.pwCdpEndpoints as string[] | undefined) ??
           cfg.pw_cdp_endpoints ??
           (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
+        cdpConnectRetry: {
+          maxAttempts: options.cdpConnectMaxAttempts ?? cfg.cdp_connect_max_attempts,
+          backoffBaseMs: options.cdpConnectBackoffBaseMs ?? cfg.cdp_connect_backoff_base_ms,
+        },
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
         navigationRetry: {
           baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,

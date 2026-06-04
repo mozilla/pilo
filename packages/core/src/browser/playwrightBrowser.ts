@@ -66,6 +66,8 @@ export interface PlaywrightBrowserOptions {
   pwCdpEndpoint?: string;
   /** Ordered list of CDP endpoint URLs to try in sequence (chromium only, takes precedence over pwCdpEndpoint) */
   pwCdpEndpoints?: string[];
+  /** Retry/backoff configuration for CDP connection attempts (chromium only) */
+  cdpConnectRetry?: Partial<CdpConnectRetryConfig>;
   /** Called when a CDP endpoint fails and the next one is being tried */
   onCdpEndpointCycle?: (attempt: number, error: Error) => void;
   /** Called when a CDP endpoint is successfully connected to */
@@ -100,6 +102,39 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
  */
 /** Timeout per CDP endpoint connection attempt in milliseconds */
 const CDP_CONNECTION_TIMEOUT_MS = 5_000;
+
+/**
+ * Retry/backoff settings for CDP connection attempts. Each endpoint is retried up to
+ * `maxAttempts` times on transient connection errors before failing over to the next
+ * endpoint (a retry is a "failover-to-self"). Backoff is exponential with jitter,
+ * capped at `backoffMaxMs`.
+ */
+export interface CdpConnectRetryConfig {
+  /** Max connection attempts per endpoint (>= 1) */
+  maxAttempts: number;
+  /** Base delay for exponential backoff, in milliseconds */
+  backoffBaseMs: number;
+  /** Cap on backoff delay, in milliseconds */
+  backoffMaxMs: number;
+}
+
+/** Default attempts per CDP endpoint before failing over to the next endpoint */
+const CDP_CONNECT_MAX_ATTEMPTS = 3;
+/** Default base delay (ms) for exponential backoff between CDP connect retries */
+const CDP_CONNECT_BACKOFF_BASE_MS = 1_000;
+/** Cap (ms) on the exponential backoff delay between CDP connect retries */
+const CDP_CONNECT_BACKOFF_MAX_MS = 10_000;
+
+/** Resolve a partial retry config against defaults, ignoring undefined overrides. */
+function resolveCdpConnectRetryConfig(
+  partial?: Partial<CdpConnectRetryConfig>,
+): CdpConnectRetryConfig {
+  return {
+    maxAttempts: Math.max(1, partial?.maxAttempts ?? CDP_CONNECT_MAX_ATTEMPTS),
+    backoffBaseMs: partial?.backoffBaseMs ?? CDP_CONNECT_BACKOFF_BASE_MS,
+    backoffMaxMs: partial?.backoffMaxMs ?? CDP_CONNECT_BACKOFF_MAX_MS,
+  };
+}
 
 /**
  * Timeout for evaluating the aria-tree script in a single frame, in milliseconds.
@@ -144,6 +179,7 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   // CDP endpoint failover state
   private readonly cdpEndpoints: string[];
+  private readonly cdpConnectRetry: CdpConnectRetryConfig;
   private nextStartIndex: number = 0;
 
   /** Called when a CDP endpoint fails and the next one is being tried. Can be set after construction. */
@@ -172,6 +208,9 @@ export class PlaywrightBrowser implements AriaBrowser {
       : options.pwCdpEndpoint
         ? [options.pwCdpEndpoint]
         : [];
+
+    // Resolve CDP connect retry/backoff config (defaults safely applied)
+    this.cdpConnectRetry = resolveCdpConnectRetryConfig(options.cdpConnectRetry);
 
     // Initialize callbacks from options (can also be set directly after construction)
     this.onCdpEndpointCycle = options.onCdpEndpointCycle;
@@ -481,34 +520,81 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Try each CDP endpoint in sequence starting from nextStartIndex.
-   * Advances nextStartIndex on success. Throws a hard error if all are exhausted.
+   * Connect over CDP with retry and failover.
+   *
+   * Visits every configured endpoint once per call, starting at `nextStartIndex` and
+   * wrapping with modulo. Wrapping (rather than slicing from `nextStartIndex` to the end)
+   * is what gives each `start()` a fresh attempt budget: a single-endpoint reconnect after
+   * a prior success — where `nextStartIndex` has advanced to 1 — still attempts that
+   * endpoint instead of running an empty loop and instantly failing.
+   *
+   * Each endpoint is retried up to `cdpConnectRetry.maxAttempts` times on transient
+   * connection errors (a retry is a failover-to-self), with exponential backoff + jitter
+   * between attempts. Non-connection errors (e.g. auth) throw immediately. When an
+   * endpoint's attempts are exhausted, control fails over to the next endpoint. If every
+   * endpoint is exhausted, a hard error is thrown.
+   *
+   * On success, `nextStartIndex` advances past the connected endpoint so a later restart
+   * prefers the next distinct endpoint (multi-endpoint failover semantics preserved).
    */
   private async connectOverCDPWithFailover(
     connectOptions: ConnectOptions,
   ): Promise<PlaywrightOriginalBrowser> {
-    for (let i = this.nextStartIndex; i < this.cdpEndpoints.length; i++) {
-      const endpoint = this.cdpEndpoints[i];
-      try {
-        const browser = await chromium.connectOverCDP(endpoint, {
-          ...connectOptions,
-          timeout: CDP_CONNECTION_TIMEOUT_MS,
-        });
-        this.nextStartIndex = i + 1;
-        this.onCdpEndpointConnected?.(i + 1, this.cdpEndpoints.length);
-        return browser;
-      } catch (err) {
-        if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
-          throw err;
-        }
-        const attemptNumber = i + 1;
-        const remaining = this.cdpEndpoints.length - i - 1;
-        if (remaining > 0) {
-          this.onCdpEndpointCycle?.(attemptNumber, err);
+    const total = this.cdpEndpoints.length;
+    const { maxAttempts } = this.cdpConnectRetry;
+
+    for (let visited = 0; visited < total; visited++) {
+      const index = (this.nextStartIndex + visited) % total;
+      const endpoint = this.cdpEndpoints[index];
+      const isLastEndpoint = visited === total - 1;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const browser = await chromium.connectOverCDP(endpoint, {
+            ...connectOptions,
+            timeout: CDP_CONNECTION_TIMEOUT_MS,
+          });
+          this.nextStartIndex = index + 1;
+          this.onCdpEndpointConnected?.(index + 1, total);
+          return browser;
+        } catch (err) {
+          // Non-connection errors (auth, malformed URL, ...) are not transient — fail fast.
+          if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
+            throw err;
+          }
+
+          const moreAttemptsOnThisEndpoint = attempt < maxAttempts;
+          if (moreAttemptsOnThisEndpoint) {
+            // Same-endpoint retry: back off, then try this endpoint again.
+            await this.delay(this.backoffDelayMs(attempt));
+            continue;
+          }
+
+          // Endpoint exhausted. Fail over to the next endpoint if one remains.
+          if (!isLastEndpoint) {
+            this.onCdpEndpointCycle?.(index + 1, err);
+          }
         }
       }
     }
-    throw new Error(`All ${this.cdpEndpoints.length} CDP endpoint(s) failed. Giving up.`);
+
+    throw new Error(`All ${total} CDP endpoint(s) failed. Giving up.`);
+  }
+
+  /**
+   * Exponential backoff delay for the Nth retry, capped and jittered.
+   * `attempt` is 1-based (1 → base, 2 → 2×base, ...). Full jitter in [0, computed].
+   */
+  private backoffDelayMs(attempt: number): number {
+    const { backoffBaseMs, backoffMaxMs } = this.cdpConnectRetry;
+    const exponential = backoffBaseMs * 2 ** (attempt - 1);
+    const capped = Math.min(exponential, backoffMaxMs);
+    return Math.floor(Math.random() * capped);
+  }
+
+  /** Promise-based delay (testable under fake timers). */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

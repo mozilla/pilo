@@ -1085,6 +1085,9 @@ describe("PlaywrightBrowser", () => {
       const browser = new PlaywrightBrowser({
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        // One attempt per endpoint: a single failure on host-a exhausts its
+        // budget and forces failover to host-b (the behavior under test here).
+        cdpConnectRetry: { maxAttempts: 1 },
       });
       await browser.start();
 
@@ -1102,6 +1105,7 @@ describe("PlaywrightBrowser", () => {
       const browser = new PlaywrightBrowser({
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        cdpConnectRetry: { maxAttempts: 1 },
       });
       await browser.start();
 
@@ -1115,6 +1119,9 @@ describe("PlaywrightBrowser", () => {
       const browser = new PlaywrightBrowser({
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222", "ws://host-c:9222"],
+        // One attempt per endpoint isolates the failover (cross-endpoint) count
+        // from the same-endpoint retry behavior exercised in the retry suite.
+        cdpConnectRetry: { maxAttempts: 1 },
       });
 
       await expect(browser.start()).rejects.toThrow("All 3 CDP endpoint(s) failed");
@@ -1170,6 +1177,9 @@ describe("PlaywrightBrowser", () => {
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
         onCdpEndpointCycle: cycleCallback,
+        // One attempt per endpoint so the single host-a failure cycles to host-b
+        // rather than being absorbed by a same-endpoint retry.
+        cdpConnectRetry: { maxAttempts: 1 },
       });
       await browser.start();
 
@@ -1196,6 +1206,176 @@ describe("PlaywrightBrowser", () => {
       // (We just verify the internal state; actual launch isn't tested here)
       const browser = new PlaywrightBrowser({ browser: "chromium" });
       expect((browser as any).cdpEndpoints).toEqual([]);
+    });
+  });
+
+  describe("CDP connect retry with backoff", () => {
+    let mockChromium: { connectOverCDP: ReturnType<typeof vi.fn> };
+
+    beforeEach(async () => {
+      const playwright = await import("playwright");
+      mockChromium = playwright.chromium as any;
+      vi.clearAllMocks();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    });
+
+    function makeMockBrowser() {
+      const mockPage = { setDefaultTimeout: vi.fn(), close: vi.fn() };
+      const mockContext = { newPage: vi.fn().mockResolvedValue(mockPage), close: vi.fn() };
+      const mockBrowser = { newContext: vi.fn().mockResolvedValue(mockContext), close: vi.fn() };
+      return { mockBrowser, mockContext, mockPage };
+    }
+
+    it("retries the same endpoint on a transient connection error, then succeeds", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      // Two transient failures on the single endpoint, then success on attempt 3.
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222"],
+        cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 1000 },
+      });
+
+      const startPromise = browser.start();
+      // Drain pending microtasks + scheduled backoff timers until the retries resolve.
+      await vi.runAllTimersAsync();
+      await startPromise;
+
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
+      // Every retry hit the SAME endpoint.
+      for (const call of mockChromium.connectOverCDP.mock.calls) {
+        expect(call[0]).toBe("ws://host-a:9222");
+      }
+      expect(browser.pwCdpEndpoint).toBe("ws://host-a:9222");
+    });
+
+    it("waits with a backoff delay between same-endpoint retries", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222"],
+        cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 1000 },
+      });
+
+      const startPromise = browser.start();
+
+      // Let the first (failing) attempt settle, but do NOT advance timers yet.
+      await Promise.resolve();
+      await Promise.resolve();
+      // Backoff is pending: the second attempt must not have fired yet.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+
+      await vi.runAllTimersAsync();
+      await startPromise;
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(2);
+    });
+
+    it("gives up after max attempts with the all-failed error", async () => {
+      mockChromium.connectOverCDP.mockRejectedValue(new Error("ECONNREFUSED"));
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222"],
+        cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 1000 },
+      });
+
+      const startPromise = browser.start();
+      // Attach the rejection handler before draining timers to avoid an
+      // unhandled rejection during the fake-timer flush.
+      const assertion = expect(startPromise).rejects.toThrow("All 1 CDP endpoint(s) failed");
+      await vi.runAllTimersAsync();
+      await assertion;
+
+      // Single endpoint × 3 attempts.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not retry a non-connection error — throws immediately", async () => {
+      mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222"],
+        cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 1000 },
+      });
+
+      const startPromise = browser.start();
+      const assertion = expect(startPromise).rejects.toThrow("HTTP 401 Unauthorized");
+      await vi.runAllTimersAsync();
+      await assertion;
+
+      // No retry on a non-connection (auth) error.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+    });
+
+    it("single-endpoint reconnect: a second start() connects again instead of instantly failing", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      mockChromium.connectOverCDP.mockResolvedValue(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222"],
+        cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 1000 },
+      });
+
+      const first = browser.start();
+      await vi.runAllTimersAsync();
+      await first;
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+
+      // Simulate a mid-task disconnect + reconnect.
+      await browser.shutdown();
+      const second = browser.start();
+      await vi.runAllTimersAsync();
+      await second;
+
+      // Reconnect must actually attempt the endpoint again — the pre-fix bug
+      // ran `for (i = 1; i < 1; ...)` and threw "All 1 CDP endpoint(s) failed".
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(2);
+      expect(mockChromium.connectOverCDP).toHaveBeenLastCalledWith(
+        "ws://host-a:9222",
+        expect.any(Object),
+      );
+      expect(browser.pwCdpEndpoint).toBe("ws://host-a:9222");
+    });
+
+    it("multi-endpoint failover still advances to the next endpoint after exhausting retries", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      // host-a fails both attempts; host-b succeeds on its first attempt.
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      const browser = new PlaywrightBrowser({
+        browser: "chromium",
+        pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        cdpConnectRetry: { maxAttempts: 2, backoffBaseMs: 1000 },
+      });
+
+      const startPromise = browser.start();
+      await vi.runAllTimersAsync();
+      await startPromise;
+
+      // 2 attempts on host-a, then 1 on host-b.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
+      expect(mockChromium.connectOverCDP.mock.calls[0][0]).toBe("ws://host-a:9222");
+      expect(mockChromium.connectOverCDP.mock.calls[1][0]).toBe("ws://host-a:9222");
+      expect(mockChromium.connectOverCDP.mock.calls[2][0]).toBe("ws://host-b:9222");
+      expect(browser.pwCdpEndpoint).toBe("ws://host-b:9222");
     });
   });
 

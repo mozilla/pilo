@@ -52,6 +52,8 @@ export interface PiloTaskRequest {
   pwEndpoint?: string;
   pwCdpEndpoint?: string;
   pwCdpEndpoints?: string[];
+  cdpConnectMaxAttempts?: number;
+  cdpConnectBackoffBaseMs?: number;
   bypassCSP?: boolean;
 
   // WebAgent behavior overrides
@@ -329,6 +331,10 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       body.pwCdpEndpoints ??
       serverConfig.pw_cdp_endpoints ??
       (serverConfig.pw_cdp_endpoint ? [serverConfig.pw_cdp_endpoint] : undefined),
+    cdpConnectRetry: {
+      maxAttempts: body.cdpConnectMaxAttempts ?? serverConfig.cdp_connect_max_attempts,
+      backoffBaseMs: body.cdpConnectBackoffBaseMs ?? serverConfig.cdp_connect_backoff_base_ms,
+    },
     bypassCSP: body.bypassCSP ?? serverConfig.bypass_csp,
     proxyServer: body.proxy ?? serverConfig.proxy,
     proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,
