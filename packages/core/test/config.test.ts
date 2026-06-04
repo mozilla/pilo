@@ -187,6 +187,7 @@ describe("ConfigManager", () => {
         "pw_cdp_endpoints",
         "cdp_connect_max_attempts",
         "cdp_connect_backoff_base_ms",
+        "cdp_connect_backoff_max_ms",
         "bypass_csp",
         "navigation_timeout_ms",
         "navigation_max_timeout_ms",

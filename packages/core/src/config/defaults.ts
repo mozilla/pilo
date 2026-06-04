@@ -118,6 +118,7 @@ export interface PiloConfig {
   pw_cdp_endpoints?: string[];
   cdp_connect_max_attempts?: number;
   cdp_connect_backoff_base_ms?: number;
+  cdp_connect_backoff_max_ms?: number;
   bypass_csp?: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -195,6 +196,7 @@ export interface PiloConfigResolved {
   pw_cdp_endpoints?: string[];
   cdp_connect_max_attempts: number;
   cdp_connect_backoff_base_ms: number;
+  cdp_connect_backoff_max_ms: number;
   bypass_csp: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -610,7 +612,17 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "ms",
     env: ["PILO_CDP_CONNECT_BACKOFF_BASE_MS"],
     description:
-      "Base delay in milliseconds for exponential backoff between CDP connect retries (doubles each attempt, capped at 10s, with jitter)",
+      "Base delay in milliseconds for exponential backoff between CDP connect retries (doubles each attempt, capped at cdp_connect_backoff_max_ms, with jitter)",
+    category: "playwright",
+  },
+  cdp_connect_backoff_max_ms: {
+    default: 10000,
+    type: "number",
+    cli: "--cdp-connect-backoff-max-ms",
+    placeholder: "ms",
+    env: ["PILO_CDP_CONNECT_BACKOFF_MAX_MS"],
+    description:
+      "Maximum delay in milliseconds for exponential backoff between CDP connect retries (chromium only)",
     category: "playwright",
   },
   bypass_csp: {
@@ -762,6 +774,7 @@ function buildDefaults(): PiloConfigResolved {
     "initial_navigation_retries",
     "cdp_connect_max_attempts",
     "cdp_connect_backoff_base_ms",
+    "cdp_connect_backoff_max_ms",
     "bypass_csp",
     "navigation_timeout_ms",
     "navigation_max_timeout_ms",

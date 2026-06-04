@@ -244,6 +244,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         cdpConnectRetry: {
           maxAttempts: options.cdpConnectMaxAttempts ?? cfg.cdp_connect_max_attempts,
           backoffBaseMs: options.cdpConnectBackoffBaseMs ?? cfg.cdp_connect_backoff_base_ms,
+          backoffMaxMs: options.cdpConnectBackoffMaxMs ?? cfg.cdp_connect_backoff_max_ms,
         },
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
         navigationRetry: {
