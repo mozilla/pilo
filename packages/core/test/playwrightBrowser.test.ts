@@ -1377,6 +1377,39 @@ describe("PlaywrightBrowser", () => {
       expect(mockChromium.connectOverCDP.mock.calls[2][0]).toBe("ws://host-b:9222");
       expect(browser.pwCdpEndpoint).toBe("ws://host-b:9222");
     });
+
+    it("caps the backoff delay at the configured backoffMaxMs", async () => {
+      const { mockBrowser } = makeMockBrowser();
+      // Fail twice so two backoff delays are scheduled, then succeed.
+      mockChromium.connectOverCDP
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+        .mockResolvedValueOnce(mockBrowser);
+
+      // Near-max jitter so the delay ~= the (capped) exponential, isolating the cap.
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.999999);
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+      try {
+        const browser = new PlaywrightBrowser({
+          browser: "chromium",
+          pwCdpEndpoints: ["ws://host-a:9222"],
+          // Un-capped exponential would be 5000 then 10000; both must clamp to 1000.
+          cdpConnectRetry: { maxAttempts: 3, backoffBaseMs: 5000, backoffMaxMs: 1000 },
+        });
+
+        const startPromise = browser.start();
+        await vi.runAllTimersAsync();
+        await startPromise;
+
+        // Two retries scheduled; every backoff delay is clamped to backoffMaxMs (1000).
+        // floor(0.999999 * 1000) = 999, never the un-capped 5000/10000.
+        const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+        expect(delays).toEqual([999, 999]);
+      } finally {
+        setTimeoutSpy.mockRestore();
+        randomSpy.mockRestore();
+      }
+    });
   });
 
   describe("browser disconnect detection", () => {

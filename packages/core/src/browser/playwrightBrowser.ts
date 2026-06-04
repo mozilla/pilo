@@ -118,21 +118,15 @@ export interface CdpConnectRetryConfig {
   backoffMaxMs: number;
 }
 
-/** Default attempts per CDP endpoint before failing over to the next endpoint */
-const CDP_CONNECT_MAX_ATTEMPTS = 3;
-/** Default base delay (ms) for exponential backoff between CDP connect retries */
-const CDP_CONNECT_BACKOFF_BASE_MS = 1_000;
-/** Cap (ms) on the exponential backoff delay between CDP connect retries */
-const CDP_CONNECT_BACKOFF_MAX_MS = 10_000;
-
-/** Resolve a partial retry config against defaults, ignoring undefined overrides. */
+/** Resolve a partial retry config against schema defaults, ignoring undefined overrides. */
 function resolveCdpConnectRetryConfig(
   partial?: Partial<CdpConnectRetryConfig>,
 ): CdpConnectRetryConfig {
+  const defaults = getConfigDefaults();
   return {
-    maxAttempts: Math.max(1, partial?.maxAttempts ?? CDP_CONNECT_MAX_ATTEMPTS),
-    backoffBaseMs: partial?.backoffBaseMs ?? CDP_CONNECT_BACKOFF_BASE_MS,
-    backoffMaxMs: partial?.backoffMaxMs ?? CDP_CONNECT_BACKOFF_MAX_MS,
+    maxAttempts: Math.max(1, partial?.maxAttempts ?? defaults.cdp_connect_max_attempts),
+    backoffBaseMs: partial?.backoffBaseMs ?? defaults.cdp_connect_backoff_base_ms,
+    backoffMaxMs: partial?.backoffMaxMs ?? defaults.cdp_connect_backoff_max_ms,
   };
 }
 
