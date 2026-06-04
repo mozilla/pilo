@@ -1128,17 +1128,22 @@ describe("PlaywrightBrowser", () => {
       expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
     });
 
-    it("does not cycle on auth/hard errors", async () => {
+    it("retries every endpoint on any connect failure, then fails over", async () => {
+      // Any connect error (here an auth-shaped message) is retried per endpoint
+      // and cycles — no classifier gates failover. Playwright flattens connect
+      // errors to message-only, so retry-all is the only sound policy.
       mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
 
       const browser = new PlaywrightBrowser({
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
+        // One attempt per endpoint isolates the failover count from same-endpoint retry.
+        cdpConnectRetry: { maxAttempts: 1 },
       });
 
-      await expect(browser.start()).rejects.toThrow("HTTP 401 Unauthorized");
-      // Only tried the first endpoint — didn't cycle
-      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+      await expect(browser.start()).rejects.toThrow("All 2 CDP endpoint(s) failed");
+      // Cycled through both endpoints.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(2);
     });
 
     it("advances nextStartIndex after successful connection for mid-task restart", async () => {
@@ -1187,7 +1192,7 @@ describe("PlaywrightBrowser", () => {
       expect(cycleCallback).toHaveBeenCalledWith(1, expect.any(Error));
     });
 
-    it("does not call onCdpEndpointCycle on hard errors", async () => {
+    it("calls onCdpEndpointCycle on any connect failure when cycling", async () => {
       const cycleCallback = vi.fn();
       mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
 
@@ -1195,10 +1200,14 @@ describe("PlaywrightBrowser", () => {
         browser: "chromium",
         pwCdpEndpoints: ["ws://host-a:9222", "ws://host-b:9222"],
         onCdpEndpointCycle: cycleCallback,
+        // One attempt per endpoint so the first failure cycles rather than retrying in place.
+        cdpConnectRetry: { maxAttempts: 1 },
       });
 
       await expect(browser.start()).rejects.toThrow();
-      expect(cycleCallback).not.toHaveBeenCalled();
+      // Cycled off the first (non-last) endpoint.
+      expect(cycleCallback).toHaveBeenCalledOnce();
+      expect(cycleCallback).toHaveBeenCalledWith(1, expect.any(Error));
     });
 
     it("falls through to local launch when cdpEndpoints is empty", () => {
@@ -1303,7 +1312,10 @@ describe("PlaywrightBrowser", () => {
       expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
     });
 
-    it("does not retry a non-connection error — throws immediately", async () => {
+    it("retries any connect failure up to maxAttempts, then throws", async () => {
+      // Connect failures are not classified — an auth-shaped message is retried
+      // the same as a transient one (Playwright flattens connect errors to
+      // message-only; connecting is idempotent, so retry-all is sound).
       mockChromium.connectOverCDP.mockRejectedValue(new Error("HTTP 401 Unauthorized"));
 
       const browser = new PlaywrightBrowser({
@@ -1313,12 +1325,12 @@ describe("PlaywrightBrowser", () => {
       });
 
       const startPromise = browser.start();
-      const assertion = expect(startPromise).rejects.toThrow("HTTP 401 Unauthorized");
+      const assertion = expect(startPromise).rejects.toThrow("All 1 CDP endpoint(s) failed");
       await vi.runAllTimersAsync();
       await assertion;
 
-      // No retry on a non-connection (auth) error.
-      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(1);
+      // Retried up to maxAttempts on the single endpoint before giving up.
+      expect(mockChromium.connectOverCDP).toHaveBeenCalledTimes(3);
     });
 
     it("single-endpoint reconnect: a second start() connects again instead of instantly failing", async () => {

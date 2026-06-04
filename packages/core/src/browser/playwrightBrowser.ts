@@ -517,9 +517,10 @@ export class PlaywrightBrowser implements AriaBrowser {
    * Connect over CDP with per-endpoint retry (exponential backoff + jitter) and failover
    * across endpoints. The index wraps modulo from `nextStartIndex` so each call gets a
    * fresh budget — a single-endpoint reconnect (nextStartIndex already past 0) still
-   * retries that endpoint instead of looping zero times. Non-connection errors throw
-   * immediately; on success nextStartIndex advances so a later restart prefers the next
-   * endpoint.
+   * retries that endpoint instead of looping zero times. Every connect failure is retried
+   * (bounded): Playwright flattens connect errors to message-only `Error`s with no
+   * structured codes, and connecting is idempotent, so classifying is unsound — we retry
+   * all. On success nextStartIndex advances so a later restart prefers the next endpoint.
    */
   private async connectOverCDPWithFailover(
     connectOptions: ConnectOptions,
@@ -542,15 +543,13 @@ export class PlaywrightBrowser implements AriaBrowser {
           this.onCdpEndpointConnected?.(index + 1, total);
           return browser;
         } catch (err) {
-          if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
-            throw err; // non-connection error (auth, bad URL) — not transient
-          }
           if (attempt < maxAttempts) {
             await this.delay(this.backoffDelayMs(attempt));
             continue;
           }
           if (!isLastEndpoint) {
-            this.onCdpEndpointCycle?.(index + 1, err);
+            const error = err instanceof Error ? err : new Error(String(err));
+            this.onCdpEndpointCycle?.(index + 1, error);
           }
         }
       }
@@ -569,22 +568,6 @@ export class PlaywrightBrowser implements AriaBrowser {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Returns true for connection-level errors that should trigger CDP endpoint cycling:
-   * timeouts and network-level failures. Auth errors, malformed URLs, etc. return false.
-   */
-  private isCdpConnectionError(error: Error): boolean {
-    if (error instanceof playwrightErrors.TimeoutError) return true;
-    const message = error.message;
-    return (
-      message.includes("ECONNREFUSED") ||
-      message.includes("ECONNRESET") ||
-      message.includes("ETIMEDOUT") ||
-      message.includes("net::ERR_") ||
-      message.includes("NS_ERROR_")
-    );
   }
 
   /**
