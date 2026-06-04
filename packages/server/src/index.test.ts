@@ -44,21 +44,26 @@ describe("Server Application", () => {
     expect(data.description).toBe("Web server for Pilo AI-powered web automation");
   });
 
-  describe("GET /ready", () => {
+  describe("health/readiness probes", () => {
     beforeEach(() => {
       vi.resetModules();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       delete process.env.MAX_CONCURRENT_TASKS;
+      const { _resetActiveTasksForTesting } = await import("./concurrencyGuard.js");
+      _resetActiveTasksForTesting();
     });
 
-    it("should return 200 when below capacity", async () => {
-      const { isAtCapacity } = await import("./concurrencyGuard.js");
+    it("readiness returns 200 even when at concurrency capacity", async () => {
+      // MAX_CONCURRENT_TASKS=0 makes the pod report 'at capacity' for every
+      // task. Readiness must still report ready so the load balancer keeps
+      // routing here; over-capacity requests are shed per-request
+      // (CONCURRENCY_LIMIT), not by evicting the pod from the Service. (TAB-993)
+      process.env.MAX_CONCURRENT_TASKS = "0";
+      const { registerHealthRoutes } = await import("./health.js");
       const app = new Hono();
-      app.get("/ready", (c) =>
-        isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
-      );
+      registerHealthRoutes(app);
 
       const res = await app.request("/ready");
       expect(res.status).toBe(200);
@@ -66,18 +71,15 @@ describe("Server Application", () => {
       expect(data.status).toBe("ok");
     });
 
-    it("should return 503 when at capacity", async () => {
-      process.env.MAX_CONCURRENT_TASKS = "0";
-      const { isAtCapacity } = await import("./concurrencyGuard.js");
+    it("liveness /health returns 200", async () => {
+      const { registerHealthRoutes } = await import("./health.js");
       const app = new Hono();
-      app.get("/ready", (c) =>
-        isAtCapacity() ? c.json({ status: "at capacity" }, 503) : c.json({ status: "ok" }),
-      );
+      registerHealthRoutes(app);
 
-      const res = await app.request("/ready");
-      expect(res.status).toBe(503);
+      const res = await app.request("/health");
+      expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.status).toBe("at capacity");
+      expect(data.status).toBe("ok");
     });
   });
 

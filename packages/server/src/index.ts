@@ -10,7 +10,8 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { cors } from "hono/cors";
 import { sentry } from "@hono/sentry";
 import piloRoutes from "./routes/pilo.js";
-import { isAtCapacity, setDraining, getActiveTasks } from "./concurrencyGuard.js";
+import { setDraining, getActiveTasks } from "./concurrencyGuard.js";
+import { registerHealthRoutes } from "./health.js";
 import { createPiloWsRoute, type ActiveWS } from "./routes/piloWs.js";
 
 const app = new Hono();
@@ -43,19 +44,8 @@ app.use(
   }),
 );
 
-// Liveness: is the process alive?
-app.get("/health", (c) => {
-  return c.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Readiness: should this pod receive traffic?
-// Returns 503 when at concurrency limit so the load balancer stops routing here.
-app.get("/ready", (c) => {
-  if (isAtCapacity()) {
-    return c.json({ status: "at capacity" }, 503);
-  }
-  return c.json({ status: "ok" });
-});
+// Liveness (/health) and readiness (/ready) probes.
+registerHealthRoutes(app);
 
 // Basic info endpoint
 app.get("/", (c) => {
