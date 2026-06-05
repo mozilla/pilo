@@ -12,7 +12,8 @@ import {
   SEARCH_PROVIDERS,
   PLAYWRIGHT_BROWSERS,
 } from "pilo-core";
-import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
+import type { FileUploadConfig, TaskExecutionResult, UserDataCallback } from "pilo-core";
+import * as path from "node:path";
 import { StreamLogger } from "./StreamLogger.js";
 import { config } from "./config.js";
 
@@ -62,6 +63,7 @@ export interface PiloTaskRequest {
   // Action firewall overrides
   trustedHostnames?: string[];
   unsafeMode?: boolean;
+  uploadAllowedPaths?: string[];
 
   // Proxy configuration overrides
   proxy?: string;
@@ -312,6 +314,12 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       `Server only supports Playwright browsers (${PLAYWRIGHT_BROWSERS.join(", ")}), got "${browserName}"`,
     );
   }
+  const uploadAllowedPaths = resolveServerUploadAllowedPaths(
+    serverConfig.upload_allowed_paths,
+    body.uploadAllowedPaths,
+  );
+  const allowFileUpload: false | FileUploadConfig =
+    uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
 
   const browserConfig = {
     browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
@@ -334,6 +342,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,
     proxyPassword: body.proxyPassword ?? serverConfig.proxy_password,
     actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
+    allowFileUpload,
     navigationRetry: createNavigationRetryConfig({
       baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
       maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
@@ -350,6 +359,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
     trustedHostnames: body.trustedHostnames ?? serverConfig.trusted_hostnames,
     unsafeMode: body.unsafeMode ?? serverConfig.unsafe_mode,
+    allowFileUpload,
     llmProviderTimeoutMs: body.llmProviderTimeoutMs ?? serverConfig.llm_provider_timeout_ms,
     guardrails: body.guardrails,
     searchProvider: body.searchProvider ?? serverConfig.search_provider,
@@ -400,4 +410,29 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       });
     }
   }
+}
+
+function resolveServerUploadAllowedPaths(
+  serverAllowedPaths: readonly string[],
+  requestAllowedPaths?: readonly string[],
+): string[] {
+  if (serverAllowedPaths.length === 0) {
+    return [];
+  }
+  if (requestAllowedPaths === undefined) {
+    return [...serverAllowedPaths];
+  }
+  if (requestAllowedPaths.length === 0) {
+    return [];
+  }
+
+  const normalizedServerRoots = serverAllowedPaths.map((root) => path.resolve(root));
+  return requestAllowedPaths.flatMap((requestPath) => {
+    const normalizedRequestPath = path.resolve(requestPath);
+    const allowed = normalizedServerRoots.some((serverRoot) => {
+      const relative = path.relative(serverRoot, normalizedRequestPath);
+      return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    });
+    return allowed ? [normalizedRequestPath] : [];
+  });
 }

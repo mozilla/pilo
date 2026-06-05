@@ -9,7 +9,7 @@
 
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
-import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
+import { AriaBrowser, FileUploadConfig, PageAction } from "./browser/ariaBrowser.js";
 import {
   BrowserReconnectedEventData,
   CdpEndpointConnectedEventData,
@@ -125,6 +125,18 @@ export interface WebAgentOptions {
    * trusted, controlled environments.
    */
   unsafeMode?: boolean;
+  /**
+   * Enables `upload_file` only for explicitly allowlisted local paths.
+   *
+   * Only PlaywrightBrowser currently implements PageAction.UploadFile. Callers
+   * using BiDi/Foxcloud should leave this disabled until those backends add
+   * concrete upload support.
+   *
+   * @warning Uploaded files are read from the local filesystem. Keep this
+   * disabled unless the caller controls the target page and the allowed path
+   * roots.
+   */
+  allowFileUpload?: false | FileUploadConfig;
   /** Timeout for LLM provider calls in milliseconds (default: from config) */
   llmProviderTimeoutMs?: number;
 }
@@ -266,6 +278,7 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+  private readonly allowFileUpload: false | FileUploadConfig;
   private readonly llmProviderTimeoutMs: number;
   // Host of the caller-provided start URL (options.startingUrl), captured at
   // execute() time. Trusted by the firewall — navigating somewhere the caller
@@ -309,6 +322,7 @@ export class WebAgent {
       trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
       unsafeMode: Boolean(options.unsafeMode),
     });
+    this.allowFileUpload = options.allowFileUpload ?? false;
     this.llmProviderTimeoutMs = options.llmProviderTimeoutMs ?? defaults.llm_provider_timeout_ms;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
@@ -480,6 +494,7 @@ export class WebAgent {
       operationalRefs,
       firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
+      allowFileUpload: this.allowFileUpload,
       llmProviderTimeoutMs: this.llmProviderTimeoutMs,
     });
 

@@ -11,8 +11,11 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import {
   AriaBrowser,
+  FileUploadConfig,
   FieldMetadata,
   FormSubmissionTrigger,
   FormSubmissionContext,
@@ -84,6 +87,8 @@ export interface PlaywrightBrowserOptions {
    * Primarily a testability seam; rarely needs overriding in production.
    */
   ariaFrameEvaluateTimeoutMs?: number;
+  /** Explicit local filesystem allowlist for file uploads. Empty/false disables uploads. */
+  allowFileUpload?: false | FileUploadConfig;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -550,6 +555,52 @@ export class PlaywrightBrowser implements AriaBrowser {
       message.includes("NS_ERROR_") || // Firefox: NS_ERROR_NET_RESET, etc.
       message.includes("NS_BINDING_") // Firefox: NS_BINDING_ABORTED, etc.
     );
+  }
+
+  private async resolveAllowedUploadPath(inputPath: string): Promise<string> {
+    const uploadConfig = this.options.allowFileUpload;
+    if (!uploadConfig || uploadConfig.allowedPaths.length === 0) {
+      throw new BrowserActionException("upload_file", "upload_disabled");
+    }
+
+    const resolvedPath = path.resolve(inputPath);
+    let stat;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+
+    if (!stat.isFile()) {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+
+    const realPath = await fs.realpath(resolvedPath);
+    for (const allowedRoot of uploadConfig.allowedPaths) {
+      try {
+        const realRoot = await fs.realpath(path.resolve(allowedRoot));
+        const relative = path.relative(realRoot, realPath);
+        if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+          return realPath;
+        }
+      } catch {
+        // Ignore missing or unreadable allowlist roots. They simply cannot match.
+      }
+    }
+
+    throw new BrowserActionException("upload_file", "upload_path_not_allowed");
+  }
+
+  private async resolveFileInputLocator(locator: Locator): Promise<Locator> {
+    const isDirectFileInput = await locator.evaluate((element) => {
+      return element instanceof HTMLInputElement && element.type.toLowerCase() === "file";
+    });
+    if (isDirectFileInput) return locator;
+
+    const nestedFileInput = locator.locator('input[type="file"]').first();
+    if ((await nestedFileInput.count()) > 0) return nestedFileInput;
+
+    throw new BrowserActionException("upload_file", "upload_target_not_file_input");
   }
 
   /**
@@ -1147,6 +1198,16 @@ export class PlaywrightBrowser implements AriaBrowser {
                 await locator!.fill(value, { timeout: this.actionTimeoutMs });
                 break;
 
+              case PageAction.UploadFile: {
+                if (!value) {
+                  throw new BrowserActionException("upload_file", "upload_path_required");
+                }
+                const uploadPath = await this.resolveAllowedUploadPath(value);
+                const fileInput = await this.resolveFileInputLocator(locator!);
+                await fileInput.setInputFiles(uploadPath, { timeout: this.actionTimeoutMs });
+                break;
+              }
+
               case PageAction.Focus:
                 await locator!.focus({ timeout: this.actionTimeoutMs });
                 break;
@@ -1331,6 +1392,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       PageAction.Click,
       PageAction.Hover,
       PageAction.Fill,
+      PageAction.UploadFile,
       PageAction.Focus,
       PageAction.Check,
       PageAction.Uncheck,

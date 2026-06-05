@@ -7,7 +7,12 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import { AriaBrowser, PageAction, SCROLL_DIRECTIONS } from "../browser/ariaBrowser.js";
+import {
+  AriaBrowser,
+  FileUploadConfig,
+  PageAction,
+  SCROLL_DIRECTIONS,
+} from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
@@ -38,6 +43,7 @@ interface WebActionContext {
   operationalRefs: Set<string>;
   firewall: FirewallConfig;
   interactive: boolean;
+  allowFileUpload?: false | FileUploadConfig;
   /** Timeout for LLM provider calls in milliseconds (used by extract). */
   llmProviderTimeoutMs?: number;
 }
@@ -356,6 +362,22 @@ export function createWebActionTools(context: WebActionContext) {
           }
           throw error;
         }
+      },
+    }),
+
+    upload_file: tool({
+      description: TOOL_STRINGS.webActions.uploadFile.description,
+      inputSchema: z.object({
+        ref: z.string().describe(TOOL_STRINGS.webActions.uploadFile.ref),
+        path: z.string().describe(TOOL_STRINGS.webActions.uploadFile.path),
+      }),
+      execute: async ({ ref, path }) => {
+        const uploadConfig = context.allowFileUpload;
+        if (!uploadConfig || uploadConfig.allowedPaths.length === 0) {
+          return failedActionResult(PageAction.UploadFile, "upload_disabled", context, ref, path);
+        }
+
+        return await performActionWithValidation(PageAction.UploadFile, context, ref, path);
       },
     }),
 
