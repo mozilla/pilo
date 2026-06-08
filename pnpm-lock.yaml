@@ -382,8 +382,8 @@ importers:
         specifier: ^0.218.0
         version: 0.218.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions':
-        specifier: ^1.34.0
-        version: 1.40.0
+        specifier: ^1.41.1
+        version: 1.41.1
       hono:
         specifier: ^4.12.21
         version: 4.12.21
@@ -1412,8 +1412,8 @@ packages:
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
-  '@opentelemetry/semantic-conventions@1.40.0':
-    resolution: {integrity: sha512-cifvXDhcqMwwTlTK04GBNeIe7yyo28Mfby85QXFe1Yk8nmi36Ab/5UQwptOx84SsoGNRg+EVSjwzfSZMy6pmlw==}
+  '@opentelemetry/semantic-conventions@1.41.1':
+    resolution: {integrity: sha512-/UhIkaZgPutTFmQ7RnIJGgDXZmtEJ7Dvi86xNTFWcnRxVRNk/aotsqDJYeEvDP+FSMB2SdW+pQzNMcWP0rwuNA==}
     engines: {node: '>=14'}
 
   '@oxc-project/types@0.132.0':
@@ -5486,7 +5486,7 @@ snapshots:
   '@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/exporter-logs-otlp-grpc@0.218.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5574,7 +5574,7 @@ snapshots:
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-metrics': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/exporter-trace-otlp-grpc@0.218.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5611,7 +5611,7 @@ snapshots:
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/instrumentation@0.218.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5677,7 +5677,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/sdk-logs@0.216.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5685,7 +5685,7 @@ snapshots:
       '@opentelemetry/api-logs': 0.216.0
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/sdk-logs@0.218.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5693,7 +5693,7 @@ snapshots:
       '@opentelemetry/api-logs': 0.218.0
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/sdk-metrics@2.7.1(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5728,7 +5728,7 @@ snapshots:
       '@opentelemetry/sdk-metrics': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-node': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
     transitivePeerDependencies:
       - supports-color
 
@@ -5737,7 +5737,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.40.0
+      '@opentelemetry/semantic-conventions': 1.41.1
 
   '@opentelemetry/sdk-trace-node@2.7.1(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -5746,7 +5746,7 @@ snapshots:
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.1)
 
-  '@opentelemetry/semantic-conventions@1.40.0': {}
+  '@opentelemetry/semantic-conventions@1.41.1': {}
 
   '@oxc-project/types@0.132.0': {}
 
