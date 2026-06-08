@@ -12,26 +12,26 @@ importers:
   .:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^3.0.77
-        version: 3.0.77(zod@4.3.6)
+        specifier: ^3.0.79
+        version: 3.0.79(zod@4.3.6)
       '@ai-sdk/google-vertex':
-        specifier: ^4.0.133
-        version: 4.0.133(zod@4.3.6)
+        specifier: ^4.0.137
+        version: 4.0.137(zod@4.3.6)
       '@ai-sdk/openai':
-        specifier: ^3.0.64
-        version: 3.0.64(zod@4.3.6)
+        specifier: ^3.0.65
+        version: 3.0.65(zod@4.3.6)
       '@ai-sdk/openai-compatible':
-        specifier: ^2.0.47
-        version: 2.0.47(zod@4.3.6)
+        specifier: ^2.0.48
+        version: 2.0.48(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.17.3
         version: 2.17.3(playwright@1.60.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
-        version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 2.9.0(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       ai:
-        specifier: ^6.0.187
-        version: 6.0.187(zod@4.3.6)
+        specifier: ^6.0.191
+        version: 6.0.191(zod@4.3.6)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -52,7 +52,7 @@ importers:
         version: 5.1.11
       ollama-ai-provider-v2:
         specifier: ^3.5.1
-        version: 3.5.1(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 3.5.1(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       playwright:
         specifier: 1.60.0
         version: 1.60.0
@@ -101,26 +101,26 @@ importers:
         version: 10.1.0(jiti@2.7.0)
     devDependencies:
       '@ai-sdk/google':
-        specifier: ^3.0.77
-        version: 3.0.77(zod@4.3.6)
+        specifier: ^3.0.79
+        version: 3.0.79(zod@4.3.6)
       '@ai-sdk/google-vertex':
-        specifier: ^4.0.133
-        version: 4.0.133(zod@4.3.6)
+        specifier: ^4.0.137
+        version: 4.0.137(zod@4.3.6)
       '@ai-sdk/openai':
-        specifier: ^3.0.64
-        version: 3.0.64(zod@4.3.6)
+        specifier: ^3.0.65
+        version: 3.0.65(zod@4.3.6)
       '@ai-sdk/openai-compatible':
-        specifier: ^2.0.47
-        version: 2.0.47(zod@4.3.6)
+        specifier: ^2.0.48
+        version: 2.0.48(zod@4.3.6)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
-        version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 2.9.0(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       '@types/node':
         specifier: ^25.7.0
         version: 25.9.1
       ollama-ai-provider-v2:
         specifier: ^3.5.1
-        version: 3.5.1(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 3.5.1(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       tsx:
         specifier: ^4.22.3
         version: 4.22.3
@@ -134,29 +134,29 @@ importers:
   packages/core:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^3.0.77
-        version: 3.0.77(zod@4.3.6)
+        specifier: ^3.0.79
+        version: 3.0.79(zod@4.3.6)
       '@ai-sdk/google-vertex':
-        specifier: ^4.0.133
-        version: 4.0.133(zod@4.3.6)
+        specifier: ^4.0.137
+        version: 4.0.137(zod@4.3.6)
       '@ai-sdk/openai':
-        specifier: ^3.0.64
-        version: 3.0.64(zod@4.3.6)
+        specifier: ^3.0.65
+        version: 3.0.65(zod@4.3.6)
       '@ai-sdk/openai-compatible':
-        specifier: ^2.0.47
-        version: 2.0.47(zod@4.3.6)
+        specifier: ^2.0.48
+        version: 2.0.48(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.17.3
         version: 2.17.3(playwright@1.60.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
-        version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 2.9.0(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       '@tabstack/sdk':
         specifier: ^2.3.0
         version: 2.6.1
       ai:
-        specifier: ^6.0.187
-        version: 6.0.187(zod@4.3.6)
+        specifier: ^6.0.191
+        version: 6.0.191(zod@4.3.6)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -177,7 +177,7 @@ importers:
         version: 5.1.11
       ollama-ai-provider-v2:
         specifier: ^3.5.1
-        version: 3.5.1(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 3.5.1(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       playwright:
         specifier: 1.60.0
         version: 1.60.0
@@ -231,14 +231,14 @@ importers:
   packages/extension:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^3.0.77
-        version: 3.0.77(zod@4.3.6)
+        specifier: ^3.0.79
+        version: 3.0.79(zod@4.3.6)
       '@ai-sdk/openai':
-        specifier: ^3.0.64
-        version: 3.0.64(zod@4.3.6)
+        specifier: ^3.0.65
+        version: 3.0.65(zod@4.3.6)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.8.0
-        version: 2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 2.9.0(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.15
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -277,7 +277,7 @@ importers:
         version: 4.0.0(react@19.2.6)
       ollama-ai-provider-v2:
         specifier: ^3.5.1
-        version: 3.5.1(ai@6.0.187(zod@4.3.6))(zod@4.3.6)
+        version: 3.5.1(ai@6.0.191(zod@4.3.6))(zod@4.3.6)
       pilo-core:
         specifier: workspace:*
         version: link:../core
@@ -412,38 +412,38 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/anthropic@3.0.78':
-    resolution: {integrity: sha512-0OY12G20cUt6iU6htpEA1491Oz++NVxZxlmWGX4B7rSbeZ5pnDmOu6YtW9BKzdZlNx5Gn23i6WMxyZFoMKNcgA==}
+  '@ai-sdk/anthropic@3.0.79':
+    resolution: {integrity: sha512-saEX+h5JDOkT9P/+REKDyikbnJiToFuLipgNcsmu4Zr3GW5kW1m9HhvrPK+vj63itIOsoZU6tmVIjkrePOlIUA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
 
-  '@ai-sdk/gateway@3.0.118':
-    resolution: {integrity: sha512-XYPbVoDo1TDMVLe5Eg42gIjdOyxaizh9H0kiSSnTXr+AdrqZvutk/ypLOiqBXPV3D1K3+BSm/sbFeomZJlM64A==}
+  '@ai-sdk/gateway@3.0.120':
+    resolution: {integrity: sha512-MYKAeD2q7/sa1ZdqtL2tw0Me0B8Tok6Q/fhkJDhJl39dG8u+VBlWO9yk9lcdm784bM418o1EKObo4aOxs6+18Q==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
 
-  '@ai-sdk/google-vertex@4.0.133':
-    resolution: {integrity: sha512-wxl0ic9kdWnvCNPwe+o/gduf9+JW8HMI48qwXoQvPkqAqr9F85vJaqA9Jls6wIinY9w6CxI7jCwRKPHHXsBmBw==}
+  '@ai-sdk/google-vertex@4.0.137':
+    resolution: {integrity: sha512-gJ6eOkT6V8lC2QCJsubL7NDjZZS9LdYzhR+95PFh1Xhy2N1X5TJcsc7YOavSQ6LbiQCeykFGfBsH/I7Evt5xJQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
 
-  '@ai-sdk/google@3.0.77':
-    resolution: {integrity: sha512-t6BdlhF5TBC8fRtGAwugS0UwAwWlUyUriYGYjYzFhap6iB7dY+tnPPL/AVn1k5BeGdIYAkLjRKeQdjUhHaB7rQ==}
+  '@ai-sdk/google@3.0.79':
+    resolution: {integrity: sha512-QWVAvYeA7JzEX2wkSyXOWv/I9PD9kvTzdykkSTLi+Eu8RyJ6gA0tdPIGa8esEtOcHE//G5vy6FTB70qQw8l/uw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
 
-  '@ai-sdk/openai-compatible@2.0.47':
-    resolution: {integrity: sha512-Enm5UlL0zUCrW3792opk5h7hRWxZOZzDe6eQYVFqX9LUOGGCe1h8MZWAGim765nwzgnjlpeYOsuzZmLtRsTPlg==}
+  '@ai-sdk/openai-compatible@2.0.48':
+    resolution: {integrity: sha512-z9MC6M4Oh/yUY/F/eszOtO8wc2nMz99XmZQKd2gWTtyIfe716xTfrKe3aYZKg20NZDtyjqPPKPSR+wqz7q1T7Q==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
 
-  '@ai-sdk/openai@3.0.64':
-    resolution: {integrity: sha512-epO4iS6QwktaY2PF6uBcPnDTJ3BxPOfsGS7/OEtBe3GtNj7C8h8gMDVtIe5K8W16HNDbn0tbR4dcQfpfs+XVFg==}
+  '@ai-sdk/openai@3.0.65':
+    resolution: {integrity: sha512-ZlVoWH+zrdiYDiUt6n/xvfCsk33mzsB81TUQkBRVx79rxU1FKZqVH9J/QCtEpSLqx0cUzjvtIw9l9p7EbUv+dw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
@@ -2394,8 +2394,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@6.0.187:
-    resolution: {integrity: sha512-+0SWsOnrZ1CvfMeLUMBTd5L3ytf82FuL9VyJnaw475P78CUbvudZ1Jj/x/kmu3xE8ECoLqyu9Mn3LmuAjjbLIg==}
+  ai@6.0.191:
+    resolution: {integrity: sha512-zAxvjKebQE7YkSyyNIl0OM7i6/zygnKeF+yNUjD4nWOelYrG+LpDd6RnH6mjySI4zUpZ7o4wbnmAy8jc6u98vQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: 4.3.6
@@ -3093,8 +3093,8 @@ packages:
     resolution: {integrity: sha512-rci1g6U0rdTg6bAaBboP7XdRu01dzTAaKXxFf+PUqGuCv6Xu7o8NZdY1D5MvKGIjb6EdS1g3VlXOgksir1uGkg==}
     hasBin: true
 
-  gaxios@7.1.4:
-    resolution: {integrity: sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA==}
+  gaxios@7.1.5:
+    resolution: {integrity: sha512-5FZy72Rh8LhtjmvDrKkI+lVhrsQrVKVsItxMoDm5mNQE+xR0WVIIs+jzPSJgBvKVsLi24fZhXJIsNI0bihDzFg==}
     engines: {node: '>=18'}
 
   gcp-metadata@8.1.2:
@@ -3143,8 +3143,8 @@ packages:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
     engines: {node: '>=18'}
 
-  google-auth-library@10.6.2:
-    resolution: {integrity: sha512-e27Z6EThmVNNvtYASwQxose/G57rkRuaRbQyxM2bvYLLX/GqWZ5chWq2EBoUchJbCc57eC9ArzO5wMsEmWftCw==}
+  google-auth-library@10.7.0:
+    resolution: {integrity: sha512-QpTAbNJ36TliZLx3TTtahR8HG0hN9RllL1e3FymOvQSIKK8JmgV58H924ub2wa2DsS3ANjjP1Aw1N+Ramc8hqQ==}
     engines: {node: '>=18'}
 
   google-logging-utils@1.1.3:
@@ -4827,44 +4827,44 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@3.0.78(zod@4.3.6)':
+  '@ai-sdk/anthropic@3.0.79(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
       zod: 4.3.6
 
-  '@ai-sdk/gateway@3.0.118(zod@4.3.6)':
+  '@ai-sdk/gateway@3.0.120(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
       '@vercel/oidc': 3.2.0
       zod: 4.3.6
 
-  '@ai-sdk/google-vertex@4.0.133(zod@4.3.6)':
+  '@ai-sdk/google-vertex@4.0.137(zod@4.3.6)':
     dependencies:
-      '@ai-sdk/anthropic': 3.0.78(zod@4.3.6)
-      '@ai-sdk/google': 3.0.77(zod@4.3.6)
-      '@ai-sdk/openai-compatible': 2.0.47(zod@4.3.6)
+      '@ai-sdk/anthropic': 3.0.79(zod@4.3.6)
+      '@ai-sdk/google': 3.0.79(zod@4.3.6)
+      '@ai-sdk/openai-compatible': 2.0.48(zod@4.3.6)
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
-      google-auth-library: 10.6.2
+      google-auth-library: 10.7.0
       zod: 4.3.6
     transitivePeerDependencies:
       - supports-color
 
-  '@ai-sdk/google@3.0.77(zod@4.3.6)':
+  '@ai-sdk/google@3.0.79(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
       zod: 4.3.6
 
-  '@ai-sdk/openai-compatible@2.0.47(zod@4.3.6)':
+  '@ai-sdk/openai-compatible@2.0.48(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
       zod: 4.3.6
 
-  '@ai-sdk/openai@3.0.64(zod@4.3.6)':
+  '@ai-sdk/openai@3.0.65(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
@@ -5458,9 +5458,9 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
-  '@openrouter/ai-sdk-provider@2.9.0(ai@6.0.187(zod@4.3.6))(zod@4.3.6)':
+  '@openrouter/ai-sdk-provider@2.9.0(ai@6.0.191(zod@4.3.6))(zod@4.3.6)':
     dependencies:
-      ai: 6.0.187(zod@4.3.6)
+      ai: 6.0.191(zod@4.3.6)
       zod: 4.3.6
 
   '@opentelemetry/api-logs@0.216.0':
@@ -6619,9 +6619,9 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@6.0.187(zod@4.3.6):
+  ai@6.0.191(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 3.0.118(zod@4.3.6)
+      '@ai-sdk/gateway': 3.0.120(zod@4.3.6)
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
       '@opentelemetry/api': 1.9.1
@@ -7329,7 +7329,7 @@ snapshots:
       which: 1.2.4
       winreg: 0.0.12
 
-  gaxios@7.1.4:
+  gaxios@7.1.5:
     dependencies:
       extend: 3.0.2
       https-proxy-agent: 7.0.6
@@ -7339,7 +7339,7 @@ snapshots:
 
   gcp-metadata@8.1.2:
     dependencies:
-      gaxios: 7.1.4
+      gaxios: 7.1.5
       google-logging-utils: 1.1.3
       json-bigint: 1.0.0
     transitivePeerDependencies:
@@ -7375,11 +7375,11 @@ snapshots:
 
   globals@14.0.0: {}
 
-  google-auth-library@10.6.2:
+  google-auth-library@10.7.0:
     dependencies:
       base64-js: 1.5.1
       ecdsa-sig-formatter: 1.0.11
-      gaxios: 7.1.4
+      gaxios: 7.1.5
       gcp-metadata: 8.1.2
       google-logging-utils: 1.1.3
       jws: 4.0.1
@@ -7947,11 +7947,11 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  ollama-ai-provider-v2@3.5.1(ai@6.0.187(zod@4.3.6))(zod@4.3.6):
+  ollama-ai-provider-v2@3.5.1(ai@6.0.191(zod@4.3.6))(zod@4.3.6):
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.6)
-      ai: 6.0.187(zod@4.3.6)
+      ai: 6.0.191(zod@4.3.6)
       zod: 4.3.6
 
   on-exit-leak-free@2.1.2: {}
