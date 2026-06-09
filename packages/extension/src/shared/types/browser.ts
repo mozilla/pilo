@@ -81,6 +81,11 @@ export interface AIGenerationErrorEventData {
   isToolError?: boolean;
 }
 
+export interface ToolExecutionErrorEventData {
+  error?: string;
+  action?: string;
+}
+
 export interface TaskValidationErrorEventData {
   errors?: string[];
   retryCount?: number;
@@ -128,6 +133,7 @@ export type RealtimeEvent =
   | { type: "agent:status"; data: AgentStatusEventData; timestamp: number }
   | { type: "agent:action"; data: AgentActionEventData; timestamp: number }
   | { type: "ai:generation:error"; data: AIGenerationErrorEventData; timestamp: number }
+  | { type: "tool:execution:error"; data: ToolExecutionErrorEventData; timestamp: number }
   | { type: "task:validation_error"; data: TaskValidationErrorEventData; timestamp: number }
   | { type: "browser:action:completed"; data: BrowserActionCompletedEventData; timestamp: number }
   | { type: "browser:action_started"; data: BrowserActionStartedEventData; timestamp: number }

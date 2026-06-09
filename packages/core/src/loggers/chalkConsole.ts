@@ -22,6 +22,7 @@ import type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
   AIGenerationErrorEventData,
+  ToolExecutionErrorEventData,
   TaskMetricsEventData,
   FirewallBlockedNonInteractiveEventData,
 } from "../events.js";
@@ -85,6 +86,7 @@ export class ChalkConsoleLogger implements Logger {
 
     // AI events
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+    emitter.onEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
 
     // CDP failover events
     emitter.onEvent(WebAgentEventType.CDP_ENDPOINT_CONNECTED, this.handleCdpEndpointConnected);
@@ -139,6 +141,7 @@ export class ChalkConsoleLogger implements Logger {
 
       // AI events
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+      this.emitter.offEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
 
       // CDP failover events
       this.emitter.offEvent(
@@ -322,6 +325,13 @@ export class ChalkConsoleLogger implements Logger {
     console.error(chalk.red.bold("❌ AI generation error:"), chalk.whiteBright(data.error));
   };
 
+  private handleToolExecutionError = (data: ToolExecutionErrorEventData): void => {
+    console.error(
+      chalk.yellow.bold("⚠️ Tool execution failed (retrying):"),
+      chalk.whiteBright(data.error),
+    );
+  };
+
   private handleCdpEndpointConnected = (data: CdpEndpointConnectedEventData): void => {
     console.log(chalk.green(`🌐 Connected to CDP endpoint ${data.endpointIndex} of ${data.total}`));
   };
@@ -355,6 +365,13 @@ export class ChalkConsoleLogger implements Logger {
         `   AI Generations: ${chalk.whiteBright(data.aiGenerationCount)} ${data.aiGenerationErrorCount > 0 ? chalk.red(`(${data.aiGenerationErrorCount} errors)`) : ""}`,
       ),
     );
+    if (data.toolExecutionErrorCount > 0) {
+      console.log(
+        chalk.gray(
+          `   Tool Execution Errors: ${chalk.yellow(data.toolExecutionErrorCount)} (recoverable)`,
+        ),
+      );
+    }
 
     // Token usage
     if (data.totalInputTokens > 0 || data.totalOutputTokens > 0) {

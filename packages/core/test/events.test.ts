@@ -121,6 +121,7 @@ describe("WebAgentEventEmitter", () => {
         "task:metrics_incremental",
         "ai:generation",
         "ai:generation:error",
+        "tool:execution:error",
         "agent:action",
         "agent:step",
         "agent:reasoned",

@@ -13,6 +13,7 @@ export class MetricsCollector extends LoggerWrapper {
   private stepCount: number = 0;
   private aiGenerationCount: number = 0;
   private aiGenerationErrorCount: number = 0;
+  private toolExecutionErrorCount: number = 0;
   private totalInputTokens: number = 0;
   private totalOutputTokens: number = 0;
 
@@ -24,6 +25,7 @@ export class MetricsCollector extends LoggerWrapper {
     this.stepCount = 0;
     this.aiGenerationCount = 0;
     this.aiGenerationErrorCount = 0;
+    this.toolExecutionErrorCount = 0;
     this.totalInputTokens = 0;
     this.totalOutputTokens = 0;
 
@@ -31,6 +33,7 @@ export class MetricsCollector extends LoggerWrapper {
     emitter.onEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
     emitter.onEvent(WebAgentEventType.AI_GENERATION, this.handleAiGeneration);
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAiGenerationError);
+    emitter.onEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
     emitter.onEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
 
     super.initialize(emitter);
@@ -43,6 +46,7 @@ export class MetricsCollector extends LoggerWrapper {
       this.emitter.offEvent(WebAgentEventType.AGENT_STEP, this.handleAgentStep);
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION, this.handleAiGeneration);
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAiGenerationError);
+      this.emitter.offEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
       this.emitter.offEvent(WebAgentEventType.TASK_COMPLETED, this.handleTaskComplete);
     }
     super.dispose();
@@ -65,6 +69,7 @@ export class MetricsCollector extends LoggerWrapper {
           stepCount: this.stepCount,
           aiGenerationCount: this.aiGenerationCount,
           aiGenerationErrorCount: this.aiGenerationErrorCount,
+          toolExecutionErrorCount: this.toolExecutionErrorCount,
           totalInputTokens: this.totalInputTokens,
           totalOutputTokens: this.totalOutputTokens,
         },
@@ -92,6 +97,10 @@ export class MetricsCollector extends LoggerWrapper {
 
   private handleAiGenerationError = (): void => {
     this.aiGenerationErrorCount += 1;
+  };
+
+  private handleToolExecutionError = (): void => {
+    this.toolExecutionErrorCount += 1;
   };
 
   private handleTaskComplete = (data: TaskCompleteEventData): void => {
