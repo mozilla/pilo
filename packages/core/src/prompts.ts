@@ -23,6 +23,11 @@ export const TOOL_STRINGS = {
     fill: {
       description: "Fill text into an input field",
     },
+    uploadFile: {
+      description: "Upload an allowlisted local file to a file input element or its container",
+      ref: "Element reference for the file input or a container containing one",
+      path: "Local file path inside configured upload_allowed_paths",
+    },
     select: {
       description: "Select an option from a dropdown",
       value: "Option to select",
@@ -173,6 +178,7 @@ function buildToolExamples(
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
     `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
+    `- upload_file({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "path": "/path/to/file"}) - ${TOOL_STRINGS.webActions.uploadFile.description}`,
     `- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}`,
     `- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}`,
     `- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}`,

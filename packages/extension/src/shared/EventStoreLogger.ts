@@ -49,6 +49,9 @@ export class EventStoreLogger extends GenericLogger {
       case "ai:generation:error":
         console.error("AI Generation Error:", data);
         break;
+      case "tool:execution:error":
+        console.error("Tool Execution Error:", data);
+        break;
       case "browser:action_completed":
         if (data && typeof data === "object" && "success" in data && !data.success) {
           console.error("Browser Action Failed:", data);

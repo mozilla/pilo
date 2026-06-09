@@ -691,6 +691,71 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("iteration watchdog", () => {
+    function mockPlan(): void {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. do it" },
+            output: { successCriteria: "Done", plan: "1. do it" },
+          },
+        ],
+      } as any);
+    }
+
+    // A streamText result whose fullStream never completes (simulates a stalled stream).
+    function hangingStreamResult(): any {
+      return {
+        fullStream: {
+          async *[Symbol.asyncIterator]() {
+            await new Promise(() => {});
+          },
+        },
+        toolResults: new Promise(() => {}),
+        response: new Promise(() => {}),
+        finishReason: new Promise(() => {}),
+        usage: new Promise(() => {}),
+        warnings: new Promise(() => {}),
+        providerMetadata: new Promise(() => {}),
+      };
+    }
+
+    it("aborts an iteration whose LLM stream never completes and returns ITERATION_TIMEOUT", async () => {
+      // Real timers + a tiny watchdog so the stalled iteration is bounded quickly.
+      vi.useRealTimers();
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(hangingStreamResult());
+
+      const agent = new WebAgent(mockBrowser, { ...options, iterationTimeoutMs: 50 });
+      const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("ITERATION_TIMEOUT");
+
+      await agent.close();
+    });
+
+    it("passes a watchdog-derived abort signal to streamText that fires on timeout", async () => {
+      vi.useRealTimers();
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(hangingStreamResult());
+
+      const agent = new WebAgent(mockBrowser, { ...options, iterationTimeoutMs: 50 });
+      await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      const call = mockStreamText.mock.calls.at(-1)?.[0];
+      expect(call?.abortSignal).toBeInstanceOf(AbortSignal);
+      // The watchdog fired, so the signal handed to the LLM call is now aborted.
+      expect(call?.abortSignal?.aborted).toBe(true);
+
+      await agent.close();
+    });
+  });
+
   describe("planning", () => {
     it("should generate plan with URL when not provided", async () => {
       mockGenerateTextWithRetry.mockResolvedValueOnce({
@@ -2003,13 +2068,17 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
 
-      // Check that error event was emitted
+      // Check that a tool-execution error event was emitted (NOT an AI
+      // generation error — the model generation succeeded; tool execution failed)
       const errorEvent = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+        (e) => e.type === WebAgentEventType.TOOL_EXECUTION_ERROR,
       );
       expect(errorEvent).toBeDefined();
       expect(errorEvent?.data.error).toContain("You must use exactly one tool");
-      expect(errorEvent?.data.isToolError).toBe(true); // Should be marked as tool error for UI filtering
+      // It must NOT be reported as an AI generation error
+      expect(
+        mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION_ERROR),
+      ).toBeUndefined();
     });
 
     it("should handle tool result without output property", async () => {

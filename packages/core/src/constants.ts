@@ -20,6 +20,16 @@ export const DEFAULT_PLANNING_MAX_TOKENS = 1500;
 /** Max tokens for validation */
 export const DEFAULT_VALIDATION_MAX_TOKENS = 1000;
 
+/**
+ * Per-iteration watchdog timeout in milliseconds (5 minutes).
+ *
+ * Bounds a single agent loop iteration (page snapshot + LLM call + tool execution) so a
+ * hung operation can't freeze the task indefinitely. Generous: an iteration legitimately
+ * spans an LLM call (~120s) plus tool execution (extract can be another ~120s call), so
+ * this should only fire on a genuine hang.
+ */
+export const DEFAULT_ITERATION_TIMEOUT_MS = 300000;
+
 // ============================================================================
 // AI Retry Configuration
 // ============================================================================

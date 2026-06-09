@@ -7,6 +7,7 @@ describe("env: firewall fields", () => {
   beforeEach(() => {
     delete process.env.PILO_TRUSTED_HOSTNAMES;
     delete process.env.PILO_UNSAFE_MODE;
+    delete process.env.PILO_UPLOAD_ALLOWED_PATHS;
   });
 
   afterEach(() => {
@@ -31,9 +32,16 @@ describe("env: firewall fields", () => {
     expect(result.unsafe_mode).toBe(false);
   });
 
+  it("parses PILO_UPLOAD_ALLOWED_PATHS as comma-separated list", () => {
+    process.env.PILO_UPLOAD_ALLOWED_PATHS = "/tmp/a,/tmp/b";
+    const result = parseEnvConfig();
+    expect(result.upload_allowed_paths).toEqual(["/tmp/a", "/tmp/b"]);
+  });
+
   it("returns undefined when env vars are not set", () => {
     const result = parseEnvConfig();
     expect(result.trusted_hostnames).toBeUndefined();
     expect(result.unsafe_mode).toBeUndefined();
+    expect(result.upload_allowed_paths).toBeUndefined();
   });
 });
