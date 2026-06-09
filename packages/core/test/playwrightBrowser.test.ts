@@ -1701,4 +1701,20 @@ describe("PlaywrightBrowser", () => {
       expect(error).not.toBeInstanceOf(BrowserDisconnectedError);
     });
   });
+
+  describe("ensureOptimizedPageLoad", () => {
+    it("bounds the domcontentloaded wait with actionTimeoutMs so it can't hang indefinitely", async () => {
+      const browser = new PlaywrightBrowser({ browser: "chromium", actionTimeoutMs: 1234 });
+      const waitForLoadState = vi.fn().mockResolvedValue(undefined);
+      (browser as any).page = {
+        waitForLoadState,
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await (browser as any).ensureOptimizedPageLoad();
+
+      // The domcontentloaded wait must carry a timeout (previously unbounded).
+      expect(waitForLoadState).toHaveBeenCalledWith("domcontentloaded", { timeout: 1234 });
+    });
+  });
 });

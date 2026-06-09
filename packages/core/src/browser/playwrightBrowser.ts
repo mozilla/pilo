@@ -684,8 +684,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     if (!this.page) throw new Error("Browser not started");
 
     try {
-      // 1. Wait for DOM to be ready - this is critical for interactivity
-      await this.page.waitForLoadState("domcontentloaded");
+      // 1. Wait for DOM to be ready - this is critical for interactivity.
+      // Bounded by actionTimeoutMs: a page (or SPA soft-nav) that never reaches
+      // domcontentloaded must not hang the agent. On timeout we continue, since the
+      // page may still be interactive and the load wait + settle below still run.
+      await this.page.waitForLoadState("domcontentloaded", {
+        timeout: this.actionTimeoutMs,
+      });
     } catch (error) {
       // Still continue since we might be able to interact with what's loaded
     }
