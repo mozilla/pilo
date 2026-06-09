@@ -163,6 +163,20 @@ export class NavigationTimeoutException extends BrowserException {
 }
 
 /**
+ * Thrown when a single agent iteration exceeds its watchdog timeout.
+ *
+ * Terminal: extends Error (not RecoverableError) because a hung iteration ends the
+ * task with a clear error rather than being retried. Distinct from a user abort
+ * (the caller's abortSignal is not aborted by the watchdog).
+ */
+export class IterationTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "IterationTimeoutError";
+  }
+}
+
+/**
  * Thrown when the browser connection is lost mid-task (CDP session closed).
  * WebAgent catches this to trigger a browser restart and execution reset rather
  * than treating it as an ordinary agent error.

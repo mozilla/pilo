@@ -3920,7 +3920,8 @@
         "TASK_ABORTED",
         "MAX_ITERATIONS",
         "MAX_ERRORS",
-        "TASK_FAILED"
+        "TASK_FAILED",
+        "ITERATION_TIMEOUT"
       ],
       "type": "string"
     },
