@@ -40,6 +40,7 @@ vi.mock("pilo-core", () => {
         provider: "openai",
         openai_api_key: "sk-test123",
         browser: "chromium",
+        upload_allowed_paths: [],
       })),
     },
     createAIProvider: vi.fn(() => ({})),

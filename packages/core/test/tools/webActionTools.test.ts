@@ -171,6 +171,7 @@ describe("Web Action Tools", () => {
       expect(tools).toBeDefined();
       expect(tools.click).toBeDefined();
       expect(tools.fill).toBeDefined();
+      expect(tools.upload_file).toBeDefined();
       expect(tools.select).toBeDefined();
       expect(tools.hover).toBeDefined();
       expect(tools.check).toBeDefined();
@@ -190,6 +191,9 @@ describe("Web Action Tools", () => {
     it("should have correct descriptions", () => {
       expect(tools.click.description).toBe("Click on an element on the page");
       expect(tools.fill.description).toBe("Fill text into an input field");
+      expect(tools.upload_file.description).toBe(
+        "Upload an allowlisted local file to a file input element or its container",
+      );
       expect(tools.select.description).toBe("Select an option from a dropdown");
       expect(tools.hover.description).toBe("Hover over an element");
       expect(tools.check.description).toBe("Check a checkbox");
@@ -452,6 +456,80 @@ describe("Web Action Tools", () => {
 
       const invalid = schema.safeParse({ ref: "input1" }); // missing value
       expect(invalid.success).toBe(false);
+    });
+  });
+
+  describe("Upload File Action", () => {
+    it("should return upload_disabled by default without calling the browser", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/tmp/fixture/sample.pdf",
+      });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: false,
+        action: "upload_file",
+        ref: "file1",
+        value: "/tmp/fixture/sample.pdf",
+        error: "upload_disabled",
+        isRecoverable: true,
+      });
+    });
+
+    it("should execute upload_file when allowed paths are configured", async () => {
+      context.allowFileUpload = { allowedPaths: ["/tmp/fixture"] };
+      tools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/tmp/fixture/sample.pdf",
+      });
+
+      expect(performActionSpy).toHaveBeenCalledWith(
+        "file1",
+        PageAction.UploadFile,
+        "/tmp/fixture/sample.pdf",
+      );
+      expect(result).toEqual({
+        success: true,
+        action: "upload_file",
+        ref: "file1",
+        value: "/tmp/fixture/sample.pdf",
+      });
+    });
+
+    it("should validate upload_file input schema", () => {
+      const schema = tools.upload_file.inputSchema;
+
+      expect(schema.safeParse({ ref: "file1", path: "/tmp/sample.pdf" }).success).toBe(true);
+      expect(schema.safeParse({ ref: "file1" }).success).toBe(false);
+      expect(schema.safeParse({ path: "/tmp/sample.pdf" }).success).toBe(false);
+    });
+
+    it("should return structured browser upload errors as recoverable results", async () => {
+      context.allowFileUpload = { allowedPaths: ["/tmp/fixture"] };
+      tools = createWebActionTools(context);
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("upload_file", "upload_path_not_allowed"),
+      );
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/other/sample.pdf",
+      });
+
+      expect(result).toEqual({
+        success: false,
+        action: "upload_file",
+        ref: "file1",
+        value: "/other/sample.pdf",
+        error: "upload_path_not_allowed",
+        isRecoverable: true,
+      });
     });
   });
 
@@ -929,6 +1007,27 @@ describe("Web Action Tools", () => {
       expect(mockGenerateTextWithRetry).toHaveBeenCalledWith(
         expect.objectContaining({
           abortSignal: controller.signal,
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it("passes abort signal and configured timeout to extract generation", async () => {
+      const controller = new AbortController();
+      context.abortSignal = controller.signal;
+      context.llmProviderTimeoutMs = 45000;
+      tools = createWebActionTools(context);
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "extracted",
+      } as any);
+
+      await tools.extract.execute({ description: "Extract page data" });
+
+      expect(mockGenerateTextWithRetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          abortSignal: controller.signal,
+          timeout: 45000,
         }),
         expect.any(Object),
       );

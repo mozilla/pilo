@@ -61,11 +61,7 @@ export class ConfigManager {
     }
 
     // Dev mode: load local .env file and include env vars.
-    try {
-      process.loadEnvFile(".env");
-    } catch {
-      // Ignore if .env doesn't exist
-    }
+    this.loadDotEnv();
 
     const envConfig = parseEnvConfig();
 
@@ -77,6 +73,29 @@ export class ConfigManager {
     };
 
     return merged as PiloConfigResolved;
+  }
+
+  /**
+   * Load a local `.env` file into process.env (dev mode only).
+   *
+   * The path is resolved against INIT_CWD when set — this is the directory the
+   * user invoked the command from. It matters because `pnpm pilo` runs the CLI
+   * with the working directory set to the package dir, not the repo root where
+   * the user's .env lives. INIT_CWD is unset for the published binary, so it
+   * falls back to process.cwd().
+   */
+  private loadDotEnv(): void {
+    const baseDir = process.env.INIT_CWD ?? process.cwd();
+    try {
+      process.loadEnvFile(join(baseDir, ".env"));
+    } catch (err) {
+      // A missing .env is expected and fine to ignore. Any other failure (e.g.
+      // a malformed file that fails to parse) is worth surfacing rather than
+      // silently dropping the user's entire env config.
+      if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+        console.warn(`Config warning: failed to load .env: ${(err as Error).message}`);
+      }
+    }
   }
 
   /**
@@ -190,8 +209,11 @@ export class ConfigManager {
     merged: PiloConfigResolved;
   } {
     const global = this.getGlobalConfig();
-    const env = parseEnvConfig();
+    // getConfig() loads the local .env (dev mode), so it must run before
+    // parseEnvConfig() — otherwise the env view is read before .env is loaded
+    // and always comes back empty.
     const merged = this.getConfig();
+    const env = parseEnvConfig();
     return { global, env, merged };
   }
 }

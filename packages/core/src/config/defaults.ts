@@ -77,6 +77,7 @@ export interface PiloConfig {
   openai_compatible_base_url?: string;
   openai_compatible_name?: string;
   reasoning_effort?: ReasoningLevel;
+  llm_provider_timeout_ms?: number;
 
   // Browser Configuration
   browser?: Browser;
@@ -115,6 +116,9 @@ export interface PiloConfig {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   pw_cdp_endpoints?: string[];
+  cdp_connect_max_attempts?: number;
+  cdp_connect_backoff_base_ms?: number;
+  cdp_connect_backoff_max_ms?: number;
   bypass_csp?: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -127,6 +131,7 @@ export interface PiloConfig {
   action_timeout_ms?: number;
   trusted_hostnames?: string[];
   unsafe_mode?: boolean;
+  upload_allowed_paths?: string[];
 
   // Search Configuration
   search_provider?: SearchProviderName;
@@ -151,6 +156,7 @@ export interface PiloConfigResolved {
   openai_compatible_base_url?: string;
   openai_compatible_name?: string;
   reasoning_effort: ReasoningLevel;
+  llm_provider_timeout_ms: number;
 
   // Browser Configuration
   browser: Browser;
@@ -189,6 +195,9 @@ export interface PiloConfigResolved {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   pw_cdp_endpoints?: string[];
+  cdp_connect_max_attempts: number;
+  cdp_connect_backoff_base_ms: number;
+  cdp_connect_backoff_max_ms: number;
   bypass_csp: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -201,6 +210,7 @@ export interface PiloConfigResolved {
   action_timeout_ms: number;
   trusted_hostnames: string[];
   unsafe_mode: boolean;
+  upload_allowed_paths: string[];
 
   // Search Configuration
   search_provider: SearchProviderName;
@@ -321,6 +331,19 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "level",
     env: ["PILO_REASONING_EFFORT"],
     description: "Reasoning effort level",
+    category: "ai",
+  },
+  // Default 120000 is ~2x the observed p99 of the `pilo.ai.generate` span in
+  // Cloud Trace (prod p99 ~61s, nonprod p99 ~39s across ~8.7k calls, 2026-05);
+  // only ~0.05-0.37% of calls exceed it, and those are stuck/degraded calls
+  // where abort-and-retry is preferable. Tunable per deploy via env/config.
+  llm_provider_timeout_ms: {
+    default: 120000,
+    type: "number",
+    cli: "--llm-provider-timeout-ms",
+    placeholder: "ms",
+    env: ["PILO_LLM_PROVIDER_TIMEOUT_MS"],
+    description: "Timeout for LLM provider calls in milliseconds",
     category: "ai",
   },
 
@@ -574,6 +597,36 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
       "Comma-separated list of CDP endpoint URLs to try in order (chromium only, takes precedence over --pw-cdp-endpoint)",
     category: "playwright",
   },
+  cdp_connect_max_attempts: {
+    default: 3,
+    type: "number",
+    cli: "--cdp-connect-max-attempts",
+    placeholder: "n",
+    env: ["PILO_CDP_CONNECT_MAX_ATTEMPTS"],
+    description:
+      "Max connection attempts per CDP endpoint before failing over to the next (chromium only). Retries transient connection errors with exponential backoff.",
+    category: "playwright",
+  },
+  cdp_connect_backoff_base_ms: {
+    default: 1000,
+    type: "number",
+    cli: "--cdp-connect-backoff-base-ms",
+    placeholder: "ms",
+    env: ["PILO_CDP_CONNECT_BACKOFF_BASE_MS"],
+    description:
+      "Base delay in milliseconds for exponential backoff between CDP connect retries (doubles each attempt, capped at cdp_connect_backoff_max_ms, with jitter)",
+    category: "playwright",
+  },
+  cdp_connect_backoff_max_ms: {
+    default: 10000,
+    type: "number",
+    cli: "--cdp-connect-backoff-max-ms",
+    placeholder: "ms",
+    env: ["PILO_CDP_CONNECT_BACKOFF_MAX_MS"],
+    description:
+      "Maximum delay in milliseconds for exponential backoff between CDP connect retries (chromium only)",
+    category: "playwright",
+  },
   bypass_csp: {
     default: false,
     type: "boolean",
@@ -650,6 +703,16 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
       "Disables the action firewall entirely. WARNING: prompt injection from page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.",
     category: "action",
   },
+  upload_allowed_paths: {
+    default: [],
+    type: "string[]",
+    cli: "--upload-allowed-paths",
+    placeholder: "path1,path2,...",
+    env: ["PILO_UPLOAD_ALLOWED_PATHS"],
+    description:
+      "Comma-separated local filesystem roots where upload_file may read files. Empty means file upload is disabled.",
+    category: "action",
+  },
 
   // Search Configuration
   search_provider: {
@@ -706,6 +769,7 @@ function buildDefaults(): PiloConfigResolved {
   const requiredFields: (keyof PiloConfigResolved)[] = [
     "provider",
     "reasoning_effort",
+    "llm_provider_timeout_ms",
     "browser",
     "headless",
     "block_ads",
@@ -720,6 +784,9 @@ function buildDefaults(): PiloConfigResolved {
     "max_consecutive_errors",
     "max_total_errors",
     "initial_navigation_retries",
+    "cdp_connect_max_attempts",
+    "cdp_connect_backoff_base_ms",
+    "cdp_connect_backoff_max_ms",
     "bypass_csp",
     "navigation_timeout_ms",
     "navigation_max_timeout_ms",
@@ -728,6 +795,7 @@ function buildDefaults(): PiloConfigResolved {
     "action_timeout_ms",
     "trusted_hostnames",
     "unsafe_mode",
+    "upload_allowed_paths",
     "search_provider",
   ];
 

@@ -11,8 +11,11 @@ import {
   Locator,
   errors as playwrightErrors,
 } from "playwright";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import {
   AriaBrowser,
+  FileUploadConfig,
   FieldMetadata,
   FormSubmissionTrigger,
   FormSubmissionContext,
@@ -66,6 +69,8 @@ export interface PlaywrightBrowserOptions {
   pwCdpEndpoint?: string;
   /** Ordered list of CDP endpoint URLs to try in sequence (chromium only, takes precedence over pwCdpEndpoint) */
   pwCdpEndpoints?: string[];
+  /** Retry/backoff configuration for CDP connection attempts (chromium only) */
+  cdpConnectRetry?: Partial<CdpConnectRetryConfig>;
   /** Called when a CDP endpoint fails and the next one is being tried */
   onCdpEndpointCycle?: (attempt: number, error: Error) => void;
   /** Called when a CDP endpoint is successfully connected to */
@@ -76,6 +81,16 @@ export interface PlaywrightBrowserOptions {
   navigationRetry?: Partial<NavigationRetryConfig>;
   /** Timeout for page load and element actions in milliseconds (default: 30000) */
   actionTimeoutMs?: number;
+  /**
+   * Timeout for evaluating the aria-tree script in a single frame, in milliseconds
+   * (default: 5000). Bounds an otherwise unbounded Playwright `evaluate` so an
+   * unresponsive frame can't hang the snapshot. A child frame that exceeds it is skipped;
+   * a main-frame timeout surfaces as an error (the page's own document is unusable).
+   * Primarily a testability seam; rarely needs overriding in production.
+   */
+  ariaFrameEvaluateTimeoutMs?: number;
+  /** Explicit local filesystem allowlist for file uploads. Empty/false disables uploads. */
+  allowFileUpload?: false | FileUploadConfig;
 }
 
 export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptions {
@@ -93,6 +108,57 @@ export interface ExtendedPlaywrightBrowserOptions extends PlaywrightBrowserOptio
 /** Timeout per CDP endpoint connection attempt in milliseconds */
 const CDP_CONNECTION_TIMEOUT_MS = 5_000;
 
+/**
+ * Retry/backoff settings for CDP connection attempts. Each endpoint is retried up to
+ * `maxAttempts` times on transient connection errors before failing over to the next
+ * endpoint (a retry is a "failover-to-self"). Backoff is exponential with jitter,
+ * capped at `backoffMaxMs`.
+ */
+export interface CdpConnectRetryConfig {
+  /** Max connection attempts per endpoint (>= 1) */
+  maxAttempts: number;
+  /** Base delay for exponential backoff, in milliseconds */
+  backoffBaseMs: number;
+  /** Cap on backoff delay, in milliseconds */
+  backoffMaxMs: number;
+}
+
+/** Resolve a partial retry config against schema defaults, ignoring undefined overrides. */
+function resolveCdpConnectRetryConfig(
+  partial?: Partial<CdpConnectRetryConfig>,
+): CdpConnectRetryConfig {
+  const defaults = getConfigDefaults();
+  return {
+    maxAttempts: Math.max(1, partial?.maxAttempts ?? defaults.cdp_connect_max_attempts),
+    backoffBaseMs: partial?.backoffBaseMs ?? defaults.cdp_connect_backoff_base_ms,
+    backoffMaxMs: partial?.backoffMaxMs ?? defaults.cdp_connect_backoff_max_ms,
+  };
+}
+
+/**
+ * Timeout for evaluating the aria-tree script in a single frame, in milliseconds.
+ *
+ * Playwright's `evaluate` has no timeout option and is not governed by
+ * `setDefaultTimeout`. A hostile or unresponsive iframe (e.g. a busy ad frame whose
+ * main thread never yields) can leave `frame.evaluate` pending forever — neither
+ * resolving nor rejecting — which hangs the page snapshot and, in turn, the whole agent.
+ * Bounding each evaluate lets us skip such a frame instead of freezing.
+ */
+const ARIA_FRAME_EVALUATE_TIMEOUT_MS = 5_000;
+
+/**
+ * Race a promise against a timeout. Rejects with `Error(message)` if `ms` elapses before
+ * `promise` settles. The timer is always cleared, so no timer handle leaks on the happy
+ * path.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer!: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export class PlaywrightBrowser implements AriaBrowser {
   public browserName: string;
   public channel: string | undefined;
@@ -104,11 +170,15 @@ export class PlaywrightBrowser implements AriaBrowser {
   // Timeout for page load and element actions (configurable)
   private readonly actionTimeoutMs: number;
 
+  // Timeout for the aria-tree evaluate in a single frame (configurable)
+  private readonly ariaFrameEvaluateTimeoutMs: number;
+
   // Navigation retry configuration
   private readonly navigationConfig: NavigationRetryConfig;
 
   // CDP endpoint failover state
   private readonly cdpEndpoints: string[];
+  private readonly cdpConnectRetry: CdpConnectRetryConfig;
   private nextStartIndex: number = 0;
 
   /** Called when a CDP endpoint fails and the next one is being tried. Can be set after construction. */
@@ -123,6 +193,10 @@ export class PlaywrightBrowser implements AriaBrowser {
     // Initialize action timeout from options or use default
     this.actionTimeoutMs = options.actionTimeoutMs ?? getConfigDefaults().action_timeout_ms;
 
+    // Initialize per-frame aria-tree evaluate timeout from options or use default
+    this.ariaFrameEvaluateTimeoutMs =
+      options.ariaFrameEvaluateTimeoutMs ?? ARIA_FRAME_EVALUATE_TIMEOUT_MS;
+
     // Initialize navigation retry config with defaults and overrides
     // Uses createNavigationRetryConfig which safely handles undefined values
     this.navigationConfig = createNavigationRetryConfig(options.navigationRetry);
@@ -133,6 +207,9 @@ export class PlaywrightBrowser implements AriaBrowser {
       : options.pwCdpEndpoint
         ? [options.pwCdpEndpoint]
         : [];
+
+    // Resolve CDP connect retry/backoff config (defaults safely applied)
+    this.cdpConnectRetry = resolveCdpConnectRetryConfig(options.cdpConnectRetry);
 
     // Initialize callbacks from options (can also be set directly after construction)
     this.onCdpEndpointCycle = options.onCdpEndpointCycle;
@@ -442,50 +519,60 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   /**
-   * Try each CDP endpoint in sequence starting from nextStartIndex.
-   * Advances nextStartIndex on success. Throws a hard error if all are exhausted.
+   * Connect over CDP with per-endpoint retry (exponential backoff + jitter) and failover
+   * across endpoints. The index wraps modulo from `nextStartIndex` so each call gets a
+   * fresh budget — a single-endpoint reconnect (nextStartIndex already past 0) still
+   * retries that endpoint instead of looping zero times. Every connect failure is retried
+   * (bounded): Playwright flattens connect errors to message-only `Error`s with no
+   * structured codes, and connecting is idempotent, so classifying is unsound — we retry
+   * all. On success nextStartIndex advances so a later restart prefers the next endpoint.
    */
   private async connectOverCDPWithFailover(
     connectOptions: ConnectOptions,
   ): Promise<PlaywrightOriginalBrowser> {
-    for (let i = this.nextStartIndex; i < this.cdpEndpoints.length; i++) {
-      const endpoint = this.cdpEndpoints[i];
-      try {
-        const browser = await chromium.connectOverCDP(endpoint, {
-          ...connectOptions,
-          timeout: CDP_CONNECTION_TIMEOUT_MS,
-        });
-        this.nextStartIndex = i + 1;
-        this.onCdpEndpointConnected?.(i + 1, this.cdpEndpoints.length);
-        return browser;
-      } catch (err) {
-        if (!(err instanceof Error) || !this.isCdpConnectionError(err)) {
-          throw err;
-        }
-        const attemptNumber = i + 1;
-        const remaining = this.cdpEndpoints.length - i - 1;
-        if (remaining > 0) {
-          this.onCdpEndpointCycle?.(attemptNumber, err);
+    const total = this.cdpEndpoints.length;
+    const { maxAttempts } = this.cdpConnectRetry;
+
+    for (let visited = 0; visited < total; visited++) {
+      const index = (this.nextStartIndex + visited) % total;
+      const endpoint = this.cdpEndpoints[index];
+      const isLastEndpoint = visited === total - 1;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const browser = await chromium.connectOverCDP(endpoint, {
+            ...connectOptions,
+            timeout: CDP_CONNECTION_TIMEOUT_MS,
+          });
+          this.nextStartIndex = index + 1;
+          this.onCdpEndpointConnected?.(index + 1, total);
+          return browser;
+        } catch (err) {
+          if (attempt < maxAttempts) {
+            await this.delay(this.backoffDelayMs(attempt));
+            continue;
+          }
+          if (!isLastEndpoint) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            this.onCdpEndpointCycle?.(index + 1, error);
+          }
         }
       }
     }
-    throw new Error(`All ${this.cdpEndpoints.length} CDP endpoint(s) failed. Giving up.`);
+
+    throw new Error(`All ${total} CDP endpoint(s) failed. Giving up.`);
   }
 
-  /**
-   * Returns true for connection-level errors that should trigger CDP endpoint cycling:
-   * timeouts and network-level failures. Auth errors, malformed URLs, etc. return false.
-   */
-  private isCdpConnectionError(error: Error): boolean {
-    if (error instanceof playwrightErrors.TimeoutError) return true;
-    const message = error.message;
-    return (
-      message.includes("ECONNREFUSED") ||
-      message.includes("ECONNRESET") ||
-      message.includes("ETIMEDOUT") ||
-      message.includes("net::ERR_") ||
-      message.includes("NS_ERROR_")
-    );
+  /** Exponential backoff with full jitter for the 1-based attempt, capped at backoffMaxMs. */
+  private backoffDelayMs(attempt: number): number {
+    const { backoffBaseMs, backoffMaxMs } = this.cdpConnectRetry;
+    const exponential = backoffBaseMs * 2 ** (attempt - 1);
+    const capped = Math.min(exponential, backoffMaxMs);
+    return Math.floor(Math.random() * capped);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -511,6 +598,52 @@ export class PlaywrightBrowser implements AriaBrowser {
       message.includes("NS_ERROR_") || // Firefox: NS_ERROR_NET_RESET, etc.
       message.includes("NS_BINDING_") // Firefox: NS_BINDING_ABORTED, etc.
     );
+  }
+
+  private async resolveAllowedUploadPath(inputPath: string): Promise<string> {
+    const uploadConfig = this.options.allowFileUpload;
+    if (!uploadConfig || uploadConfig.allowedPaths.length === 0) {
+      throw new BrowserActionException("upload_file", "upload_disabled");
+    }
+
+    const resolvedPath = path.resolve(inputPath);
+    let stat;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+
+    if (!stat.isFile()) {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+
+    const realPath = await fs.realpath(resolvedPath);
+    for (const allowedRoot of uploadConfig.allowedPaths) {
+      try {
+        const realRoot = await fs.realpath(path.resolve(allowedRoot));
+        const relative = path.relative(realRoot, realPath);
+        if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+          return realPath;
+        }
+      } catch {
+        // Ignore missing or unreadable allowlist roots. They simply cannot match.
+      }
+    }
+
+    throw new BrowserActionException("upload_file", "upload_path_not_allowed");
+  }
+
+  private async resolveFileInputLocator(locator: Locator): Promise<Locator> {
+    const isDirectFileInput = await locator.evaluate((element) => {
+      return element instanceof HTMLInputElement && element.type.toLowerCase() === "file";
+    });
+    if (isDirectFileInput) return locator;
+
+    const nestedFileInput = locator.locator('input[type="file"]').first();
+    if ((await nestedFileInput.count()) > 0) return nestedFileInput;
+
+    throw new BrowserActionException("upload_file", "upload_target_not_file_input");
   }
 
   /**
@@ -551,8 +684,13 @@ export class PlaywrightBrowser implements AriaBrowser {
     if (!this.page) throw new Error("Browser not started");
 
     try {
-      // 1. Wait for DOM to be ready - this is critical for interactivity
-      await this.page.waitForLoadState("domcontentloaded");
+      // 1. Wait for DOM to be ready - this is critical for interactivity.
+      // Bounded by actionTimeoutMs: a page (or SPA soft-nav) that never reaches
+      // domcontentloaded must not hang the agent. On timeout we continue, since the
+      // page may still be interactive and the load wait + settle below still run.
+      await this.page.waitForLoadState("domcontentloaded", {
+        timeout: this.actionTimeoutMs,
+      });
     } catch (error) {
       // Still continue since we might be able to interact with what's loaded
     }
@@ -604,21 +742,27 @@ export class PlaywrightBrowser implements AriaBrowser {
   }
 
   private async getTreeWithRefsImpl(): Promise<string> {
-    // Inject the ariaTree bundle and generate snapshot in the main frame
-    const mainResult = await this.page!.evaluate(
-      ({ script }) => {
-        // Idempotent injection guard
-        const win = window as any;
-        if (!win.__piloAriaTree) {
-          const fn = new Function(script);
-          fn();
-          win.__piloAriaTree = (globalThis as any).__piloAriaTree;
-        }
-        const counter = { value: 0 };
-        const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
-        return { yaml, counterValue: counter.value };
-      },
-      { script: ARIA_TREE_SCRIPT },
+    // Inject the ariaTree bundle and generate snapshot in the main frame.
+    // Bounded by a timeout so an unresponsive page can't hang the snapshot forever; a
+    // main-frame timeout is a real failure and propagates to getTreeWithRefs's wrapper.
+    const mainResult = await withTimeout(
+      this.page!.evaluate(
+        ({ script }) => {
+          // Idempotent injection guard
+          const win = window as any;
+          if (!win.__piloAriaTree) {
+            const fn = new Function(script);
+            fn();
+            win.__piloAriaTree = (globalThis as any).__piloAriaTree;
+          }
+          const counter = { value: 0 };
+          const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(document.body, counter);
+          return { yaml, counterValue: counter.value };
+        },
+        { script: ARIA_TREE_SCRIPT },
+      ),
+      this.ariaFrameEvaluateTimeoutMs,
+      `aria-tree main-frame evaluate timed out after ${this.ariaFrameEvaluateTimeoutMs}ms`,
     );
 
     // Handle cross-origin iframes via Playwright's frame API
@@ -631,29 +775,35 @@ export class PlaywrightBrowser implements AriaBrowser {
       if (frame === this.page!.mainFrame()) continue;
 
       try {
-        const frameResult = await frame.evaluate(
-          ({ script, counterStart }) => {
-            const win = window as any;
-            if (!win.__piloAriaTree) {
-              const fn = new Function(script);
-              fn();
-              win.__piloAriaTree = (globalThis as any).__piloAriaTree;
-            }
-            const counter = { value: counterStart };
-            const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
-              document.body,
-              counter,
-            );
-            return { yaml, counterValue: counter.value };
-          },
-          { script: ARIA_TREE_SCRIPT, counterStart: counter },
+        // Bounded by a timeout: a busy/unresponsive ad iframe can otherwise leave
+        // frame.evaluate pending forever (Playwright's evaluate has no timeout).
+        const frameResult = await withTimeout(
+          frame.evaluate(
+            ({ script, counterStart }) => {
+              const win = window as any;
+              if (!win.__piloAriaTree) {
+                const fn = new Function(script);
+                fn();
+                win.__piloAriaTree = (globalThis as any).__piloAriaTree;
+              }
+              const counter = { value: counterStart };
+              const yaml: string = win.__piloAriaTree.generateAndRenderAriaTree(
+                document.body,
+                counter,
+              );
+              return { yaml, counterValue: counter.value };
+            },
+            { script: ARIA_TREE_SCRIPT, counterStart: counter },
+          ),
+          this.ariaFrameEvaluateTimeoutMs,
+          `aria-tree frame evaluate timed out after ${this.ariaFrameEvaluateTimeoutMs}ms`,
         );
         if (frameResult.yaml) {
           childYamls.push(frameResult.yaml);
           counter = frameResult.counterValue;
         }
       } catch {
-        // Cross-origin or detached frame, skip
+        // Cross-origin frame, detached frame, or an evaluate that timed out — skip it.
       }
     }
 
@@ -1096,6 +1246,16 @@ export class PlaywrightBrowser implements AriaBrowser {
                 await locator!.fill(value, { timeout: this.actionTimeoutMs });
                 break;
 
+              case PageAction.UploadFile: {
+                if (!value) {
+                  throw new BrowserActionException("upload_file", "upload_path_required");
+                }
+                const uploadPath = await this.resolveAllowedUploadPath(value);
+                const fileInput = await this.resolveFileInputLocator(locator!);
+                await fileInput.setInputFiles(uploadPath, { timeout: this.actionTimeoutMs });
+                break;
+              }
+
               case PageAction.Focus:
                 await locator!.focus({ timeout: this.actionTimeoutMs });
                 break;
@@ -1280,6 +1440,7 @@ export class PlaywrightBrowser implements AriaBrowser {
       PageAction.Click,
       PageAction.Hover,
       PageAction.Fill,
+      PageAction.UploadFile,
       PageAction.Focus,
       PageAction.Check,
       PageAction.Uncheck,

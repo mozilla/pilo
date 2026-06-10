@@ -10,6 +10,7 @@ import type {
   TaskValidationEventData,
   AIGenerationEventData,
   AIGenerationErrorEventData,
+  ToolExecutionErrorEventData,
   PageNavigationEventData,
   AgentStepEventData,
   ReasoningEventData,
@@ -22,6 +23,7 @@ import type {
   ProcessingEventData,
   ScreenshotCapturedEventData,
   ScreenshotCapturedImageEventData,
+  FirewallBlockedNonInteractiveEventData,
 } from "../src/events.js";
 
 // Mock console methods
@@ -665,6 +667,119 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("❌ AI generation error:");
       expect(allOutput).toContain("API rate limit exceeded");
     });
+
+    it("should handle TOOL_EXECUTION_ERROR events as a tool failure, not an AI error", () => {
+      const eventData: ToolExecutionErrorEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        error: "locator.click: Timeout 30000ms exceeded",
+        action: "click",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TOOL_EXECUTION_ERROR,
+        data: eventData,
+      });
+
+      expect(mockConsole.error).toHaveBeenCalled();
+      const allOutput = mockConsole.error.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Tool execution failed");
+      expect(allOutput).toContain("locator.click: Timeout 30000ms exceeded");
+      // Must NOT be mislabeled as an AI generation error
+      expect(allOutput).not.toContain("AI generation error");
+    });
+  });
+
+  describe("Firewall events", () => {
+    // console.warn is not part of the shared mockConsole, so spy on it locally.
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    const warnOutput = () => warnSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+
+    it("prints plain-text remediation options with the blocked hostname", () => {
+      const data: FirewallBlockedNonInteractiveEventData = {
+        timestamp: Date.now(),
+        iterationId: "",
+        reason:
+          "Security policy blocked submitting a form containing unauthorized agent-filled data",
+        kind: "form-submission",
+        pageHostname: "untrusted.com",
+        formActionHostnames: ["untrusted.com"],
+        remediations: [
+          {
+            kind: "add-trusted-hostnames",
+            hostnames: ["untrusted.com"],
+            description:
+              "Add untrusted.com to trusted_hostnames to allow this action on this site.",
+          },
+          {
+            kind: "enable-interactive-mode",
+            description:
+              "Run in interactive mode by providing a UserDataCallback so the agent can ask the user to approve sensitive fields per-action via request_user_data.",
+          },
+          {
+            kind: "enable-unsafe-mode",
+            description:
+              "Set unsafe_mode=true to disable the action firewall entirely. WARNING: ...",
+          },
+        ],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        data,
+      });
+
+      const output = warnOutput();
+      expect(output).toContain("untrusted.com");
+      expect(output).toContain("trusted_hostnames untrusted.com");
+      expect(output).toContain("interactive mode");
+      expect(output).toContain("unsafe_mode true");
+      // Output must be plain text, with no ANSI escape codes.
+      expect(output).not.toMatch(/\x1b\[[0-9;]*m/);
+    });
+
+    it("falls back to a generic command when no hostnames are listed", () => {
+      const data: FirewallBlockedNonInteractiveEventData = {
+        timestamp: Date.now(),
+        iterationId: "",
+        reason: "Security policy blocked filling a submittable form field without user approval",
+        kind: "freeform-fill",
+        pageHostname: null,
+        formActionHostnames: [],
+        remediations: [
+          {
+            kind: "add-trusted-hostnames",
+            hostnames: [],
+            description:
+              "Add the page hostname to trusted_hostnames to allow this action on this site.",
+          },
+          {
+            kind: "enable-interactive-mode",
+            description: "Run in interactive mode...",
+          },
+          {
+            kind: "enable-unsafe-mode",
+            description: "Set unsafe_mode=true...",
+          },
+        ],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        data,
+      });
+
+      expect(warnOutput()).toContain("trusted_hostnames <host>");
+    });
   });
 });
 
@@ -1082,10 +1197,12 @@ describe("JSONConsoleLogger", () => {
 describe("ChalkConsoleLogger", () => {
   let logger: ChalkConsoleLogger;
   let emitter: WebAgentEventEmitter;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     console.log = mockConsole.log;
     mockConsole.log.mockClear();
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     logger = new ChalkConsoleLogger();
     emitter = new WebAgentEventEmitter();
     logger.initialize(emitter);
@@ -1094,7 +1211,15 @@ describe("ChalkConsoleLogger", () => {
   afterEach(() => {
     console.log = originalConsole.log;
     logger.dispose();
+    warnSpy.mockRestore();
   });
+
+  // Strip ANSI color codes so assertions can match plain text.
+  const plainOutput = () =>
+    warnSpy.mock.calls
+      .map((c: unknown[]) => c.join(" "))
+      .join("\n")
+      .replace(/\x1b\[[0-9;]*m/g, "");
 
   describe("TASK_COMPLETED validationOutcome surfacing", () => {
     const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -1156,6 +1281,83 @@ describe("ChalkConsoleLogger", () => {
       expect(allOutput).toContain("Final answer text");
       expect(allOutput).not.toContain("Validator did not endorse");
       expect(allOutput).not.toContain("force-accepted");
+    });
+  });
+
+  describe("firewall remediation", () => {
+    it("prints all three remediation options with the blocked hostname", () => {
+      const data: FirewallBlockedNonInteractiveEventData = {
+        timestamp: Date.now(),
+        iterationId: "",
+        reason:
+          "Security policy blocked submitting a form containing unauthorized agent-filled data",
+        kind: "form-submission",
+        pageHostname: "untrusted.com",
+        formActionHostnames: ["untrusted.com"],
+        remediations: [
+          {
+            kind: "add-trusted-hostnames",
+            hostnames: ["untrusted.com"],
+            description:
+              "Add untrusted.com to trusted_hostnames to allow this action on this site.",
+          },
+          {
+            kind: "enable-interactive-mode",
+            description:
+              "Run in interactive mode by providing a UserDataCallback so the agent can ask the user to approve sensitive fields per-action via request_user_data.",
+          },
+          {
+            kind: "enable-unsafe-mode",
+            description:
+              "Set unsafe_mode=true to disable the action firewall entirely. WARNING: ...",
+          },
+        ],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        data,
+      });
+
+      const output = plainOutput();
+      expect(output).toContain("untrusted.com");
+      expect(output).toContain("trusted_hostnames untrusted.com");
+      expect(output).toContain("interactive mode");
+      expect(output).toContain("unsafe_mode true");
+    });
+
+    it("falls back to a generic command when no hostnames are listed", () => {
+      const data: FirewallBlockedNonInteractiveEventData = {
+        timestamp: Date.now(),
+        iterationId: "",
+        reason: "Security policy blocked filling a submittable form field without user approval",
+        kind: "freeform-fill",
+        pageHostname: null,
+        formActionHostnames: [],
+        remediations: [
+          {
+            kind: "add-trusted-hostnames",
+            hostnames: [],
+            description:
+              "Add the page hostname to trusted_hostnames to allow this action on this site.",
+          },
+          {
+            kind: "enable-interactive-mode",
+            description: "Run in interactive mode...",
+          },
+          {
+            kind: "enable-unsafe-mode",
+            description: "Set unsafe_mode=true...",
+          },
+        ],
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        data,
+      });
+
+      expect(plainOutput()).toContain("trusted_hostnames <host>");
     });
   });
 });

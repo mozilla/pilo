@@ -414,6 +414,47 @@ describe("MetricsCollector", () => {
       const metricsData = metricsListener.mock.calls[0][0] as TaskMetricsEventData;
       expect(metricsData.aiGenerationErrorCount).toBe(2);
     });
+
+    it("should track TOOL_EXECUTION_ERROR separately from AI generation errors", () => {
+      emitter.emitEvent({
+        type: WebAgentEventType.TOOL_EXECUTION_ERROR,
+        data: {
+          timestamp: Date.now(),
+          iterationId: "test-1",
+          error: "locator.click: Timeout 30000ms exceeded",
+          action: "click",
+        },
+      });
+
+      emitter.emitEvent({
+        type: WebAgentEventType.AI_GENERATION_ERROR,
+        data: {
+          timestamp: Date.now(),
+          iterationId: "test-1",
+          prompt: "test prompt",
+          error: "API error",
+          schema: {},
+          messages: [],
+        },
+      });
+
+      const metricsListener = vi.fn();
+      emitter.onEvent(WebAgentEventType.TASK_METRICS, metricsListener);
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TASK_COMPLETED,
+        data: {
+          timestamp: Date.now(),
+          iterationId: "test-1",
+          finalAnswer: "Done",
+        },
+      });
+
+      const metricsData = metricsListener.mock.calls[0][0] as TaskMetricsEventData;
+      // A browser/tool failure must not be counted as an AI generation error
+      expect(metricsData.toolExecutionErrorCount).toBe(1);
+      expect(metricsData.aiGenerationErrorCount).toBe(1);
+    });
   });
 
   describe("Task completion metrics", () => {

@@ -9,7 +9,7 @@
 
 import { streamText, ModelMessage, StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
-import { AriaBrowser, PageAction } from "./browser/ariaBrowser.js";
+import { AriaBrowser, FileUploadConfig, PageAction } from "./browser/ariaBrowser.js";
 import {
   BrowserReconnectedEventData,
   CdpEndpointConnectedEventData,
@@ -22,6 +22,7 @@ import { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import {
   BrowserDisconnectedError,
+  IterationTimeoutError,
   NoStartingUrlError,
   PlanningError,
   RecoverableError,
@@ -51,6 +52,7 @@ import { nanoid } from "nanoid";
 import { getConfigDefaults, type SearchProviderName } from "./config/defaults.js";
 import {
   DEFAULT_GENERATION_MAX_TOKENS,
+  DEFAULT_ITERATION_TIMEOUT_MS,
   DEFAULT_PLANNING_MAX_TOKENS,
   DEFAULT_VALIDATION_MAX_TOKENS,
 } from "./constants.js";
@@ -125,6 +127,27 @@ export interface WebAgentOptions {
    * trusted, controlled environments.
    */
   unsafeMode?: boolean;
+  /**
+   * Enables `upload_file` only for explicitly allowlisted local paths.
+   *
+   * Only PlaywrightBrowser currently implements PageAction.UploadFile. Callers
+   * using BiDi/Foxcloud should leave this disabled until those backends add
+   * concrete upload support.
+   *
+   * @warning Uploaded files are read from the local filesystem. Keep this
+   * disabled unless the caller controls the target page and the allowed path
+   * roots.
+   */
+  allowFileUpload?: false | FileUploadConfig;
+  /** Timeout for LLM provider calls in milliseconds (default: from config) */
+  llmProviderTimeoutMs?: number;
+  /**
+   * Per-iteration watchdog timeout in milliseconds (default: 300000 / 5 min). A single
+   * loop iteration (page snapshot + LLM call + tool execution) that exceeds this is
+   * aborted and the task ends with an ITERATION_TIMEOUT error, instead of hanging
+   * indefinitely. Generous by default so it only fires on a genuine hang.
+   */
+  iterationTimeoutMs?: number;
 }
 
 export interface ExecuteOptions {
@@ -146,6 +169,8 @@ export enum TaskErrorCode {
   MAX_ERRORS = "MAX_ERRORS",
   /** Generic task failure */
   TASK_FAILED = "TASK_FAILED",
+  /** A single iteration exceeded its watchdog timeout */
+  ITERATION_TIMEOUT = "ITERATION_TIMEOUT",
 }
 
 /** Structured error information for failed tasks */
@@ -239,6 +264,12 @@ export class WebAgent {
   private currentIterationId: string = "";
   private data: any = null;
   private abortSignal: AbortSignal | undefined = undefined;
+  /**
+   * The abort signal for the current iteration: the caller's abortSignal combined with
+   * the per-iteration watchdog. LLM calls use this so a watchdog timeout aborts the
+   * in-flight request. Set while an iteration runs, cleared afterward.
+   */
+  private currentIterationSignal: AbortSignal | undefined = undefined;
 
   // === Services ===
   private compressor: SnapshotCompressor;
@@ -264,6 +295,9 @@ export class WebAgent {
   private readonly onUserDataRequired: UserDataCallback | undefined;
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
+  private readonly allowFileUpload: false | FileUploadConfig;
+  private readonly llmProviderTimeoutMs: number;
+  private readonly iterationTimeoutMs: number;
   // Host of the caller-provided start URL (options.startingUrl), captured at
   // execute() time. Trusted by the firewall — navigating somewhere the caller
   // explicitly named is consent to interact with that host. NOT set from the
@@ -306,6 +340,9 @@ export class WebAgent {
       trustedHostnames: new Set((options.trustedHostnames ?? []).map((h) => normalizeHostname(h))),
       unsafeMode: Boolean(options.unsafeMode),
     });
+    this.allowFileUpload = options.allowFileUpload ?? false;
+    this.llmProviderTimeoutMs = options.llmProviderTimeoutMs ?? defaults.llm_provider_timeout_ms;
+    this.iterationTimeoutMs = options.iterationTimeoutMs ?? DEFAULT_ITERATION_TIMEOUT_MS;
 
     if (this.searchProvider === "parallel-api" && !this.searchApiKey) {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
@@ -439,6 +476,53 @@ export class WebAgent {
   }
 
   /**
+   * Run one iteration's work under a per-iteration watchdog.
+   *
+   * Sets `this.currentIterationSignal` to the caller's abortSignal combined with a fresh
+   * watchdog controller. The directly-issued iteration LLM calls (action `streamText` and
+   * validation) read this signal, so they abort when the watchdog fires. (The `extract`
+   * tool runs its own LLM call with the abort signal captured at tool-creation time — the
+   * external signal — so the watchdog doesn't propagate to it; the `Promise.race` below
+   * still bounds the iteration regardless.)
+   *
+   * Races the work against the timeout — the race is the correctness guarantee: the
+   * iteration is bounded even if an operation ignores the abort signal (the abort is
+   * best-effort cleanup of the in-flight LLM call). On timeout, throws
+   * `IterationTimeoutError`.
+   */
+  private async runWithIterationWatchdog<T>(work: () => Promise<T>): Promise<T> {
+    const watchdog = new AbortController();
+    this.currentIterationSignal = this.abortSignal
+      ? AbortSignal.any([this.abortSignal, watchdog.signal])
+      : watchdog.signal;
+
+    let timer!: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        watchdog.abort();
+        reject(
+          new IterationTimeoutError(
+            `Iteration exceeded the ${this.iterationTimeoutMs}ms watchdog timeout`,
+          ),
+        );
+      }, this.iterationTimeoutMs);
+    });
+
+    try {
+      return await Promise.race([work(), timeout]);
+    } finally {
+      clearTimeout(timer);
+      // Only restore the signal on the normal path. If the watchdog fired, leave the
+      // (now-aborted) signal in place so any work() still running in the background
+      // cancels its remaining LLM calls instead of falling back to the un-aborted
+      // external signal. The task ends on timeout, so nothing else needs it reset.
+      if (!watchdog.signal.aborted) {
+        this.currentIterationSignal = undefined;
+      }
+    }
+  }
+
+  /**
    * The main execution loop - clean and maintainable
    */
   private async runMainLoop(
@@ -476,6 +560,8 @@ export class WebAgent {
       operationalRefs,
       firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
       interactive: Boolean(this.onUserDataRequired),
+      allowFileUpload: this.allowFileUpload,
+      llmProviderTimeoutMs: this.llmProviderTimeoutMs,
     });
 
     // Only include search tools if a search service was created
@@ -540,23 +626,31 @@ export class WebAgent {
             currentIteration: executionState.currentIteration,
           });
 
-          // Add page snapshot if needed
-          if (needsPageSnapshot) {
-            // Clear approved refs when page changes: ARIA refs reset on each snapshot,
-            // so old ref strings may now point to different DOM elements.
-            // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
-            // so a blocked submit retry remains tied to the same agent-filled refs.
-            if (approvedRefs) {
-              approvedRefs.clear();
-            }
-            agentFilledRefs.clear();
-            operationalRefs.clear();
-            await this.addPageSnapshot();
-          }
-
-          // Single try-catch for ALL iteration logic
+          // Single try-catch for ALL iteration logic, including the page snapshot.
+          // The snapshot lives inside the try so a mid-snapshot browser disconnect
+          // (e.g. getTreeWithRefs/getCurrentPageInfo throwing BrowserDisconnectedError
+          // after a navigation destroys the page) is routed through
+          // handleBrowserDisconnect rather than escaping runMainLoop as a hard failure.
           try {
-            const result = await this.generateAndProcessAction(task, allTools, executionState);
+            // Run the snapshot + action under the per-iteration watchdog so a hung
+            // operation (e.g. a stalled LLM stream) can't freeze the task indefinitely.
+            const result = await this.runWithIterationWatchdog(async () => {
+              // Add page snapshot if needed
+              if (needsPageSnapshot) {
+                // Clear approved refs when page changes: ARIA refs reset on each snapshot,
+                // so old ref strings may now point to different DOM elements.
+                // Recoverable blocked action errors deliberately keep needsPageSnapshot=false
+                // so a blocked submit retry remains tied to the same agent-filled refs.
+                if (approvedRefs) {
+                  approvedRefs.clear();
+                }
+                agentFilledRefs.clear();
+                operationalRefs.clear();
+                await this.addPageSnapshot();
+              }
+
+              return await this.generateAndProcessAction(task, allTools, executionState);
+            });
 
             // Reset error counter on success
             consecutiveErrors = 0;
@@ -577,6 +671,23 @@ export class WebAgent {
 
             return { flow: "next" as const, needsPageSnapshot: result.pageChanged };
           } catch (error) {
+            // Iteration watchdog fired — end the task with a clear, distinct error rather
+            // than retrying a step that has already hung past its bound.
+            if (error instanceof IterationTimeoutError) {
+              stepSpan.setStatus({ code: SpanStatusCode.ERROR, message: "IterationTimeoutError" });
+              recordSanitizedException(stepSpan, error);
+              console.error(`[WebAgent] ${error.message}; ending task`);
+              const message = `Task failed: ${error.message}`;
+              return {
+                flow: "return" as const,
+                value: {
+                  success: false,
+                  finalAnswer: message,
+                  error: { code: TaskErrorCode.ITERATION_TIMEOUT, message },
+                },
+              };
+            }
+
             // Browser disconnects handled specially — don't mark span as error when recovery succeeds
             if (error instanceof BrowserDisconnectedError) {
               // May throw if all endpoints exhausted — propagates as hard error
@@ -735,11 +846,12 @@ export class WebAgent {
       // Don't add a user message - the error is already in the tool result
       // The LLM will see the error in the tool output and can retry
 
-      // Still emit the error event for logging/monitoring
-      this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
+      // Emit a tool-execution error event (NOT an AI generation error): the
+      // model generation succeeded, but executing the tool it chose failed.
+      this.emit(WebAgentEventType.TOOL_EXECUTION_ERROR, {
         error: error.message,
+        action: error.toolName,
         iterationId: this.currentIterationId,
-        isToolError: true,
       });
 
       // Early return - no user message needed
@@ -754,7 +866,6 @@ export class WebAgent {
     this.emit(WebAgentEventType.AI_GENERATION_ERROR, {
       error: errorMessage,
       iterationId: this.currentIterationId,
-      isToolError: false,
     });
 
     // Add error feedback to conversation for non-tool errors
@@ -997,7 +1108,10 @@ export class WebAgent {
             tools: webActionTools,
             toolChoice: "required",
             maxOutputTokens: DEFAULT_GENERATION_MAX_TOKENS,
-            abortSignal: this.abortSignal,
+            // Per-iteration watchdog signal (falls back to the caller's signal) so a
+            // stalled stream is aborted when the watchdog fires.
+            abortSignal: this.currentIterationSignal ?? this.abortSignal,
+            timeout: this.llmProviderTimeoutMs,
           });
 
           // Process the full stream to capture reasoning before tool execution
@@ -1373,7 +1487,7 @@ export class WebAgent {
               tools: validationTools,
               toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
               maxOutputTokens: DEFAULT_VALIDATION_MAX_TOKENS,
-              abortSignal: this.abortSignal,
+              abortSignal: this.currentIterationSignal ?? this.abortSignal,
             },
             {
               maxAttempts: 2,
@@ -1547,6 +1661,8 @@ export class WebAgent {
               tools: planningTools,
               toolChoice: "required", // Use "required" for compatibility with providers that don't support specific tool selection
               maxOutputTokens: DEFAULT_PLANNING_MAX_TOKENS,
+              abortSignal: this.abortSignal,
+              timeout: this.llmProviderTimeoutMs,
             },
             {
               maxAttempts: 3,
@@ -1828,10 +1944,15 @@ export class WebAgent {
         url,
       });
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Use cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Use cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (!this.currentPage.url) {
-        throw new Error("Browser disconnected or page unavailable");
+        throw new BrowserDisconnectedError(
+          error instanceof Error ? error.message : "page state unavailable",
+        );
       }
     }
   }
@@ -1843,12 +1964,17 @@ export class WebAgent {
       this.currentPage = { title, url };
       return { title, url };
     } catch (error) {
-      // Browser might be disconnected or page might be in transition
-      // Return cached values if available
+      // Browser might be disconnected or page might be in transition.
+      // Return cached values if available; otherwise the browser is unavailable
+      // with no recoverable state — surface a BrowserDisconnectedError so the
+      // action loop routes it through handleBrowserDisconnect (restart on the
+      // next CDP endpoint) instead of treating it as an ordinary agent error.
       if (this.currentPage.url) {
         return this.currentPage;
       }
-      throw new Error("Browser disconnected or page unavailable");
+      throw new BrowserDisconnectedError(
+        error instanceof Error ? error.message : "page state unavailable",
+      );
     }
   }
 

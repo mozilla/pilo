@@ -12,6 +12,7 @@ import {
   DEFAULT_RETRY_MAX_DELAY_MS,
   DEFAULT_RETRY_BACKOFF_FACTOR,
 } from "../constants.js";
+import { getConfigDefaults } from "../config/defaults.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -94,12 +95,20 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
       onRetry,
     } = retryOptions || {};
 
+    // Apply the configured LLM provider timeout via the AI SDK `timeout` option
+    // unless the caller supplied an explicit timeout. The AI SDK aborts the call
+    // if it exceeds this duration (works alongside any provided abortSignal).
+    const paramsWithTimeout = {
+      ...params,
+      timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
+    };
+
     let lastError: unknown;
     let delay = initialDelay;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const result = await generateText(params);
+        const result = await generateText(paramsWithTimeout);
 
         if (params.toolChoice === "required" && !result.toolResults?.length) {
           throw new Error("Tool call was required but model did not call any tools");

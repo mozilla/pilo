@@ -16,6 +16,13 @@ describe("config defaults: firewall fields", () => {
     expect(DEFAULTS.unsafe_mode).toBe(false);
   });
 
+  it("declares upload_allowed_paths as string[] with empty default", () => {
+    expect(FIELDS.upload_allowed_paths).toBeDefined();
+    expect(FIELDS.upload_allowed_paths.type).toBe("string[]");
+    expect(FIELDS.upload_allowed_paths.category).toBe("action");
+    expect(DEFAULTS.upload_allowed_paths).toEqual([]);
+  });
+
   it("trusted_hostnames description warns about data risk", () => {
     expect(FIELDS.trusted_hostnames.description).toMatch(/WARNING/);
     expect(FIELDS.trusted_hostnames.description.toLowerCase()).toContain("trust");
@@ -34,5 +41,10 @@ describe("config defaults: firewall fields", () => {
   it("unsafe_mode has a CLI flag and env var", () => {
     expect(FIELDS.unsafe_mode.cli).toBe("--unsafe");
     expect(FIELDS.unsafe_mode.env).toContain("PILO_UNSAFE_MODE");
+  });
+
+  it("upload_allowed_paths has a CLI flag and env var", () => {
+    expect(FIELDS.upload_allowed_paths.cli).toBe("--upload-allowed-paths");
+    expect(FIELDS.upload_allowed_paths.env).toContain("PILO_UPLOAD_ALLOWED_PATHS");
   });
 });

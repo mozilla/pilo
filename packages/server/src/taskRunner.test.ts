@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as path from "node:path";
 
 // Shared mock state for WebAgent so tests can override behavior
 let mockExecute = vi.fn().mockResolvedValue({
@@ -31,6 +32,8 @@ vi.mock("pilo-core", () => {
         openai_api_key: "sk-test123",
         browser: "firefox",
         headless: true,
+        llm_provider_timeout_ms: 90000,
+        upload_allowed_paths: [],
       })),
     },
     createAIProvider: vi.fn(() => ({})),
@@ -55,6 +58,7 @@ vi.mock("./StreamLogger.js", () => ({
   StreamLogger: class MockStreamLogger {},
 }));
 
+import { config } from "pilo-core";
 import {
   validateTaskRequest,
   createErrorResponse,
@@ -63,6 +67,15 @@ import {
 } from "./taskRunner.js";
 
 describe("taskRunner", () => {
+  const defaultServerConfig = {
+    provider: "openai",
+    openai_api_key: "sk-test123",
+    browser: "firefox",
+    headless: true,
+    llm_provider_timeout_ms: 90000,
+    upload_allowed_paths: [],
+  };
+
   describe("createErrorResponse", () => {
     it("should build the structured error shape from explicit fields", () => {
       const res = createErrorResponse({
@@ -279,6 +292,7 @@ describe("taskRunner", () => {
   describe("runTask", () => {
     beforeEach(() => {
       process.env.OPENAI_API_KEY = "test-key";
+      vi.mocked(config.getConfig).mockReturnValue({ ...defaultServerConfig } as any);
       mockExecute = vi.fn().mockResolvedValue({
         success: true,
         finalAnswer: "Task completed",
@@ -354,6 +368,120 @@ describe("taskRunner", () => {
 
       expect(mockConstructorSpy).toHaveBeenCalledWith(
         expect.objectContaining({ taskId: "task-abc-123" }),
+      );
+    });
+
+    it("should pass trustedHostnames and unsafeMode to WebAgent constructor", async () => {
+      await runTask({
+        body: {
+          task: "submit the form",
+          trustedHostnames: ["example.com", "app.example.com"],
+          unsafeMode: true,
+        },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trustedHostnames: ["example.com", "app.example.com"],
+          unsafeMode: true,
+        }),
+      );
+    });
+
+    it("passes the configured llm provider timeout to WebAgent", async () => {
+      await runTask({
+        body: { task: "test" },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ llmProviderTimeoutMs: 90000 }),
+      );
+    });
+
+    it("lets the request body override the llm provider timeout", async () => {
+      await runTask({
+        body: { task: "test", llmProviderTimeoutMs: 45000 },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ llmProviderTimeoutMs: 45000 }),
+      );
+    });
+
+    it("keeps file uploads disabled when only the request supplies upload paths", async () => {
+      await runTask({
+        body: { task: "test", uploadAllowedPaths: [path.resolve("secrets")] },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ allowFileUpload: false }),
+      );
+    });
+
+    it("uses the configured server upload allowlist when the request does not narrow it", async () => {
+      const serverRoot = path.resolve("fixtures");
+      vi.mocked(config.getConfig).mockReturnValue({
+        ...defaultServerConfig,
+        upload_allowed_paths: [serverRoot],
+      } as any);
+
+      await runTask({
+        body: { task: "test" },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowFileUpload: { allowedPaths: [serverRoot] },
+        }),
+      );
+    });
+
+    it("allows request upload paths only when they are inside the server allowlist", async () => {
+      const serverRoot = path.resolve("fixtures");
+      const allowedChild = path.join(serverRoot, "uploads");
+      const outside = path.resolve("outside");
+      vi.mocked(config.getConfig).mockReturnValue({
+        ...defaultServerConfig,
+        upload_allowed_paths: [serverRoot],
+      } as any);
+
+      await runTask({
+        body: { task: "test", uploadAllowedPaths: [allowedChild, outside] },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowFileUpload: { allowedPaths: [allowedChild] },
+        }),
+      );
+    });
+
+    it("lets an empty request upload allowlist disable uploads for that request", async () => {
+      vi.mocked(config.getConfig).mockReturnValue({
+        ...defaultServerConfig,
+        upload_allowed_paths: [path.resolve("fixtures")],
+      } as any);
+
+      await runTask({
+        body: { task: "test", uploadAllowedPaths: [] },
+        sendEvent: vi.fn(),
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(mockConstructorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ allowFileUpload: false }),
       );
     });
 

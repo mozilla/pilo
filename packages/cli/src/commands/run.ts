@@ -13,13 +13,14 @@ import {
   WebAgentEventEmitter,
   MetricsCollector,
   SecretsRedactor,
+  PLAYWRIGHT_BROWSERS,
 } from "pilo-core";
 import type {
+  FileUploadConfig,
   Logger,
   UserDataCallback,
   UserDataRequest,
   UserDataResponse,
-  FirewallBlockedNonInteractiveEventData,
 } from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
@@ -192,6 +193,14 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       process.exit(1);
     }
 
+    const uploadAllowedPaths =
+      (options.uploadAllowedPaths as string[] | undefined) ?? cfg.upload_allowed_paths;
+    const allowFileUpload: false | FileUploadConfig =
+      PLAYWRIGHT_BROWSERS.includes(browserOption as (typeof PLAYWRIGHT_BROWSERS)[number]) &&
+      uploadAllowedPaths?.length > 0
+        ? { allowedPaths: uploadAllowedPaths }
+        : false;
+
     // Create logger
     const loggerType = options.logger ?? cfg.logger;
     const metricsIncremental = options.metricsIncremental ?? cfg.metrics_incremental;
@@ -247,7 +256,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
           (options.pwCdpEndpoints as string[] | undefined) ??
           cfg.pw_cdp_endpoints ??
           (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
+        cdpConnectRetry: {
+          maxAttempts: options.cdpConnectMaxAttempts ?? cfg.cdp_connect_max_attempts,
+          backoffBaseMs: options.cdpConnectBackoffBaseMs ?? cfg.cdp_connect_backoff_base_ms,
+          backoffMaxMs: options.cdpConnectBackoffMaxMs ?? cfg.cdp_connect_backoff_max_ms,
+        },
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
         navigationRetry: {
           baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,
           maxTimeoutMs: options.navigationMaxTimeoutMs ?? cfg.navigation_max_timeout_ms,
@@ -312,10 +327,6 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       });
     }
 
-    eventEmitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, (data: unknown) => {
-      printFirewallRemediation(data as FirewallBlockedNonInteractiveEventData);
-    });
-
     // Create WebAgent
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
@@ -333,6 +344,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       tabstackApiUrl: options.tabstackApiUrl ?? cfg.tabstack_api_url,
       trustedHostnames: options.trustedHostnames ?? cfg.trusted_hostnames,
       unsafeMode: options.unsafe ?? cfg.unsafe_mode,
+      allowFileUpload,
       providerConfig,
       logger,
       eventEmitter,
@@ -350,42 +362,5 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
   } catch (error) {
     console.error(chalk.red.bold("\n❌ Error:"), chalk.whiteBright(error));
     process.exit(1);
-  }
-}
-
-export function printFirewallRemediation(data: FirewallBlockedNonInteractiveEventData): void {
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(chalk.yellow.bold("Pilo: an action was blocked by the prompt-injection firewall."));
-  lines.push(chalk.yellow(`Reason: ${data.reason}`));
-
-  const involvedHosts = Array.from(
-    new Set(
-      [data.pageHostname, ...data.formActionHostnames].filter((h): h is string => Boolean(h)),
-    ),
-  );
-  if (involvedHosts.length > 0) {
-    lines.push(chalk.yellow(`Hostnames involved: ${involvedHosts.join(", ")}`));
-  }
-
-  lines.push(chalk.yellow("To allow this action, you can:"));
-  for (const r of data.remediations) {
-    if (r.kind === "add-trusted-hostnames") {
-      const cmd =
-        r.hostnames.length > 0
-          ? `pilo config set trusted_hostnames ${r.hostnames.join(",")}`
-          : "pilo config set trusted_hostnames <host>";
-      lines.push(`  - ${r.description}`);
-      lines.push(`    Run: ${chalk.cyan(cmd)}`);
-    } else if (r.kind === "enable-interactive-mode") {
-      lines.push(`  - ${r.description}`);
-    } else if (r.kind === "enable-unsafe-mode") {
-      lines.push(`  - ${r.description}`);
-      lines.push(`    Run: ${chalk.cyan("pilo config set unsafe_mode true")}`);
-    }
-  }
-
-  for (const line of lines) {
-    console.warn(line);
   }
 }

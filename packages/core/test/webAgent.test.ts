@@ -12,7 +12,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
-import { PlanningError } from "../src/errors.js";
+import { PlanningError, BrowserDisconnectedError } from "../src/errors.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
@@ -288,6 +288,7 @@ describe("WebAgent", () => {
   let eventEmitter: WebAgentEventEmitter;
   let webAgent: WebAgent;
   let mockProvider: LanguageModel;
+  let options: WebAgentOptions;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -299,7 +300,7 @@ describe("WebAgent", () => {
     eventEmitter = new WebAgentEventEmitter();
     mockProvider = { specificationVersion: "v1" } as unknown as LanguageModel;
 
-    const options: WebAgentOptions = {
+    options = {
       providerConfig: { model: mockProvider },
       debug: false,
       vision: false,
@@ -604,6 +605,154 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(false);
       expect(result.finalAnswer).toBe("Task aborted by user");
+    });
+  });
+
+  describe("llm provider timeout", () => {
+    // Set up a minimal successful run: plan -> done -> validation.
+    function mockPlanThenDone(): void {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. do it" },
+            output: { successCriteria: "Done", plan: "1. do it" },
+          },
+        ],
+      } as any);
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Done" },
+              output: { action: "done", result: "Done", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Task complete" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Done", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+    }
+
+    it("passes the execute abort signal to planning", async () => {
+      const controller = new AbortController();
+      mockPlanThenDone();
+
+      await webAgent.execute("test task", {
+        startingUrl: "https://example.com",
+        abortSignal: controller.signal,
+      });
+
+      // Planning is the first generateTextWithRetry call.
+      expect(mockGenerateTextWithRetry.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ abortSignal: controller.signal }),
+      );
+    });
+
+    it("passes the default LLM provider timeout to action generation", async () => {
+      mockPlanThenDone();
+
+      await webAgent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 120000 }));
+    });
+
+    it("allows callers to override the LLM provider timeout", async () => {
+      const agent = new WebAgent(mockBrowser, { ...options, llmProviderTimeoutMs: 45000 });
+      mockPlanThenDone();
+
+      await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(mockStreamText).toHaveBeenCalledWith(expect.objectContaining({ timeout: 45000 }));
+
+      await agent.close();
+    });
+  });
+
+  describe("iteration watchdog", () => {
+    function mockPlan(): void {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Done", plan: "1. do it" },
+            output: { successCriteria: "Done", plan: "1. do it" },
+          },
+        ],
+      } as any);
+    }
+
+    // A streamText result whose fullStream never completes (simulates a stalled stream).
+    function hangingStreamResult(): any {
+      return {
+        fullStream: {
+          async *[Symbol.asyncIterator]() {
+            await new Promise(() => {});
+          },
+        },
+        toolResults: new Promise(() => {}),
+        response: new Promise(() => {}),
+        finishReason: new Promise(() => {}),
+        usage: new Promise(() => {}),
+        warnings: new Promise(() => {}),
+        providerMetadata: new Promise(() => {}),
+      };
+    }
+
+    it("aborts an iteration whose LLM stream never completes and returns ITERATION_TIMEOUT", async () => {
+      // Real timers + a tiny watchdog so the stalled iteration is bounded quickly.
+      vi.useRealTimers();
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(hangingStreamResult());
+
+      const agent = new WebAgent(mockBrowser, { ...options, iterationTimeoutMs: 50 });
+      const result = await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("ITERATION_TIMEOUT");
+
+      await agent.close();
+    });
+
+    it("passes a watchdog-derived abort signal to streamText that fires on timeout", async () => {
+      vi.useRealTimers();
+      mockPlan();
+      mockStreamText.mockReturnValueOnce(hangingStreamResult());
+
+      const agent = new WebAgent(mockBrowser, { ...options, iterationTimeoutMs: 50 });
+      await agent.execute("test task", { startingUrl: "https://example.com" });
+
+      const call = mockStreamText.mock.calls.at(-1)?.[0];
+      expect(call?.abortSignal).toBeInstanceOf(AbortSignal);
+      // The watchdog fired, so the signal handed to the LLM call is now aborted.
+      expect(call?.abortSignal?.aborted).toBe(true);
+
+      await agent.close();
     });
   });
 
@@ -1410,6 +1559,115 @@ describe("WebAgent", () => {
     });
   });
 
+  describe("browser disconnect classification", () => {
+    it("getCurrentPageInfo throws BrowserDisconnectedError when browser unavailable and no page cached", async () => {
+      mockBrowser.getTitle = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      mockBrowser.getUrl = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      (webAgent as any).currentPage = { url: "", title: "" };
+
+      await expect((webAgent as any).getCurrentPageInfo()).rejects.toBeInstanceOf(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("updatePageState throws BrowserDisconnectedError when browser unavailable and no page cached", async () => {
+      mockBrowser.getTitle = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      mockBrowser.getUrl = vi
+        .fn()
+        .mockRejectedValue(new Error("Target page, context or browser has been closed"));
+      (webAgent as any).currentPage = { url: "", title: "" };
+
+      await expect((webAgent as any).updatePageState()).rejects.toBeInstanceOf(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("getCurrentPageInfo returns cached page info without throwing when browser unavailable but page cached", async () => {
+      mockBrowser.getTitle = vi.fn().mockRejectedValue(new Error("transient"));
+      mockBrowser.getUrl = vi.fn().mockRejectedValue(new Error("transient"));
+      (webAgent as any).currentPage = { url: "https://example.com", title: "Cached" };
+
+      await expect((webAgent as any).getCurrentPageInfo()).resolves.toEqual({
+        url: "https://example.com",
+        title: "Cached",
+      });
+    });
+
+    it("recovers via handleBrowserDisconnect when the first page snapshot hits a disconnect", async () => {
+      // Planning phase
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: { successCriteria: "Test", plan: "1. Test" },
+            output: { successCriteria: "Test", plan: "1. Test" },
+          },
+        ],
+      } as any);
+
+      // First snapshot disconnects; subsequent snapshots succeed (post-reconnect).
+      vi.spyOn(mockBrowser, "getTreeWithRefs")
+        .mockRejectedValueOnce(
+          new BrowserDisconnectedError(
+            "page.evaluate: Execution context was destroyed, most likely because of a navigation",
+          ),
+        )
+        .mockResolvedValue(`<div><button [ref=btn1]>Click me</button></div>`);
+
+      const reconnectSpy = vi.spyOn(webAgent as any, "handleBrowserDisconnect");
+
+      // After reconnect, finish the task.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Task complete",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Recovered and completed" },
+              output: { action: "done", result: "Recovered and completed", isTerminal: true },
+            },
+          ],
+          response: {
+            messages: [
+              { role: "assistant", content: "Task complete" },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "done_1",
+                    toolName: "done",
+                    output: { action: "done", result: "Recovered and completed", isTerminal: true },
+                  },
+                ],
+              },
+            ],
+          },
+        }) as any,
+      );
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      const result = await webAgent.execute("Find something", {
+        startingUrl: "https://example.com",
+      });
+
+      expect(reconnectSpy).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+      expect(result.finalAnswer).toBe("Recovered and completed");
+    });
+  });
+
   describe("error handling", () => {
     beforeEach(() => {
       // Setup default planning
@@ -1810,13 +2068,17 @@ describe("WebAgent", () => {
 
       expect(result.success).toBe(true);
 
-      // Check that error event was emitted
+      // Check that a tool-execution error event was emitted (NOT an AI
+      // generation error — the model generation succeeded; tool execution failed)
       const errorEvent = mockLogger.events.find(
-        (e) => e.type === WebAgentEventType.AI_GENERATION_ERROR,
+        (e) => e.type === WebAgentEventType.TOOL_EXECUTION_ERROR,
       );
       expect(errorEvent).toBeDefined();
       expect(errorEvent?.data.error).toContain("You must use exactly one tool");
-      expect(errorEvent?.data.isToolError).toBe(true); // Should be marked as tool error for UI filtering
+      // It must NOT be reported as an AI generation error
+      expect(
+        mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION_ERROR),
+      ).toBeUndefined();
     });
 
     it("should handle tool result without output property", async () => {
