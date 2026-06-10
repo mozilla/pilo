@@ -196,6 +196,13 @@ export class ChalkConsoleLogger implements Logger {
     if (data.finalAnswer) {
       console.log(chalk.green.bold("\n✨ Final Answer:"), chalk.whiteBright(data.finalAnswer));
     }
+    if (data.validationOutcome === "force-accepted") {
+      console.log(
+        chalk.yellow.bold(
+          "⚠️  Validator did not endorse this answer (force-accepted after max validation attempts)",
+        ),
+      );
+    }
   };
 
   private handleTaskValidation = (data: TaskValidationEventData): void => {

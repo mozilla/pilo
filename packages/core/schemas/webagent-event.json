@@ -3886,6 +3886,14 @@
         },
         "timestamp": {
           "type": "number"
+        },
+        "validationOutcome": {
+          "description": "How validation resolved when a final answer was accepted:\n- \"accepted\": validator returned complete/excellent\n- \"force-accepted\": validator never accepted but maxValidationAttempts was hit\n- undefined: validation didn't run (task aborted, max iterations, etc.)\n\nMirrors `TaskExecutionResult.validationOutcome`; consumers can read the outcome from this event without needing the function return value.",
+          "enum": [
+            "accepted",
+            "force-accepted"
+          ],
+          "type": "string"
         }
       },
       "required": [

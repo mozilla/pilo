@@ -142,6 +142,16 @@ export interface TaskStartEventData extends WebAgentEventData {
 export interface TaskCompleteEventData extends WebAgentEventData {
   finalAnswer: string | null;
   success?: boolean;
+  /**
+   * How validation resolved when a final answer was accepted:
+   * - "accepted": validator returned complete/excellent
+   * - "force-accepted": validator never accepted but maxValidationAttempts was hit
+   * - undefined: validation didn't run (task aborted, max iterations, etc.)
+   *
+   * Mirrors `TaskExecutionResult.validationOutcome`; consumers can read the
+   * outcome from this event without needing the function return value.
+   */
+  validationOutcome?: "accepted" | "force-accepted";
 }
 
 /**
