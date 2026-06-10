@@ -11,6 +11,7 @@ import {
   RecoverableError,
   SEARCH_PROVIDERS,
   PLAYWRIGHT_BROWSERS,
+  resolveAdvertisedUploadFiles,
 } from "pilo-core";
 import type { FileUploadConfig, TaskExecutionResult, UserDataCallback } from "pilo-core";
 import * as path from "node:path";
@@ -323,6 +324,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
   );
   const allowFileUpload: false | FileUploadConfig =
     uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
+  const advertisedUploadFiles = await resolveAdvertisedUploadFiles(allowFileUpload);
 
   const browserConfig = {
     browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
@@ -368,6 +370,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     trustedHostnames: body.trustedHostnames ?? serverConfig.trusted_hostnames,
     unsafeMode: body.unsafeMode ?? serverConfig.unsafe_mode,
     allowFileUpload,
+    advertisedUploadFiles,
     llmProviderTimeoutMs: body.llmProviderTimeoutMs ?? serverConfig.llm_provider_timeout_ms,
     guardrails: body.guardrails,
     searchProvider: body.searchProvider ?? serverConfig.search_provider,

@@ -14,6 +14,7 @@ import {
   MetricsCollector,
   SecretsRedactor,
   PLAYWRIGHT_BROWSERS,
+  resolveAdvertisedUploadFiles,
 } from "pilo-core";
 import type {
   FileUploadConfig,
@@ -201,6 +202,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         ? { allowedPaths: uploadAllowedPaths }
         : false;
 
+    const advertisedUploadFiles = await resolveAdvertisedUploadFiles(allowFileUpload);
+
     // Create logger
     const loggerType = options.logger ?? cfg.logger;
     const metricsIncremental = options.metricsIncremental ?? cfg.metrics_incremental;
@@ -345,6 +348,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       trustedHostnames: options.trustedHostnames ?? cfg.trusted_hostnames,
       unsafeMode: options.unsafe ?? cfg.unsafe_mode,
       allowFileUpload,
+      advertisedUploadFiles,
       providerConfig,
       logger,
       eventEmitter,

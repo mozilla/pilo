@@ -139,6 +139,13 @@ export interface WebAgentOptions {
    * roots.
    */
   allowFileUpload?: false | FileUploadConfig;
+  /**
+   * Concrete local file paths the agent may upload, surfaced in its prompt so it
+   * knows what is available. Derived from `allowFileUpload` by the caller
+   * (CLI/server) via `resolveAdvertisedUploadFiles`. Empty when uploads are
+   * disabled or the allowlist names only directories.
+   */
+  advertisedUploadFiles?: string[];
   /** Timeout for LLM provider calls in milliseconds (default: from config) */
   llmProviderTimeoutMs?: number;
   /**
@@ -296,6 +303,7 @@ export class WebAgent {
   private readonly taskId: string | undefined;
   private readonly firewall: FirewallConfig;
   private readonly allowFileUpload: false | FileUploadConfig;
+  private readonly advertisedUploadFiles: string[];
   private readonly llmProviderTimeoutMs: number;
   private readonly iterationTimeoutMs: number;
   // Host of the caller-provided start URL (options.startingUrl), captured at
@@ -341,6 +349,7 @@ export class WebAgent {
       unsafeMode: Boolean(options.unsafeMode),
     });
     this.allowFileUpload = options.allowFileUpload ?? false;
+    this.advertisedUploadFiles = options.advertisedUploadFiles ?? [];
     this.llmProviderTimeoutMs = options.llmProviderTimeoutMs ?? defaults.llm_provider_timeout_ms;
     this.iterationTimeoutMs = options.iterationTimeoutMs ?? DEFAULT_ITERATION_TIMEOUT_MS;
 
@@ -874,8 +883,14 @@ export class WebAgent {
       Boolean(this.guardrails),
       this.searchProvider !== "none",
       Boolean(this.tabstackApiKey),
+      this.hasFileUpload,
+      this.advertisedUploadFiles,
     );
     this.messages.push({ role: "user", content: errorFeedback });
+  }
+
+  private get hasFileUpload(): boolean {
+    return this.allowFileUpload !== false && this.allowFileUpload.allowedPaths.length > 0;
   }
 
   /** Remove image parts from the most recent user message (fallback for AI SDK image crashes). */
@@ -1923,6 +1938,8 @@ export class WebAgent {
       hasTabstack,
       hasStartingUrl,
       hasInteractive,
+      this.hasFileUpload,
+      this.advertisedUploadFiles,
     );
 
     this.messages = [

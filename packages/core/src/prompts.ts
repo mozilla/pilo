@@ -174,11 +174,12 @@ function buildToolExamples(
   hasWebSearch: boolean,
   hasTabstack: boolean = false,
   hasInteractive: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
 ): string {
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
     `- fill({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "text"}) - ${TOOL_STRINGS.webActions.fill.description}`,
-    `- upload_file({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "path": "/path/to/file"}) - ${TOOL_STRINGS.webActions.uploadFile.description}`,
     `- select({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "value": "option"}) - ${TOOL_STRINGS.webActions.select.description}`,
     `- hover({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.hover.description}`,
     `- check({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.check.description}`,
@@ -192,6 +193,15 @@ function buildToolExamples(
     `- scroll({"direction": "down"}) - ${TOOL_STRINGS.webActions.scroll.description}`,
     `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
   ];
+
+  if (hasFileUpload) {
+    let uploadLine = `- upload_file({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "path": "/path/to/file"}) - ${TOOL_STRINGS.webActions.uploadFile.description}`;
+    if (advertisedUploadFiles.length > 0) {
+      uploadLine += `\n  Files available to upload (use one of these exact paths as "path"): ${advertisedUploadFiles.join(", ")}`;
+    }
+    // Insert just after the fill() example (index 1) to preserve ordering.
+    lines.splice(2, 0, uploadLine);
+  }
 
   if (hasWebSearch) {
     lines.push(
@@ -433,13 +443,15 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails, web search, Tabstack, and interactive tools. */
+/** Build action system prompt with optional guardrails, web search, Tabstack, interactive tools, and file upload. */
 const buildActionLoopSystemPrompt = (
   hasGuardrails: boolean,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
   hasStartingUrl: boolean = false,
   hasInteractive: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -447,7 +459,13 @@ const buildActionLoopSystemPrompt = (
     hasTabstack,
     hasStartingUrl,
     hasInteractive,
-    toolExamples: buildToolExamples(hasWebSearch, hasTabstack, hasInteractive),
+    toolExamples: buildToolExamples(
+      hasWebSearch,
+      hasTabstack,
+      hasInteractive,
+      hasFileUpload,
+      advertisedUploadFiles,
+    ),
     currentDate: getCurrentFormattedDate(),
   });
 
@@ -574,11 +592,19 @@ export const buildStepErrorFeedbackPrompt = (
   hasGuardrails: boolean = false,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
 ) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
-    toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
+    toolExamples: buildToolExamples(
+      hasWebSearch,
+      hasTabstack,
+      false,
+      hasFileUpload,
+      advertisedUploadFiles,
+    ),
   });
 
 /**

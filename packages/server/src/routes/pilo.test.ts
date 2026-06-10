@@ -47,6 +47,7 @@ vi.mock("pilo-core", () => ({
   DEFAULT_VISION: false,
   DEFAULT_MAX_ITERATIONS: 50,
   DEFAULT_MAX_VALIDATION_ATTEMPTS: 3,
+  resolveAdvertisedUploadFiles: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock the AI SDK

@@ -74,3 +74,6 @@ export type { ProviderConfig } from "./provider.js";
 
 // Config merge utilities
 export { mergeWithDefaults, createNavigationRetryConfig } from "./utils/configMerge.js";
+
+// Upload file utilities (Node-only)
+export { resolveAdvertisedUploadFiles } from "./utils/uploadFiles.js";
