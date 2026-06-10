@@ -753,6 +753,38 @@ describe("prompts", () => {
     });
   });
 
+  describe("upload_file tool surfacing", () => {
+    it("omits upload_file when uploads are disabled", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, false, []);
+      expect(prompt).not.toContain("upload_file(");
+    });
+
+    it("shows upload_file when enabled, without a files note if none advertised", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, true, []);
+      expect(prompt).toContain("upload_file(");
+      expect(prompt).not.toContain("Files available to upload");
+    });
+
+    it("lists advertised files when present", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false, false, false, false, true, [
+        "/fixtures/sample.txt",
+      ]);
+      expect(prompt).toContain("upload_file(");
+      expect(prompt).toContain("Files available to upload");
+      expect(prompt).toContain("/fixtures/sample.txt");
+    });
+
+    it("error-feedback prompt also gates upload_file on enablement", () => {
+      const disabled = buildStepErrorFeedbackPrompt("boom", false, false, false, false, []);
+      expect(disabled).not.toContain("upload_file(");
+      const enabled = buildStepErrorFeedbackPrompt("boom", false, false, false, true, [
+        "/fixtures/sample.txt",
+      ]);
+      expect(enabled).toContain("upload_file(");
+      expect(enabled).toContain("/fixtures/sample.txt");
+    });
+  });
+
   describe("Template consistency", () => {
     it("should use consistent prompt style across functions", () => {
       const prompts = [

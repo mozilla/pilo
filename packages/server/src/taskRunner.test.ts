@@ -51,6 +51,7 @@ vi.mock("pilo-core", () => {
     })),
     SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
     PLAYWRIGHT_BROWSERS: ["firefox", "chrome", "chromium", "safari", "webkit", "edge"],
+    resolveAdvertisedUploadFiles: vi.fn().mockResolvedValue([]),
   };
 });
 
