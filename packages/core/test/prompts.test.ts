@@ -287,6 +287,15 @@ describe("prompts", () => {
       expect(prompt).toContain("GUARDRAIL COMPLIANCE");
     });
 
+    it("guides done() for an action that completed without error but showed no confirmation", () => {
+      const prompt = buildActionLoopSystemPrompt(false, false);
+
+      // A submitted form with neither confirmation nor error should be reported
+      // with done() (caveated), not aborted as "unverified".
+      expect(prompt).toContain("no confirmation was shown");
+      expect(prompt).toContain('is NOT "unverified"');
+    });
+
     it("should support both guardrails and webSearch", () => {
       const prompt = buildActionLoopSystemPrompt(true, true);
 
