@@ -379,11 +379,13 @@ Analyze the current page state and determine your next action based on previous 
    - Did all specified filters/criteria apply (price range, date, location, format)?
    - Does your answer match the requested format?
 3. Verify actions actually completed by checking the most recent page state:
-   - If you submitted a form, did the next page confirm success?
+   - If you submitted a form, look for a success message or a validation error:
+     - A validation error means it did NOT submit — fix and retry.
+     - Neither a confirmation nor an error is a normal outcome on many sites: treat the submission as completed and report it with done(), stating explicitly that no confirmation was shown.
    - If you extracted data, did you actually find it in the page snapshot or extract() output?
 4. Data grounding: every value in your answer must appear in a page snapshot, a tool result, or the task input. Do NOT use general knowledge to fill gaps. If a value was not found during this session, say so explicitly rather than inventing it.
 5. Blockers vs. obstacles: if you hit an unrecoverable block (paywall, login wall, access denied, payment declined) that prevented completing a core requirement, call abort() with the reason. Temporary obstacles you handled (dismissed popups, retried errors) don't change the outcome.
-6. If anything is unverified, incomplete, or uncertain — call abort() with the reason rather than done() with an overclaiming answer.
+6. If the information or data the task asks you to return is unverified, or a core step was blocked outright, call abort() with the reason rather than done() with an overclaiming answer. But an action you actually performed — e.g. a form submit that returned no error and showed no validation error — is NOT "unverified" merely because the site displayed no explicit success message; report that with done() and the caveat, don't abort.
 
 **When using done():**
 Provide your final answer:
