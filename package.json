@@ -71,7 +71,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "prettier": "^3.8.3",
     "tsup": "^8.3.5",
     "tsx": "^4.22.4",
