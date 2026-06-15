@@ -26,8 +26,8 @@
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@types/node": "^25.7.0",
     "ollama-ai-provider-v2": "^3.5.1",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
