@@ -19,9 +19,9 @@
     "web-ext": "^10.2.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.79",
-    "@ai-sdk/google-vertex": "^4.0.137",
-    "@ai-sdk/openai": "^3.0.65",
+    "@ai-sdk/google": "^3.0.80",
+    "@ai-sdk/google-vertex": "^4.0.140",
+    "@ai-sdk/openai": "^3.0.67",
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@openrouter/ai-sdk-provider": "^2.8.0",
     "@types/node": "^25.7.0",
