@@ -68,8 +68,8 @@
     "esbuild": "^0.28.0",
     "jsdom": "^29.0.2",
     "ts-json-schema-generator": "2.9.0",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
