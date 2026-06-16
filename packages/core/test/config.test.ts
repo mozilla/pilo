@@ -198,6 +198,7 @@ describe("ConfigManager", () => {
         "unsafe_mode",
         "search_provider",
         "parallel_api_key",
+        "exa_api_key",
         "tabstack_api_key",
         "tabstack_api_url",
         "upload_allowed_paths",

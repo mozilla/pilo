@@ -42,7 +42,14 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
 export const LOGGERS = ["console", "json"] as const;
 export type LoggerType = (typeof LOGGERS)[number];
 
-export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
+export const SEARCH_PROVIDERS = [
+  "none",
+  "duckduckgo",
+  "google",
+  "bing",
+  "parallel-api",
+  "exa-api",
+] as const;
 export type SearchProviderName = (typeof SEARCH_PROVIDERS)[number];
 
 export type ConfigFieldType = "string" | "string[]" | "number" | "boolean" | "enum";
@@ -136,6 +143,7 @@ export interface PiloConfig {
   // Search Configuration
   search_provider?: SearchProviderName;
   parallel_api_key?: string;
+  exa_api_key?: string;
 
   // Tabstack Configuration
   tabstack_api_key?: string;
@@ -215,6 +223,7 @@ export interface PiloConfigResolved {
   // Search Configuration
   search_provider: SearchProviderName;
   parallel_api_key?: string;
+  exa_api_key?: string;
 
   // Tabstack Configuration
   tabstack_api_key?: string;
@@ -731,6 +740,14 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "key",
     env: ["PARALLEL_API_KEY"],
     description: "Parallel API key for search",
+    category: "search",
+  },
+  exa_api_key: {
+    type: "string",
+    cli: "--exa-api-key",
+    placeholder: "key",
+    env: ["EXA_API_KEY"],
+    description: "Exa API key for search",
     category: "search",
   },
 

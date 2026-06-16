@@ -1,7 +1,7 @@
 /**
- * Parallel API Search Provider
+ * Exa API Search Provider
  *
- * API-based search provider that uses the Parallel API for search.
+ * API-based search provider that uses the Exa API for search.
  * Returns results formatted as markdown for consistency with browser providers.
  */
 
@@ -13,19 +13,18 @@ import {
 } from "../../utils/promptSecurity.js";
 import { abbreviateForDebug } from "../debugPreview.js";
 
-interface ParallelSearchResult {
+interface ExaSearchResult {
   url: string;
   title?: string;
-  excerpts?: string[];
+  highlights?: string[];
 }
 
-interface ParallelApiResponse {
-  results?: ParallelSearchResult[];
-  error?: string;
+interface ExaApiResponse {
+  results?: ExaSearchResult[];
 }
 
-export class ParallelSearchProvider implements SearchProvider {
-  readonly name = "parallel-api";
+export class ExaSearchProvider implements SearchProvider {
+  readonly name = "exa-api";
   readonly requiresBrowser = false;
 
   constructor(
@@ -34,17 +33,17 @@ export class ParallelSearchProvider implements SearchProvider {
   ) {}
 
   async search(query: string, _browser?: AriaBrowser): Promise<string> {
-    const url = "https://api.parallel.ai/v1beta/search";
+    const url = "https://api.exa.ai/search";
     const body = JSON.stringify({
-      objective: query,
-      search_queries: [query],
-      excerpts: { max_chars_per_result: 1500 },
+      query,
+      // Opt into highlights, or Exa returns metadata only (no snippets).
+      contents: { highlights: { maxCharacters: 1500 } },
     });
 
     if (this.debug) {
       // Log the exact outbound request body (sans API key) so the query and
-      // options are observable. Matches the [X:debug] console.warn convention.
-      console.warn(`[ParallelSearch:debug] POST ${url}`, body);
+      // contents options are observable. Matches the [X:debug] console.warn convention.
+      console.warn(`[ExaSearch:debug] POST ${url}`, body);
     }
 
     const response = await fetch(url, {
@@ -52,28 +51,24 @@ export class ParallelSearchProvider implements SearchProvider {
       headers: {
         "Content-Type": "application/json",
         "x-api-key": this.apiKey,
-        "parallel-beta": "search-extract-2025-10-10",
       },
       body,
     });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error");
-      throw new Error(`Parallel API error (${response.status}): ${errorText}`);
+      throw new Error(`Exa API error (${response.status}): ${errorText}`);
     }
 
-    const data = (await response.json()) as ParallelApiResponse;
-
-    if (data.error) {
-      throw new Error(`Parallel API error: ${data.error}`);
-    }
+    const data = (await response.json()) as ExaApiResponse;
 
     if (this.debug) {
       // Log the count plus an abbreviated sample of the first result so all
-      // returned fields are visible, with long strings truncated.
+      // returned fields (including ones we don't map, like summary/score/
+      // publishedDate) are visible, with long strings truncated.
       const results = data.results ?? [];
       console.warn(
-        `[ParallelSearch:debug] response: ${results.length} result(s), sample:`,
+        `[ExaSearch:debug] response: ${results.length} result(s), sample:`,
         abbreviateForDebug(results[0]),
       );
     }
@@ -81,7 +76,7 @@ export class ParallelSearchProvider implements SearchProvider {
     return this.formatAsMarkdown(query, data);
   }
 
-  private formatAsMarkdown(query: string, data: ParallelApiResponse): string {
+  private formatAsMarkdown(query: string, data: ExaApiResponse): string {
     const header = `# Search Results for "${query}" (via ${this.name})`;
 
     let wrapped: string;
@@ -96,8 +91,8 @@ export class ParallelSearchProvider implements SearchProvider {
       data.results.forEach((result, index) => {
         const title = result.title || result.url;
         lines.push(`${index + 1}. [${title}](${result.url})`);
-        if (result.excerpts?.length) {
-          lines.push(result.excerpts.join("\n"));
+        if (result.highlights?.length) {
+          lines.push(result.highlights.join("\n"));
         }
         lines.push("");
       });
