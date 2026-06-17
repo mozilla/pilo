@@ -39,7 +39,7 @@
     "@opentelemetry/sdk-metrics": "^2.5.0",
     "@opentelemetry/sdk-node": "^0.218.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
-    "hono": "^4.12.23",
+    "hono": "^4.12.25",
     "pilo-core": "workspace:*"
   },
   "packageManager": "pnpm@9.0.0"
