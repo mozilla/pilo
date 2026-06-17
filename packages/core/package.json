@@ -39,7 +39,7 @@
     "@tabstack/sdk": "^2.3.0",
     "ai": "^6.0.193",
     "chalk": "^5.6.2",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "cross-fetch": "^4.1.0",
     "eventemitter3": "^5.0.4",
     "liquidjs": "^10.27.0",
