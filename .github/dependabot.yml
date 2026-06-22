@@ -36,3 +36,6 @@ updates:
           - vitest
           - wxt
           - "@wxt-dev/*"
+      radixui:
+        patterns:
+          - "@radix-ui/*"
