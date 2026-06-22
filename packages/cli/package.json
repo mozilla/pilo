@@ -24,7 +24,7 @@
     "@ai-sdk/openai": "^3.0.67",
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@openrouter/ai-sdk-provider": "^2.8.0",
-    "@types/node": "^25.7.0",
+    "@types/node": "^25.9.2",
     "ollama-ai-provider-v2": "^3.5.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
