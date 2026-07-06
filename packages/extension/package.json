@@ -34,7 +34,7 @@
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.18.0",
+    "lucide-react": "^1.21.0",
     "marked-react": "^4.0.0",
     "ollama-ai-provider-v2": "^3.6.0",
     "react": "^19.2.7",
