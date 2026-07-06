@@ -16,7 +16,7 @@
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "pilo-core": "workspace:*",
-    "web-ext": "^10.3.0"
+    "web-ext": "^10.4.0"
   },
   "devDependencies": {
     "@ai-sdk/google": "^3.0.83",
