@@ -25,7 +25,7 @@ importers:
         version: 2.0.51(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.18.0
-        version: 2.18.0(playwright@1.60.0)
+        version: 2.18.0(playwright@1.61.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.9.1(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
@@ -54,8 +54,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.61.0
+        version: 1.61.0
       turndown:
         specifier: ^7.2.2
         version: 7.2.4
@@ -147,7 +147,7 @@ importers:
         version: 2.0.51(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.18.0
-        version: 2.18.0(playwright@1.60.0)
+        version: 2.18.0(playwright@1.61.0)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.9.1(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
@@ -179,8 +179,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.61.0
+        version: 1.61.0
       turndown:
         specifier: ^7.2.2
         version: 7.2.4
@@ -270,8 +270,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       lucide-react:
-        specifier: ^1.18.0
-        version: 1.18.0(react@19.2.7)
+        specifier: ^1.21.0
+        version: 1.21.0(react@19.2.7)
       marked-react:
         specifier: ^4.0.0
         version: 4.0.0(react@19.2.7)
@@ -355,11 +355,11 @@ importers:
   packages/server:
     dependencies:
       '@hono/node-server':
-        specifier: ^2.0.4
-        version: 2.0.4(hono@4.12.25)
+        specifier: ^2.0.6
+        version: 2.0.6(hono@4.12.25)
       '@hono/node-ws':
         specifier: ^1.3.0
-        version: 1.3.1(@hono/node-server@2.0.4(hono@4.12.25))(hono@4.12.25)
+        version: 1.3.1(@hono/node-server@2.0.6(hono@4.12.25))(hono@4.12.25)
       '@hono/sentry':
         specifier: ^1.2.2
         version: 1.2.2(hono@4.12.25)
@@ -376,8 +376,8 @@ importers:
         specifier: ^2.8.0
         version: 2.8.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-metrics':
-        specifier: ^2.5.0
-        version: 2.7.1(@opentelemetry/api@1.9.1)
+        specifier: ^2.8.0
+        version: 2.8.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-node':
         specifier: ^0.218.0
         version: 0.218.0(@opentelemetry/api@1.9.1)
@@ -1006,8 +1006,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@hono/node-server@2.0.4':
-    resolution: {integrity: sha512-Ut3y0dMMPWy6bZ2kVfx25EOVbZlm15dhF4mOsezMlhpNHy+4MkU1qN9Y6lnruYi4wPmFzimGX2X7LF/FwHli4A==}
+  '@hono/node-server@2.0.6':
+    resolution: {integrity: sha512-7DeRlKG57JDBNZ5Qj2jwVdgwQy4b0tLubRLl3zCf91/rCf9i7p1V5FtW/yWibm1uUHE493ts9ZXH/7g/LQWl+g==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
@@ -3628,8 +3628,8 @@ packages:
     resolution: {integrity: sha512-Gf/KoL3C/MlI7Bt0PGI9I+TeTC/I6r/csU58N4BSNc4lppLBeKsOdFYkK+dX0ABDUMJNfCHTyPpzwwO21Awd3A==}
     engines: {node: 20 || >=22}
 
-  lucide-react@1.18.0:
-    resolution: {integrity: sha512-LZDb7H/0YfM+RJncD0hDQRCAu+vSGODqpe35TuVI8EuXaRjkczbsx7p8dY4J87F/MUSj6bpYqeI8nw8qXaAdmA==}
+  lucide-react@1.21.0:
+    resolution: {integrity: sha512-reEZMXq8Qdd5jg5XYkQ5TR1fB/GiQ7ih4vcrthYDtgjSDwh0i6/YLiGjsWsIwgN49gpAnd4J2elSNzncMEEUUQ==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -3915,18 +3915,8 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
-  playwright-core@1.60.0:
-    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.61.0:
     resolution: {integrity: sha512-caX7TrY3Ml6egyDX0WUcTHDxodl/b51y5wJOdCEA36QviK/s2g081hvmGs8eaE3DWb6NYZQ6BjO/QkNRPenoPA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.60.0:
-    resolution: {integrity: sha512-hheHdokM8cdqCb0lcE3s+zT4t4W+vvjpGxsZlDnikarzx8tSzMebh3UiFtgqwFwnTnjYQcsyMF8ei2mCO/tpeA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -5288,11 +5278,11 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.18.0': {}
 
-  '@ghostery/adblocker-playwright@2.18.0(playwright@1.60.0)':
+  '@ghostery/adblocker-playwright@2.18.0(playwright@1.61.0)':
     dependencies:
       '@ghostery/adblocker': 2.18.0
       '@ghostery/adblocker-content': 2.18.0
-      playwright: 1.60.0
+      playwright: 1.61.0
       tldts-experimental: 7.4.3
 
   '@ghostery/adblocker@2.18.0':
@@ -5321,13 +5311,13 @@ snapshots:
       protobufjs: 7.6.2
       yargs: 17.7.3
 
-  '@hono/node-server@2.0.4(hono@4.12.25)':
+  '@hono/node-server@2.0.6(hono@4.12.25)':
     dependencies:
       hono: 4.12.25
 
-  '@hono/node-ws@1.3.1(@hono/node-server@2.0.4(hono@4.12.25))(hono@4.12.25)':
+  '@hono/node-ws@1.3.1(@hono/node-server@2.0.6(hono@4.12.25))(hono@4.12.25)':
     dependencies:
-      '@hono/node-server': 2.0.4(hono@4.12.25)
+      '@hono/node-server': 2.0.6(hono@4.12.25)
       hono: 4.12.25
       ws: 8.21.0
     transitivePeerDependencies:
@@ -7858,7 +7848,7 @@ snapshots:
 
   lru-cache@11.3.6: {}
 
-  lucide-react@1.18.0(react@19.2.7):
+  lucide-react@1.21.0(react@19.2.7):
     dependencies:
       react: 19.2.7
 
@@ -8161,15 +8151,7 @@ snapshots:
       exsolve: 1.0.8
       pathe: 2.0.3
 
-  playwright-core@1.60.0: {}
-
   playwright-core@1.61.0: {}
-
-  playwright@1.60.0:
-    dependencies:
-      playwright-core: 1.60.0
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.61.0:
     dependencies:
