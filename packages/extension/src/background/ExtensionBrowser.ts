@@ -17,8 +17,7 @@ interface ActionResult {
 }
 
 type MetadataScriptResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; errorType?: "invalid-ref" };
+  { success: true; data: T } | { success: false; error: string; errorType?: "invalid-ref" };
 
 interface AriaSnapshotWindow {
   generateAndRenderAriaTree: (root: Element, counter?: { value: number }) => string;

@@ -27,13 +27,7 @@ export interface PiloTaskRequest {
 
   // AI configuration overrides
   provider?:
-    | "openai"
-    | "openrouter"
-    | "vertex"
-    | "ollama"
-    | "openai-compatible"
-    | "lmstudio"
-    | "google";
+    "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio" | "google";
   model?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
@@ -334,8 +328,7 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     blockAds: body.blockAds ?? serverConfig.block_ads,
     blockResources: (body.blockResources ??
       (serverConfig.block_resources ? serverConfig.block_resources.split(",") : undefined)) as
-      | Array<"image" | "stylesheet" | "font" | "media" | "manifest">
-      | undefined,
+      Array<"image" | "stylesheet" | "font" | "media" | "manifest"> | undefined,
     pwEndpoint: body.pwEndpoint ?? serverConfig.pw_endpoint,
     pwCdpEndpoint: body.pwCdpEndpoint ?? serverConfig.pw_cdp_endpoint,
     pwCdpEndpoints:
