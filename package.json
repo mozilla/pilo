@@ -62,7 +62,7 @@
     "commander": "^15.0.0",
     "cross-fetch": "^4.1.0",
     "eventemitter3": "^5.0.4",
-    "liquidjs": "^10.27.0",
+    "liquidjs": "^10.27.1",
     "nanoid": "^5.1.15",
     "ollama-ai-provider-v2": "^3.6.0",
     "playwright": "1.61.0",
