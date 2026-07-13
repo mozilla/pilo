@@ -25,7 +25,7 @@ importers:
         version: 2.0.51(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.18.0
-        version: 2.18.0(playwright@1.61.0)
+        version: 2.18.0(playwright@1.61.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.9.1(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
@@ -54,8 +54,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.61.0
-        version: 1.61.0
+        specifier: 1.61.1
+        version: 1.61.1
       turndown:
         specifier: ^7.2.2
         version: 7.2.4
@@ -147,7 +147,7 @@ importers:
         version: 2.0.51(zod@4.3.6)
       '@ghostery/adblocker-playwright':
         specifier: ^2.18.0
-        version: 2.18.0(playwright@1.61.0)
+        version: 2.18.0(playwright@1.61.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.9.1(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
@@ -179,8 +179,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0(ai@6.0.208(zod@4.3.6))(zod@4.3.6)
       playwright:
-        specifier: 1.61.0
-        version: 1.61.0
+        specifier: 1.61.1
+        version: 1.61.1
       turndown:
         specifier: ^7.2.2
         version: 7.2.4
@@ -3920,8 +3920,18 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  playwright-core@1.61.1:
+    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   playwright@1.61.0:
     resolution: {integrity: sha512-Z+7BeeqQPRRzklHsVFP4KTGIyMxKUmfeRA4WisM6G3/XW6nwGeX6fX9qYaDa+CiUqpOkb2f6X3nar05R3kSuJQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.61.1:
+    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -5278,11 +5288,11 @@ snapshots:
 
   '@ghostery/adblocker-extended-selectors@2.18.0': {}
 
-  '@ghostery/adblocker-playwright@2.18.0(playwright@1.61.0)':
+  '@ghostery/adblocker-playwright@2.18.0(playwright@1.61.1)':
     dependencies:
       '@ghostery/adblocker': 2.18.0
       '@ghostery/adblocker-content': 2.18.0
-      playwright: 1.61.0
+      playwright: 1.61.1
       tldts-experimental: 7.4.3
 
   '@ghostery/adblocker@2.18.0':
@@ -8153,9 +8163,17 @@ snapshots:
 
   playwright-core@1.61.0: {}
 
+  playwright-core@1.61.1: {}
+
   playwright@1.61.0:
     dependencies:
       playwright-core: 1.61.0
+    optionalDependencies:
+      fsevents: 2.3.2
+
+  playwright@1.61.1:
+    dependencies:
+      playwright-core: 1.61.1
     optionalDependencies:
       fsevents: 2.3.2
 
