@@ -80,11 +80,11 @@
                                 "type": "boolean"
                               },
                               {
-                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                               },
                               {
                                 "items": {
-                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                 },
                                 "type": "array"
                               }
@@ -147,11 +147,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -185,7 +185,8 @@
                             },
                             {
                               "additionalProperties": false,
-                              "description": "Image content part of a prompt. It contains an image.",
+                              "deprecated": true,
+                              "description": "Deprecated. Use `FilePart` with `mediaType: 'image'` instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'data', data } }`. Image content part of a prompt. It contains an image.",
                               "properties": {
                                 "image": {
                                   "anyOf": [
@@ -254,9 +255,17 @@
                                     {
                                       "format": "uri",
                                       "type": "string"
+                                    },
+                                    {
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      },
+                                      "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.",
+                                      "properties": {},
+                                      "type": "object"
                                     }
                                   ],
-                                  "description": "Image data. Can either be:\n\n- data: a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer\n- URL: a URL that points to the image"
+                                  "description": "Image data. Can either be:\n\n- data: a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer\n- URL: a URL that points to the image\n- ProviderReference: a provider reference from `uploadFile`"
                                 },
                                 "mediaType": {
                                   "description": "Optional IANA media type of the image.",
@@ -281,11 +290,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -319,6 +328,148 @@
                               "properties": {
                                 "data": {
                                   "anyOf": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing raw bytes (`Uint8Array`, `ArrayBuffer`, or `Buffer`) or a base64-encoded string.\n\nThis is slightly more permissive than `SharedV4FileDataData`.",
+                                          "properties": {
+                                            "data": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "additionalProperties": {
+                                                    "type": "number"
+                                                  },
+                                                  "properties": {
+                                                    "BYTES_PER_ELEMENT": {
+                                                      "type": "number"
+                                                    },
+                                                    "buffer": {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "byteLength": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "byteLength"
+                                                      ],
+                                                      "type": "object"
+                                                    },
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    },
+                                                    "byteOffset": {
+                                                      "type": "number"
+                                                    },
+                                                    "length": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "BYTES_PER_ELEMENT",
+                                                    "buffer",
+                                                    "byteLength",
+                                                    "byteOffset",
+                                                    "length"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "byteLength"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "$ref": "#/definitions/global.Buffer"
+                                                }
+                                              ],
+                                              "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                            },
+                                            "type": {
+                                              "const": "data",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "data"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing a URL that points to the file.",
+                                          "properties": {
+                                            "type": {
+                                              "const": "url",
+                                              "type": "string"
+                                            },
+                                            "url": {
+                                              "format": "uri",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "url"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing a provider reference (`{ [provider]: id }`).",
+                                          "properties": {
+                                            "reference": {
+                                              "additionalProperties": {
+                                                "type": "string"
+                                              },
+                                              "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.\n\n```ts {   \"openai\": \"file-abc123\",   \"anthropic\": \"file-xyz789\" } ```\n\nThe `type?: never` constraint excludes any object that has a `type` property, so a `SharedV4ProviderReference` cannot be confused with a tagged file-data shape (e.g. `{ type: 'data', data }` or `{ type: 'reference', reference }`) when both appear in the same union.",
+                                              "properties": {},
+                                              "type": "object"
+                                            },
+                                            "type": {
+                                              "const": "reference",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "reference"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing inline text content (e.g. an inline text document).",
+                                          "properties": {
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ],
+                                      "description": "File data as a tagged discriminated union:\n\n- `{ type: 'data', data }`: raw bytes (`Uint8Array`, `ArrayBuffer`, or   `Buffer`) or a base64-encoded string.\n- `{ type: 'url', url }`: a URL that points to the file.\n- `{ type: 'reference', reference }`: a provider reference (`{ [provider]: id }`).\n- `{ type: 'text', text }`: inline text content (e.g. an inline text document)."
+                                    },
                                     {
                                       "anyOf": [
                                         {
@@ -384,16 +535,24 @@
                                     {
                                       "format": "uri",
                                       "type": "string"
+                                    },
+                                    {
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      },
+                                      "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.",
+                                      "properties": {},
+                                      "type": "object"
                                     }
                                   ],
-                                  "description": "File data. Can either be:\n\n- data: a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer\n- URL: a URL that points to the image"
+                                  "description": "File data. Either a tagged shape or a bare shorthand:\n\n- `{ type: 'data', data }` or bare `DataContent`: raw bytes   (base64 string, Uint8Array, ArrayBuffer, Buffer)\n- `{ type: 'url', url }` or bare `URL`: a URL that points to the file\n- `{ type: 'reference', reference }` or bare `ProviderReference`:   a provider reference from `uploadFile`\n- `{ type: 'text', text }`: inline text content (tagged only)"
                                 },
                                 "filename": {
                                   "description": "Optional filename of the file.",
                                   "type": "string"
                                 },
                                 "mediaType": {
-                                  "description": "IANA media type of the file.",
+                                  "description": "Either a full IANA media type (`type/subtype`, e.g. `image/png`) or just the top-level IANA segment (e.g. `image`, `audio`, `video`, `text`).\n\n`*`-subtype wildcards (e.g. `image/*`) are normalized as equivalent to the top-level segment alone (e.g. `image`). Providers can use the helpers in `@ai-sdk/provider-utils` (`isFullMediaType`, `getTopLevelMediaType`, `detectMediaType`) to resolve the field according to their API requirements.",
                                   "type": "string"
                                 },
                                 "providerOptions": {
@@ -415,11 +574,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -474,11 +633,11 @@
                                 "type": "boolean"
                               },
                               {
-                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                               },
                               {
                                 "items": {
-                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                 },
                                 "type": "array"
                               }
@@ -541,11 +700,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -579,10 +738,509 @@
                             },
                             {
                               "additionalProperties": false,
+                              "description": "Custom content part of a prompt. It contains no standardized payload beyond provider-specific options.",
+                              "properties": {
+                                "kind": {
+                                  "description": "The kind of custom content, in the format `{provider}.{provider-type}`.",
+                                  "type": "string"
+                                },
+                                "providerOptions": {
+                                  "additionalProperties": {
+                                    "additionalProperties": {
+                                      "anyOf": [
+                                        {
+                                          "anyOf": [
+                                            {
+                                              "type": "null"
+                                            },
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                            },
+                                            {
+                                              "items": {
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                              },
+                                              "type": "array"
+                                            }
+                                          ],
+                                          "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                        },
+                                        {
+                                          "not": {}
+                                        }
+                                      ]
+                                    },
+                                    "type": "object"
+                                  },
+                                  "description": "Additional provider-specific metadata. They are passed through to the provider from the AI SDK and enable provider-specific functionality that can be fully encapsulated in the provider.",
+                                  "type": "object"
+                                },
+                                "type": {
+                                  "const": "custom",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "kind"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
                               "description": "File content part of a prompt. It contains a file.",
                               "properties": {
                                 "data": {
                                   "anyOf": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing raw bytes (`Uint8Array`, `ArrayBuffer`, or `Buffer`) or a base64-encoded string.\n\nThis is slightly more permissive than `SharedV4FileDataData`.",
+                                          "properties": {
+                                            "data": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "additionalProperties": {
+                                                    "type": "number"
+                                                  },
+                                                  "properties": {
+                                                    "BYTES_PER_ELEMENT": {
+                                                      "type": "number"
+                                                    },
+                                                    "buffer": {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "byteLength": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "byteLength"
+                                                      ],
+                                                      "type": "object"
+                                                    },
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    },
+                                                    "byteOffset": {
+                                                      "type": "number"
+                                                    },
+                                                    "length": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "BYTES_PER_ELEMENT",
+                                                    "buffer",
+                                                    "byteLength",
+                                                    "byteOffset",
+                                                    "length"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "byteLength"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "$ref": "#/definitions/global.Buffer"
+                                                }
+                                              ],
+                                              "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                            },
+                                            "type": {
+                                              "const": "data",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "data"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing a URL that points to the file.",
+                                          "properties": {
+                                            "type": {
+                                              "const": "url",
+                                              "type": "string"
+                                            },
+                                            "url": {
+                                              "format": "uri",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "url"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing a provider reference (`{ [provider]: id }`).",
+                                          "properties": {
+                                            "reference": {
+                                              "additionalProperties": {
+                                                "type": "string"
+                                              },
+                                              "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.\n\n```ts {   \"openai\": \"file-abc123\",   \"anthropic\": \"file-xyz789\" } ```\n\nThe `type?: never` constraint excludes any object that has a `type` property, so a `SharedV4ProviderReference` cannot be confused with a tagged file-data shape (e.g. `{ type: 'data', data }` or `{ type: 'reference', reference }`) when both appear in the same union.",
+                                              "properties": {},
+                                              "type": "object"
+                                            },
+                                            "type": {
+                                              "const": "reference",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "reference"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "File data variant containing inline text content (e.g. an inline text document).",
+                                          "properties": {
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ],
+                                      "description": "File data as a tagged discriminated union:\n\n- `{ type: 'data', data }`: raw bytes (`Uint8Array`, `ArrayBuffer`, or   `Buffer`) or a base64-encoded string.\n- `{ type: 'url', url }`: a URL that points to the file.\n- `{ type: 'reference', reference }`: a provider reference (`{ [provider]: id }`).\n- `{ type: 'text', text }`: inline text content (e.g. an inline text document)."
+                                    },
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "additionalProperties": {
+                                            "type": "number"
+                                          },
+                                          "properties": {
+                                            "BYTES_PER_ELEMENT": {
+                                              "type": "number"
+                                            },
+                                            "buffer": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "byteLength": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "byteLength"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            "byteLength": {
+                                              "type": "number"
+                                            },
+                                            "byteOffset": {
+                                              "type": "number"
+                                            },
+                                            "length": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "BYTES_PER_ELEMENT",
+                                            "buffer",
+                                            "byteLength",
+                                            "byteOffset",
+                                            "length"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "byteLength": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "byteLength"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "$ref": "#/definitions/global.Buffer"
+                                        }
+                                      ],
+                                      "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                    },
+                                    {
+                                      "format": "uri",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      },
+                                      "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.",
+                                      "properties": {},
+                                      "type": "object"
+                                    }
+                                  ],
+                                  "description": "File data. Either a tagged shape or a bare shorthand:\n\n- `{ type: 'data', data }` or bare `DataContent`: raw bytes   (base64 string, Uint8Array, ArrayBuffer, Buffer)\n- `{ type: 'url', url }` or bare `URL`: a URL that points to the file\n- `{ type: 'reference', reference }` or bare `ProviderReference`:   a provider reference from `uploadFile`\n- `{ type: 'text', text }`: inline text content (tagged only)"
+                                },
+                                "filename": {
+                                  "description": "Optional filename of the file.",
+                                  "type": "string"
+                                },
+                                "mediaType": {
+                                  "description": "Either a full IANA media type (`type/subtype`, e.g. `image/png`) or just the top-level IANA segment (e.g. `image`, `audio`, `video`, `text`).\n\n`*`-subtype wildcards (e.g. `image/*`) are normalized as equivalent to the top-level segment alone (e.g. `image`). Providers can use the helpers in `@ai-sdk/provider-utils` (`isFullMediaType`, `getTopLevelMediaType`, `detectMediaType`) to resolve the field according to their API requirements.",
+                                  "type": "string"
+                                },
+                                "providerOptions": {
+                                  "additionalProperties": {
+                                    "additionalProperties": {
+                                      "anyOf": [
+                                        {
+                                          "anyOf": [
+                                            {
+                                              "type": "null"
+                                            },
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                            },
+                                            {
+                                              "items": {
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                              },
+                                              "type": "array"
+                                            }
+                                          ],
+                                          "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                        },
+                                        {
+                                          "not": {}
+                                        }
+                                      ]
+                                    },
+                                    "type": "object"
+                                  },
+                                  "description": "Additional provider-specific metadata. They are passed through to the provider from the AI SDK and enable provider-specific functionality that can be fully encapsulated in the provider.",
+                                  "type": "object"
+                                },
+                                "type": {
+                                  "const": "file",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "data",
+                                "mediaType"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "description": "Reasoning content part of a prompt. It contains a reasoning.",
+                              "properties": {
+                                "providerOptions": {
+                                  "additionalProperties": {
+                                    "additionalProperties": {
+                                      "anyOf": [
+                                        {
+                                          "anyOf": [
+                                            {
+                                              "type": "null"
+                                            },
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                            },
+                                            {
+                                              "items": {
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                              },
+                                              "type": "array"
+                                            }
+                                          ],
+                                          "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                        },
+                                        {
+                                          "not": {}
+                                        }
+                                      ]
+                                    },
+                                    "type": "object"
+                                  },
+                                  "description": "Additional provider-specific metadata. They are passed through to the provider from the AI SDK and enable provider-specific functionality that can be fully encapsulated in the provider.",
+                                  "type": "object"
+                                },
+                                "text": {
+                                  "description": "The reasoning text.",
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "const": "reasoning",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "text"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "description": "Reasoning file content part of a prompt. It contains a file generated as part of reasoning.",
+                              "properties": {
+                                "data": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "File data variant containing raw bytes (`Uint8Array`, `ArrayBuffer`, or `Buffer`) or a base64-encoded string.\n\nThis is slightly more permissive than `SharedV4FileDataData`.",
+                                      "properties": {
+                                        "data": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "additionalProperties": {
+                                                "type": "number"
+                                              },
+                                              "properties": {
+                                                "BYTES_PER_ELEMENT": {
+                                                  "type": "number"
+                                                },
+                                                "buffer": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "byteLength": {
+                                                      "type": "number"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "byteLength"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                "byteLength": {
+                                                  "type": "number"
+                                                },
+                                                "byteOffset": {
+                                                  "type": "number"
+                                                },
+                                                "length": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "BYTES_PER_ELEMENT",
+                                                "buffer",
+                                                "byteLength",
+                                                "byteOffset",
+                                                "length"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "byteLength": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "byteLength"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "$ref": "#/definitions/global.Buffer"
+                                            }
+                                          ],
+                                          "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                        },
+                                        "type": {
+                                          "const": "data",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "data"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "File data variant containing a URL that points to the file.",
+                                      "properties": {
+                                        "type": {
+                                          "const": "url",
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "format": "uri",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "url"
+                                      ],
+                                      "type": "object"
+                                    },
                                     {
                                       "anyOf": [
                                         {
@@ -650,11 +1308,7 @@
                                       "type": "string"
                                     }
                                   ],
-                                  "description": "File data. Can either be:\n\n- data: a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer\n- URL: a URL that points to the image"
-                                },
-                                "filename": {
-                                  "description": "Optional filename of the file.",
-                                  "type": "string"
+                                  "description": "Reasoning file data.\n\nReasoning files originate from a model's reasoning output and are always raw bytes or a fetchable URL. Unlike `FilePart.data`, the `reference` and `text` shapes are not supported here: provider references describe files uploaded by the user (not produced as model output), and reasoning text is carried by `ReasoningPart` rather than as a file.\n\nEither a tagged shape or a bare shorthand:\n\n- `{ type: 'data', data }` or bare `DataContent`: raw bytes   (base64 string, Uint8Array, ArrayBuffer, Buffer)\n- `{ type: 'url', url }` or bare `URL`: a URL that points to the file"
                                 },
                                 "mediaType": {
                                   "description": "IANA media type of the file.",
@@ -679,11 +1333,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -701,7 +1355,7 @@
                                   "type": "object"
                                 },
                                 "type": {
-                                  "const": "file",
+                                  "const": "reasoning-file",
                                   "type": "string"
                                 }
                               },
@@ -709,65 +1363,6 @@
                                 "type",
                                 "data",
                                 "mediaType"
-                              ],
-                              "type": "object"
-                            },
-                            {
-                              "additionalProperties": false,
-                              "description": "Reasoning content part of a prompt. It contains a reasoning.",
-                              "properties": {
-                                "providerOptions": {
-                                  "additionalProperties": {
-                                    "additionalProperties": {
-                                      "anyOf": [
-                                        {
-                                          "anyOf": [
-                                            {
-                                              "type": "null"
-                                            },
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "number"
-                                            },
-                                            {
-                                              "type": "boolean"
-                                            },
-                                            {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
-                                            },
-                                            {
-                                              "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
-                                              },
-                                              "type": "array"
-                                            }
-                                          ],
-                                          "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
-                                        },
-                                        {
-                                          "not": {}
-                                        }
-                                      ]
-                                    },
-                                    "type": "object"
-                                  },
-                                  "description": "Additional provider-specific metadata. They are passed through to the provider from the AI SDK and enable provider-specific functionality that can be fully encapsulated in the provider.",
-                                  "type": "object"
-                                },
-                                "text": {
-                                  "description": "The reasoning text.",
-                                  "type": "string"
-                                },
-                                "type": {
-                                  "const": "reasoning",
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "text"
                               ],
                               "type": "object"
                             },
@@ -801,11 +1396,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -871,11 +1466,11 @@
                                                       "type": "boolean"
                                                     },
                                                     {
-                                                      "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                      "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                     },
                                                     {
                                                       "items": {
-                                                        "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                        "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                       },
                                                       "type": "array"
                                                     }
@@ -929,11 +1524,11 @@
                                                       "type": "boolean"
                                                     },
                                                     {
-                                                      "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                      "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                     },
                                                     {
                                                       "items": {
-                                                        "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                        "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                       },
                                                       "type": "array"
                                                     }
@@ -986,11 +1581,11 @@
                                                         "type": "boolean"
                                                       },
                                                       {
-                                                        "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                        "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                       },
                                                       {
                                                         "items": {
-                                                          "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                          "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                         },
                                                         "type": "array"
                                                       }
@@ -1006,7 +1601,7 @@
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -1042,11 +1637,11 @@
                                                       "type": "boolean"
                                                     },
                                                     {
-                                                      "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                      "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                     },
                                                     {
                                                       "items": {
-                                                        "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                        "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                       },
                                                       "type": "array"
                                                     }
@@ -1100,11 +1695,11 @@
                                                       "type": "boolean"
                                                     },
                                                     {
-                                                      "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                      "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                     },
                                                     {
                                                       "items": {
-                                                        "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                        "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                       },
                                                       "type": "array"
                                                     }
@@ -1157,11 +1752,11 @@
                                                       "type": "boolean"
                                                     },
                                                     {
-                                                      "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                      "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                     },
                                                     {
                                                       "items": {
-                                                        "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                        "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                       },
                                                       "type": "array"
                                                     }
@@ -1214,11 +1809,11 @@
                                                         "type": "boolean"
                                                       },
                                                       {
-                                                        "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                        "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                       },
                                                       {
                                                         "items": {
-                                                          "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                          "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                         },
                                                         "type": "array"
                                                       }
@@ -1234,7 +1829,7 @@
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -1280,11 +1875,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1320,15 +1915,197 @@
                                                 "additionalProperties": false,
                                                 "properties": {
                                                   "data": {
+                                                    "anyOf": [
+                                                      {
+                                                        "additionalProperties": false,
+                                                        "description": "File data variant containing raw bytes (`Uint8Array`, `ArrayBuffer`, or `Buffer`) or a base64-encoded string.\n\nThis is slightly more permissive than `SharedV4FileDataData`.",
+                                                        "properties": {
+                                                          "data": {
+                                                            "anyOf": [
+                                                              {
+                                                                "type": "string"
+                                                              },
+                                                              {
+                                                                "additionalProperties": {
+                                                                  "type": "number"
+                                                                },
+                                                                "properties": {
+                                                                  "BYTES_PER_ELEMENT": {
+                                                                    "type": "number"
+                                                                  },
+                                                                  "buffer": {
+                                                                    "additionalProperties": false,
+                                                                    "properties": {
+                                                                      "byteLength": {
+                                                                        "type": "number"
+                                                                      }
+                                                                    },
+                                                                    "required": [
+                                                                      "byteLength"
+                                                                    ],
+                                                                    "type": "object"
+                                                                  },
+                                                                  "byteLength": {
+                                                                    "type": "number"
+                                                                  },
+                                                                  "byteOffset": {
+                                                                    "type": "number"
+                                                                  },
+                                                                  "length": {
+                                                                    "type": "number"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "BYTES_PER_ELEMENT",
+                                                                  "buffer",
+                                                                  "byteLength",
+                                                                  "byteOffset",
+                                                                  "length"
+                                                                ],
+                                                                "type": "object"
+                                                              },
+                                                              {
+                                                                "additionalProperties": false,
+                                                                "properties": {
+                                                                  "byteLength": {
+                                                                    "type": "number"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "byteLength"
+                                                                ],
+                                                                "type": "object"
+                                                              },
+                                                              {
+                                                                "$ref": "#/definitions/global.Buffer"
+                                                              }
+                                                            ],
+                                                            "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                                          },
+                                                          "type": {
+                                                            "const": "data",
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "type",
+                                                          "data"
+                                                        ],
+                                                        "type": "object"
+                                                      },
+                                                      {
+                                                        "additionalProperties": false,
+                                                        "description": "File data variant containing a URL that points to the file.",
+                                                        "properties": {
+                                                          "type": {
+                                                            "const": "url",
+                                                            "type": "string"
+                                                          },
+                                                          "url": {
+                                                            "format": "uri",
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "type",
+                                                          "url"
+                                                        ],
+                                                        "type": "object"
+                                                      },
+                                                      {
+                                                        "additionalProperties": false,
+                                                        "description": "File data variant containing a provider reference (`{ [provider]: id }`).",
+                                                        "properties": {
+                                                          "reference": {
+                                                            "additionalProperties": {
+                                                              "type": "string"
+                                                            },
+                                                            "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.\n\n```ts {   \"openai\": \"file-abc123\",   \"anthropic\": \"file-xyz789\" } ```\n\nThe `type?: never` constraint excludes any object that has a `type` property, so a `SharedV4ProviderReference` cannot be confused with a tagged file-data shape (e.g. `{ type: 'data', data }` or `{ type: 'reference', reference }`) when both appear in the same union.",
+                                                            "properties": {},
+                                                            "type": "object"
+                                                          },
+                                                          "type": {
+                                                            "const": "reference",
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "type",
+                                                          "reference"
+                                                        ],
+                                                        "type": "object"
+                                                      },
+                                                      {
+                                                        "additionalProperties": false,
+                                                        "description": "File data variant containing inline text content (e.g. an inline text document).",
+                                                        "properties": {
+                                                          "text": {
+                                                            "type": "string"
+                                                          },
+                                                          "type": {
+                                                            "const": "text",
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "type",
+                                                          "text"
+                                                        ],
+                                                        "type": "object"
+                                                      }
+                                                    ],
+                                                    "description": "File data as a tagged discriminated union:\n\n- `{ type: 'data', data }`: raw bytes   (base64 string, Uint8Array, ArrayBuffer, Buffer)\n- `{ type: 'url', url }`: a URL that points to the file\n- `{ type: 'reference', reference }`: a provider reference   from `uploadFile`\n- `{ type: 'text', text }`: inline text content (e.g. an inline   text document)"
+                                                  },
+                                                  "filename": {
+                                                    "description": "Optional filename of the file.",
                                                     "type": "string"
                                                   },
                                                   "mediaType": {
+                                                    "description": "Either a full IANA media type (`type/subtype`, e.g. `image/png`) or just the top-level IANA segment (e.g. `image`, `audio`, `video`, `text`).\n\n`*`-subtype wildcards (e.g. `image/*`) are normalized as equivalent to the top-level segment alone (e.g. `image`). Providers can use the helpers in `@ai-sdk/provider-utils` (`isFullMediaType`, `getTopLevelMediaType`, `detectMediaType`) to resolve the field according to their API requirements.",
                                                     "type": "string"
                                                   },
+                                                  "providerOptions": {
+                                                    "additionalProperties": {
+                                                      "additionalProperties": {
+                                                        "anyOf": [
+                                                          {
+                                                            "anyOf": [
+                                                              {
+                                                                "type": "null"
+                                                              },
+                                                              {
+                                                                "type": "string"
+                                                              },
+                                                              {
+                                                                "type": "number"
+                                                              },
+                                                              {
+                                                                "type": "boolean"
+                                                              },
+                                                              {
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                              },
+                                                              {
+                                                                "items": {
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                                },
+                                                                "type": "array"
+                                                              }
+                                                            ],
+                                                            "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                          },
+                                                          {
+                                                            "not": {}
+                                                          }
+                                                        ]
+                                                      },
+                                                      "type": "object"
+                                                    },
+                                                    "description": "Provider-specific options.",
+                                                    "type": "object"
+                                                  },
                                                   "type": {
-                                                    "const": "media",
-                                                    "deprecated": true,
-                                                    "description": "Deprecated. Use image-data or file-data instead.",
+                                                    "const": "file",
                                                     "type": "string"
                                                   }
                                                 },
@@ -1373,11 +2150,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1396,6 +2173,8 @@
                                                   },
                                                   "type": {
                                                     "const": "file-data",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with mediaType + tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'data', data } }`.",
                                                     "type": "string"
                                                   }
                                                 },
@@ -1409,6 +2188,10 @@
                                               {
                                                 "additionalProperties": false,
                                                 "properties": {
+                                                  "mediaType": {
+                                                    "description": "IANA media type.",
+                                                    "type": "string"
+                                                  },
                                                   "providerOptions": {
                                                     "additionalProperties": {
                                                       "additionalProperties": {
@@ -1428,11 +2211,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1451,6 +2234,8 @@
                                                   },
                                                   "type": {
                                                     "const": "file-url",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with mediaType and tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'url', url: new URL(url) } }`.",
                                                     "type": "string"
                                                   },
                                                   "url": {
@@ -1500,11 +2285,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1523,12 +2308,78 @@
                                                   },
                                                   "type": {
                                                     "const": "file-id",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'reference', reference } }`.",
                                                     "type": "string"
                                                   }
                                                 },
                                                 "required": [
                                                   "type",
                                                   "fileId"
+                                                ],
+                                                "type": "object"
+                                              },
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "providerOptions": {
+                                                    "additionalProperties": {
+                                                      "additionalProperties": {
+                                                        "anyOf": [
+                                                          {
+                                                            "anyOf": [
+                                                              {
+                                                                "type": "null"
+                                                              },
+                                                              {
+                                                                "type": "string"
+                                                              },
+                                                              {
+                                                                "type": "number"
+                                                              },
+                                                              {
+                                                                "type": "boolean"
+                                                              },
+                                                              {
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                              },
+                                                              {
+                                                                "items": {
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                                },
+                                                                "type": "array"
+                                                              }
+                                                            ],
+                                                            "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                          },
+                                                          {
+                                                            "not": {}
+                                                          }
+                                                        ]
+                                                      },
+                                                      "type": "object"
+                                                    },
+                                                    "description": "Provider-specific options.",
+                                                    "type": "object"
+                                                  },
+                                                  "providerReference": {
+                                                    "additionalProperties": {
+                                                      "type": "string"
+                                                    },
+                                                    "description": "Provider-specific references for the file. The key is the provider name, e.g. 'openai' or 'anthropic'.",
+                                                    "properties": {},
+                                                    "type": "object"
+                                                  },
+                                                  "type": {
+                                                    "const": "file-reference",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'reference', reference } }`.",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "providerReference"
                                                 ],
                                                 "type": "object"
                                               },
@@ -1562,11 +2413,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1585,7 +2436,8 @@
                                                   },
                                                   "type": {
                                                     "const": "image-data",
-                                                    "description": "Images that are referenced using base64 encoded data.",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with mediaType (e.g. 'image' or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'data', data } }`.",
                                                     "type": "string"
                                                   }
                                                 },
@@ -1618,11 +2470,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1641,7 +2493,8 @@
                                                   },
                                                   "type": {
                                                     "const": "image-url",
-                                                    "description": "Images that are referenced using a URL.",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'url', url: new URL(url) } }`.",
                                                     "type": "string"
                                                   },
                                                   "url": {
@@ -1691,11 +2544,11 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1714,7 +2567,8 @@
                                                   },
                                                   "type": {
                                                     "const": "image-file-id",
-                                                    "description": "Images that are referenced using a provider file id.",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'reference', reference } }`.",
                                                     "type": "string"
                                                   }
                                                 },
@@ -1746,11 +2600,75 @@
                                                                 "type": "boolean"
                                                               },
                                                               {
-                                                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                               },
                                                               {
                                                                 "items": {
-                                                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                                },
+                                                                "type": "array"
+                                                              }
+                                                            ],
+                                                            "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                          },
+                                                          {
+                                                            "not": {}
+                                                          }
+                                                        ]
+                                                      },
+                                                      "type": "object"
+                                                    },
+                                                    "description": "Provider-specific options.",
+                                                    "type": "object"
+                                                  },
+                                                  "providerReference": {
+                                                    "additionalProperties": {
+                                                      "type": "string"
+                                                    },
+                                                    "description": "Provider-specific references for the image file. The key is the provider name, e.g. 'openai' or 'anthropic'.",
+                                                    "properties": {},
+                                                    "type": "object"
+                                                  },
+                                                  "type": {
+                                                    "const": "image-file-reference",
+                                                    "deprecated": true,
+                                                    "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'reference', reference } }`.",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "providerReference"
+                                                ],
+                                                "type": "object"
+                                              },
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "providerOptions": {
+                                                    "additionalProperties": {
+                                                      "additionalProperties": {
+                                                        "anyOf": [
+                                                          {
+                                                            "anyOf": [
+                                                              {
+                                                                "type": "null"
+                                                              },
+                                                              {
+                                                                "type": "string"
+                                                              },
+                                                              {
+                                                                "type": "number"
+                                                              },
+                                                              {
+                                                                "type": "boolean"
+                                                              },
+                                                              {
+                                                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                              },
+                                                              {
+                                                                "items": {
+                                                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                                 },
                                                                 "type": "array"
                                                               }
@@ -1811,11 +2729,11 @@
                                               "type": "boolean"
                                             },
                                             {
-                                              "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                              "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                             },
                                             {
                                               "items": {
-                                                "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                               },
                                               "type": "array"
                                             }
@@ -1860,6 +2778,11 @@
                                 "approvalId": {
                                   "description": "ID of the tool approval.",
                                   "type": "string"
+                                },
+                                "isAutomatic": {
+                                  "default": false,
+                                  "description": "Flag indicating whether the tool was automatically approved or denied.",
+                                  "type": "boolean"
                                 },
                                 "signature": {
                                   "description": "HMAC-SHA256 signature binding this approval to its tool call. Present only when `experimental_toolApprovalSecret` is configured.",
@@ -1907,11 +2830,11 @@
                                 "type": "boolean"
                               },
                               {
-                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                               },
                               {
                                 "items": {
-                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                 },
                                 "type": "array"
                               }
@@ -1975,11 +2898,11 @@
                                                   "type": "boolean"
                                                 },
                                                 {
-                                                  "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                  "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                 },
                                                 {
                                                   "items": {
-                                                    "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                    "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                   },
                                                   "type": "array"
                                                 }
@@ -2033,11 +2956,11 @@
                                                   "type": "boolean"
                                                 },
                                                 {
-                                                  "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                  "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                 },
                                                 {
                                                   "items": {
-                                                    "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                    "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                   },
                                                   "type": "array"
                                                 }
@@ -2090,11 +3013,11 @@
                                                     "type": "boolean"
                                                   },
                                                   {
-                                                    "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                    "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                   },
                                                   {
                                                     "items": {
-                                                      "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                      "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                     },
                                                     "type": "array"
                                                   }
@@ -2110,7 +3033,7 @@
                                         },
                                         {
                                           "items": {
-                                            "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                            "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                           },
                                           "type": "array"
                                         }
@@ -2146,11 +3069,11 @@
                                                   "type": "boolean"
                                                 },
                                                 {
-                                                  "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                  "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                 },
                                                 {
                                                   "items": {
-                                                    "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                    "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                   },
                                                   "type": "array"
                                                 }
@@ -2204,11 +3127,11 @@
                                                   "type": "boolean"
                                                 },
                                                 {
-                                                  "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                  "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                 },
                                                 {
                                                   "items": {
-                                                    "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                    "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                   },
                                                   "type": "array"
                                                 }
@@ -2261,11 +3184,11 @@
                                                   "type": "boolean"
                                                 },
                                                 {
-                                                  "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                  "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                 },
                                                 {
                                                   "items": {
-                                                    "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                    "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                   },
                                                   "type": "array"
                                                 }
@@ -2318,11 +3241,11 @@
                                                     "type": "boolean"
                                                   },
                                                   {
-                                                    "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                    "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                   },
                                                   {
                                                     "items": {
-                                                      "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                      "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                     },
                                                     "type": "array"
                                                   }
@@ -2338,7 +3261,7 @@
                                         },
                                         {
                                           "items": {
-                                            "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                            "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                           },
                                           "type": "array"
                                         }
@@ -2384,11 +3307,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2424,15 +3347,197 @@
                                             "additionalProperties": false,
                                             "properties": {
                                               "data": {
+                                                "anyOf": [
+                                                  {
+                                                    "additionalProperties": false,
+                                                    "description": "File data variant containing raw bytes (`Uint8Array`, `ArrayBuffer`, or `Buffer`) or a base64-encoded string.\n\nThis is slightly more permissive than `SharedV4FileDataData`.",
+                                                    "properties": {
+                                                      "data": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "additionalProperties": {
+                                                              "type": "number"
+                                                            },
+                                                            "properties": {
+                                                              "BYTES_PER_ELEMENT": {
+                                                                "type": "number"
+                                                              },
+                                                              "buffer": {
+                                                                "additionalProperties": false,
+                                                                "properties": {
+                                                                  "byteLength": {
+                                                                    "type": "number"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "byteLength"
+                                                                ],
+                                                                "type": "object"
+                                                              },
+                                                              "byteLength": {
+                                                                "type": "number"
+                                                              },
+                                                              "byteOffset": {
+                                                                "type": "number"
+                                                              },
+                                                              "length": {
+                                                                "type": "number"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "BYTES_PER_ELEMENT",
+                                                              "buffer",
+                                                              "byteLength",
+                                                              "byteOffset",
+                                                              "length"
+                                                            ],
+                                                            "type": "object"
+                                                          },
+                                                          {
+                                                            "additionalProperties": false,
+                                                            "properties": {
+                                                              "byteLength": {
+                                                                "type": "number"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "byteLength"
+                                                            ],
+                                                            "type": "object"
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/global.Buffer"
+                                                          }
+                                                        ],
+                                                        "description": "Data content. Can either be a base64-encoded string, a Uint8Array, an ArrayBuffer, or a Buffer."
+                                                      },
+                                                      "type": {
+                                                        "const": "data",
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "data"
+                                                    ],
+                                                    "type": "object"
+                                                  },
+                                                  {
+                                                    "additionalProperties": false,
+                                                    "description": "File data variant containing a URL that points to the file.",
+                                                    "properties": {
+                                                      "type": {
+                                                        "const": "url",
+                                                        "type": "string"
+                                                      },
+                                                      "url": {
+                                                        "format": "uri",
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "url"
+                                                    ],
+                                                    "type": "object"
+                                                  },
+                                                  {
+                                                    "additionalProperties": false,
+                                                    "description": "File data variant containing a provider reference (`{ [provider]: id }`).",
+                                                    "properties": {
+                                                      "reference": {
+                                                        "additionalProperties": {
+                                                          "type": "string"
+                                                        },
+                                                        "description": "A mapping of provider names to provider-specific file identifiers.\n\nProvider references allow files to be identified across different providers without re-uploading, by storing each provider's own identifier for the same logical file.\n\n```ts {   \"openai\": \"file-abc123\",   \"anthropic\": \"file-xyz789\" } ```\n\nThe `type?: never` constraint excludes any object that has a `type` property, so a `SharedV4ProviderReference` cannot be confused with a tagged file-data shape (e.g. `{ type: 'data', data }` or `{ type: 'reference', reference }`) when both appear in the same union.",
+                                                        "properties": {},
+                                                        "type": "object"
+                                                      },
+                                                      "type": {
+                                                        "const": "reference",
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "reference"
+                                                    ],
+                                                    "type": "object"
+                                                  },
+                                                  {
+                                                    "additionalProperties": false,
+                                                    "description": "File data variant containing inline text content (e.g. an inline text document).",
+                                                    "properties": {
+                                                      "text": {
+                                                        "type": "string"
+                                                      },
+                                                      "type": {
+                                                        "const": "text",
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "text"
+                                                    ],
+                                                    "type": "object"
+                                                  }
+                                                ],
+                                                "description": "File data as a tagged discriminated union:\n\n- `{ type: 'data', data }`: raw bytes   (base64 string, Uint8Array, ArrayBuffer, Buffer)\n- `{ type: 'url', url }`: a URL that points to the file\n- `{ type: 'reference', reference }`: a provider reference   from `uploadFile`\n- `{ type: 'text', text }`: inline text content (e.g. an inline   text document)"
+                                              },
+                                              "filename": {
+                                                "description": "Optional filename of the file.",
                                                 "type": "string"
                                               },
                                               "mediaType": {
+                                                "description": "Either a full IANA media type (`type/subtype`, e.g. `image/png`) or just the top-level IANA segment (e.g. `image`, `audio`, `video`, `text`).\n\n`*`-subtype wildcards (e.g. `image/*`) are normalized as equivalent to the top-level segment alone (e.g. `image`). Providers can use the helpers in `@ai-sdk/provider-utils` (`isFullMediaType`, `getTopLevelMediaType`, `detectMediaType`) to resolve the field according to their API requirements.",
                                                 "type": "string"
                                               },
+                                              "providerOptions": {
+                                                "additionalProperties": {
+                                                  "additionalProperties": {
+                                                    "anyOf": [
+                                                      {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "null"
+                                                          },
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "type": "number"
+                                                          },
+                                                          {
+                                                            "type": "boolean"
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                          },
+                                                          {
+                                                            "items": {
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                            },
+                                                            "type": "array"
+                                                          }
+                                                        ],
+                                                        "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                      },
+                                                      {
+                                                        "not": {}
+                                                      }
+                                                    ]
+                                                  },
+                                                  "type": "object"
+                                                },
+                                                "description": "Provider-specific options.",
+                                                "type": "object"
+                                              },
                                               "type": {
-                                                "const": "media",
-                                                "deprecated": true,
-                                                "description": "Deprecated. Use image-data or file-data instead.",
+                                                "const": "file",
                                                 "type": "string"
                                               }
                                             },
@@ -2477,11 +3582,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2500,6 +3605,8 @@
                                               },
                                               "type": {
                                                 "const": "file-data",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with mediaType + tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'data', data } }`.",
                                                 "type": "string"
                                               }
                                             },
@@ -2513,6 +3620,10 @@
                                           {
                                             "additionalProperties": false,
                                             "properties": {
+                                              "mediaType": {
+                                                "description": "IANA media type.",
+                                                "type": "string"
+                                              },
                                               "providerOptions": {
                                                 "additionalProperties": {
                                                   "additionalProperties": {
@@ -2532,11 +3643,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2555,6 +3666,8 @@
                                               },
                                               "type": {
                                                 "const": "file-url",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with mediaType and tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'url', url: new URL(url) } }`.",
                                                 "type": "string"
                                               },
                                               "url": {
@@ -2604,11 +3717,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2627,12 +3740,78 @@
                                               },
                                               "type": {
                                                 "const": "file-id",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'reference', reference } }`.",
                                                 "type": "string"
                                               }
                                             },
                                             "required": [
                                               "type",
                                               "fileId"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "providerOptions": {
+                                                "additionalProperties": {
+                                                  "additionalProperties": {
+                                                    "anyOf": [
+                                                      {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "null"
+                                                          },
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "type": "number"
+                                                          },
+                                                          {
+                                                            "type": "boolean"
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                          },
+                                                          {
+                                                            "items": {
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                            },
+                                                            "type": "array"
+                                                          }
+                                                        ],
+                                                        "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                      },
+                                                      {
+                                                        "not": {}
+                                                      }
+                                                    ]
+                                                  },
+                                                  "type": "object"
+                                                },
+                                                "description": "Provider-specific options.",
+                                                "type": "object"
+                                              },
+                                              "providerReference": {
+                                                "additionalProperties": {
+                                                  "type": "string"
+                                                },
+                                                "description": "Provider-specific references for the file. The key is the provider name, e.g. 'openai' or 'anthropic'.",
+                                                "properties": {},
+                                                "type": "object"
+                                              },
+                                              "type": {
+                                                "const": "file-reference",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with tagged data instead:\n`{ type: 'file', mediaType, data: { type: 'reference', reference } }`.",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "providerReference"
                                             ],
                                             "type": "object"
                                           },
@@ -2666,11 +3845,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2689,7 +3868,8 @@
                                               },
                                               "type": {
                                                 "const": "image-data",
-                                                "description": "Images that are referenced using base64 encoded data.",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with mediaType (e.g. 'image' or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'data', data } }`.",
                                                 "type": "string"
                                               }
                                             },
@@ -2722,11 +3902,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2745,7 +3925,8 @@
                                               },
                                               "type": {
                                                 "const": "image-url",
-                                                "description": "Images that are referenced using a URL.",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'url', url: new URL(url) } }`.",
                                                 "type": "string"
                                               },
                                               "url": {
@@ -2795,11 +3976,11 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2818,7 +3999,8 @@
                                               },
                                               "type": {
                                                 "const": "image-file-id",
-                                                "description": "Images that are referenced using a provider file id.",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'reference', reference } }`.",
                                                 "type": "string"
                                               }
                                             },
@@ -2850,11 +4032,75 @@
                                                             "type": "boolean"
                                                           },
                                                           {
-                                                            "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                                           },
                                                           {
                                                             "items": {
-                                                              "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
+                                                            },
+                                                            "type": "array"
+                                                          }
+                                                        ],
+                                                        "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
+                                                      },
+                                                      {
+                                                        "not": {}
+                                                      }
+                                                    ]
+                                                  },
+                                                  "type": "object"
+                                                },
+                                                "description": "Provider-specific options.",
+                                                "type": "object"
+                                              },
+                                              "providerReference": {
+                                                "additionalProperties": {
+                                                  "type": "string"
+                                                },
+                                                "description": "Provider-specific references for the image file. The key is the provider name, e.g. 'openai' or 'anthropic'.",
+                                                "properties": {},
+                                                "type": "object"
+                                              },
+                                              "type": {
+                                                "const": "image-file-reference",
+                                                "deprecated": true,
+                                                "description": "Deprecated. Use 'file' with `mediaType: 'image'` (or a specific\n`image/*` subtype) and tagged data instead:\n`{ type: 'file', mediaType: 'image', data: { type: 'reference', reference } }`.",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "providerReference"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "providerOptions": {
+                                                "additionalProperties": {
+                                                  "additionalProperties": {
+                                                    "anyOf": [
+                                                      {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "null"
+                                                          },
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "type": "number"
+                                                          },
+                                                          {
+                                                            "type": "boolean"
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
+                                                          },
+                                                          {
+                                                            "items": {
+                                                              "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                                             },
                                                             "type": "array"
                                                           }
@@ -2915,11 +4161,11 @@
                                           "type": "boolean"
                                         },
                                         {
-                                          "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                          "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                                         },
                                         {
                                           "items": {
-                                            "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                            "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                           },
                                           "type": "array"
                                         }
@@ -3012,11 +4258,11 @@
                                 "type": "boolean"
                               },
                               {
-                                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
                               },
                               {
                                 "items": {
-                                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                                 },
                                 "type": "array"
                               }
@@ -4855,7 +6101,7 @@
       ],
       "description": "Union type of all event data types"
     },
-    "alias-1707531587-156-411-1707531587-0-129727133205725": {
+    "alias-1623388915-2027-2282-1623388915-0-228060133205725": {
       "anyOf": [
         {
           "type": "null"
@@ -4870,18 +6116,18 @@
           "type": "boolean"
         },
         {
-          "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+          "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
         },
         {
           "items": {
-            "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+            "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
           },
           "type": "array"
         }
       ],
       "description": "A JSON value can be a string, number, boolean, object, array, or null. JSON values can be serialized and deserialized by the JSON.stringify and JSON.parse methods."
     },
-    "alias-1707531587-411-476-1707531587-0-129727": {
+    "alias-1623388915-2282-2347-1623388915-0-228060": {
       "additionalProperties": {
         "anyOf": [
           {
@@ -4899,11 +6145,11 @@
                 "type": "boolean"
               },
               {
-                "$ref": "#/definitions/alias-1707531587-411-476-1707531587-0-129727"
+                "$ref": "#/definitions/alias-1623388915-2282-2347-1623388915-0-228060"
               },
               {
                 "items": {
-                  "$ref": "#/definitions/alias-1707531587-156-411-1707531587-0-129727133205725"
+                  "$ref": "#/definitions/alias-1623388915-2027-2282-1623388915-0-228060133205725"
                 },
                 "type": "array"
               }

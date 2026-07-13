@@ -4,11 +4,11 @@
  * Tools for validating task completion quality.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { TOOL_STRINGS } from "../prompts.js";
 
-export function createValidationTools() {
+export function createValidationTools(): ToolSet {
   return {
     validate_task: tool({
       description: TOOL_STRINGS.validation.validate_task.description,
