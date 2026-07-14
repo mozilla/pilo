@@ -247,7 +247,7 @@ type StepOutcome =
   | { flow: "return"; value: { success: boolean; finalAnswer: string; error?: TaskError } }
   | { flow: "next"; needsPageSnapshot: boolean };
 
-type StreamTextResultGeneric = StreamTextResult<any, never>;
+type StreamTextResultGeneric = StreamTextResult<any, any, never>;
 // HACK: cobble together a type from StreamTextResult with promises resolved
 type ProcessedAIResponse = AwaitedProperties<
   Pick<

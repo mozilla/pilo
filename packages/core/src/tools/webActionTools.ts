@@ -5,7 +5,7 @@
  * Each tool includes description, inputSchema, and execute function.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import {
   AriaBrowser,
@@ -297,7 +297,7 @@ async function performActionWithValidation(
   );
 }
 
-export function createWebActionTools(context: WebActionContext) {
+export function createWebActionTools(context: WebActionContext): ToolSet {
   if (!context.agentFilledRefs || !context.operationalRefs) {
     throw new Error("Web action provenance tracking sets are required");
   }

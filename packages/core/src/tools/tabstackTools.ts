@@ -7,7 +7,7 @@
  * data extraction.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type Tabstack from "@tabstack/sdk";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
@@ -19,7 +19,7 @@ export interface TabstackToolContext {
   eventEmitter: WebAgentEventEmitter;
 }
 
-export function createTabstackTools(context: TabstackToolContext) {
+export function createTabstackTools(context: TabstackToolContext): ToolSet {
   return {
     tabstack_extract_markdown: tool({
       description: TOOL_STRINGS.tabstack.tabstack_extract_markdown.description,
