@@ -975,8 +975,10 @@ describe("JSONConsoleLogger", () => {
       expect(imageBlock.type).toBe("image");
       expect(imageBlock.data).toBe("<omitted>");
       expect(imageBlock.size).toBe(fakeJpeg.byteLength);
-      // Raw byte array must not appear in the output
-      expect(output).not.toContain("255"); // 0xff byte value
+      // Raw byte array must not appear in the output. Match the serialized
+      // byte sequence rather than a bare "255" — the latter collides with
+      // the millisecond timestamp in the output and makes this test flaky.
+      expect(output).not.toContain("255,216,255"); // raw fakeJpeg bytes
     });
 
     it("should preserve raw image data when sanitizeGenerationImages is false", () => {
