@@ -5,6 +5,7 @@ import { DuckDuckGoSearchProvider } from "../../src/search/providers/duckduckgoS
 import { GoogleSearchProvider } from "../../src/search/providers/googleSearch.js";
 import { BingSearchProvider } from "../../src/search/providers/bingSearch.js";
 import { ParallelSearchProvider } from "../../src/search/providers/parallelSearch.js";
+import { ExaSearchProvider } from "../../src/search/providers/exaSearch.js";
 import { BrowserSearchProvider } from "../../src/search/providers/browserSearch.js";
 import type { AriaBrowser, TemporaryTab } from "../../src/browser/ariaBrowser.js";
 import { LoadState } from "../../src/browser/ariaBrowser.js";
@@ -52,6 +53,22 @@ describe("Search Provider", () => {
     it("should throw error for Parallel provider without API key", async () => {
       await expect(createSearchProvider("parallel-api")).rejects.toThrow(
         "Parallel API key is required for parallel-api search provider",
+      );
+    });
+
+    it("should create Exa provider with API key", async () => {
+      const provider = await createSearchProvider("exa-api", {
+        apiKey: "test-api-key",
+      });
+
+      expect(provider).toBeInstanceOf(ExaSearchProvider);
+      expect(provider.name).toBe("exa-api");
+      expect(provider.requiresBrowser).toBe(false);
+    });
+
+    it("should throw error for Exa provider without API key", async () => {
+      await expect(createSearchProvider("exa-api")).rejects.toThrow(
+        "Exa API key is required for exa-api search provider",
       );
     });
 
@@ -253,6 +270,239 @@ describe("Search Provider", () => {
           body: expect.stringContaining("my search query"),
         }),
       );
+    });
+
+    it("should log the outbound request at debug level when debug is enabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ParallelSearchProvider("test-api-key", true);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      await provider.search("debug me");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[ParallelSearch:debug]"),
+        expect.stringContaining("debug me"),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it("should log an abbreviated response sample at debug level when debug is enabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ParallelSearchProvider("test-api-key", true);
+      const longExcerpt = "y".repeat(500);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [{ url: "https://example.com", title: "Example", excerpts: [longExcerpt] }],
+          }),
+      });
+
+      await provider.search("debug me");
+
+      const responseCall = (warnSpy.mock.calls as unknown[][]).find((c) =>
+        String(c[0]).includes("response"),
+      );
+      expect(responseCall).toBeDefined();
+      const logged = JSON.stringify(responseCall?.[1]);
+      expect(logged).toContain("https://example.com");
+      expect(logged).not.toContain(longExcerpt);
+      expect(logged).toContain("…");
+
+      warnSpy.mockRestore();
+    });
+
+    it("should not log when debug is disabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ParallelSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      await provider.search("quiet");
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe("ExaSearchProvider", () => {
+    it("should format results as markdown", async () => {
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                url: "https://example.com",
+                title: "Example",
+                highlights: ["This is an example"],
+              },
+              { url: "https://test.com", title: "Test", highlights: ["This is a test"] },
+            ],
+          }),
+      });
+
+      const result = await provider.search("test query");
+
+      expect(result).toContain('# Search Results for "test query"');
+      expect(result).toContain("1. [Example](https://example.com)");
+      expect(result).toContain("This is an example");
+      expect(result).toContain("2. [Test](https://test.com)");
+      expect(result).toContain("This is a test");
+    });
+
+    it("should handle empty results", async () => {
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      const result = await provider.search("test query");
+
+      expect(result).toContain('# Search Results for "test query"');
+      expect(result).toContain("No results found.");
+    });
+
+    it("should use URL as title when title is missing", async () => {
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [{ url: "https://example.com/page", highlights: ["Content"] }],
+          }),
+      });
+
+      const result = await provider.search("test");
+
+      expect(result).toContain("[https://example.com/page](https://example.com/page)");
+    });
+
+    it("should throw error on API failure", async () => {
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve("Unauthorized"),
+      });
+
+      await expect(provider.search("test")).rejects.toThrow("Exa API error (401): Unauthorized");
+    });
+
+    it("should send correct request to API", async () => {
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      await provider.search("my search query");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://api.exa.ai/search",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            "x-api-key": "test-api-key",
+          }),
+          body: expect.stringContaining("my search query"),
+        }),
+      );
+
+      // Must opt into highlights, or Exa returns metadata only.
+      const body = JSON.parse((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      expect(body.contents.highlights).toBeTruthy();
+    });
+
+    it("should log the outbound request at debug level when debug is enabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ExaSearchProvider("test-api-key", true);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      await provider.search("debug me");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[ExaSearch:debug]"),
+        expect.stringContaining("debug me"),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it("should log an abbreviated response sample at debug level when debug is enabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ExaSearchProvider("test-api-key", true);
+      const longText = "x".repeat(500);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                url: "https://example.com",
+                title: "Example",
+                summary: "A concise summary",
+                text: longText,
+                highlights: ["hi"],
+              },
+            ],
+          }),
+      });
+
+      await provider.search("debug me");
+
+      const responseCall = (warnSpy.mock.calls as unknown[][]).find((c) =>
+        String(c[0]).includes("response"),
+      );
+      expect(responseCall).toBeDefined();
+      const logged = JSON.stringify(responseCall?.[1]);
+      // Extra fields beyond what we map (summary) are surfaced...
+      expect(logged).toContain("https://example.com");
+      expect(logged).toContain("A concise summary");
+      // ...but long values are truncated rather than dumped in full.
+      expect(logged).not.toContain(longText);
+      expect(logged).toContain("…");
+
+      warnSpy.mockRestore();
+    });
+
+    it("should not log when debug is disabled", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const provider = new ExaSearchProvider("test-api-key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [] }),
+      });
+
+      await provider.search("quiet");
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

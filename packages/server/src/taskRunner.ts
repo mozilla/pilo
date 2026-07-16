@@ -81,7 +81,7 @@ export interface PiloTaskRequest {
   logger?: "console" | "json";
 
   // Search configuration overrides
-  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
+  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api" | "exa-api";
 
   // Tabstack configuration overrides
   tabstackApiKey?: string;
@@ -271,6 +271,17 @@ export function validateTaskRequest(
       }),
     };
   }
+  if (effectiveSearchProvider === "exa-api" && !serverConfig.exa_api_key) {
+    return {
+      status: 400,
+      response: createErrorResponse({
+        message: "exa-api search provider requires EXA_API_KEY to be configured on the server",
+        code: "MISSING_SEARCH_API_KEY",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+      }),
+    };
+  }
 
   try {
     getAIProviderInfo();
@@ -320,6 +331,8 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
   const advertisedUploadFiles = await resolveAdvertisedUploadFiles(allowFileUpload);
 
+  const searchProvider = body.searchProvider ?? serverConfig.search_provider;
+
   const browserConfig = {
     browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
     channel: body.channel ?? serverConfig.channel,
@@ -366,8 +379,15 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     advertisedUploadFiles,
     llmProviderTimeoutMs: body.llmProviderTimeoutMs ?? serverConfig.llm_provider_timeout_ms,
     guardrails: body.guardrails,
-    searchProvider: body.searchProvider ?? serverConfig.search_provider,
-    searchApiKey: serverConfig.parallel_api_key,
+    searchProvider,
+    // Only pass a key for providers that use one; browser providers and
+    // "none" don't, so we avoid threading an unrelated key through config.
+    searchApiKey:
+      searchProvider === "exa-api"
+        ? serverConfig.exa_api_key
+        : searchProvider === "parallel-api"
+          ? serverConfig.parallel_api_key
+          : undefined,
     tabstackApiKey: body.tabstackApiKey ?? serverConfig.tabstack_api_key,
     tabstackApiUrl: serverConfig.tabstack_api_url,
   };

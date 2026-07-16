@@ -331,6 +331,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     }
 
     // Create WebAgent
+    const searchProvider = options.searchProvider ?? cfg.search_provider;
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
       vision: options.vision ?? cfg.vision,
@@ -341,8 +342,15 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       initialNavigationRetries: options.initialNavigationRetries ?? cfg.initial_navigation_retries,
       maxConsecutiveErrors: options.maxConsecutiveErrors ?? cfg.max_consecutive_errors,
       maxTotalErrors: options.maxTotalErrors ?? cfg.max_total_errors,
-      searchProvider: options.searchProvider ?? cfg.search_provider,
-      searchApiKey: cfg.parallel_api_key,
+      searchProvider,
+      // Only pass a key for providers that use one; browser providers and
+      // "none" don't, so we avoid threading an unrelated key through config.
+      searchApiKey:
+        searchProvider === "exa-api"
+          ? cfg.exa_api_key
+          : searchProvider === "parallel-api"
+            ? cfg.parallel_api_key
+            : undefined,
       tabstackApiKey: options.tabstackApiKey ?? cfg.tabstack_api_key,
       tabstackApiUrl: options.tabstackApiUrl ?? cfg.tabstack_api_url,
       trustedHostnames: options.trustedHostnames ?? cfg.trusted_hostnames,

@@ -21,6 +21,8 @@ export interface SearchProvider {
 export interface CreateSearchProviderOptions {
   /** API key for providers that require authentication (e.g., Parallel) */
   apiKey?: string;
+  /** When true, API providers log their outbound request at debug level */
+  debug?: boolean;
 }
 
 /**
@@ -49,7 +51,14 @@ export async function createSearchProvider(
         throw new Error("Parallel API key is required for parallel-api search provider");
       }
       const { ParallelSearchProvider } = await import("./providers/parallelSearch.js");
-      return new ParallelSearchProvider(options.apiKey);
+      return new ParallelSearchProvider(options.apiKey, options.debug);
+    }
+    case "exa-api": {
+      if (!options.apiKey) {
+        throw new Error("Exa API key is required for exa-api search provider");
+      }
+      const { ExaSearchProvider } = await import("./providers/exaSearch.js");
+      return new ExaSearchProvider(options.apiKey, options.debug);
     }
     default:
       throw new Error(`Unknown search provider: ${providerName}`);

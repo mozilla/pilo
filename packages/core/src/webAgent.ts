@@ -357,6 +357,10 @@ export class WebAgent {
       throw new Error("parallel_api_key is required when search_provider is 'parallel-api'");
     }
 
+    if (this.searchProvider === "exa-api" && !this.searchApiKey) {
+      throw new Error("exa_api_key is required when search_provider is 'exa-api'");
+    }
+
     // Initialize services
     this.compressor = new SnapshotCompressor();
     this.eventEmitter = options.eventEmitter ?? new WebAgentEventEmitter();
@@ -420,6 +424,7 @@ export class WebAgent {
           if (this.searchProvider !== "none") {
             this.searchService = await SearchService.create(this.searchProvider, this.browser, {
               apiKey: this.searchApiKey,
+              debug: this.debug,
             });
           }
 
