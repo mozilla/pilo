@@ -22,6 +22,7 @@ import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/p
 import {
   assessFill,
   assessFormSubmission,
+  assessNavigation,
   extractHostname,
   type FirewallConfig,
 } from "../security/actionFirewall.js";
@@ -99,7 +100,7 @@ function buildRemediations(blockedHostnames: string[]): FirewallRemediation[] {
 
 function emitNonInteractiveBlock(
   context: WebActionContext,
-  kind: "freeform-fill" | "form-submission",
+  kind: "freeform-fill" | "form-submission" | "navigation",
   reason: string,
   pageHostname: string | null,
   formActionHostnames: string[],
@@ -519,6 +520,15 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
         url: z.url().describe(TOOL_STRINGS.webActions.goto.url),
       }),
       execute: async ({ url }) => {
+        const assessment = assessNavigation({ targetUrl: url, firewall: context.firewall });
+        if (!assessment.allowed) {
+          // For a navigation block the relevant host is the target, so pass it
+          // as the remediation host (add it to trusted_hostnames to allow).
+          const targetHostname = extractHostname(url);
+          emitNonInteractiveBlock(context, "navigation", assessment.reason, targetHostname, []);
+          return failedActionResult(PageAction.Goto, assessment.reason, context, undefined, url);
+        }
+
         const result = await performActionWithValidation(PageAction.Goto, context, undefined, url);
 
         if (result.success) {

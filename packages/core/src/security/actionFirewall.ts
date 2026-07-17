@@ -9,6 +9,9 @@ export const SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT =
 export const SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT =
   "Security policy blocked submitting operational field data to a site other than the current page";
 
+export const SECURITY_BLOCKED_UNTRUSTED_NAVIGATION =
+  "Security policy blocked navigation to a host the caller did not name";
+
 export type FillSource = "agent" | "user-approved";
 
 export type ActionFirewallResult =
@@ -190,6 +193,40 @@ export function assessFormSubmission(input: {
   }
 
   return { allowed: true };
+}
+
+/**
+ * Gate agent-initiated navigation (goto) to the caller's trusted hosts.
+ *
+ * Navigation is an unconditional data-egress sink: the agent can place any value
+ * from its context (task text, caller data) into an outbound URL, and the request
+ * carries it to the destination host with no form and no approval. Detecting the
+ * secret inside the URL is unsound — it can be encoded or reshaped — so we gate
+ * the destination instead. A goto is allowed only to a host the caller named
+ * (the start host, folded in by withTrustedStartHost, or trusted_hostnames), or
+ * when the firewall is disabled via unsafe_mode.
+ *
+ * A null host (non-http(s) target: about:, file:, data:, javascript:, …) is
+ * never trusted, so it is blocked — failing closed.
+ */
+export function assessNavigation(input: {
+  targetUrl: string;
+  firewall: FirewallConfig;
+}): ActionFirewallResult {
+  if (input.firewall.unsafeMode) {
+    return { allowed: true };
+  }
+
+  const targetHost = extractHostname(input.targetUrl);
+  if (targetHost !== null && input.firewall.trustedHostnames.has(targetHost)) {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    reason: SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+    isRecoverable: true,
+  };
 }
 
 function isOperationalField(field: FieldMetadata): boolean {
