@@ -22,10 +22,12 @@ import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/p
 import {
   assessFill,
   assessFormSubmission,
+  assessNavigation,
   extractHostname,
   type FirewallConfig,
 } from "../security/actionFirewall.js";
-import type { FirewallBlockedNonInteractiveEventData, FirewallRemediation } from "../events.js";
+import type { FirewallBlockedNonInteractiveEventData } from "../events.js";
+import { buildFirewallRemediations } from "../security/firewallRemediations.js";
 import {
   withSpan,
   SpanStatusCode,
@@ -73,33 +75,9 @@ type ActionResult = {
 
 const EMPTY_APPROVED_REFS = new Set<string>();
 
-function buildRemediations(blockedHostnames: string[]): FirewallRemediation[] {
-  const uniqueHosts = Array.from(new Set(blockedHostnames.filter((h): h is string => Boolean(h))));
-  return [
-    {
-      kind: "add-trusted-hostnames",
-      hostnames: uniqueHosts,
-      description:
-        uniqueHosts.length > 0
-          ? `Add ${uniqueHosts.join(", ")} to trusted_hostnames to allow this action on this site.`
-          : "Add the page hostname to trusted_hostnames to allow this action on this site.",
-    },
-    {
-      kind: "enable-interactive-mode",
-      description:
-        "Run in interactive mode by providing a UserDataCallback so the agent can ask the user to approve sensitive fields per-action via request_user_data.",
-    },
-    {
-      kind: "enable-unsafe-mode",
-      description:
-        "Set unsafe_mode=true to disable the action firewall entirely. WARNING: prompt injection from page content can then drive the agent to submit any field, including personal and credential data, to attacker-controlled forms.",
-    },
-  ];
-}
-
 function emitNonInteractiveBlock(
   context: WebActionContext,
-  kind: "freeform-fill" | "form-submission",
+  kind: "freeform-fill" | "form-submission" | "navigation",
   reason: string,
   pageHostname: string | null,
   formActionHostnames: string[],
@@ -114,7 +92,7 @@ function emitNonInteractiveBlock(
     kind,
     pageHostname,
     formActionHostnames,
-    remediations: buildRemediations(hostsForRemediation),
+    remediations: buildFirewallRemediations(hostsForRemediation),
   };
   context.eventEmitter.emit(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, data);
 }
@@ -519,6 +497,15 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
         url: z.url().describe(TOOL_STRINGS.webActions.goto.url),
       }),
       execute: async ({ url }) => {
+        const assessment = assessNavigation({ targetUrl: url, firewall: context.firewall });
+        if (!assessment.allowed) {
+          // For a navigation block the relevant host is the target, so pass it
+          // as the remediation host (add it to trusted_hostnames to allow).
+          const targetHostname = extractHostname(url);
+          emitNonInteractiveBlock(context, "navigation", assessment.reason, targetHostname, []);
+          return failedActionResult(PageAction.Goto, assessment.reason, context, undefined, url);
+        }
+
         const result = await performActionWithValidation(PageAction.Goto, context, undefined, url);
 
         if (result.success) {

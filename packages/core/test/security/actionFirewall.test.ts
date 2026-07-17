@@ -3,6 +3,7 @@ import type { FieldMetadata, FormSubmissionContext } from "../../src/browser/ari
 import {
   assessFill,
   assessFormSubmission,
+  assessNavigation,
   normalizeHostname,
   extractHostname,
   withTrustedStartHost,
@@ -10,6 +11,7 @@ import {
   SECURITY_BLOCKED_UNAUTHORIZED_FILL,
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
   SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT,
+  SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
   type FirewallConfig,
 } from "../../src/security/actionFirewall.js";
 
@@ -182,6 +184,55 @@ describe("actionFirewall", () => {
       firewall: { trustedHostnames: new Set(), unsafeMode: false },
     });
 
+    expect(result.allowed).toBe(true);
+  });
+});
+
+describe("assessNavigation", () => {
+  const trusted = (hosts: string[]): FirewallConfig => ({
+    trustedHostnames: new Set(hosts),
+    unsafeMode: false,
+  });
+
+  it("allows navigation to a trusted host", () => {
+    const result = assessNavigation({
+      targetUrl: "https://trusted.example/path?q=1",
+      firewall: trusted(["trusted.example"]),
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks navigation to a host the caller did not name", () => {
+    const result = assessNavigation({
+      targetUrl: "https://attacker.example/collect?code=CANARY-A1B2C3D9",
+      firewall: trusted(["trusted.example"]),
+    });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error("expected block");
+    expect(result.reason).toBe(SECURITY_BLOCKED_UNTRUSTED_NAVIGATION);
+    expect(result.isRecoverable).toBe(true);
+  });
+
+  it("allows any host when unsafe_mode is enabled", () => {
+    const result = assessNavigation({
+      targetUrl: "https://attacker.example/collect?code=CANARY-A1B2C3D9",
+      firewall: { trustedHostnames: new Set<string>(), unsafeMode: true },
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks non-http(s) targets (null host), failing closed", () => {
+    for (const url of ["file:///etc/passwd", "about:blank", "data:text/html,hi"]) {
+      const result = assessNavigation({ targetUrl: url, firewall: trusted(["trusted.example"]) });
+      expect(result.allowed).toBe(false);
+    }
+  });
+
+  it("matches trusted hosts case-insensitively", () => {
+    const result = assessNavigation({
+      targetUrl: "https://Trusted.EXAMPLE/x",
+      firewall: trusted(["trusted.example"]),
+    });
     expect(result.allowed).toBe(true);
   });
 });
