@@ -13,10 +13,64 @@ import type Tabstack from "@tabstack/sdk";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { TOOL_STRINGS } from "../prompts.js";
 import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
+import {
+  assessNavigation,
+  extractHostname,
+  type FirewallConfig,
+} from "../security/actionFirewall.js";
+import { buildFirewallRemediations } from "../security/firewallRemediations.js";
+import type { FirewallBlockedNonInteractiveEventData } from "../events.js";
 
 export interface TabstackToolContext {
   client: Tabstack;
   eventEmitter: WebAgentEventEmitter;
+  firewall: FirewallConfig;
+  interactive: boolean;
+}
+
+type TabstackBlockedResult = {
+  success: false;
+  action: string;
+  url: string;
+  error: string;
+  isRecoverable: true;
+};
+
+/**
+ * Gate a Tabstack fetch to the caller's trusted hosts. These tools fetch a
+ * model-supplied URL server-side, so they are a data-egress sink identical to
+ * `goto` and must pass the same destination allowlist (start host +
+ * trusted_hostnames, bypassed by unsafe_mode). Returns a blocked result to
+ * short-circuit the fetch, or null to proceed.
+ */
+function assessTabstackNavigation(
+  context: TabstackToolContext,
+  action: string,
+  url: string,
+): TabstackBlockedResult | null {
+  const assessment = assessNavigation({ targetUrl: url, firewall: context.firewall });
+  if (assessment.allowed) return null;
+
+  const host = extractHostname(url);
+  if (!context.interactive) {
+    const data: FirewallBlockedNonInteractiveEventData = {
+      timestamp: Date.now(),
+      iterationId: "",
+      reason: assessment.reason,
+      kind: "navigation",
+      pageHostname: host,
+      formActionHostnames: [],
+      remediations: buildFirewallRemediations(host ? [host] : []),
+    };
+    context.eventEmitter.emit(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, data);
+  }
+  context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+    success: false,
+    action,
+    error: assessment.reason,
+    isRecoverable: true,
+  });
+  return { success: false, action, url, error: assessment.reason, isRecoverable: true };
 }
 
 export function createTabstackTools(context: TabstackToolContext): ToolSet {
@@ -27,6 +81,9 @@ export function createTabstackTools(context: TabstackToolContext): ToolSet {
         url: z.string().url().describe(TOOL_STRINGS.tabstack.tabstack_extract_markdown.url),
       }),
       execute: async ({ url }) => {
+        const blocked = assessTabstackNavigation(context, "tabstack_extract_markdown", url);
+        if (blocked) return blocked;
+
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "tabstack_extract_markdown",
           value: url,
@@ -88,6 +145,9 @@ export function createTabstackTools(context: TabstackToolContext): ToolSet {
           .describe(TOOL_STRINGS.tabstack.tabstack_extract_json.json_schema),
       }),
       execute: async ({ url, json_schema }) => {
+        const blocked = assessTabstackNavigation(context, "tabstack_extract_json", url);
+        if (blocked) return blocked;
+
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "tabstack_extract_json",
           value: url,
@@ -143,6 +203,9 @@ export function createTabstackTools(context: TabstackToolContext): ToolSet {
           .describe(TOOL_STRINGS.tabstack.tabstack_generate_json.instructions),
       }),
       execute: async ({ url, json_schema, instructions }) => {
+        const blocked = assessTabstackNavigation(context, "tabstack_generate_json", url);
+        if (blocked) return blocked;
+
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "tabstack_generate_json",
           value: url,

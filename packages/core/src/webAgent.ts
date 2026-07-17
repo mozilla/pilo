@@ -588,6 +588,8 @@ export class WebAgent {
       ? createTabstackTools({
           client: createTabstackClient(this.tabstackApiKey, this.tabstackApiUrl),
           eventEmitter: this.eventEmitter,
+          firewall: withTrustedStartHost(this.firewall, this.callerStartHostUrl),
+          interactive: Boolean(this.onUserDataRequired),
         })
       : {};
 
