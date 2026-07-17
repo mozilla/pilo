@@ -355,119 +355,56 @@ describe("prompts", () => {
       expect(prompt).toContain("Today's Date: Jan 15, 2024");
     });
 
-    it("should include data when provided", () => {
+    it("shows data keys but never renders values (security)", () => {
       const task = "Book a flight";
       const successCriteria = "Reserve airline tickets";
       const plan = "1. Search flights\n2. Select flight\n3. Book";
-      const data = {
-        departure: "NYC",
-        destination: "LAX",
-        date: "2024-12-25",
-        passengers: 2,
-      };
 
-      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
+      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, ["membership_code"]);
 
-      expect(prompt).toContain("Input Data:");
-      expect(prompt).toContain("```json");
-      expect(prompt).toContain('"departure": "NYC"');
-      expect(prompt).toContain('"destination": "LAX"');
-      expect(prompt).toContain('"date": "2024-12-25"');
-      expect(prompt).toContain('"passengers": 2');
-      expect(prompt).toContain("```");
+      // Keys are shown so the model knows what it can fill.
+      expect(prompt).toContain("membership_code");
+      expect(prompt).toContain("Available keys:");
+      expect(prompt).toContain("fill_user_data(ref, key)");
+      // Values are never rendered: no JSON fence, no old "Input Data:" block.
+      expect(prompt).not.toContain("```json");
+      expect(prompt).not.toContain("Input Data:");
     });
 
-    it("should not include data section when data is null", () => {
+    it("joins multiple keys and does not leak values", () => {
+      const prompt = buildTaskAndPlanPrompt("t", "s", "p", ["membership_code", "email", "phone"]);
+
+      expect(prompt).toContain("membership_code, email, phone");
+      expect(prompt).not.toContain("```json");
+    });
+
+    it("should not include data section when dataKeys is null", () => {
       const task = "Search for hotels";
       const explanation = "Find accommodation";
       const plan = "1. Search\n2. Compare\n3. Select";
 
-      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, null);
+      const prompt = buildTaskAndPlanPrompt(task, explanation, plan, null as any);
 
-      expect(prompt).not.toContain("Input Data:");
+      expect(prompt).not.toContain("Available keys:");
       expect(prompt).not.toContain("```json");
     });
 
-    it("should not include data section when data is undefined", () => {
+    it("should not include data section when dataKeys is undefined", () => {
       const task = "Search for hotels";
       const explanation = "Find accommodation";
       const plan = "1. Search\n2. Compare\n3. Select";
 
       const prompt = buildTaskAndPlanPrompt(task, explanation, plan);
 
-      expect(prompt).not.toContain("Input Data:");
+      expect(prompt).not.toContain("Available keys:");
       expect(prompt).not.toContain("```json");
     });
 
-    it("should handle complex nested data objects", () => {
-      const task = "Complete booking";
-      const successCriteria = "Finalize reservation";
-      const plan = "1. Review\n2. Pay\n3. Confirm";
-      const data = {
-        booking: {
-          flight: {
-            departure: { city: "NYC", time: "9:00 AM" },
-            arrival: { city: "LAX", time: "12:00 PM" },
-          },
-          hotel: {
-            name: "Grand Hotel",
-            checkIn: "2024-12-25",
-            checkOut: "2024-12-27",
-          },
-        },
-        travelers: [
-          { name: "John Doe", age: 30 },
-          { name: "Jane Doe", age: 28 },
-        ],
-      };
+    it("should not include data section when dataKeys is empty", () => {
+      const prompt = buildTaskAndPlanPrompt("task", "criteria", "plan", []);
 
-      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
-
-      expect(prompt).toContain("Input Data:");
-      expect(prompt).toContain("```json");
-      expect(prompt).toContain('"departure"');
-      expect(prompt).toContain('"NYC"');
-      expect(prompt).toContain('"Grand Hotel"');
-      expect(prompt).toContain('"John Doe"');
-      expect(prompt).toContain('"travelers"');
-    });
-
-    it("should format data with proper JSON indentation", () => {
-      const task = "Test task";
-      const successCriteria = "Test successCriteria";
-      const plan = "Test plan";
-      const data = {
-        level1: {
-          level2: {
-            value: "nested",
-          },
-        },
-      };
-
-      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
-
-      // Check that JSON is properly indented (2 spaces)
-      expect(prompt).toContain(
-        '{\n  "level1": {\n    "level2": {\n      "value": "nested"\n    }\n  }\n}',
-      );
-    });
-
-    it("should handle data with special characters", () => {
-      const task = "Special chars test";
-      const successCriteria = "Test special characters";
-      const plan = "Handle special chars";
-      const data = {
-        message: 'Hello "world" & <test>',
-        symbols: "!@#$%^&*()",
-        unicode: "café naïve résumé",
-      };
-
-      const prompt = buildTaskAndPlanPrompt(task, successCriteria, plan, data);
-
-      expect(prompt).toContain("Input Data:");
-      expect(prompt).toContain('"Hello \\"world\\" & <test>"');
-      expect(prompt).toContain('"!@#$%^&*()"');
-      expect(prompt).toContain('"café naïve résumé"');
+      expect(prompt).not.toContain("Available keys:");
+      expect(prompt).not.toContain("```json");
     });
   });
 

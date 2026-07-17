@@ -563,7 +563,9 @@ export class WebAgent {
       approvedRefs = result.approvedRefs;
     }
 
-    // Setup tools once
+    // Setup tools once. Passing `data` exposes fill_user_data (only when ≥1 key
+    // is present); it fills caller data by key through the same firewall gate as
+    // fill, so the model never sees the values and cannot exfiltrate them.
     const webActionTools = createWebActionTools({
       browser: this.browser,
       eventEmitter: this.eventEmitter,
@@ -576,6 +578,7 @@ export class WebAgent {
       interactive: Boolean(this.onUserDataRequired),
       allowFileUpload: this.allowFileUpload,
       llmProviderTimeoutMs: this.llmProviderTimeoutMs,
+      data: this.data ?? undefined,
     });
 
     // Only include search tools if a search service was created
@@ -890,12 +893,17 @@ export class WebAgent {
       Boolean(this.tabstackApiKey),
       this.hasFileUpload,
       this.advertisedUploadFiles,
+      this.hasUserData,
     );
     this.messages.push({ role: "user", content: errorFeedback });
   }
 
   private get hasFileUpload(): boolean {
     return this.allowFileUpload !== false && this.allowFileUpload.allowedPaths.length > 0;
+  }
+
+  private get hasUserData(): boolean {
+    return Boolean(this.data && Object.keys(this.data).length > 0);
   }
 
   /** Remove image parts from the most recent user message (fallback for AI SDK image crashes). */
@@ -1928,12 +1936,13 @@ export class WebAgent {
     const hasTabstack = Boolean(this.tabstackApiKey);
     const hasStartingUrl = Boolean(this.url && this.url !== "about:blank");
     const hasInteractive = Boolean(this.onUserDataRequired);
+    const hasUserData = this.hasUserData;
 
     const taskPromptContent = buildTaskAndPlanPrompt(
       task,
       this.successCriteria,
       this.plan,
-      this.data,
+      this.data ? Object.keys(this.data) : undefined,
       this.guardrails,
     );
 
@@ -1945,6 +1954,7 @@ export class WebAgent {
       hasInteractive,
       this.hasFileUpload,
       this.advertisedUploadFiles,
+      hasUserData,
     );
 
     this.messages = [
