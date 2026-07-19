@@ -4633,7 +4633,8 @@
         "kind": {
           "enum": [
             "freeform-fill",
-            "form-submission"
+            "form-submission",
+            "navigation"
           ],
           "type": "string"
         },

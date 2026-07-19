@@ -403,7 +403,7 @@ export type FirewallRemediation =
 
 export interface FirewallBlockedNonInteractiveEventData extends WebAgentEventData {
   reason: string;
-  kind: "freeform-fill" | "form-submission";
+  kind: "freeform-fill" | "form-submission" | "navigation";
   pageHostname: string | null;
   formActionHostnames: string[];
   remediations: FirewallRemediation[];
