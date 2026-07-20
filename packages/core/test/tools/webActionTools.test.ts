@@ -1025,7 +1025,7 @@ describe("Web Action Tools", () => {
       vi.spyOn(mockBrowser, "getMarkdown").mockResolvedValue(`Your code is ${SECRET} — thanks!`);
       const dataTools: any = createWebActionTools({
         ...context,
-        data: { membership_code: SECRET },
+        sensitiveValues: new Set([SECRET]),
       });
       mockGenerateTextWithRetry.mockResolvedValueOnce({ text: "ok" } as any);
 

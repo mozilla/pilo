@@ -25,7 +25,6 @@ import {
   assessFormSubmission,
   assessNavigation,
   assessDataFill,
-  collectSensitiveValues,
   redactSensitiveValues,
   extractHostname,
   type FirewallConfig,
@@ -58,6 +57,12 @@ interface WebActionContext {
    * ever seeing the values — they are substituted directly at the browser sink.
    */
   data?: Record<string, unknown>;
+  /**
+   * Sensitive caller-data values (derived from `data`), precomputed by the agent
+   * and used to redact secrets from extracted page markdown before it reaches the
+   * model. Precomputed to avoid re-walking `data` on every extract.
+   */
+  sensitiveValues?: ReadonlySet<string>;
 }
 
 /**
@@ -603,8 +608,8 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
         // Redact any caller-data secret that the page echoes back (e.g. a value
         // just placed via fill_user_data), so it does not re-enter the model
         // context through the extracted content.
-        if (context.data) {
-          markdown = redactSensitiveValues(markdown, collectSensitiveValues(context.data));
+        if (context.sensitiveValues && context.sensitiveValues.size > 0) {
+          markdown = redactSensitiveValues(markdown, context.sensitiveValues);
         }
 
         // Build extraction prompt

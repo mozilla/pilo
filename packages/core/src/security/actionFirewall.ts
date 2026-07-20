@@ -282,11 +282,13 @@ const MIN_SENSITIVE_VALUE_LENGTH = 6;
 /**
  * Walk an arbitrary caller-supplied `data` object and collect the leaf values worth
  * redacting from page content: string and numeric leaves at or above the length
- * threshold. Booleans and null are ignored. Input is a parsed JSON request body, so
- * no cycle handling is needed.
+ * threshold. Booleans and null are ignored. `data` is typed `any` and may be built
+ * programmatically, so a WeakSet guards against cyclic references — redaction must
+ * fail safe, never stack-overflow the agent loop.
  */
 export function collectSensitiveValues(data: unknown): Set<string> {
   const values = new Set<string>();
+  const seen = new WeakSet<object>();
   const visit = (node: unknown): void => {
     if (node === null || node === undefined) return;
     if (typeof node === "string") {
@@ -295,10 +297,14 @@ export function collectSensitiveValues(data: unknown): Set<string> {
     } else if (typeof node === "number" || typeof node === "bigint") {
       const asString = String(node);
       if (asString.length >= MIN_SENSITIVE_VALUE_LENGTH) values.add(asString);
-    } else if (Array.isArray(node)) {
-      for (const item of node) visit(item);
     } else if (typeof node === "object") {
-      for (const value of Object.values(node as Record<string, unknown>)) visit(value);
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const item of node) visit(item);
+      } else {
+        for (const value of Object.values(node as Record<string, unknown>)) visit(value);
+      }
     }
   };
   visit(data);

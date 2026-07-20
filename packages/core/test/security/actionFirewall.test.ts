@@ -745,6 +745,15 @@ describe("collectSensitiveValues", () => {
     expect(collectSensitiveValues(null).size).toBe(0);
     expect(collectSensitiveValues(undefined).size).toBe(0);
   });
+
+  it("does not infinite-loop on a cyclic data structure (fails safe)", () => {
+    const cyclic: Record<string, unknown> = { token: "supersecret" };
+    cyclic.self = cyclic;
+    cyclic.list = [cyclic, "another-secret"];
+    const values = collectSensitiveValues(cyclic);
+    expect(values.has("supersecret")).toBe(true);
+    expect(values.has("another-secret")).toBe(true);
+  });
 });
 
 describe("redactSensitiveValues", () => {
