@@ -13,7 +13,7 @@ import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
 import { SECURITY_BLOCKED_UNTRUSTED_NAVIGATION } from "../../src/security/actionFirewall.js";
 import { generateTextWithRetry } from "../../src/utils/retry.js";
-import { SECURITY_BLOCKED_UNAUTHORIZED_FILL } from "../../src/security/actionFirewall.js";
+import { SECURITY_BLOCKED_UNTRUSTED_DATA_FILL } from "../../src/security/actionFirewall.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -1020,6 +1020,22 @@ describe("Web Action Tools", () => {
       expect((result as any).extractedData).toContain("Extracted data: Important info");
     });
 
+    it("redacts caller-data secrets from the page markdown before the extractor sees it", async () => {
+      const SECRET = "super-secret-membership-42";
+      vi.spyOn(mockBrowser, "getMarkdown").mockResolvedValue(`Your code is ${SECRET} — thanks!`);
+      const dataTools: any = createWebActionTools({
+        ...context,
+        data: { membership_code: SECRET },
+      });
+      mockGenerateTextWithRetry.mockResolvedValueOnce({ text: "ok" } as any);
+
+      await dataTools.extract.execute({ description: "read the page" });
+
+      const promptArg = (mockGenerateTextWithRetry.mock.calls[0][0] as any).prompt as string;
+      expect(promptArg).not.toContain(SECRET);
+      expect(promptArg).toContain("[hidden]");
+    });
+
     it('wraps extractedData in <EXTERNAL-CONTENT label="extract-result"> with safety warning', async () => {
       mockGenerateTextWithRetry.mockResolvedValueOnce({
         text: "Hello from the page",
@@ -1438,9 +1454,40 @@ describe("Web Action Tools", () => {
       const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(SECURITY_BLOCKED_UNAUTHORIZED_FILL);
+      expect(result.error).toBe(SECURITY_BLOCKED_UNTRUSTED_DATA_FILL);
       expect(performActionSpy).not.toHaveBeenCalled();
       expect(context.agentFilledRefs.has("E12")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+    });
+
+    it("blocks placing caller data into an OPERATIONAL field on an untrusted host (no assessFill carve-out)", async () => {
+      // A search box would be allowed by assessFill's operational exemption, but
+      // caller data must not leak into an operational field on an untrusted host.
+      const searchField: FieldMetadata = {
+        ref: "E13",
+        tagName: "input",
+        inputType: "search",
+        role: "searchbox",
+        name: "q",
+        label: "Search",
+        placeholder: "Search",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "search",
+        formAction: "https://untrusted.com/search",
+        formMethod: "get",
+      };
+      mockBrowser.url = "https://untrusted.com/search";
+      mockBrowser.fieldMetadata.set("E13", searchField);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E13", key: "membership_code" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(SECURITY_BLOCKED_UNTRUSTED_DATA_FILL);
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(context.agentFilledRefs.has("E13")).toBe(false);
+      expect(context.operationalRefs.has("E13")).toBe(false);
       expect(JSON.stringify(result)).not.toContain(SECRET);
     });
 

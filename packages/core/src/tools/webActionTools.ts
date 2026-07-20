@@ -24,6 +24,9 @@ import {
   assessFill,
   assessFormSubmission,
   assessNavigation,
+  assessDataFill,
+  collectSensitiveValues,
+  redactSensitiveValues,
   extractHostname,
   type FirewallConfig,
 } from "../security/actionFirewall.js";
@@ -595,7 +598,14 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
         });
 
         // Get the page markdown content
-        const markdown = await context.browser.getMarkdown();
+        let markdown = await context.browser.getMarkdown();
+
+        // Redact any caller-data secret that the page echoes back (e.g. a value
+        // just placed via fill_user_data), so it does not re-enter the model
+        // context through the extracted content.
+        if (context.data) {
+          markdown = redactSensitiveValues(markdown, collectSensitiveValues(context.data));
+        }
 
         // Build extraction prompt
         const prompt = buildExtractionPrompt(description, markdown);
@@ -704,15 +714,12 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
           ]);
           const pageHostname = extractHostname(pageUrl);
 
-          // SAME firewall gate as the regular fill tool: filling caller data
-          // into a field on an untrusted host is blocked exactly like a
-          // freeform agent fill, so page-driven prompt injection cannot exfil.
-          const assessment = assessFill({
-            field: metadata,
-            source: "agent",
-            pageHostname,
-            firewall: context.firewall,
-          });
+          // Stricter than the regular fill gate: caller data may be placed only
+          // on a caller-trusted host, with NO operational-field exemption. An
+          // operational field (search box) on an untrusted host is still an
+          // attacker-readable sink for a secret, so caller data must not inherit
+          // assessFill's search-box carve-out.
+          const assessment = assessDataFill({ pageHostname, firewall: context.firewall });
           if (!assessment.allowed) {
             emitNonInteractiveBlock(context, "freeform-fill", assessment.reason, pageHostname, []);
             return failedActionResult("fill_user_data", assessment.reason, context, ref);
@@ -742,12 +749,11 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
           });
 
           // Record provenance so a following submit check can gate on it. Use
-          // agentFilledRefs/operationalRefs, NEVER approvedRefs — caller data is
-          // not user-approved per-field and must not bypass the submit gate.
+          // agentFilledRefs only — NEVER approvedRefs (caller data is not
+          // user-approved per-field) and NEVER operationalRefs (the operational
+          // exemption would let caller data submit cross-host; a secret is not
+          // operational input).
           context.agentFilledRefs.add(ref);
-          if (assessment.allowed && "operational" in assessment && assessment.operational) {
-            context.operationalRefs.add(ref);
-          }
 
           return { success: true, action: "fill_user_data", ref, key };
         } catch (error) {

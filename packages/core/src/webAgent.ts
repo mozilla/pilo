@@ -65,6 +65,8 @@ import {
 import {
   normalizeHostname,
   withTrustedStartHost,
+  collectSensitiveValues,
+  redactSensitiveValues,
   type FirewallConfig,
 } from "./security/actionFirewall.js";
 
@@ -1013,7 +1015,17 @@ export class WebAgent {
     this.truncateOldExternalContent();
 
     const currentUrl = await this.browser.getUrl();
-    const currentPageSnapshot = await this.browser.getTreeWithRefs();
+    let currentPageSnapshot = await this.browser.getTreeWithRefs();
+    // Redact caller-data secrets that the page echoes back (e.g. a value just
+    // placed via fill_user_data reflected in element.value): ARIA refs are
+    // regenerated every snapshot, so per-ref masking is unviable — redact the
+    // serialized string instead, before it enters the model context.
+    if (this.data) {
+      currentPageSnapshot = redactSensitiveValues(
+        currentPageSnapshot,
+        collectSensitiveValues(this.data),
+      );
+    }
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
 
     if (this.debug) {
