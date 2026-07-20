@@ -13,6 +13,7 @@ import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
 import { SECURITY_BLOCKED_UNTRUSTED_NAVIGATION } from "../../src/security/actionFirewall.js";
 import { generateTextWithRetry } from "../../src/utils/retry.js";
+import { SECURITY_BLOCKED_UNAUTHORIZED_FILL } from "../../src/security/actionFirewall.js";
 
 // Mock the ai module
 vi.mock("ai", () => ({
@@ -1393,6 +1394,149 @@ describe("Web Action Tools", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
       expect(result.error).not.toMatch(/unsafe_mode|trusted_hostnames|untrusted\.com/);
+    });
+  });
+
+  describe("fill_user_data Action", () => {
+    const SECRET = "super-secret-membership-42";
+    const DATA = { membership_code: SECRET, age: 30, subscribed: true };
+    // A sensitive (non-operational) field: agent fills are blocked on untrusted
+    // hosts, so it exercises the firewall gate rather than the operational path.
+    const emailField: FieldMetadata = {
+      ref: "E12",
+      tagName: "input",
+      inputType: "email",
+      role: "textbox",
+      name: "email",
+      label: "Email",
+      placeholder: null,
+      autocomplete: "email",
+      isContentEditable: false,
+      formId: "signup",
+      formAction: "https://example.com/signup",
+      formMethod: "post",
+    };
+    let udTools: any;
+
+    beforeEach(() => {
+      context.data = DATA;
+      context.approvedRefs = new Set<string>();
+      udTools = createWebActionTools(context);
+    });
+
+    it("is only exposed when data has at least one key", () => {
+      expect(udTools.fill_user_data).toBeDefined();
+      expect(createWebActionTools({ ...context, data: {} }).fill_user_data).toBeUndefined();
+      expect(createWebActionTools({ ...context, data: undefined }).fill_user_data).toBeUndefined();
+    });
+
+    it("is blocked on an untrusted host and neither fills nor leaks the value (security fix)", async () => {
+      mockBrowser.url = "https://untrusted.com/signup";
+      mockBrowser.fieldMetadata.set("E12", emailField);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(SECURITY_BLOCKED_UNAUTHORIZED_FILL);
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(context.agentFilledRefs.has("E12")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+    });
+
+    it("fills on a trusted host, masks the value, and records provenance not approval", async () => {
+      mockBrowser.url = "https://example.com/signup";
+      mockBrowser.fieldMetadata.set("E12", emailField);
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      // The resolved value goes to the browser sink...
+      expect(performActionSpy).toHaveBeenCalledWith("E12", PageAction.Fill, SECRET);
+      // ...but is never returned to the model.
+      expect(result).toEqual({
+        success: true,
+        action: "fill_user_data",
+        ref: "E12",
+        key: "membership_code",
+      });
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+
+      // AGENT_ACTION carries the masked key, never the literal value.
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "fill_user_data",
+        ref: "E12",
+        value: "{{membership_code}}",
+      });
+      // No emitted event payload contains the literal value.
+      for (const call of emitSpy.mock.calls) {
+        expect(JSON.stringify(call)).not.toContain(SECRET);
+      }
+
+      // Provenance recorded for the submit gate; approval NEVER granted.
+      expect(context.agentFilledRefs.has("E12")).toBe(true);
+      expect(context.approvedRefs.has("E12")).toBe(false);
+    });
+
+    it("returns a failure listing available keys for an unknown key without filling", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E1", key: "not_a_real_key" });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not_a_real_key");
+      expect(result.error).toContain("membership_code");
+      expect(context.agentFilledRefs.has("E1")).toBe(false);
+    });
+
+    it("uses PageAction.Select for a <select> field", async () => {
+      mockBrowser.url = "https://example.com";
+      mockBrowser.fieldMetadata.set("E9", {
+        ref: "E9",
+        tagName: "select",
+        inputType: null,
+        role: "combobox",
+        name: "country",
+        label: "Country",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "signup",
+        formAction: "https://example.com/signup",
+        formMethod: "post",
+      });
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      await udTools.fill_user_data.execute({ ref: "E9", key: "membership_code" });
+
+      expect(performActionSpy).toHaveBeenCalledWith("E9", PageAction.Select, SECRET);
+    });
+
+    it("returns a recoverable failure when performAction throws BrowserException", async () => {
+      mockBrowser.url = "https://example.com";
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("fill", "element is not editable"),
+      );
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      expect(result).toEqual({
+        success: false,
+        action: "fill_user_data",
+        ref: "E12",
+        error: "element is not editable",
+        isRecoverable: true,
+      });
+      expect(context.agentFilledRefs.has("E12")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
     });
   });
 });

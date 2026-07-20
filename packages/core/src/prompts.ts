@@ -90,6 +90,12 @@ export const TOOL_STRINGS = {
       formDescription:
         "Brief description of the form and its purpose (e.g., 'Shipping address form', 'Account registration')",
     },
+    fillUserData: {
+      description:
+        "Fill a field with one of the caller's Input Data values, by key. The value is inserted directly into the field and is NEVER shown to you. Use this for any field that should receive a caller-provided data value (personal info, credentials, etc.).",
+      ref: "Element reference from page snapshot (e.g., E###)",
+      key: "The Input Data key whose value to insert (see the Available keys list)",
+    },
     webSearch: {
       description:
         "Search the web for information. Returns the search results page as markdown. Use when you need to find websites or information but don't know the URL.",
@@ -176,6 +182,7 @@ function buildToolExamples(
   hasInteractive: boolean = false,
   hasFileUpload: boolean = false,
   advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ): string {
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
@@ -220,6 +227,12 @@ function buildToolExamples(
   if (hasInteractive) {
     lines.push(
       `- request_user_data({"reason": "initial", "formDescription": "Account signup form", "fields": [{"ref": "E42", "label": "Email", "fieldType": "email", "required": true}]}) - ${TOOL_STRINGS.webActions.requestUserData.description}`,
+    );
+  }
+
+  if (hasUserData) {
+    lines.push(
+      `- fill_user_data({"ref": "E###", "key": "membership_code"}) - ${TOOL_STRINGS.webActions.fillUserData.description}`,
     );
   }
 
@@ -452,6 +465,7 @@ const buildActionLoopSystemPrompt = (
   hasInteractive: boolean = false,
   hasFileUpload: boolean = false,
   advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -465,6 +479,7 @@ const buildActionLoopSystemPrompt = (
       hasInteractive,
       hasFileUpload,
       advertisedUploadFiles,
+      hasUserData,
     ),
     currentDate: getCurrentFormattedDate(),
   });
@@ -481,11 +496,9 @@ Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Plan: {{ plan }}
-{% if data %}
-Input Data:
-\`\`\`json
-{{ data }}
-\`\`\`
+{% if dataKeys %}
+Input Data available (values hidden for your security — you cannot see them). Available keys: {{ dataKeys }}
+To put one of these values into a field, call fill_user_data(ref, key). Never ask for or guess the values.
 {% endif %}
 {% if guardrails %}
 
@@ -501,7 +514,7 @@ export const buildTaskAndPlanPrompt = (
   task: string,
   successCriteria: string,
   plan: string,
-  data?: any,
+  dataKeys?: string[],
   guardrails?: string | null,
 ) =>
   taskAndPlanTemplate({
@@ -509,7 +522,7 @@ export const buildTaskAndPlanPrompt = (
     successCriteria,
     plan,
     currentDate: getCurrentFormattedDate(),
-    data: data ? JSON.stringify(data, null, 2) : null,
+    dataKeys: dataKeys && dataKeys.length ? dataKeys.join(", ") : null,
     guardrails,
   });
 
@@ -594,6 +607,7 @@ export const buildStepErrorFeedbackPrompt = (
   hasTabstack: boolean = false,
   hasFileUpload: boolean = false,
   advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ) =>
   stepErrorFeedbackTemplate({
     error,
@@ -604,6 +618,7 @@ export const buildStepErrorFeedbackPrompt = (
       false,
       hasFileUpload,
       advertisedUploadFiles,
+      hasUserData,
     ),
   });
 

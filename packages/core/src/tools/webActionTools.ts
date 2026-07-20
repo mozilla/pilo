@@ -9,6 +9,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import {
   AriaBrowser,
+  FieldMetadata,
   FileUploadConfig,
   PageAction,
   SCROLL_DIRECTIONS,
@@ -48,6 +49,12 @@ interface WebActionContext {
   allowFileUpload?: false | FileUploadConfig;
   /** Timeout for LLM provider calls in milliseconds (used by extract). */
   llmProviderTimeoutMs?: number;
+  /**
+   * Caller-supplied Input Data, keyed by name. When present with ≥1 key, the
+   * fill_user_data tool is exposed so the agent can fill fields by key without
+   * ever seeing the values — they are substituted directly at the browser sink.
+   */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -275,6 +282,18 @@ async function performActionWithValidation(
   );
 }
 
+/**
+ * Choose the browser action for filling a caller-data field based on its type:
+ * <select> uses Select, checkbox/radio inputs use Check, everything else Fill.
+ */
+function userDataFillAction(metadata: FieldMetadata): PageAction {
+  const tagName = metadata.tagName.toLowerCase();
+  if (tagName === "select") return PageAction.Select;
+  const inputType = metadata.inputType?.toLowerCase() ?? null;
+  if (inputType === "checkbox" || inputType === "radio") return PageAction.Check;
+  return PageAction.Fill;
+}
+
 export function createWebActionTools(context: WebActionContext): ToolSet {
   if (!context.agentFilledRefs || !context.operationalRefs) {
     throw new Error("Web action provenance tracking sets are required");
@@ -286,7 +305,7 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
     throw new Error("interactive flag is required on WebActionContext");
   }
 
-  return {
+  const tools: ToolSet = {
     click: tool({
       description: TOOL_STRINGS.webActions.click.description,
       inputSchema: z.object({
@@ -647,4 +666,99 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
       },
     }),
   };
+
+  // Only expose fill_user_data when the caller supplied Input Data. It fills a
+  // field with one of those values by key: the resolved value goes straight to
+  // the browser sink and is NEVER returned or emitted (only the "{{key}}" mask
+  // or the key). It is routed through the SAME firewall gate as the regular fill
+  // tool and records provenance in agentFilledRefs (NEVER approvedRefs), so a
+  // prompt-injected model cannot exfiltrate caller data to an untrusted host.
+  if (context.data && Object.keys(context.data).length) {
+    tools.fill_user_data = tool({
+      description: TOOL_STRINGS.webActions.fillUserData.description,
+      inputSchema: z.object({
+        ref: z.string().describe(TOOL_STRINGS.webActions.fillUserData.ref),
+        key: z.string().describe(TOOL_STRINGS.webActions.fillUserData.key),
+      }),
+      execute: async ({ ref, key }) => {
+        const value = context.data?.[key];
+        if (
+          value == null ||
+          (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+        ) {
+          return failedActionResult(
+            "fill_user_data",
+            "Unknown or non-fillable data key: " +
+              key +
+              ". Available keys: " +
+              Object.keys(context.data ?? {}).join(", "),
+            context,
+            ref,
+          );
+        }
+
+        try {
+          const [metadata, pageUrl] = await Promise.all([
+            context.browser.getFieldMetadata(ref),
+            context.browser.getUrl(),
+          ]);
+          const pageHostname = extractHostname(pageUrl);
+
+          // SAME firewall gate as the regular fill tool: filling caller data
+          // into a field on an untrusted host is blocked exactly like a
+          // freeform agent fill, so page-driven prompt injection cannot exfil.
+          const assessment = assessFill({
+            field: metadata,
+            source: "agent",
+            pageHostname,
+            firewall: context.firewall,
+          });
+          if (!assessment.allowed) {
+            emitNonInteractiveBlock(context, "freeform-fill", assessment.reason, pageHostname, []);
+            return failedActionResult("fill_user_data", assessment.reason, context, ref);
+          }
+
+          const action = userDataFillAction(metadata);
+
+          // Emit the KEY as a mask, never the literal value.
+          context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+            action: "fill_user_data",
+            ref,
+            value: "{{" + key + "}}",
+          });
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_STARTED, {
+            action: "fill_user_data",
+            ref,
+            value: "{{" + key + "}}",
+          });
+
+          // The resolved value is passed straight to the browser sink. It is
+          // never returned or emitted — only the key/mask is surfaced.
+          await context.browser.performAction(ref, action, String(value));
+
+          context.eventEmitter.emit(WebAgentEventType.BROWSER_ACTION_COMPLETED, {
+            success: true,
+            action: "fill_user_data",
+          });
+
+          // Record provenance so a following submit check can gate on it. Use
+          // agentFilledRefs/operationalRefs, NEVER approvedRefs — caller data is
+          // not user-approved per-field and must not bypass the submit gate.
+          context.agentFilledRefs.add(ref);
+          if (assessment.allowed && "operational" in assessment && assessment.operational) {
+            context.operationalRefs.add(ref);
+          }
+
+          return { success: true, action: "fill_user_data", ref, key };
+        } catch (error) {
+          if (error instanceof BrowserException) {
+            return failedActionResult("fill_user_data", error.message, context, ref);
+          }
+          throw error;
+        }
+      },
+    });
+  }
+
+  return tools;
 }
