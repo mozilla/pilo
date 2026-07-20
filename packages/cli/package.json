@@ -19,15 +19,15 @@
     "web-ext": "^10.4.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^4.0.2",
-    "@ai-sdk/google-vertex": "^5.0.2",
-    "@ai-sdk/openai": "^4.0.2",
-    "@ai-sdk/openai-compatible": "^3.0.1",
+    "@ai-sdk/google": "^4.0.8",
+    "@ai-sdk/google-vertex": "^5.0.11",
+    "@ai-sdk/openai": "^4.0.8",
+    "@ai-sdk/openai-compatible": "^3.0.5",
     "@openrouter/ai-sdk-provider": "^2.10.0",
     "@types/node": "^26.0.0",
     "ollama-ai-provider-v2": "^3.6.0",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
