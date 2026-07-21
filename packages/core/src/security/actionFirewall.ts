@@ -12,6 +12,9 @@ export const SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT =
 export const SECURITY_BLOCKED_UNTRUSTED_NAVIGATION =
   "Security policy blocked navigation to a host the caller did not name";
 
+export const SECURITY_BLOCKED_UNTRUSTED_DATA_FILL =
+  "Security policy blocked placing caller-provided data on a host the caller did not name";
+
 export type FillSource = "agent" | "user-approved";
 
 export type ActionFirewallResult =
@@ -244,6 +247,84 @@ function hasSensitiveAutocomplete(autocomplete: string | null): boolean {
   if (!autocomplete) return false;
   const tokens = autocomplete.toLowerCase().split(/\s+/);
   return tokens.some((token) => SENSITIVE_AUTOCOMPLETE_TOKENS.has(token));
+}
+
+/**
+ * Gate placing a caller-provided data value (via fill_user_data) into a field.
+ *
+ * Stricter than assessFill: caller data may be placed ONLY on a host the caller
+ * named (start host + trusted_hostnames; unsafe_mode overrides). Unlike assessFill
+ * there is NO operational-field exemption — an operational field (search box,
+ * combobox) on an untrusted host is still an attacker-readable sink for a secret,
+ * so caller data must not inherit that carve-out. A null host is never trusted, so
+ * it fails closed.
+ */
+export function assessDataFill(input: {
+  pageHostname: string | null;
+  firewall: FirewallConfig;
+}): ActionFirewallResult {
+  if (input.firewall.unsafeMode) return { allowed: true };
+  if (input.pageHostname !== null && input.firewall.trustedHostnames.has(input.pageHostname)) {
+    return { allowed: true };
+  }
+  return { allowed: false, reason: SECURITY_BLOCKED_UNTRUSTED_DATA_FILL, isRecoverable: true };
+}
+
+/**
+ * Minimum length for a caller-data value to be treated as a secret worth redacting
+ * from page content re-entering the model context. Short values (country codes,
+ * single digits, "true") appear incidentally in legitimate page text and would cause
+ * false-positive redaction. This is a tuning knob; sub-threshold values are a known,
+ * documented gap.
+ */
+const MIN_SENSITIVE_VALUE_LENGTH = 6;
+
+/**
+ * Walk an arbitrary caller-supplied `data` object and collect the leaf values worth
+ * redacting from page content: string and numeric leaves at or above the length
+ * threshold. Booleans and null are ignored. `data` is typed `any` and may be built
+ * programmatically, so a WeakSet guards against cyclic references — redaction must
+ * fail safe, never stack-overflow the agent loop.
+ */
+export function collectSensitiveValues(data: unknown): Set<string> {
+  const values = new Set<string>();
+  const seen = new WeakSet<object>();
+  const visit = (node: unknown): void => {
+    if (node === null || node === undefined) return;
+    if (typeof node === "string") {
+      const trimmed = node.trim();
+      if (trimmed.length >= MIN_SENSITIVE_VALUE_LENGTH) values.add(trimmed);
+    } else if (typeof node === "number" || typeof node === "bigint") {
+      const asString = String(node);
+      if (asString.length >= MIN_SENSITIVE_VALUE_LENGTH) values.add(asString);
+    } else if (typeof node === "object") {
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const item of node) visit(item);
+      } else {
+        for (const value of Object.values(node as Record<string, unknown>)) visit(value);
+      }
+    }
+  };
+  visit(data);
+  return values;
+}
+
+/**
+ * Replace every (case-insensitive) occurrence of each value with "[hidden]".
+ * Regex-special characters in a value are matched literally; empty values are ignored.
+ * Used to strip caller-data secrets from page content (snapshot, extracted markdown)
+ * before it re-enters the model context.
+ */
+export function redactSensitiveValues(text: string, values: Iterable<string>): string {
+  let out = text;
+  for (const value of values) {
+    if (!value) continue;
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "gi"), "[hidden]");
+  }
+  return out;
 }
 
 export class InvalidHostnameError extends Error {

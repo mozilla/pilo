@@ -12,6 +12,10 @@ import {
   SECURITY_BLOCKED_UNAUTHORIZED_SUBMIT,
   SECURITY_BLOCKED_CROSS_SITE_OPERATIONAL_SUBMIT,
   SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+  SECURITY_BLOCKED_UNTRUSTED_DATA_FILL,
+  assessDataFill,
+  collectSensitiveValues,
+  redactSensitiveValues,
   type FirewallConfig,
 } from "../../src/security/actionFirewall.js";
 
@@ -666,5 +670,111 @@ describe("assessFormSubmission same-site operational restriction", () => {
       firewall: withTrusted(["example.com", "api.example.com"]),
     });
     expect(result.allowed).toBe(true);
+  });
+});
+
+describe("assessDataFill", () => {
+  const untrusted: FirewallConfig = { trustedHostnames: new Set(), unsafeMode: false };
+
+  it("allows placing caller data on a trusted host", () => {
+    const r = assessDataFill({
+      pageHostname: "example.com",
+      firewall: { trustedHostnames: new Set(["example.com"]), unsafeMode: false },
+    });
+    expect(r.allowed).toBe(true);
+  });
+
+  it("blocks placing caller data on an untrusted host", () => {
+    const r = assessDataFill({ pageHostname: "attacker.example", firewall: untrusted });
+    expect(r.allowed).toBe(false);
+    if (r.allowed) throw new Error("expected block");
+    expect(r.reason).toBe(SECURITY_BLOCKED_UNTRUSTED_DATA_FILL);
+  });
+
+  it("fails closed on a null host", () => {
+    const r = assessDataFill({
+      pageHostname: null,
+      firewall: { trustedHostnames: new Set(["example.com"]), unsafeMode: false },
+    });
+    expect(r.allowed).toBe(false);
+  });
+
+  it("has no operational-field exemption (unlike assessFill): unaffected by field type", () => {
+    // assessDataFill takes no field — an operational field on an untrusted host is
+    // still blocked, which is the whole point vs. reusing assessFill.
+    const r = assessDataFill({ pageHostname: "attacker.example", firewall: untrusted });
+    expect(r.allowed).toBe(false);
+  });
+
+  it("bypasses in unsafe mode", () => {
+    const r = assessDataFill({
+      pageHostname: "attacker.example",
+      firewall: { trustedHostnames: new Set(), unsafeMode: true },
+    });
+    expect(r.allowed).toBe(true);
+  });
+});
+
+describe("collectSensitiveValues", () => {
+  it("collects string/number leaves at or above the length threshold, recursing", () => {
+    const values = collectSensitiveValues({
+      code: "CANARY-A1B2C3D9",
+      nested: { token: "supersecret" },
+      list: ["item-one", 1234567],
+    });
+    expect(values.has("CANARY-A1B2C3D9")).toBe(true);
+    expect(values.has("supersecret")).toBe(true);
+    expect(values.has("item-one")).toBe(true);
+    expect(values.has("1234567")).toBe(true);
+  });
+
+  it("ignores short values, booleans, and null", () => {
+    const values = collectSensitiveValues({
+      a: "abc",
+      b: 42,
+      ok: true,
+      missing: null,
+      long: "abcdef",
+    });
+    expect(values.has("abc")).toBe(false);
+    expect(values.has("42")).toBe(false);
+    expect(values.has("abcdef")).toBe(true);
+  });
+
+  it("returns an empty set for null/undefined", () => {
+    expect(collectSensitiveValues(null).size).toBe(0);
+    expect(collectSensitiveValues(undefined).size).toBe(0);
+  });
+
+  it("does not infinite-loop on a cyclic data structure (fails safe)", () => {
+    const cyclic: Record<string, unknown> = { token: "supersecret" };
+    cyclic.self = cyclic;
+    cyclic.list = [cyclic, "another-secret"];
+    const values = collectSensitiveValues(cyclic);
+    expect(values.has("supersecret")).toBe(true);
+    expect(values.has("another-secret")).toBe(true);
+  });
+});
+
+describe("redactSensitiveValues", () => {
+  it("replaces every occurrence with [hidden], case-insensitively", () => {
+    const out = redactSensitiveValues(
+      "code CANARY-A1B2C3D9 then canary-a1b2c3d9",
+      new Set(["CANARY-A1B2C3D9"]),
+    );
+    expect(out).not.toMatch(/CANARY/i);
+    expect(out.match(/\[hidden\]/g)?.length).toBe(2);
+  });
+
+  it("leaves text unchanged when nothing matches", () => {
+    expect(redactSensitiveValues("nothing here", new Set(["SECRET123"]))).toBe("nothing here");
+  });
+
+  it("treats regex-special characters literally", () => {
+    expect(redactSensitiveValues("a+b (c)", new Set(["a+b"]))).toBe("[hidden] (c)");
+  });
+
+  it("ignores empty values", () => {
+    expect(redactSensitiveValues("keep", new Set([""]))).toBe("keep");
   });
 });

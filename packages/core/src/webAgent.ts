@@ -65,6 +65,8 @@ import {
 import {
   normalizeHostname,
   withTrustedStartHost,
+  collectSensitiveValues,
+  redactSensitiveValues,
   type FirewallConfig,
 } from "./security/actionFirewall.js";
 
@@ -270,6 +272,12 @@ export class WebAgent {
   private currentPage: { url: string; title: string } = { url: "", title: "" };
   private currentIterationId: string = "";
   private data: any = null;
+  /**
+   * Sensitive caller-data values to redact from page content (snapshot, extract
+   * markdown). Computed once from `data` — which is constant for a run — to avoid
+   * re-walking the payload on every snapshot.
+   */
+  private sensitiveDataValues: ReadonlySet<string> = new Set();
   private abortSignal: AbortSignal | undefined = undefined;
   /**
    * The abort signal for the current iteration: the caller's abortSignal combined with
@@ -579,6 +587,7 @@ export class WebAgent {
       allowFileUpload: this.allowFileUpload,
       llmProviderTimeoutMs: this.llmProviderTimeoutMs,
       data: this.data ?? undefined,
+      sensitiveValues: this.sensitiveDataValues,
     });
 
     // Only include search tools if a search service was created
@@ -1013,7 +1022,15 @@ export class WebAgent {
     this.truncateOldExternalContent();
 
     const currentUrl = await this.browser.getUrl();
-    const currentPageSnapshot = await this.browser.getTreeWithRefs();
+    let currentPageSnapshot = await this.browser.getTreeWithRefs();
+    // Redact caller-data secrets that the page echoes back (e.g. a value just
+    // placed via fill_user_data reflected in element.value): ARIA refs are
+    // regenerated every snapshot, so per-ref masking is unviable — redact the
+    // serialized string instead, before it enters the model context. The value
+    // set is precomputed (this.sensitiveDataValues) to avoid re-walking `data`.
+    if (this.sensitiveDataValues.size > 0) {
+      currentPageSnapshot = redactSensitiveValues(currentPageSnapshot, this.sensitiveDataValues);
+    }
     const compressedSnapshot = this.compressor.compress(currentPageSnapshot);
 
     if (this.debug) {
@@ -1848,6 +1865,7 @@ export class WebAgent {
   private async initializeBrowserAndState(task: string, options: ExecuteOptions): Promise<void> {
     this.clearInternalState();
     this.data = options.data || null;
+    this.sensitiveDataValues = collectSensitiveValues(this.data);
     this.abortSignal = options.abortSignal || undefined;
 
     this.emit(WebAgentEventType.TASK_SETUP, {
@@ -2031,6 +2049,7 @@ export class WebAgent {
     this.currentPage = { url: "", title: "" };
     this.currentIterationId = "";
     this.data = null;
+    this.sensitiveDataValues = new Set();
     this.abortSignal = undefined;
     this.searchService = null;
   }
