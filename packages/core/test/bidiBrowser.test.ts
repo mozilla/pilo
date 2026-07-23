@@ -687,6 +687,101 @@ describe("BiDiBrowser", () => {
       expect(seen).toEqual(["load"]);
     });
   });
+
+  describe("network resource blocking", () => {
+    function makeBrowser() {
+      return new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        blockResources: ["image", "stylesheet"],
+      });
+    }
+
+    it("registers an intercept in start()", async () => {
+      const browser = makeBrowser();
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+      await browser.start();
+      expect(conn.sendCommand).toHaveBeenCalledWith(
+        "network.addIntercept",
+        expect.objectContaining({ phases: ["beforeRequestSent"] }),
+      );
+    });
+
+    it("does not register an intercept when blockResources is empty", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222", blockResources: [] });
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+      await browser.start();
+      // No mockReset() here (unlike startBrowser()) — we need the real call
+      // history from start() to make this assertion meaningful.
+      expect(conn.sendCommand).not.toHaveBeenCalledWith("network.addIntercept", expect.anything());
+    });
+
+    it("fails a blocked resource type and continues others", async () => {
+      const browser = makeBrowser();
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      const b = browser as any;
+
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          isBlocked: true,
+          request: { request: "req-img", destination: "image" },
+        },
+      });
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          isBlocked: true,
+          request: { request: "req-doc", destination: "document" },
+        },
+      });
+
+      expect(conn.sendCommand).toHaveBeenCalledWith("network.failRequest", { request: "req-img" });
+      expect(conn.sendCommand).toHaveBeenCalledWith("network.continueRequest", {
+        request: "req-doc",
+      });
+    });
+
+    it("does not act on non-intercepted requests", () => {
+      const browser = makeBrowser();
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      const b = browser as any;
+
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          request: { request: "req-img", destination: "image" },
+        },
+      });
+
+      expect(conn.sendCommand).not.toHaveBeenCalledWith("network.failRequest", expect.anything());
+      expect(conn.sendCommand).not.toHaveBeenCalledWith(
+        "network.continueRequest",
+        expect.anything(),
+      );
+    });
+  });
 });
 
 describe("unwrapBiDiValue", () => {

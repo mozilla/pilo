@@ -30,6 +30,8 @@ export interface BiDiBrowserOptions {
   actionTimeoutMs?: number;
   /** File-upload allowlist. `false` (default) disables uploads. */
   allowFileUpload?: false | FileUploadConfig;
+  /** Resource types to abort via native network interception. Default: none blocked. */
+  blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
 }
 
 /**
@@ -68,11 +70,13 @@ export class BiDiBrowser implements AriaBrowser {
   private bidiUrl: string | undefined;
   protected turndown: TurndownService;
   private readonly allowFileUpload: false | FileUploadConfig;
+  private readonly blockResources: string[];
 
   constructor(options: BiDiBrowserOptions = {}) {
     this.bidiUrl = options.bidiUrl;
     this.actionTimeoutMs = options.actionTimeoutMs ?? 30_000;
     this.allowFileUpload = options.allowFileUpload ?? false;
+    this.blockResources = options.blockResources ?? [];
     this.turndown = new TurndownService({
       headingStyle: "atx",
       codeBlockStyle: "fenced",
@@ -111,6 +115,13 @@ export class BiDiBrowser implements AriaBrowser {
     this.connection.on("event", (msg: { method: string; params: Record<string, unknown> }) =>
       this.onBiDiEvent(msg),
     );
+
+    if (this.blockResources.length > 0) {
+      await this.connection.sendCommand("network.addIntercept", {
+        phases: ["beforeRequestSent"],
+      });
+    }
+
     await this.subscribe([
       "browsingContext.load",
       "browsingContext.domContentLoaded",
@@ -126,15 +137,47 @@ export class BiDiBrowser implements AriaBrowser {
   }
 
   /**
+   * Maps Pilo's `blockResources` entries to Fetch `destination` values, which
+   * is how a native-intercepted `network.beforeRequestSent` classifies the
+   * resource (per the Fetch spec's request destination enum).
+   */
+  private blockedDestinations(): Set<string> {
+    const map: Record<string, string[]> = {
+      image: ["image"],
+      stylesheet: ["style"],
+      font: ["font"],
+      media: ["audio", "video"],
+      manifest: ["manifest"],
+    };
+    return new Set(this.blockResources.flatMap((r) => map[r] ?? []));
+  }
+
+  /**
    * Routes id-less BiDi events emitted by the connection: tracks in-flight
    * network requests and re-emits per-context load signals on `loadEvents`.
    */
   protected onBiDiEvent(msg: { method: string; params: Record<string, unknown> }): void {
     const ctx = msg.params?.context as string | undefined;
     switch (msg.method) {
-      case "network.beforeRequestSent":
+      case "network.beforeRequestSent": {
         this.inFlightRequests++;
+        // ASSUMED, unverified against a real Firefox (Task 5 Step 1 was
+        // skipped — no live Firefox available in this environment): the
+        // request id lives at params.request.request, the resource
+        // classifier is the Fetch destination at params.request.destination,
+        // and a paused/intercepted request has params.isBlocked === true.
+        // Confirm these field names via the Task 7 smoke script before
+        // relying on this in production.
+        const req = (msg.params?.request ?? {}) as { request?: string; destination?: string };
+        if (msg.params?.isBlocked === true && req.request) {
+          const blocked = this.blockedDestinations().has(String(req.destination));
+          const cmd = blocked ? "network.failRequest" : "network.continueRequest";
+          // Fire-and-forget: the interception must be resolved so the page
+          // proceeds, but a resolution failure here shouldn't crash the router.
+          void this.connection.sendCommand(cmd, { request: req.request }).catch(() => {});
+        }
         break;
+      }
       case "network.responseCompleted":
       case "network.fetchError":
         this.inFlightRequests = Math.max(0, this.inFlightRequests - 1);
