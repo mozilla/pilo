@@ -24,10 +24,15 @@ const MIME: Record<string, string> = {
 
 export async function serveFixtures(
   dir: string,
-): Promise<{ baseUrl: string; stop: () => Promise<void> }> {
+): Promise<{ baseUrl: string; requests: string[]; stop: () => Promise<void> }> {
+  // Records the pathname of every request that reaches the server. A resource
+  // aborted by BiDi network interception never arrives here, so tests can assert
+  // blocking by checking a path is absent from this list.
+  const requests: string[] = [];
   const server: Server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
+      requests.push(url.pathname);
       const file = join(dir, url.pathname === "/" ? "index.html" : url.pathname.slice(1));
       const body = await readFile(file);
       res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
@@ -42,18 +47,37 @@ export async function serveFixtures(
   const port = typeof addr === "object" && addr ? addr.port : 0;
   return {
     baseUrl: `http://127.0.0.1:${port}`,
+    requests,
     stop: () => new Promise<void>((r) => server.close(() => r())),
   };
 }
 
+// Monotonic per-process counter so multiple Firefox instances in one test
+// process get distinct profile directories (the port comes from a free-port
+// probe, so it is already unique per launch).
+let instanceSeq = 0;
+
+/** Ask the OS for a free TCP port by binding port 0, then releasing it. */
+async function getFreePort(): Promise<number> {
+  const net = await import("node:net");
+  return new Promise<number>((resolve, reject) => {
+    const srv = net.createServer();
+    srv.on("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const addr = srv.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
 export async function startFirefoxBiDi(): Promise<{ bidiUrl: string; stop: () => Promise<void> }> {
   const bin = firefox.executablePath();
-  const profile = join(process.cwd(), `.tmp-ff-profile-${process.pid}`);
-  // NOTE: coarse pid-derived port for a single-PoC harness; there is no
-  // free-port probe, so a collision is possible in principle. If this
-  // harness grows beyond one PoC test, replace this with a `net`-based
-  // free-port probe.
-  const port = 9500 + (process.pid % 400);
+  const profile = join(process.cwd(), `.tmp-ff-profile-${process.pid}-${instanceSeq++}`);
+  // Bind a free port (avoids collisions when several instances run in one
+  // process). A tiny TOCTOU window remains between release and Firefox binding;
+  // acceptable for an opt-in manual harness.
+  const port = await getFreePort();
   const proc: ChildProcess = spawn(
     bin,
     ["--remote-debugging-port", String(port), "--headless", "--no-remote", "--profile", profile],
