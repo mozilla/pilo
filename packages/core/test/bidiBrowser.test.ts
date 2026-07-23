@@ -358,6 +358,65 @@ describe("BiDiBrowser", () => {
     });
   });
 
+  describe("performAction — Scroll", () => {
+    it("scrolls the viewport down via script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) =>
+        method === "script.evaluate"
+          ? Promise.resolve({ result: { type: "undefined" } })
+          : Promise.resolve(undefined),
+      );
+
+      await browser.performAction("", PageAction.Scroll, "down");
+
+      const evalCall = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "script.evaluate",
+      );
+      expect(evalCall).toBeDefined();
+      const expression = String((evalCall![1] as { expression: string }).expression);
+      expect(expression).toContain("window.scrollBy");
+      expect(expression).toContain('switch ("down")');
+    });
+
+    it("scrolls to the top via script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) =>
+        method === "script.evaluate"
+          ? Promise.resolve({ result: { type: "undefined" } })
+          : Promise.resolve(undefined),
+      );
+
+      await browser.performAction("", PageAction.Scroll, "top");
+
+      const evalCall = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "script.evaluate",
+      );
+      expect(evalCall).toBeDefined();
+      const expression = String((evalCall![1] as { expression: string }).expression);
+      expect(expression).toContain("window.scrollTo");
+      expect(expression).toContain('switch ("top")');
+    });
+
+    it("throws when direction is missing", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      await expect(browser.performAction("", PageAction.Scroll)).rejects.toThrow(/direction/i);
+    });
+
+    it("throws on an unsupported direction (host-side validation)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      // No script.evaluate should be needed — validation happens before dispatch.
+      await expect(browser.performAction("", PageAction.Scroll, "sideways")).rejects.toThrow(
+        /unsupported scroll direction/i,
+      );
+    });
+  });
+
   describe("runInTemporaryTab", () => {
     let browser: BiDiBrowser;
     let conn: ReturnType<typeof getMockConnection>;

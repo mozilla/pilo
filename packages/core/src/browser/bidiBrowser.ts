@@ -4,6 +4,8 @@ import {
   PageAction,
   LoadState,
   TemporaryTab,
+  SCROLL_DIRECTIONS,
+  type ScrollDirection,
   type FieldMetadata,
   type FormSubmissionContext,
   type FormSubmissionTrigger,
@@ -15,6 +17,7 @@ import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 const PAGE_SETTLE_TIME_MS = 1000;
 const NETWORKIDLE_DELAY_MS = 500;
+const SCROLL_SETTLE_TIMEOUT_MS = 1000;
 
 export interface BiDiBrowserOptions {
   /** WebDriver BiDi WebSocket URL (can be provided later in start()) */
@@ -361,6 +364,43 @@ export class BiDiBrowser implements AriaBrowser {
       case PageAction.Forward:
         await this.goForward();
         return;
+      case PageAction.Scroll: {
+        if (!value) {
+          throw new BrowserActionException("scroll", "PageAction.Scroll requires a direction");
+        }
+        if (!SCROLL_DIRECTIONS.includes(value as ScrollDirection)) {
+          throw new BrowserActionException("scroll", `Unsupported scroll direction: ${value}`);
+        }
+        const jsDir = JSON.stringify(value);
+        await this.evaluate(`
+          (() => {
+            switch (${jsDir}) {
+              case "down":
+                window.scrollBy({ left: 0, top: window.innerHeight, behavior: "instant" });
+                return;
+              case "up":
+                window.scrollBy({ left: 0, top: -window.innerHeight, behavior: "instant" });
+                return;
+              case "top":
+                window.scrollTo({ left: 0, top: 0, behavior: "instant" });
+                return;
+              case "bottom":
+                window.scrollTo({ left: 0, top: document.documentElement.scrollHeight, behavior: "instant" });
+                return;
+              default:
+                throw new Error("Unsupported scroll direction: " + ${jsDir});
+            }
+          })()
+        `);
+        // Best-effort settle for lazy-loaded content (mirrors PlaywrightBrowser).
+        // Timeout must exceed NETWORKIDLE_DELAY_MS so the settle can resolve instead of
+        // always timing out; Task 6 will make NetworkIdle event-driven, turning this into
+        // a real bounded network-idle wait.
+        await this.waitForLoadState(LoadState.NetworkIdle, {
+          timeout: SCROLL_SETTLE_TIMEOUT_MS,
+        }).catch(() => {});
+        return;
+      }
       case PageAction.Done:
       case PageAction.Abort:
       case PageAction.Extract:
