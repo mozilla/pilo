@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <body>
+    <form>
+      <input id="file" data-pilo-ref="file1" type="file" />
+      <output id="count">0</output>
+    </form>
+    <script>
+      document.getElementById("file").addEventListener("change", (e) => {
+        document.getElementById("count").textContent = String(e.target.files.length);
+      });
+    </script>
+  </body>
+</html>
