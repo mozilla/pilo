@@ -87,6 +87,27 @@ describe("BiDiBrowser", () => {
       const browser = new BiDiBrowser();
       await expect(browser.start()).rejects.toThrow();
     });
+
+    it("is idempotent across repeated calls (Foxcloud park/resume)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+
+      await browser.start();
+      (browser as any).inFlightRequests = 5;
+
+      await browser.start();
+
+      expect(conn.removeAllListeners).toHaveBeenCalledWith("event");
+      expect((browser as any).inFlightRequests).toBe(0);
+    });
   });
 
   describe("navigation", () => {

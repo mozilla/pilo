@@ -112,6 +112,15 @@ export class BiDiBrowser implements AriaBrowser {
       throw new Error("BiDiBrowser: no browsing contexts available after session.new");
     }
 
+    // BiDiConnection.close() does not remove listeners registered on the
+    // connection's EventEmitter, so a fresh start() on the same instance
+    // (Foxcloud park/resume reconnects without constructing a new browser)
+    // would otherwise stack up duplicate "event" listeners and leave
+    // inFlightRequests carrying over from the prior session. Reset both here
+    // so start() is safe to call more than once.
+    this.connection.removeAllListeners("event");
+    this.inFlightRequests = 0;
+
     this.connection.on("event", (msg: { method: string; params: Record<string, unknown> }) =>
       this.onBiDiEvent(msg),
     );
@@ -859,6 +868,10 @@ export class BiDiBrowser implements AriaBrowser {
     }
 
     // NetworkIdle: wait for the in-flight counter to stay at 0 for a quiet window.
+    // NOTE: inFlightRequests is instance-wide, not scoped to `context`, so a
+    // NetworkIdle wait here couples to traffic across all contexts (e.g. a
+    // temporary tab would wait on the main tab's requests too). Acceptable
+    // today because no temp-tab NetworkIdle path exists (see runInTemporaryTab).
     return new Promise<void>((resolve, reject) => {
       let cancelled = false;
       let pollTimer: ReturnType<typeof setTimeout> | undefined;
