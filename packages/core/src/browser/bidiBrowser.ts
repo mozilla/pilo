@@ -281,19 +281,15 @@ export class BiDiBrowser implements AriaBrowser {
     });
   }
 
-  // Action-firewall introspection. NOT yet implemented for the BiDi backend —
-  // porting PlaywrightBrowser's in-page field/form logic is a follow-up and is
-  // untestable without a live BiDi session. Until then these are deliberately
-  // fail-safe, never fail-open:
-  //   - getFieldMetadata reports a generic freeform text input, so the firewall
-  //     classifies every BiDi-driven fill as non-operational and blocks it on
-  //     untrusted pages (it is allowed on caller-trusted hosts, where the
-  //     firewall bypasses field classification anyway).
-  //   - getFormSubmissionContext returns null, so no submitter context is
-  //     produced. This cannot weaken protection because no agent-filled freeform
-  //     value reaches a field on an untrusted page in the first place.
+  // Action-firewall introspection. Ports PlaywrightBrowser's in-page
+  // field/form classification logic to `script.evaluate`. Both methods are
+  // deliberately fail-safe, never fail-open: on element-not-found or any
+  // eval/parse error, getFieldMetadata falls back to a generic freeform text
+  // input (the firewall then classifies the fill as non-operational and
+  // blocks it on untrusted pages), and getFormSubmissionContext falls back to
+  // null (no submitter context is produced).
   async getFieldMetadata(ref: string): Promise<FieldMetadata> {
-    return {
+    const fallback: FieldMetadata = {
       ref,
       tagName: "input",
       inputType: "text",
@@ -307,13 +303,148 @@ export class BiDiBrowser implements AriaBrowser {
       formAction: null,
       formMethod: null,
     };
+    if (!this.currentContext) return fallback;
+    try {
+      const jsRef = JSON.stringify(ref);
+      const raw = unwrapBiDiValue(
+        await this.evaluate(`
+          (() => {
+            const refMap = globalThis.__piloRefMap;
+            let el = refMap?.get(${jsRef});
+            if (el && !el.isConnected) el = null;
+            if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+            if (!el) return null;
+
+            const getElementForm = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement || node instanceof HTMLButtonElement)
+                ? node.form : node.closest('form');
+            const getElementName = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement || node instanceof HTMLButtonElement)
+                ? (node.name || null) : node.getAttribute('name');
+            const getElementLabel = (node) => {
+              const ariaLabel = node.getAttribute('aria-label');
+              if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
+              const labelledBy = node.getAttribute('aria-labelledby');
+              if (labelledBy) {
+                const text = labelledBy.split(/\\s+/)
+                  .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || '')
+                  .filter(Boolean).join(' ');
+                if (text) return text;
+              }
+              if ('labels' in node) {
+                const text = Array.from(node.labels || [])
+                  .map((l) => l.textContent?.trim() || '').filter(Boolean).join(' ');
+                if (text) return text;
+              }
+              return null;
+            };
+            const getElementPlaceholder = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement)
+                ? (node.placeholder || null) : null;
+            const getElementAutocomplete = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement) ? (node.autocomplete || null) : null;
+
+            const input = el instanceof HTMLInputElement ? el : null;
+            const form = getElementForm(el);
+            return JSON.stringify({
+              ref: ${jsRef},
+              tagName: el.tagName.toLowerCase(),
+              inputType: input?.type?.toLowerCase() ?? null,
+              role: el.getAttribute('role'),
+              name: getElementName(el),
+              label: getElementLabel(el),
+              placeholder: getElementPlaceholder(el),
+              autocomplete: getElementAutocomplete(el),
+              isContentEditable: el.isContentEditable,
+              formId: form?.id || null,
+              formAction: form?.action || null,
+              formMethod: form?.method?.toLowerCase() || null,
+            });
+          })()
+        `),
+      );
+      if (typeof raw !== "string") return fallback;
+      return JSON.parse(raw) as FieldMetadata;
+    } catch {
+      return fallback;
+    }
   }
 
   async getFormSubmissionContext(
-    _ref: string,
-    _trigger?: FormSubmissionTrigger,
+    ref: string,
+    trigger: FormSubmissionTrigger = "click",
   ): Promise<FormSubmissionContext | null> {
-    return null;
+    if (!this.currentContext) return null;
+    try {
+      const jsRef = JSON.stringify(ref);
+      const jsTrigger = JSON.stringify(trigger);
+      const raw = unwrapBiDiValue(
+        await this.evaluate(`
+          (() => {
+            const refMap = globalThis.__piloRefMap;
+            let el = refMap?.get(${jsRef});
+            if (el && !el.isConnected) el = null;
+            if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+            if (!el) return null;
+            const trigger = ${jsTrigger};
+
+            const canSubmitForm = (node, t) => {
+              if (t === 'click') {
+                if (node instanceof HTMLButtonElement) return node.type === 'submit';
+                if (node instanceof HTMLInputElement) return node.type === 'submit' || node.type === 'image';
+                return false;
+              }
+              if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) return false;
+              if (!(node instanceof HTMLInputElement)) return false;
+              return !['button','checkbox','color','file','hidden','radio','range','reset','submit'].includes(node.type);
+            };
+            const getSubmissionForm = (node) =>
+              (node instanceof HTMLButtonElement || node instanceof HTMLInputElement ||
+               node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
+                ? node.form : node.closest('form');
+
+            if (!canSubmitForm(el, trigger)) return null;
+            const form = getSubmissionForm(el);
+            if (!form) return null;
+
+            const fields = Array.from(form.elements)
+              .filter((f) => f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement || f instanceof HTMLSelectElement)
+              .filter((f) => !f.disabled)
+              .map((f) => ({
+                ref: f.getAttribute('data-pilo-ref'),
+                name: f.name || null,
+                tagName: f.tagName.toLowerCase(),
+                inputType: f instanceof HTMLInputElement ? f.type.toLowerCase() : null,
+                autocomplete: 'autocomplete' in f ? (f.autocomplete || null) : null,
+              }));
+
+            const submitterActionUrl = (() => {
+              if (!(el instanceof HTMLButtonElement) && !(el instanceof HTMLInputElement)) return null;
+              if (el instanceof HTMLInputElement && el.type !== 'submit' && el.type !== 'image') return null;
+              if (el instanceof HTMLButtonElement && el.type !== 'submit') return null;
+              if (!el.hasAttribute('formaction')) return null;
+              return el.formAction || null;
+            })();
+
+            return JSON.stringify({
+              submitterRef: ${jsRef},
+              formId: form.id || null,
+              actionUrl: form.action || null,
+              submitterActionUrl,
+              method: form.method?.toLowerCase() || null,
+              fields,
+            });
+          })()
+        `),
+      );
+      if (typeof raw !== "string") return null;
+      return JSON.parse(raw) as FormSubmissionContext;
+    } catch {
+      return null;
+    }
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {

@@ -575,6 +575,80 @@ describe("BiDiBrowser", () => {
       ).rejects.toThrow("Invalid element reference");
     });
   });
+
+  describe("getFieldMetadata (BiDi)", () => {
+    it("returns page-derived metadata parsed from script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      const meta = {
+        ref: "r1",
+        tagName: "input",
+        inputType: "email",
+        role: null,
+        name: "email",
+        label: "Email",
+        placeholder: null,
+        autocomplete: "email",
+        isContentEditable: false,
+        formId: "login",
+        formAction: "https://example.com/login",
+        formMethod: "post",
+      };
+      conn.sendCommand.mockResolvedValue({
+        result: { type: "string", value: JSON.stringify(meta) },
+      });
+
+      const result = await browser.getFieldMetadata("r1");
+      expect(result).toEqual(meta);
+    });
+
+    it("falls back to the generic stub when the element is not found (null result)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "null" } });
+
+      const result = await browser.getFieldMetadata("missing");
+      expect(result.tagName).toBe("input");
+      expect(result.inputType).toBe("text");
+      expect(result.ref).toBe("missing");
+    });
+  });
+
+  describe("getFormSubmissionContext (BiDi)", () => {
+    it("returns parsed submission context", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      const ctx = {
+        submitterRef: "btn1",
+        formId: "login",
+        actionUrl: "https://example.com/login",
+        submitterActionUrl: null,
+        method: "post",
+        fields: [
+          { ref: "r1", name: "email", tagName: "input", inputType: "email", autocomplete: "email" },
+        ],
+      };
+      conn.sendCommand.mockResolvedValue({
+        result: { type: "string", value: JSON.stringify(ctx) },
+      });
+
+      const result = await browser.getFormSubmissionContext("btn1", "click");
+      expect(result).toEqual(ctx);
+    });
+
+    it("returns null when the script yields null (non-submitter)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "null" } });
+
+      const result = await browser.getFormSubmissionContext("btn1", "click");
+      expect(result).toBeNull();
+    });
+  });
 });
 
 describe("unwrapBiDiValue", () => {
