@@ -42,7 +42,10 @@ describe.skipIf(!ENABLED)("BiDiBrowser integration (real Firefox)", () => {
 
   it("uploads a file into <input type=file> via input.setFiles", async () => {
     await browser.goto(`${site.baseUrl}/upload.html`);
-    await browser.getTreeWithRefs(); // populate __piloRefMap so ref "file1" resolves
+    // The fixture hardcodes data-pilo-ref="file1"; the ref resolves via the
+    // attribute-selector fallback. We deliberately do NOT call getTreeWithRefs()
+    // here — the ARIA-tree pass reassigns data-pilo-ref to its own generated IDs,
+    // which would clobber the fixture's "file1".
     await browser.performAction("file1", PageAction.UploadFile, fileURLToPath(import.meta.url));
     const count = await (
       browser as unknown as { evaluate: (e: string) => Promise<unknown> }
