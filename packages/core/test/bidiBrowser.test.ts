@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { BiDiBrowser, unwrapBiDiValue } from "../src/browser/bidiBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
@@ -469,6 +470,109 @@ describe("BiDiBrowser", () => {
         "browsingContext.close",
         expect.objectContaining({ context: "temp-ctx-2" }),
       );
+    });
+  });
+
+  describe("performAction — UploadFile", () => {
+    const NODE = { type: "node", sharedId: "node-file-1" };
+
+    function mockUpload(browser: BiDiBrowser, node: unknown = NODE) {
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation(
+        (method: string, params?: { resultOwnership?: string }) => {
+          if (method === "script.evaluate") {
+            // resolveFileInputSharedId requests resultOwnership: "root" and reads the node
+            // from result; the generic element-found check omits it and expects a boolean.
+            if (params?.resultOwnership === "root") {
+              return Promise.resolve({ result: node });
+            }
+            return Promise.resolve({ result: { type: "boolean", value: true } });
+          }
+          if (method === "input.setFiles") return Promise.resolve({});
+          return Promise.resolve(undefined);
+        },
+      );
+      return conn;
+    }
+
+    it("sends input.setFiles with the resolved sharedId and absolute path", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      const conn = mockUpload(browser);
+
+      // Use this very test file as a guaranteed-existing regular file under cwd.
+      const target = "test/bidiBrowser.test.ts";
+      await browser.performAction("file1", PageAction.UploadFile, target);
+
+      const setFiles = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "input.setFiles",
+      );
+      expect(setFiles).toBeDefined();
+      const params = setFiles![1] as { element: { sharedId: string }; files: string[] };
+      expect(params.element.sharedId).toBe("node-file-1");
+      expect(isAbsolute(params.files[0])).toBe(true);
+      expect(params.files[0].endsWith("bidiBrowser.test.ts")).toBe(true);
+    });
+
+    it("throws upload_path_required when value is missing", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      mockUpload(browser);
+      await expect(browser.performAction("file1", PageAction.UploadFile)).rejects.toThrow(
+        /upload_path_required/,
+      );
+    });
+
+    it("throws upload_disabled when no allowlist is configured", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      mockUpload(browser);
+      await expect(
+        browser.performAction("file1", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow(/upload_disabled/);
+    });
+
+    it("throws upload_target_not_file_input when node resolution returns non-node", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      mockUpload(browser, { type: "null" });
+      await expect(
+        browser.performAction("file1", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow(/upload_target_not_file_input/);
+    });
+
+    it("throws InvalidRefException when the ref cannot be found (bad-ref parity)", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation(
+        (method: string, params?: { resultOwnership?: string }) => {
+          if (method === "script.evaluate") {
+            if (params?.resultOwnership === "root") {
+              return Promise.resolve({ result: NODE });
+            }
+            // Generic element-found check reports the element as missing.
+            return Promise.resolve({ result: { type: "boolean", value: false } });
+          }
+          return Promise.resolve(undefined);
+        },
+      );
+
+      await expect(
+        browser.performAction("missing-ref", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow("Invalid element reference");
     });
   });
 });

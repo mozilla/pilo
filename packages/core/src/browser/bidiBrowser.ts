@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import TurndownService from "turndown";
 import {
   AriaBrowser,
@@ -9,6 +11,7 @@ import {
   type FieldMetadata,
   type FormSubmissionContext,
   type FormSubmissionTrigger,
+  type FileUploadConfig,
 } from "./ariaBrowser.js";
 import { BiDiConnection } from "./bidiConnection.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
@@ -24,6 +27,8 @@ export interface BiDiBrowserOptions {
   bidiUrl?: string;
   /** Timeout for browser actions in milliseconds (default: 30000) */
   actionTimeoutMs?: number;
+  /** File-upload allowlist. `false` (default) disables uploads. */
+  allowFileUpload?: false | FileUploadConfig;
 }
 
 /**
@@ -59,10 +64,12 @@ export class BiDiBrowser implements AriaBrowser {
   private readonly actionTimeoutMs: number;
   private bidiUrl: string | undefined;
   protected turndown: TurndownService;
+  private readonly allowFileUpload: false | FileUploadConfig;
 
   constructor(options: BiDiBrowserOptions = {}) {
     this.bidiUrl = options.bidiUrl;
     this.actionTimeoutMs = options.actionTimeoutMs ?? 30_000;
+    this.allowFileUpload = options.allowFileUpload ?? false;
     this.turndown = new TurndownService({
       headingStyle: "atx",
       codeBlockStyle: "fenced",
@@ -431,6 +438,15 @@ export class BiDiBrowser implements AriaBrowser {
       throw new InvalidRefException(ref);
     }
 
+    // UploadFile resolves its own file-input node via a dedicated script.evaluate
+    // (with resultOwnership: "root") and dispatches the native input.setFiles command.
+    // It runs after the generic found-check above so a bad/stale ref still throws
+    // InvalidRefException like every other element action.
+    if (action === PageAction.UploadFile) {
+      await this.uploadFile(ref, value);
+      return;
+    }
+
     // Build the action-specific JS to run on the already-located element.
     // Uses the same ref map → attribute fallback strategy.
     const elQuery = `(globalThis.__piloRefMap?.get(${jsRef}) ?? document.querySelector('[data-pilo-ref=' + ${jsRef} + ']'))`;
@@ -482,6 +498,76 @@ export class BiDiBrowser implements AriaBrowser {
     ) {
       await this.ensureOptimizedPageLoad();
     }
+  }
+
+  private async resolveAllowedUploadPath(inputPath: string): Promise<string> {
+    if (!this.allowFileUpload || this.allowFileUpload.allowedPaths.length === 0) {
+      throw new BrowserActionException("upload_file", "upload_disabled");
+    }
+    const resolvedPath = path.resolve(inputPath);
+    let stat;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+    if (!stat.isFile()) {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+    const realPath = await fs.realpath(resolvedPath);
+    for (const allowedRoot of this.allowFileUpload.allowedPaths) {
+      try {
+        const realRoot = await fs.realpath(path.resolve(allowedRoot));
+        const relative = path.relative(realRoot, realPath);
+        if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+          return realPath;
+        }
+      } catch {
+        // Missing/unreadable allowlist root cannot match.
+      }
+    }
+    throw new BrowserActionException("upload_file", "upload_path_not_allowed");
+  }
+
+  private async resolveFileInputSharedId(ref: string): Promise<string | null> {
+    const jsRef = JSON.stringify(ref);
+    const raw = (await this.connection.sendCommand("script.evaluate", {
+      expression: `
+        (() => {
+          const refMap = globalThis.__piloRefMap;
+          let el = refMap?.get(${jsRef});
+          if (el && !el.isConnected) el = null;
+          if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+          if (!el) return null;
+          if (el instanceof HTMLInputElement && el.type.toLowerCase() === 'file') return el;
+          return el.querySelector('input[type=file]') || null;
+        })()
+      `,
+      target: { context: this.requireContext() },
+      awaitPromise: true,
+      resultOwnership: "root",
+    })) as { result?: { type?: string; sharedId?: string } };
+    const node = raw?.result;
+    if (node && node.type === "node" && typeof node.sharedId === "string") {
+      return node.sharedId;
+    }
+    return null;
+  }
+
+  private async uploadFile(ref: string, value?: string): Promise<void> {
+    if (!value) {
+      throw new BrowserActionException("upload_file", "upload_path_required");
+    }
+    const uploadPath = await this.resolveAllowedUploadPath(value);
+    const sharedId = await this.resolveFileInputSharedId(ref);
+    if (!sharedId) {
+      throw new BrowserActionException("upload_file", "upload_target_not_file_input");
+    }
+    await this.connection.sendCommand("input.setFiles", {
+      context: this.requireContext(),
+      element: { sharedId },
+      files: [uploadPath],
+    });
   }
 
   async getRefIdentity(ref: string): Promise<{ role: string; name: string } | null> {

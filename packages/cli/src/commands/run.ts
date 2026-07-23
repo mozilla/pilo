@@ -227,6 +227,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       browser = new BiDiBrowser({
         bidiUrl,
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
       });
     } else if (browserOption === "foxcloud") {
       const { FoxcloudBrowser } = await import("pilo-core");
@@ -240,6 +241,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         brokerUrl: foxcloudUrl,
         proxyUrl: options.foxcloudProxyUrl ?? cfg.foxcloud_proxy_url,
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
       });
     } else {
       browser = new PlaywrightBrowser({
