@@ -827,38 +827,74 @@ export class BiDiBrowser implements AriaBrowser {
   ): Promise<void> {
     const timeout = options?.timeout ?? this.actionTimeoutMs;
 
-    await this.evaluate(
-      `
-      new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error('Timeout waiting for ${state} after ${timeout}ms')), ${timeout});
-        const finish = () => { clearTimeout(timeoutId); resolve(true); };
+    if (state === LoadState.DOMContentLoaded || state === LoadState.Load) {
+      const readyState = String(
+        unwrapBiDiValue(await this.evaluate(`document.readyState`, context)) ?? "",
+      );
 
-        ${
-          state === LoadState.DOMContentLoaded
-            ? `
-          if (document.readyState === 'interactive' || document.readyState === 'complete') {
-            finish();
-          } else {
-            document.addEventListener('DOMContentLoaded', finish, { once: true });
-          }`
-            : state === LoadState.Load
-              ? `
-          if (document.readyState === 'complete') {
-            finish();
-          } else {
-            window.addEventListener('load', finish, { once: true });
-          }`
-              : /* NetworkIdle */ `
-          if (document.readyState === 'complete') {
-            setTimeout(finish, ${NETWORKIDLE_DELAY_MS});
-          } else {
-            window.addEventListener('load', () => setTimeout(finish, ${NETWORKIDLE_DELAY_MS}), { once: true });
-          }`
+      if (
+        state === LoadState.DOMContentLoaded &&
+        (readyState === "interactive" || readyState === "complete")
+      ) {
+        return;
+      }
+      if (state === LoadState.Load && readyState === "complete") {
+        return;
+      }
+
+      const eventName =
+        state === LoadState.Load ? `load:${context}` : `domcontentloaded:${context}`;
+
+      return new Promise<void>((resolve, reject) => {
+        const listener = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          this.loadEvents.off(eventName, listener);
+          reject(new Error(`Timeout waiting for ${state} after ${timeout}ms`));
+        }, timeout);
+        this.loadEvents.once(eventName, listener);
+      });
+    }
+
+    // NetworkIdle: wait for the in-flight counter to stay at 0 for a quiet window.
+    return new Promise<void>((resolve, reject) => {
+      let cancelled = false;
+      let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const timer = setTimeout(() => {
+        cancelled = true;
+        if (pollTimer) clearTimeout(pollTimer);
+        reject(new Error(`Timeout waiting for ${state} after ${timeout}ms`));
+      }, timeout);
+
+      const finish = () => {
+        cancelled = true;
+        clearTimeout(timer);
+        if (pollTimer) clearTimeout(pollTimer);
+        resolve();
+      };
+
+      const poll = () => {
+        if (!cancelled) pollTimer = setTimeout(check, 50);
+      };
+
+      const check = () => {
+        if (cancelled) return;
+        if (this.inFlightRequests === 0) {
+          pollTimer = setTimeout(() => {
+            if (cancelled) return;
+            if (this.inFlightRequests === 0) finish();
+            else poll();
+          }, NETWORKIDLE_DELAY_MS);
+        } else {
+          poll();
         }
-      })
-    `,
-      context,
-    );
+      };
+
+      check();
+    });
   }
 
   async runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T> {

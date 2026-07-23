@@ -99,7 +99,7 @@ describe("BiDiBrowser", () => {
 
     it("goto sends browsingContext.navigate", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goto("https://example.com");
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.navigate",
@@ -131,7 +131,7 @@ describe("BiDiBrowser", () => {
 
     it("goBack sends browsingContext.traverseHistory with delta -1", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goBack();
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.traverseHistory",
@@ -144,7 +144,7 @@ describe("BiDiBrowser", () => {
 
     it("goForward sends browsingContext.traverseHistory with delta 1", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goForward();
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.traverseHistory",
@@ -200,7 +200,7 @@ describe("BiDiBrowser", () => {
 
     it("evaluates a load state check script", async () => {
       conn.sendCommand.mockResolvedValue({
-        result: { type: "boolean", value: true },
+        result: { type: "string", value: "complete" },
       });
 
       await browser.waitForLoadState(LoadState.Load);
@@ -212,6 +212,96 @@ describe("BiDiBrowser", () => {
           awaitPromise: true,
         }),
       );
+    });
+  });
+
+  describe("event-driven waitForLoadState", () => {
+    it("DOMContentLoaded resolves immediately when readyState is already interactive", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      await expect(
+        browser.waitForLoadState(LoadState.DOMContentLoaded, { timeout: 1000 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("Load waits for the browsingContext.load event when not yet complete", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      const p = browser.waitForLoadState(LoadState.Load, { timeout: 2000 });
+      // Simulate Firefox firing the load event for the current context.
+      setTimeout(
+        () =>
+          b.onBiDiEvent({ method: "browsingContext.load", params: { context: b.currentContext } }),
+        10,
+      );
+      await expect(p).resolves.toBeUndefined();
+    });
+
+    it("NetworkIdle resolves once the in-flight counter is quiet", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      (browser as any).inFlightRequests = 0;
+      await expect(
+        browser.waitForLoadState(LoadState.NetworkIdle, { timeout: 2000 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("rejects on timeout when the event never fires", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      await expect(browser.waitForLoadState(LoadState.Load, { timeout: 50 })).rejects.toThrow(
+        /Timeout waiting for/,
+      );
+    });
+
+    it("DOMContentLoaded waits for the browsingContext.domContentLoaded event when not yet ready", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      const p = browser.waitForLoadState(LoadState.DOMContentLoaded, { timeout: 2000 });
+      setTimeout(
+        () =>
+          b.onBiDiEvent({
+            method: "browsingContext.domContentLoaded",
+            params: { context: b.currentContext },
+          }),
+        10,
+      );
+      await expect(p).resolves.toBeUndefined();
+    });
+
+    it("removes the load-event listener after a timeout so it does not leak", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      await expect(browser.waitForLoadState(LoadState.Load, { timeout: 50 })).rejects.toThrow(
+        /Timeout waiting for/,
+      );
+      expect(b.loadEvents.listenerCount(`load:${b.currentContext}`)).toBe(0);
+    });
+
+    it("rejects on timeout for NetworkIdle and stops the poll loop", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      (browser as any).inFlightRequests = 1;
+      await expect(
+        browser.waitForLoadState(LoadState.NetworkIdle, { timeout: 60 }),
+      ).rejects.toThrow(/Timeout waiting for/);
     });
   });
 
@@ -282,6 +372,10 @@ describe("BiDiBrowser", () => {
       });
       // Second evaluate: click action
       conn.sendCommand.mockResolvedValueOnce({ result: { type: "undefined" } });
+      // Post-click ensureOptimizedPageLoad: readyState checks for DOMContentLoaded and Load,
+      // both already "complete" so they resolve via the fast path without waiting on events.
+      conn.sendCommand.mockResolvedValueOnce({ result: { type: "string", value: "complete" } });
+      conn.sendCommand.mockResolvedValueOnce({ result: { type: "string", value: "complete" } });
 
       await browser.performAction("E1", PageAction.Click);
 
@@ -345,10 +439,7 @@ describe("BiDiBrowser", () => {
     });
 
     it("goto action delegates to this.goto()", async () => {
-      conn.sendCommand.mockResolvedValue({
-        url: "https://example.com",
-        navigation: "nav-1",
-      });
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
 
       await browser.performAction("", PageAction.Goto, "https://example.com");
 
