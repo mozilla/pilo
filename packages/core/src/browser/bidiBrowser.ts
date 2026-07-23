@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import TurndownService from "turndown";
 import {
@@ -60,6 +61,8 @@ export class BiDiBrowser implements AriaBrowser {
 
   protected connection: BiDiConnection;
   protected currentContext: string | null = null;
+  protected inFlightRequests = 0;
+  protected loadEvents = new EventEmitter();
 
   private readonly actionTimeoutMs: number;
   private bidiUrl: string | undefined;
@@ -103,6 +106,45 @@ export class BiDiBrowser implements AriaBrowser {
       this.currentContext = treeResult.contexts[0].context;
     } else {
       throw new Error("BiDiBrowser: no browsing contexts available after session.new");
+    }
+
+    this.connection.on("event", (msg: { method: string; params: Record<string, unknown> }) =>
+      this.onBiDiEvent(msg),
+    );
+    await this.subscribe([
+      "browsingContext.load",
+      "browsingContext.domContentLoaded",
+      "network.beforeRequestSent",
+      "network.responseCompleted",
+      "network.fetchError",
+    ]);
+  }
+
+  /** Sends session.subscribe for the given BiDi event names. */
+  protected async subscribe(events: string[]): Promise<void> {
+    await this.connection.sendCommand("session.subscribe", { events });
+  }
+
+  /**
+   * Routes id-less BiDi events emitted by the connection: tracks in-flight
+   * network requests and re-emits per-context load signals on `loadEvents`.
+   */
+  protected onBiDiEvent(msg: { method: string; params: Record<string, unknown> }): void {
+    const ctx = msg.params?.context as string | undefined;
+    switch (msg.method) {
+      case "network.beforeRequestSent":
+        this.inFlightRequests++;
+        break;
+      case "network.responseCompleted":
+      case "network.fetchError":
+        this.inFlightRequests = Math.max(0, this.inFlightRequests - 1);
+        break;
+      case "browsingContext.load":
+        if (ctx) this.loadEvents.emit(`load:${ctx}`);
+        break;
+      case "browsingContext.domContentLoaded":
+        if (ctx) this.loadEvents.emit(`domcontentloaded:${ctx}`);
+        break;
     }
   }
 

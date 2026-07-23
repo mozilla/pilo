@@ -649,6 +649,44 @@ describe("BiDiBrowser", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("event subscription + routing", () => {
+    it("subscribe() sends session.subscribe with the event list", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      await (browser as any).subscribe(["browsingContext.load"]);
+      expect(conn.sendCommand).toHaveBeenCalledWith("session.subscribe", {
+        events: ["browsingContext.load"],
+      });
+    });
+
+    it("router increments/decrements the in-flight counter", () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const b = browser as any;
+      expect(b.inFlightRequests).toBe(0);
+      b.onBiDiEvent({ method: "network.beforeRequestSent", params: { context: "c1" } });
+      b.onBiDiEvent({ method: "network.beforeRequestSent", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(2);
+      b.onBiDiEvent({ method: "network.responseCompleted", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(1);
+      b.onBiDiEvent({ method: "network.fetchError", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(0);
+      // never goes negative
+      b.onBiDiEvent({ method: "network.responseCompleted", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(0);
+    });
+
+    it("router re-emits load signals per context", () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const b = browser as any;
+      const seen: string[] = [];
+      b.loadEvents.on("load:c1", () => seen.push("load"));
+      b.onBiDiEvent({ method: "browsingContext.load", params: { context: "c1" } });
+      expect(seen).toEqual(["load"]);
+    });
+  });
 });
 
 describe("unwrapBiDiValue", () => {
