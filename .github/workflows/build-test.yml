@@ -19,6 +19,7 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
       extension: ${{ steps.filter.outputs.extension }}
       workflows: ${{ steps.filter.outputs.workflows }}
+      build: ${{ steps.filter.outputs.build }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,6 +47,15 @@ jobs:
               - 'package.json'
             workflows:
               - '.github/workflows/**'
+            # Everything the root tsup assembly consumes. Broad on purpose: this
+            # gates the only job that exercises the command `release.yml` runs.
+            build:
+              - 'tsup.config.ts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'packages/core/**'
+              - 'packages/cli/**'
+              - 'packages/extension/**'
 
   # Reports which secret-backed credentials are available to this run.
   # The `secrets` context cannot be read in a job-level `if:`, so downstream
@@ -117,6 +127,81 @@ jobs:
 
       - name: Check formatting
         run: pnpm format:check
+
+  # Exercises the exact command `release.yml` runs between "Run tests" and
+  # "npm pack". No other job runs the root `pnpm run build`, so without this a
+  # broken release assembly surfaces only at tag time — which is how the
+  # TypeScript 6 `baseUrl` deprecation (TS5101) came to block releases while
+  # every PR stayed green.
+  build:
+    name: Release build
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.build == 'true' || needs.detect-changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Deliberately "24" rather than the "22" the test jobs use: this job
+          # guards the release path, so it should run the version release.yml runs.
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No cached core build is restored here on purpose: `prebuild` rebuilds
+      # core and the extension itself, and this job should assemble from scratch
+      # exactly the way a release does.
+      - name: Build published package
+        run: pnpm run build
+
+      - name: Verify the tarball is complete
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts --dry-run --json > "$RUNNER_TEMP/pack.json"
+          files=$(jq -r '.[0].files[].path' "$RUNNER_TEMP/pack.json")
+
+          fail=0
+          for required in dist/cli/src/cli.js dist/core/src/index.js dist/core/src/index.d.ts; do
+            if ! grep -qxF "$required" <<<"$files"; then
+              echo "::error::published tarball is missing $required"
+              fail=1
+            fi
+          done
+
+          # Guards the failure mode that shipped 0.19.4 as a 3-file tarball with
+          # no dist/ at all: a pack that succeeds while the build output is
+          # absent or only partly assembled.
+          for prefix in dist/core/src/ dist/extension/chrome/ dist/extension/firefox/; do
+            count=$(grep -c "^$prefix" <<<"$files" || true)
+            if [ "$count" -lt 10 ]; then
+              echo "::error::published tarball has only $count files under $prefix"
+              fail=1
+            fi
+          done
+
+          echo "Tarball contains $(grep -c . <<<"$files") files."
+          exit "$fail"
 
   core:
     runs-on: ubuntu-latest
