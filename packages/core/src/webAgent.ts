@@ -258,6 +258,19 @@ type ProcessedAIResponse = AwaitedProperties<
   >
 >;
 
+/** SPA snapshot readiness guard (see addPageSnapshot). */
+const SNAPSHOT_READINESS_MAX_RETRIES = 3;
+const SNAPSHOT_READINESS_DELAY_MS = 1000;
+
+// Interactive ARIA roles that carry a [ref=…] the agent can actually act on.
+const INTERACTIVE_REF_RE =
+  /\b(button|link|textbox|combobox|checkbox|radio|searchbox|slider|switch|spinbutton|menuitem|menuitemcheckbox|menuitemradio|tab|option|listbox)\b[^\n]*\[ref=/;
+
+/** True if the aria snapshot has at least one interactive element with a ref. */
+function hasInteractiveRefs(tree: string): boolean {
+  return INTERACTIVE_REF_RE.test(tree);
+}
+
 /**
  * Simplified WebAgent with core execution logic
  */
@@ -1023,6 +1036,20 @@ export class WebAgent {
 
     const currentUrl = await this.browser.getUrl();
     let currentPageSnapshot = await this.browser.getTreeWithRefs();
+    // SPA readiness guard: a client-rendered page (or one mid client-side
+    // redirect) can yield a snapshot with no actionable elements. Since every
+    // action tool is ref-only, an empty interactive tree strands the agent — it
+    // sees a form in the screenshot but has no ref to act on, and aborts. If the
+    // tree carries no interactive refs, wait briefly and re-capture (bounded).
+    // Runs before redaction so redaction operates on the final, hydrated tree.
+    for (
+      let attempt = 0;
+      attempt < SNAPSHOT_READINESS_MAX_RETRIES && !hasInteractiveRefs(currentPageSnapshot);
+      attempt++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, SNAPSHOT_READINESS_DELAY_MS));
+      currentPageSnapshot = await this.browser.getTreeWithRefs();
+    }
     // Redact caller-data secrets that the page echoes back (e.g. a value just
     // placed via fill_user_data reflected in element.value): ARIA refs are
     // regenerated every snapshot, so per-ref masking is unviable — redact the
