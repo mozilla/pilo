@@ -18,7 +18,32 @@ export default defineConfig({
     "packages/cli/src/cli.ts",
   ],
   format: ["esm"],
-  dts: true,
+  // pilo-core is bundled (see above), which pulls its transitive CommonJS
+  // dependencies into the ESM output. Some of them — mute-stream, via
+  // @inquirer/core — call bare `require("stream")`. Bare builtins are not matched
+  // by the /^node:/ external rule below, so esbuild inlines them behind a shim
+  // that throws `Dynamic require of "stream" is not supported`, and the CLI dies
+  // on startup before it can print anything.
+  //
+  // Defining a real `require` gives that shim something to delegate to. esbuild
+  // renames this binding and every reference to it inside the shim consistently,
+  // so the throwing branch becomes unreachable.
+  banner: {
+    js: [
+      'import { createRequire } from "node:module";',
+      "const require = createRequire(import.meta.url);",
+    ].join("\n"),
+  },
+  // tsup injects `baseUrl` into the compiler options it synthesises for the
+  // declaration build. TypeScript 6 reports that as an error (TS5101) rather than a
+  // warning, so `pnpm run build` fails at "DTS Build start" on a clean checkout.
+  // Acknowledging the deprecation keeps the declaration build working until tsup
+  // stops setting it.
+  dts: {
+    compilerOptions: {
+      ignoreDeprecations: "6.0",
+    },
+  },
   outDir: "dist",
   target: "node22",
   clean: true,
