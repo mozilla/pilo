@@ -276,6 +276,24 @@ export function hasInteractiveRefs(tree: string): boolean {
   return INTERACTIVE_REF_RE.test(tree);
 }
 
+// A stale/invalid element ref means the DOM changed under the agent and its
+// cached refs are gone. This is the exact phrase the recovery prompt keys on
+// (see prompts.ts — "Invalid element reference … does not exist on the current
+// page"); keep the two in sync.
+const STALE_REF_ERROR_RE = /invalid element reference|does not exist on the current page/i;
+
+/**
+ * After a recoverable tool error, decide whether to force a page-snapshot
+ * refresh on the retry. Only a stale/invalid-ref error warrants it: that is the
+ * one case where the model's cached snapshot is known-bad, and the recovery
+ * prompt has already promised the model a fresh snapshot will arrive. Other
+ * recoverable errors keep the prior behavior (no forced refresh). The loop's
+ * consecutive-error budget bounds any refresh loop.
+ */
+export function shouldRefreshSnapshotAfterError(error: unknown): boolean {
+  return error instanceof Error && STALE_REF_ERROR_RE.test(error.message);
+}
+
 /**
  * Simplified WebAgent with core execution logic
  */
@@ -799,9 +817,18 @@ export class WebAgent {
               };
             }
 
-            // Add error feedback and retry
+            // Add error feedback and retry. On a stale/invalid-ref error the
+            // model's cached snapshot is known-bad and the recovery prompt has
+            // promised it a fresh one, so force a snapshot refresh; otherwise
+            // keep the prior no-refresh behavior. Without this, a recoverable
+            // ref error strands the agent on a frozen snapshot — it "waits" for
+            // a refresh that never comes and confabulates refs until the
+            // consecutive-error budget kills the run.
             this.addErrorFeedback(error);
-            return { flow: "next" as const, needsPageSnapshot: false };
+            return {
+              flow: "next" as const,
+              needsPageSnapshot: shouldRefreshSnapshotAfterError(error),
+            };
           }
         },
       );

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebAgent, WebAgentOptions, hasInteractiveRefs } from "../src/webAgent.js";
+import {
+  WebAgent,
+  WebAgentOptions,
+  hasInteractiveRefs,
+  shouldRefreshSnapshotAfterError,
+} from "../src/webAgent.js";
 import { InvalidHostnameError } from "../src/security/actionFirewall.js";
 import {
   AriaBrowser,
@@ -12,7 +17,12 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
-import { PlanningError, BrowserDisconnectedError } from "../src/errors.js";
+import {
+  PlanningError,
+  BrowserDisconnectedError,
+  ToolExecutionError,
+  InvalidRefException,
+} from "../src/errors.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
@@ -5126,5 +5136,37 @@ describe("hasInteractiveRefs (SPA snapshot readiness guard)", () => {
     // A name containing ": " forces yaml to single-quote the whole key; the role
     // still leads, so the optional leading quote in the pattern keeps it matching.
     expect(hasInteractiveRefs(`- 'button "Save: now" [ref=E1]'`)).toBe(true);
+  });
+});
+
+describe("shouldRefreshSnapshotAfterError (recover from stale refs)", () => {
+  it("refreshes on an InvalidRefException (the stale-ref signal)", () => {
+    expect(shouldRefreshSnapshotAfterError(new InvalidRefException("E44"))).toBe(true);
+  });
+
+  it("refreshes on a ToolExecutionError carrying the invalid-ref message", () => {
+    // This is the actual type on the recoverable-error retry path: webActionTools
+    // catches the BrowserException and re-throws it as a ToolExecutionError.
+    const err = new ToolExecutionError(
+      "Invalid element reference 'E44'. The element does not exist on the current page.",
+      { action: "fill", ref: "E44" },
+    );
+    expect(shouldRefreshSnapshotAfterError(err)).toBe(true);
+  });
+
+  it("matches the 'does not exist on the current page' phrasing", () => {
+    expect(
+      shouldRefreshSnapshotAfterError(new Error("Element does not exist on the current page")),
+    ).toBe(true);
+  });
+
+  it("does NOT refresh on an unrelated recoverable tool error", () => {
+    const err = new ToolExecutionError("Click timed out after 5000ms", { action: "click" });
+    expect(shouldRefreshSnapshotAfterError(err)).toBe(false);
+  });
+
+  it("does not throw on non-Error values", () => {
+    expect(shouldRefreshSnapshotAfterError(undefined)).toBe(false);
+    expect(shouldRefreshSnapshotAfterError("Invalid element reference 'E1'")).toBe(false);
   });
 });
