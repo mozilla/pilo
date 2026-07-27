@@ -73,4 +73,27 @@ describe("normalizeSchema", () => {
     const result = normalizeSchema(buildSchema("1623388915", "228060")) as any;
     expect(Object.keys(result.definitions)).toHaveLength(2);
   });
+
+  it("does not clobber an existing definition that already owns a generated name", () => {
+    // Discover the stable name this shape hashes to, then plant a pre-existing
+    // definition under that exact key. Renaming must not overwrite it.
+    const probe = normalizeSchema(buildSchema("1623388915", "228060")) as any;
+    const takenName = Object.keys(probe.definitions).find((n) => n.startsWith("alias-"))!;
+
+    const schema = buildSchema("1623388915", "228060") as any;
+    schema.definitions[takenName] = { const: "pre-existing", type: "string" };
+
+    const result = normalizeSchema(schema) as any;
+
+    // The pre-existing definition must survive intact.
+    expect(result.definitions[takenName]).toEqual({ const: "pre-existing", type: "string" });
+    // Both volatile aliases still got their own definitions alongside it.
+    expect(Object.keys(result.definitions)).toHaveLength(3);
+    // And no $ref dangles.
+    const names = Object.keys(result.definitions);
+    const refs = JSON.stringify(result).match(/#\/definitions\/([^"]+)/g) ?? [];
+    for (const ref of refs) {
+      expect(names).toContain(ref.replace("#/definitions/", ""));
+    }
+  });
 });

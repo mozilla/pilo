@@ -94,7 +94,10 @@ function stabilizeAliasNames(schema) {
   if (volatileNames.length === 0) return 0;
 
   const rename = {};
-  const used = new Set();
+  // Seed with the definition names we are *not* renaming, so a generated
+  // `alias-<hash>` can never collide with — and silently overwrite — a
+  // definition that already exists under that key.
+  const used = new Set(Object.keys(definitions).filter((name) => !VOLATILE_ALIAS.test(name)));
   for (const oldName of volatileNames) {
     const canonical = JSON.stringify(canonicalize(definitions[oldName]));
     const digest = crypto.createHash("sha256").update(canonical).digest("hex").slice(0, 16);
