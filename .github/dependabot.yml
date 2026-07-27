@@ -53,3 +53,13 @@ updates:
       radixui:
         patterns:
           - "@radix-ui/*"
+      # The OpenTelemetry JS packages are released from a shared monorepo and
+      # move in lockstep, so ungrouped they arrive as a burst of near-identical
+      # PRs for one upstream release — e.g. 0.219.0 -> 0.220.0 took three
+      # (#601, #605, #606). Group them into a single PR per release wave.
+      # The three version lines (0.x exporters/sdk-node, 2.x sdk/resources,
+      # 1.x api/semantic-conventions) are independent, so a wave that only
+      # moves one line simply produces a smaller grouped PR.
+      opentelemetry:
+        patterns:
+          - "@opentelemetry/*"
