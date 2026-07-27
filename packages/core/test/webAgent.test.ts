@@ -155,13 +155,13 @@ class MockBrowser implements AriaBrowser {
   browserName = "mock-browser";
   private url = "about:blank";
   private title = "Mock Page";
-  private pageSnapshot = `
-    <div>
-      <button [ref=btn1]>Click me</button>
-      <input [ref=input1] type="text" />
-      <a [ref=link1] href="/page">Link</a>
-    </div>
-  `;
+  // Real aria-snapshot YAML shape (`<indent>- <role> "<name>" [ref=…]`) so the
+  // SPA readiness guard in addPageSnapshot sees interactive refs and doesn't
+  // spuriously retry. Ref IDs are kept short (btn1/input1/link1) for readable
+  // tool-call fixtures below.
+  private pageSnapshot = `- button "Click me" [ref=btn1]
+- textbox "Search" [ref=input1]
+- link "Link" [ref=link1]`;
   private markdown = "# Mock Page\nContent here";
   fieldMetadata = new Map<string, FieldMetadata>();
   formSubmissionContexts = new Map<string, FormSubmissionContext | null>();
@@ -1621,7 +1621,7 @@ describe("WebAgent", () => {
             "page.evaluate: Execution context was destroyed, most likely because of a navigation",
           ),
         )
-        .mockResolvedValue(`<div><button [ref=btn1]>Click me</button></div>`);
+        .mockResolvedValue(`- button "Click me" [ref=btn1]`);
 
       const reconnectSpy = vi.spyOn(webAgent as any, "handleBrowserDisconnect");
 
@@ -5095,22 +5095,36 @@ describe("WebAgent firewall options", () => {
 
 describe("hasInteractiveRefs (SPA snapshot readiness guard)", () => {
   it("returns false for a pre-hydration shell with no interactive elements", () => {
-    // The exact sparse tree that stranded the agent on the Mattermost login page.
-    const shell = "generic [ref=E1]:\n  img [ref=E2]\n  img [ref=E3]";
+    // The exact sparse tree that stranded the agent on the Mattermost login page,
+    // in the real snapshot YAML format (`<indent>- <role> … [ref=E##]`).
+    const shell = "- generic [ref=E1]:\n  - img [ref=E2]\n  - img [ref=E3]";
     expect(hasInteractiveRefs(shell)).toBe(false);
   });
 
   it("returns true once interactive elements with refs are present", () => {
     const hydrated =
-      'generic [ref=E1]:\n  textbox "Username" [ref=E5]\n  textbox "Password" [ref=E6]\n  button "Sign in" [ref=E7]';
+      '- generic [ref=E1]:\n  - textbox "Username" [ref=E5]\n  - textbox "Password" [ref=E6]\n  - button "Sign in" [ref=E7]';
     expect(hasInteractiveRefs(hydrated)).toBe(true);
   });
 
   it("treats a link with a ref as interactive", () => {
-    expect(hasInteractiveRefs('link "Forgot password?" [ref=E9]')).toBe(true);
+    expect(hasInteractiveRefs('- link "Forgot password?" [ref=E9]')).toBe(true);
   });
 
   it("ignores an interactive role that has no ref (not yet actionable)", () => {
-    expect(hasInteractiveRefs("button (no ref rendered)")).toBe(false);
+    expect(hasInteractiveRefs("- button (no ref rendered)")).toBe(false);
+  });
+
+  it("ignores an interactive word inside a non-interactive node's name", () => {
+    // Regression: `generic` is not actionable even though its accessible name is
+    // "button" — the role, not the name, decides. Anchoring prevents this false positive.
+    expect(hasInteractiveRefs('- generic "button" [ref=E5]')).toBe(false);
+    expect(hasInteractiveRefs('- text "click the link to continue" [ref=E6]')).toBe(false);
+  });
+
+  it("still matches an interactive node whose quoted key was yaml-escaped", () => {
+    // A name containing ": " forces yaml to single-quote the whole key; the role
+    // still leads, so the optional leading quote in the pattern keeps it matching.
+    expect(hasInteractiveRefs(`- 'button "Save: now" [ref=E1]'`)).toBe(true);
   });
 });

@@ -263,8 +263,13 @@ const SNAPSHOT_READINESS_MAX_RETRIES = 3;
 const SNAPSHOT_READINESS_DELAY_MS = 1000;
 
 // Interactive ARIA roles that carry a [ref=…] the agent can actually act on.
+// Anchored to the node's role position — each snapshot line is
+// `<indent>- <role> "<name>" … [ref=E##]` (role first, name after). Matching
+// the role at line-start (after the optional `'` a quote-wrapped key adds)
+// avoids false positives where an interactive word appears inside a
+// non-interactive node's accessible name, e.g. `- generic "button" [ref=E5]`.
 const INTERACTIVE_REF_RE =
-  /\b(button|link|textbox|combobox|checkbox|radio|searchbox|slider|switch|spinbutton|menuitem|menuitemcheckbox|menuitemradio|tab|option|listbox)\b[^\n]*\[ref=/;
+  /^[ \t]*- '?(button|link|textbox|combobox|checkbox|radio|searchbox|slider|switch|spinbutton|menuitem|menuitemcheckbox|menuitemradio|tab|option|listbox)\b[^\n]*\[ref=/m;
 
 /** True if the aria snapshot has at least one interactive element with a ref. */
 export function hasInteractiveRefs(tree: string): boolean {
@@ -1040,7 +1045,9 @@ export class WebAgent {
     // redirect) can yield a snapshot with no actionable elements. Since every
     // action tool is ref-only, an empty interactive tree strands the agent — it
     // sees a form in the screenshot but has no ref to act on, and aborts. If the
-    // tree carries no interactive refs, wait briefly and re-capture (bounded).
+    // tree carries no interactive refs, wait briefly and re-capture: the initial
+    // capture above plus up to SNAPSHOT_READINESS_MAX_RETRIES re-captures
+    // (≤ MAX_RETRIES × DELAY_MS of added latency, only on a stranded snapshot).
     // Runs before redaction so redaction operates on the final, hydrated tree.
     for (
       let attempt = 0;
