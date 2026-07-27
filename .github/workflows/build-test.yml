@@ -175,6 +175,14 @@ jobs:
       - name: Build published package
         run: pnpm run build
 
+      # A successful build does not mean a working binary. The bundled CLI can
+      # assemble cleanly and still die on startup — e.g. a transitive CommonJS
+      # dependency calling bare `require("stream")`, which esbuild inlines behind
+      # a shim that throws "Dynamic require of ... is not supported". Actually
+      # running the entry point is the only thing that catches that class of bug.
+      - name: Verify the built CLI starts
+        run: node dist/cli/src/cli.js --version
+
       - name: Verify the tarball is complete
         run: |
           set -euo pipefail
