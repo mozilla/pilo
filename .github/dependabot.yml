@@ -11,6 +11,20 @@ updates:
       default-days: 14
     open-pull-requests-limit: 10
     versioning-strategy: increase
+    ignore:
+      # TypeScript 7 is the Go port of the compiler and ships no public
+      # programmatic API (Microsoft has said a new one arrives in 7.1). Every
+      # tool that drives TypeScript through that API breaks on it — for us,
+      # tsup's declaration emit via rollup-plugin-dts, which takes down all of
+      # `pnpm run build` and therefore releases. rollup-plugin-dts still caps
+      # its peer range at `^6.0` and tsup is already at its latest.
+      #
+      # A major bump here is not actionable until that upstream chain moves, so
+      # don't keep proposing one. Minor and patch updates still come through.
+      # Remove this once TS 7.1 lands and rollup-plugin-dts supports it.
+      # See #628 for the upgrade plan; #617 is the bump that broke the build.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       react:
         patterns:
