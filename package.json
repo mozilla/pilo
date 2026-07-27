@@ -74,8 +74,8 @@
     "esbuild": "^0.28.1",
     "prettier": "^3.9.3",
     "tsup": "^8.3.5",
-    "tsx": "^4.23.0",
-    "typescript": "^6.0.3"
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
   },
   "packageManager": "pnpm@9.0.0",
   "pnpm": {
