@@ -267,7 +267,7 @@ const INTERACTIVE_REF_RE =
   /\b(button|link|textbox|combobox|checkbox|radio|searchbox|slider|switch|spinbutton|menuitem|menuitemcheckbox|menuitemradio|tab|option|listbox)\b[^\n]*\[ref=/;
 
 /** True if the aria snapshot has at least one interactive element with a ref. */
-function hasInteractiveRefs(tree: string): boolean {
+export function hasInteractiveRefs(tree: string): boolean {
   return INTERACTIVE_REF_RE.test(tree);
 }
 

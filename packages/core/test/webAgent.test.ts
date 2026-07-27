@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
+import { WebAgent, WebAgentOptions, hasInteractiveRefs } from "../src/webAgent.js";
 import { InvalidHostnameError } from "../src/security/actionFirewall.js";
 import {
   AriaBrowser,
@@ -5090,5 +5090,27 @@ describe("WebAgent firewall options", () => {
           unsafeMode: true,
         }),
     ).not.toThrow();
+  });
+});
+
+describe("hasInteractiveRefs (SPA snapshot readiness guard)", () => {
+  it("returns false for a pre-hydration shell with no interactive elements", () => {
+    // The exact sparse tree that stranded the agent on the Mattermost login page.
+    const shell = "generic [ref=E1]:\n  img [ref=E2]\n  img [ref=E3]";
+    expect(hasInteractiveRefs(shell)).toBe(false);
+  });
+
+  it("returns true once interactive elements with refs are present", () => {
+    const hydrated =
+      'generic [ref=E1]:\n  textbox "Username" [ref=E5]\n  textbox "Password" [ref=E6]\n  button "Sign in" [ref=E7]';
+    expect(hasInteractiveRefs(hydrated)).toBe(true);
+  });
+
+  it("treats a link with a ref as interactive", () => {
+    expect(hasInteractiveRefs('link "Forgot password?" [ref=E9]')).toBe(true);
+  });
+
+  it("ignores an interactive role that has no ref (not yet actionable)", () => {
+    expect(hasInteractiveRefs("button (no ref rendered)")).toBe(false);
   });
 });
