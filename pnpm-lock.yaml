@@ -31,10 +31,10 @@ importers:
         version: 2.18.1(playwright@1.61.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 3.0.0(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       ai:
-        specifier: ^7.0.25
-        version: 7.0.25(zod@4.3.6)
+        specifier: ^7.0.26
+        version: 7.0.26(zod@4.3.6)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -55,7 +55,7 @@ importers:
         version: 6.0.0
       ollama-ai-provider-v2:
         specifier: ^4.0.1
-        version: 4.0.1(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 4.0.1(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       playwright:
         specifier: 1.61.1
         version: 1.61.1
@@ -117,13 +117,13 @@ importers:
         version: 3.0.9(zod@4.3.6)
       '@openrouter/ai-sdk-provider':
         specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 3.0.0(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.2
       ollama-ai-provider-v2:
         specifier: ^4.0.1
-        version: 4.0.1(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 4.0.1(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       tsx:
         specifier: ^4.23.1
         version: 4.23.1
@@ -153,13 +153,13 @@ importers:
         version: 2.18.1(playwright@1.61.1)
       '@openrouter/ai-sdk-provider':
         specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 3.0.0(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       '@tabstack/sdk':
         specifier: ^2.3.0
         version: 2.6.1
       ai:
-        specifier: ^7.0.25
-        version: 7.0.25(zod@4.3.6)
+        specifier: ^7.0.26
+        version: 7.0.26(zod@4.3.6)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -180,7 +180,7 @@ importers:
         version: 6.0.0
       ollama-ai-provider-v2:
         specifier: ^4.0.1
-        version: 4.0.1(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 4.0.1(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       playwright:
         specifier: 1.61.1
         version: 1.61.1
@@ -241,7 +241,7 @@ importers:
         version: 4.0.13(zod@4.3.6)
       '@openrouter/ai-sdk-provider':
         specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 3.0.0(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.20
         version: 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -280,7 +280,7 @@ importers:
         version: 4.0.0(react@19.2.7)
       ollama-ai-provider-v2:
         specifier: ^4.0.1
-        version: 4.0.1(ai@7.0.25(zod@4.3.6))(zod@4.3.6)
+        version: 4.0.1(ai@7.0.26(zod@4.3.6))(zod@4.3.6)
       pilo-core:
         specifier: workspace:*
         version: link:../core
@@ -2342,8 +2342,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@7.0.25:
-    resolution: {integrity: sha512-LA9AwYRpXdQoQFBrBdvHltMz0Q6k/2Q7CtFJa0oIJPtGhuMWknHWiI45a60wFNZqP/jlQZhfRSh1ZFnpsVrgdg==}
+  ai@7.0.26:
+    resolution: {integrity: sha512-gzLoOHoXFJNcxrzFyHClbZsDEA1z0LNm3Kwq8lEWIfL+8wEEir+eDJqJJbkEJdLxGrc0IuBkybxEDzkbvSavjw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: 4.3.6
@@ -5438,9 +5438,9 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
-  '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.25(zod@4.3.6))(zod@4.3.6)':
+  '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.26(zod@4.3.6))(zod@4.3.6)':
     dependencies:
-      ai: 7.0.25(zod@4.3.6)
+      ai: 7.0.26(zod@4.3.6)
       zod: 4.3.6
 
   '@opentelemetry/api-logs@0.220.0':
@@ -6531,7 +6531,7 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.25(zod@4.3.6):
+  ai@7.0.26(zod@4.3.6):
     dependencies:
       '@ai-sdk/gateway': 4.0.19(zod@4.3.6)
       '@ai-sdk/provider': 4.0.3
@@ -7871,11 +7871,11 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  ollama-ai-provider-v2@4.0.1(ai@7.0.25(zod@4.3.6))(zod@4.3.6):
+  ollama-ai-provider-v2@4.0.1(ai@7.0.26(zod@4.3.6))(zod@4.3.6):
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.12(zod@4.3.6)
-      ai: 7.0.25(zod@4.3.6)
+      ai: 7.0.26(zod@4.3.6)
       zod: 4.3.6
 
   on-exit-leak-free@2.1.2: {}
