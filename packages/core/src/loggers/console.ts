@@ -18,6 +18,7 @@ import type {
   ScreenshotCapturedEventData,
   ValidationErrorEventData,
   AIGenerationErrorEventData,
+  ToolExecutionErrorEventData,
   FirewallBlockedNonInteractiveEventData,
 } from "../events.js";
 import { Logger } from "./types.js";
@@ -64,6 +65,7 @@ export class ConsoleLogger implements Logger {
 
     // AI events
     emitter.onEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+    emitter.onEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
 
     // Firewall events
     emitter.onEvent(WebAgentEventType.FIREWALL_BLOCKED_NON_INTERACTIVE, this.handleFirewallBlocked);
@@ -106,6 +108,7 @@ export class ConsoleLogger implements Logger {
 
       // AI events
       this.emitter.offEvent(WebAgentEventType.AI_GENERATION_ERROR, this.handleAIGenerationError);
+      this.emitter.offEvent(WebAgentEventType.TOOL_EXECUTION_ERROR, this.handleToolExecutionError);
 
       // Firewall events
       this.emitter.offEvent(
@@ -257,6 +260,10 @@ export class ConsoleLogger implements Logger {
 
   private handleAIGenerationError = (data: AIGenerationErrorEventData): void => {
     console.error("❌ AI generation error:", data.error);
+  };
+
+  private handleToolExecutionError = (data: ToolExecutionErrorEventData): void => {
+    console.error("⚠️ Tool execution failed (retrying):", data.error);
   };
 
   private handleFirewallBlocked = (data: FirewallBlockedNonInteractiveEventData): void => {

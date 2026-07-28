@@ -10,6 +10,7 @@ export enum PageAction {
   Click = "click",
   Hover = "hover",
   Fill = "fill",
+  UploadFile = "upload_file",
   Focus = "focus",
   Check = "check",
   Uncheck = "uncheck",
@@ -34,6 +35,10 @@ export enum PageAction {
  */
 export type ScrollDirection = "up" | "down" | "top" | "bottom";
 export const SCROLL_DIRECTIONS: ScrollDirection[] = ["up", "down", "top", "bottom"];
+
+export interface FileUploadConfig {
+  allowedPaths: readonly string[];
+}
 
 /**
  * Page load states to wait for

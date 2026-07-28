@@ -23,6 +23,11 @@ export const TOOL_STRINGS = {
     fill: {
       description: "Fill text into an input field",
     },
+    uploadFile: {
+      description: "Upload an allowlisted local file to a file input element or its container",
+      ref: "Element reference for the file input or a container containing one",
+      path: "Local file path inside configured upload_allowed_paths",
+    },
     select: {
       description: "Select an option from a dropdown",
       value: "Option to select",
@@ -87,6 +92,12 @@ export const TOOL_STRINGS = {
         'Why data is being requested: "initial" for first-time requests, "validation_error" when re-requesting after form validation failed',
       formDescription:
         "Brief description of the form and its purpose (e.g., 'Shipping address form', 'Account registration')",
+    },
+    fillUserData: {
+      description:
+        "Fill a field with one of the caller's Input Data values, by key. The value is inserted directly into the field and is NEVER shown to you. Use this for any field that should receive a caller-provided data value (personal info, credentials, etc.).",
+      ref: "Element reference from page snapshot (e.g., E###)",
+      key: "The Input Data key whose value to insert (see the Available keys list)",
     },
     webSearch: {
       description:
@@ -193,6 +204,9 @@ function buildToolExamples(
   hasWebSearch: boolean,
   hasTabstack: boolean = false,
   hasInteractive: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ): string {
   const lines = [
     `- click({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.click.description}`,
@@ -213,6 +227,15 @@ function buildToolExamples(
     `- find_elements({"selector": "a", "attributes": ["href"], "withinRef": "E42"}) - ${TOOL_STRINGS.webActions.findElements.description}`,
   ];
 
+  if (hasFileUpload) {
+    let uploadLine = `- upload_file({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}", "path": "/path/to/file"}) - ${TOOL_STRINGS.webActions.uploadFile.description}`;
+    if (advertisedUploadFiles.length > 0) {
+      uploadLine += `\n  Files available to upload (use one of these exact paths as "path"): ${advertisedUploadFiles.join(", ")}`;
+    }
+    // Insert just after the fill() example (index 1) to preserve ordering.
+    lines.splice(2, 0, uploadLine);
+  }
+
   if (hasWebSearch) {
     lines.push(
       `- webSearch({"query": "search terms"}) - ${TOOL_STRINGS.webActions.webSearch.description}`,
@@ -230,6 +253,12 @@ function buildToolExamples(
   if (hasInteractive) {
     lines.push(
       `- request_user_data({"reason": "initial", "formDescription": "Account signup form", "fields": [{"ref": "E42", "label": "Email", "fieldType": "email", "required": true}]}) - ${TOOL_STRINGS.webActions.requestUserData.description}`,
+    );
+  }
+
+  if (hasUserData) {
+    lines.push(
+      `- fill_user_data({"ref": "E###", "key": "membership_code"}) - ${TOOL_STRINGS.webActions.fillUserData.description}`,
     );
   }
 
@@ -405,11 +434,13 @@ Analyze the current page state and determine your next action based on previous 
    - Did all specified filters/criteria apply (price range, date, location, format)?
    - Does your answer match the requested format?
 3. Verify actions actually completed by checking the most recent page state:
-   - If you submitted a form, did the next page confirm success?
+   - If you submitted a form, look for a success message or a validation error:
+     - A validation error means it did NOT submit — fix and retry.
+     - Neither a confirmation nor an error is a normal outcome on many sites: treat the submission as completed and report it with done(), stating explicitly that no confirmation was shown.
    - If you extracted data, did you actually find it in the page snapshot or extract() output?
 4. Data grounding: every value in your answer must appear in a page snapshot, a tool result, or the task input. Do NOT use general knowledge to fill gaps. If a value was not found during this session, say so explicitly rather than inventing it.
 5. Blockers vs. obstacles: if you hit an unrecoverable block (paywall, login wall, access denied, payment declined) that prevented completing a core requirement, call abort() with the reason. Temporary obstacles you handled (dismissed popups, retried errors) don't change the outcome.
-6. If anything is unverified, incomplete, or uncertain — call abort() with the reason rather than done() with an overclaiming answer.
+6. If the information or data the task asks you to return is unverified, or a core step was blocked outright, call abort() with the reason rather than done() with an overclaiming answer. But an action you actually performed — e.g. a form submit that returned no error and showed no validation error — is NOT "unverified" merely because the site displayed no explicit success message; report that with done() and the caveat, don't abort.
 
 **When using done():**
 Provide your final answer:
@@ -457,13 +488,16 @@ ${toolCallInstruction}
 `.trim(),
 );
 
-/** Build action system prompt with optional guardrails, web search, Tabstack, and interactive tools. */
+/** Build action system prompt with optional guardrails, web search, Tabstack, interactive tools, and file upload. */
 const buildActionLoopSystemPrompt = (
   hasGuardrails: boolean,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
   hasStartingUrl: boolean = false,
   hasInteractive: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ) =>
   actionLoopSystemPromptTemplate({
     hasGuardrails,
@@ -471,7 +505,14 @@ const buildActionLoopSystemPrompt = (
     hasTabstack,
     hasStartingUrl,
     hasInteractive,
-    toolExamples: buildToolExamples(hasWebSearch, hasTabstack, hasInteractive),
+    toolExamples: buildToolExamples(
+      hasWebSearch,
+      hasTabstack,
+      hasInteractive,
+      hasFileUpload,
+      advertisedUploadFiles,
+      hasUserData,
+    ),
     currentDate: getCurrentFormattedDate(),
   });
 
@@ -487,11 +528,9 @@ Today's Date: {{ currentDate }}
 Task: {{ task }}
 Success Criteria: {{ successCriteria }}
 Plan: {{ plan }}
-{% if data %}
-Input Data:
-\`\`\`json
-{{ data }}
-\`\`\`
+{% if dataKeys %}
+Input Data available (values hidden for your security — you cannot see them). Available keys: {{ dataKeys }}
+To put one of these values into a field, call fill_user_data(ref, key). Never ask for or guess the values.
 {% endif %}
 {% if guardrails %}
 
@@ -507,7 +546,7 @@ export const buildTaskAndPlanPrompt = (
   task: string,
   successCriteria: string,
   plan: string,
-  data?: any,
+  dataKeys?: string[],
   guardrails?: string | null,
 ) =>
   taskAndPlanTemplate({
@@ -515,7 +554,7 @@ export const buildTaskAndPlanPrompt = (
     successCriteria,
     plan,
     currentDate: getCurrentFormattedDate(),
-    data: data ? JSON.stringify(data, null, 2) : null,
+    dataKeys: dataKeys && dataKeys.length ? dataKeys.join(", ") : null,
     guardrails,
   });
 
@@ -598,11 +637,21 @@ export const buildStepErrorFeedbackPrompt = (
   hasGuardrails: boolean = false,
   hasWebSearch: boolean = false,
   hasTabstack: boolean = false,
+  hasFileUpload: boolean = false,
+  advertisedUploadFiles: string[] = [],
+  hasUserData: boolean = false,
 ) =>
   stepErrorFeedbackTemplate({
     error,
     hasGuardrails,
-    toolExamples: buildToolExamples(hasWebSearch, hasTabstack),
+    toolExamples: buildToolExamples(
+      hasWebSearch,
+      hasTabstack,
+      false,
+      hasFileUpload,
+      advertisedUploadFiles,
+      hasUserData,
+    ),
   });
 
 /**

@@ -9,7 +9,7 @@
  * auto-resolved to absolute URLs), and the nearest `data-pilo-ref` ancestor.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { AriaBrowser } from "../browser/ariaBrowser.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
@@ -20,7 +20,7 @@ interface InspectionToolContext {
   eventEmitter: WebAgentEventEmitter;
 }
 
-export function createInspectionTools(context: InspectionToolContext) {
+export function createInspectionTools(context: InspectionToolContext): ToolSet {
   return {
     search_page: tool({
       description: TOOL_STRINGS.webActions.searchPage.description,

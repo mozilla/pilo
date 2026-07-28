@@ -6,14 +6,14 @@
  * When no starting URL is provided, the planner determines the best url.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { TOOL_STRINGS } from "../prompts.js";
 
 /**
  * Creates the planning tool: `create_plan` with optional `url`.
  */
-export function createPlanningTools() {
+export function createPlanningTools(): ToolSet {
   return {
     create_plan: tool({
       description: TOOL_STRINGS.planning.create_plan.description,

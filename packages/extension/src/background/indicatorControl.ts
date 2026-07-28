@@ -26,8 +26,7 @@ let tabsUpdatedListener:
     ) => void)
   | null = null;
 let webNavCommittedListener:
-  | ((details: browser.WebNavigation.OnCommittedDetailsType) => void)
-  | null = null;
+  ((details: browser.WebNavigation.OnCommittedDetailsType) => void) | null = null;
 let tabRemovedListener: ((tabId: number) => void) | null = null;
 
 // CSS for the indicator - injected programmatically for reliability

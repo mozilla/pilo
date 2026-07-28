@@ -21,6 +21,10 @@ export enum WebAgentEventType {
   AI_GENERATION = "ai:generation",
   AI_GENERATION_ERROR = "ai:generation:error",
 
+  // Tool execution (a tool the model invoked failed during execution — distinct
+  // from AI_GENERATION_ERROR, which means the model generation step itself failed)
+  TOOL_EXECUTION_ERROR = "tool:execution:error",
+
   // Agent reasoning and status
   AGENT_ACTION = "agent:action",
   AGENT_STEP = "agent:step",
@@ -138,6 +142,16 @@ export interface TaskStartEventData extends WebAgentEventData {
 export interface TaskCompleteEventData extends WebAgentEventData {
   finalAnswer: string | null;
   success?: boolean;
+  /**
+   * How validation resolved when a final answer was accepted:
+   * - "accepted": validator returned complete/excellent
+   * - "force-accepted": validator never accepted but maxValidationAttempts was hit
+   * - undefined: validation didn't run (task aborted, max iterations, etc.)
+   *
+   * Mirrors `TaskExecutionResult.validationOutcome`; consumers can read the
+   * outcome from this event without needing the function return value.
+   */
+  validationOutcome?: "accepted" | "force-accepted";
 }
 
 /**
@@ -153,6 +167,7 @@ export interface TaskMetricsEventData extends WebAgentEventData {
   stepCount: number;
   aiGenerationCount: number;
   aiGenerationErrorCount: number;
+  toolExecutionErrorCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;
 }
@@ -201,6 +216,21 @@ export interface AIGenerationErrorEventData extends WebAgentEventData {
   error: string;
   schema: any;
   messages?: any[];
+}
+
+/**
+ * Event data when a tool the model invoked fails during execution.
+ *
+ * This is distinct from AI_GENERATION_ERROR: the model generation step
+ * succeeded (it produced a valid tool call), but executing that tool failed.
+ * For browser actions the failure is also reported via BROWSER_ACTION_COMPLETED
+ * (success: false); this event covers all recoverable tool failures, including
+ * non-browser tools (search, extract) that have no browser-action event.
+ */
+export interface ToolExecutionErrorEventData extends WebAgentEventData {
+  error: string;
+  /** The action/tool name that failed, when available. */
+  action?: string;
 }
 
 /**
@@ -373,7 +403,7 @@ export type FirewallRemediation =
 
 export interface FirewallBlockedNonInteractiveEventData extends WebAgentEventData {
   reason: string;
-  kind: "freeform-fill" | "form-submission";
+  kind: "freeform-fill" | "form-submission" | "navigation";
   pageHostname: string | null;
   formActionHostnames: string[];
   remediations: FirewallRemediation[];
@@ -393,6 +423,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.TASK_METRICS_INCREMENTAL; data: TaskMetricsEventData }
   | { type: WebAgentEventType.AI_GENERATION; data: AIGenerationEventData }
   | { type: WebAgentEventType.AI_GENERATION_ERROR; data: AIGenerationErrorEventData }
+  | { type: WebAgentEventType.TOOL_EXECUTION_ERROR; data: ToolExecutionErrorEventData }
   | { type: WebAgentEventType.AGENT_ACTION; data: ActionExecutionEventData }
   | { type: WebAgentEventType.AGENT_STEP; data: AgentStepEventData }
   | { type: WebAgentEventType.AGENT_REASONED; data: ReasoningEventData }

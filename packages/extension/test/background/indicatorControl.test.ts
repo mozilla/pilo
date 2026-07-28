@@ -216,8 +216,8 @@ describe("indicatorControl", () => {
 
   describe("navigation listener", () => {
     let capturedTabsListener:
-      | ((tabId: number, changeInfo: { status?: string }, tab: { id?: number }) => void)
-      | null = null;
+      ((tabId: number, changeInfo: { status?: string }, tab: { id?: number }) => void) | null =
+      null;
     let capturedWebNavListener: ((details: { tabId: number; frameId: number }) => void) | null =
       null;
 

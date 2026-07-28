@@ -6,7 +6,7 @@
  * Also manages approved refs to gate fill/select/check actions.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { type AriaBrowser, PageAction } from "../browser/ariaBrowser.js";
@@ -77,7 +77,10 @@ async function fillFieldsDirectly(
   return { filled, errors };
 }
 
-export function createInteractiveTools(context: InteractiveToolContext) {
+export function createInteractiveTools(context: InteractiveToolContext): {
+  tools: ToolSet;
+  approvedRefs: ApprovedRefs;
+} {
   const approvedRefs = new ApprovedRefs();
 
   const tools = {

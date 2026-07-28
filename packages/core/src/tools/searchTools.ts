@@ -5,7 +5,7 @@
  * Returns markdown that the LLM parses like any other web page.
  */
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { SearchService } from "../search/searchService.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
@@ -17,7 +17,7 @@ interface SearchToolContext {
   eventEmitter: WebAgentEventEmitter;
 }
 
-export function createSearchTools(context: SearchToolContext) {
+export function createSearchTools(context: SearchToolContext): ToolSet {
   return {
     webSearch: tool({
       description: TOOL_STRINGS.webActions.webSearch.description,

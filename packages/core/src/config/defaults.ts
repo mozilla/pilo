@@ -42,7 +42,14 @@ export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
 export const LOGGERS = ["console", "json"] as const;
 export type LoggerType = (typeof LOGGERS)[number];
 
-export const SEARCH_PROVIDERS = ["none", "duckduckgo", "google", "bing", "parallel-api"] as const;
+export const SEARCH_PROVIDERS = [
+  "none",
+  "duckduckgo",
+  "google",
+  "bing",
+  "parallel-api",
+  "exa-api",
+] as const;
 export type SearchProviderName = (typeof SEARCH_PROVIDERS)[number];
 
 export type ConfigFieldType = "string" | "string[]" | "number" | "boolean" | "enum";
@@ -116,6 +123,9 @@ export interface PiloConfig {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   pw_cdp_endpoints?: string[];
+  cdp_connect_max_attempts?: number;
+  cdp_connect_backoff_base_ms?: number;
+  cdp_connect_backoff_max_ms?: number;
   bypass_csp?: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -128,10 +138,12 @@ export interface PiloConfig {
   action_timeout_ms?: number;
   trusted_hostnames?: string[];
   unsafe_mode?: boolean;
+  upload_allowed_paths?: string[];
 
   // Search Configuration
   search_provider?: SearchProviderName;
   parallel_api_key?: string;
+  exa_api_key?: string;
 
   // Tabstack Configuration
   tabstack_api_key?: string;
@@ -191,6 +203,9 @@ export interface PiloConfigResolved {
   pw_endpoint?: string;
   pw_cdp_endpoint?: string;
   pw_cdp_endpoints?: string[];
+  cdp_connect_max_attempts: number;
+  cdp_connect_backoff_base_ms: number;
+  cdp_connect_backoff_max_ms: number;
   bypass_csp: boolean;
 
   // Navigation Configuration (timeouts in milliseconds)
@@ -203,10 +218,12 @@ export interface PiloConfigResolved {
   action_timeout_ms: number;
   trusted_hostnames: string[];
   unsafe_mode: boolean;
+  upload_allowed_paths: string[];
 
   // Search Configuration
   search_provider: SearchProviderName;
   parallel_api_key?: string;
+  exa_api_key?: string;
 
   // Tabstack Configuration
   tabstack_api_key?: string;
@@ -589,6 +606,36 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
       "Comma-separated list of CDP endpoint URLs to try in order (chromium only, takes precedence over --pw-cdp-endpoint)",
     category: "playwright",
   },
+  cdp_connect_max_attempts: {
+    default: 3,
+    type: "number",
+    cli: "--cdp-connect-max-attempts",
+    placeholder: "n",
+    env: ["PILO_CDP_CONNECT_MAX_ATTEMPTS"],
+    description:
+      "Max connection attempts per CDP endpoint before failing over to the next (chromium only). Retries transient connection errors with exponential backoff.",
+    category: "playwright",
+  },
+  cdp_connect_backoff_base_ms: {
+    default: 1000,
+    type: "number",
+    cli: "--cdp-connect-backoff-base-ms",
+    placeholder: "ms",
+    env: ["PILO_CDP_CONNECT_BACKOFF_BASE_MS"],
+    description:
+      "Base delay in milliseconds for exponential backoff between CDP connect retries (doubles each attempt, capped at cdp_connect_backoff_max_ms, with jitter)",
+    category: "playwright",
+  },
+  cdp_connect_backoff_max_ms: {
+    default: 10000,
+    type: "number",
+    cli: "--cdp-connect-backoff-max-ms",
+    placeholder: "ms",
+    env: ["PILO_CDP_CONNECT_BACKOFF_MAX_MS"],
+    description:
+      "Maximum delay in milliseconds for exponential backoff between CDP connect retries (chromium only)",
+    category: "playwright",
+  },
   bypass_csp: {
     default: false,
     type: "boolean",
@@ -665,6 +712,16 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
       "Disables the action firewall entirely. WARNING: prompt injection from page content can then cause the agent to submit your data, including credentials, personal info, and conversation context, to attacker-controlled forms. Only enable for trusted, controlled environments.",
     category: "action",
   },
+  upload_allowed_paths: {
+    default: [],
+    type: "string[]",
+    cli: "--upload-allowed-paths",
+    placeholder: "path1,path2,...",
+    env: ["PILO_UPLOAD_ALLOWED_PATHS"],
+    description:
+      "Comma-separated local filesystem roots where upload_file may read files. Empty means file upload is disabled.",
+    category: "action",
+  },
 
   // Search Configuration
   search_provider: {
@@ -683,6 +740,14 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "key",
     env: ["PARALLEL_API_KEY"],
     description: "Parallel API key for search",
+    category: "search",
+  },
+  exa_api_key: {
+    type: "string",
+    cli: "--exa-api-key",
+    placeholder: "key",
+    env: ["EXA_API_KEY"],
+    description: "Exa API key for search",
     category: "search",
   },
 
@@ -736,6 +801,9 @@ function buildDefaults(): PiloConfigResolved {
     "max_consecutive_errors",
     "max_total_errors",
     "initial_navigation_retries",
+    "cdp_connect_max_attempts",
+    "cdp_connect_backoff_base_ms",
+    "cdp_connect_backoff_max_ms",
     "bypass_csp",
     "navigation_timeout_ms",
     "navigation_max_timeout_ms",
@@ -744,6 +812,7 @@ function buildDefaults(): PiloConfigResolved {
     "action_timeout_ms",
     "trusted_hostnames",
     "unsafe_mode",
+    "upload_allowed_paths",
     "search_provider",
   ];
 

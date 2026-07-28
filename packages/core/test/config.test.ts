@@ -185,6 +185,9 @@ describe("ConfigManager", () => {
         "pw_endpoint",
         "pw_cdp_endpoint",
         "pw_cdp_endpoints",
+        "cdp_connect_max_attempts",
+        "cdp_connect_backoff_base_ms",
+        "cdp_connect_backoff_max_ms",
         "bypass_csp",
         "navigation_timeout_ms",
         "navigation_max_timeout_ms",
@@ -195,8 +198,10 @@ describe("ConfigManager", () => {
         "unsafe_mode",
         "search_provider",
         "parallel_api_key",
+        "exa_api_key",
         "tabstack_api_key",
         "tabstack_api_url",
+        "upload_allowed_paths",
       ];
 
       // Check that schema has all PiloConfig keys

@@ -13,6 +13,7 @@ export type {
   FindElementsOptions,
   FindElementsMatch,
   FindElementsResult,
+  FileUploadConfig,
   FieldMetadata,
   FormSubmissionContext,
   FormSubmissionTrigger,

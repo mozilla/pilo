@@ -15,6 +15,7 @@ const BASE_EXCLUDED_EVENTS: readonly WebAgentEventType[] = [
   WebAgentEventType.TASK_SETUP, // Contains sensitive endpoint URLs
   WebAgentEventType.AI_GENERATION, // Too verbose
   WebAgentEventType.AI_GENERATION_ERROR, // Too verbose
+  WebAgentEventType.TOOL_EXECUTION_ERROR, // Recoverable retry noise; already surfaced via browser:action_completed
 ] as const;
 
 /**

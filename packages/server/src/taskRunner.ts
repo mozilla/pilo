@@ -11,8 +11,10 @@ import {
   RecoverableError,
   SEARCH_PROVIDERS,
   PLAYWRIGHT_BROWSERS,
+  resolveAdvertisedUploadFiles,
 } from "pilo-core";
-import type { TaskExecutionResult, UserDataCallback } from "pilo-core";
+import type { FileUploadConfig, TaskExecutionResult, UserDataCallback } from "pilo-core";
+import * as path from "node:path";
 import { StreamLogger } from "./StreamLogger.js";
 import { config } from "./config.js";
 
@@ -25,13 +27,7 @@ export interface PiloTaskRequest {
 
   // AI configuration overrides
   provider?:
-    | "openai"
-    | "openrouter"
-    | "vertex"
-    | "ollama"
-    | "openai-compatible"
-    | "lmstudio"
-    | "google";
+    "openai" | "openrouter" | "vertex" | "ollama" | "openai-compatible" | "lmstudio" | "google";
   model?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
@@ -52,6 +48,9 @@ export interface PiloTaskRequest {
   pwEndpoint?: string;
   pwCdpEndpoint?: string;
   pwCdpEndpoints?: string[];
+  cdpConnectMaxAttempts?: number;
+  cdpConnectBackoffBaseMs?: number;
+  cdpConnectBackoffMaxMs?: number;
   bypassCSP?: boolean;
 
   // WebAgent behavior overrides
@@ -62,6 +61,7 @@ export interface PiloTaskRequest {
   // Action firewall overrides
   trustedHostnames?: string[];
   unsafeMode?: boolean;
+  uploadAllowedPaths?: string[];
 
   // Proxy configuration overrides
   proxy?: string;
@@ -81,7 +81,7 @@ export interface PiloTaskRequest {
   logger?: "console" | "json";
 
   // Search configuration overrides
-  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api";
+  searchProvider?: "none" | "duckduckgo" | "google" | "bing" | "parallel-api" | "exa-api";
 
   // Tabstack configuration overrides
   tabstackApiKey?: string;
@@ -271,6 +271,17 @@ export function validateTaskRequest(
       }),
     };
   }
+  if (effectiveSearchProvider === "exa-api" && !serverConfig.exa_api_key) {
+    return {
+      status: 400,
+      response: createErrorResponse({
+        message: "exa-api search provider requires EXA_API_KEY to be configured on the server",
+        code: "MISSING_SEARCH_API_KEY",
+        reason: "INVALID_REQUEST",
+        phase: "setup",
+      }),
+    };
+  }
 
   try {
     getAIProviderInfo();
@@ -312,6 +323,15 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       `Server only supports Playwright browsers (${PLAYWRIGHT_BROWSERS.join(", ")}), got "${browserName}"`,
     );
   }
+  const uploadAllowedPaths = resolveServerUploadAllowedPaths(
+    serverConfig.upload_allowed_paths,
+    body.uploadAllowedPaths,
+  );
+  const allowFileUpload: false | FileUploadConfig =
+    uploadAllowedPaths.length > 0 ? { allowedPaths: uploadAllowedPaths } : false;
+  const advertisedUploadFiles = await resolveAdvertisedUploadFiles(allowFileUpload);
+
+  const searchProvider = body.searchProvider ?? serverConfig.search_provider;
 
   const browserConfig = {
     browser: browserName as (typeof PLAYWRIGHT_BROWSERS)[number],
@@ -321,19 +341,24 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     blockAds: body.blockAds ?? serverConfig.block_ads,
     blockResources: (body.blockResources ??
       (serverConfig.block_resources ? serverConfig.block_resources.split(",") : undefined)) as
-      | Array<"image" | "stylesheet" | "font" | "media" | "manifest">
-      | undefined,
+      Array<"image" | "stylesheet" | "font" | "media" | "manifest"> | undefined,
     pwEndpoint: body.pwEndpoint ?? serverConfig.pw_endpoint,
     pwCdpEndpoint: body.pwCdpEndpoint ?? serverConfig.pw_cdp_endpoint,
     pwCdpEndpoints:
       body.pwCdpEndpoints ??
       serverConfig.pw_cdp_endpoints ??
       (serverConfig.pw_cdp_endpoint ? [serverConfig.pw_cdp_endpoint] : undefined),
+    cdpConnectRetry: {
+      maxAttempts: body.cdpConnectMaxAttempts ?? serverConfig.cdp_connect_max_attempts,
+      backoffBaseMs: body.cdpConnectBackoffBaseMs ?? serverConfig.cdp_connect_backoff_base_ms,
+      backoffMaxMs: body.cdpConnectBackoffMaxMs ?? serverConfig.cdp_connect_backoff_max_ms,
+    },
     bypassCSP: body.bypassCSP ?? serverConfig.bypass_csp,
     proxyServer: body.proxy ?? serverConfig.proxy,
     proxyUsername: body.proxyUsername ?? serverConfig.proxy_username,
     proxyPassword: body.proxyPassword ?? serverConfig.proxy_password,
     actionTimeoutMs: body.actionTimeoutMs ?? serverConfig.action_timeout_ms,
+    allowFileUpload,
     navigationRetry: createNavigationRetryConfig({
       baseTimeoutMs: body.navigationTimeoutMs ?? serverConfig.navigation_timeout_ms,
       maxTimeoutMs: body.navigationMaxTimeoutMs ?? serverConfig.navigation_max_timeout_ms,
@@ -350,10 +375,19 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
     maxValidationAttempts: body.maxValidationAttempts ?? serverConfig.max_validation_attempts,
     trustedHostnames: body.trustedHostnames ?? serverConfig.trusted_hostnames,
     unsafeMode: body.unsafeMode ?? serverConfig.unsafe_mode,
+    allowFileUpload,
+    advertisedUploadFiles,
     llmProviderTimeoutMs: body.llmProviderTimeoutMs ?? serverConfig.llm_provider_timeout_ms,
     guardrails: body.guardrails,
-    searchProvider: body.searchProvider ?? serverConfig.search_provider,
-    searchApiKey: serverConfig.parallel_api_key,
+    searchProvider,
+    // Only pass a key for providers that use one; browser providers and
+    // "none" don't, so we avoid threading an unrelated key through config.
+    searchApiKey:
+      searchProvider === "exa-api"
+        ? serverConfig.exa_api_key
+        : searchProvider === "parallel-api"
+          ? serverConfig.parallel_api_key
+          : undefined,
     tabstackApiKey: body.tabstackApiKey ?? serverConfig.tabstack_api_key,
     tabstackApiUrl: serverConfig.tabstack_api_url,
   };
@@ -400,4 +434,29 @@ export async function runTask(options: TaskRunnerOptions): Promise<TaskExecution
       });
     }
   }
+}
+
+function resolveServerUploadAllowedPaths(
+  serverAllowedPaths: readonly string[],
+  requestAllowedPaths?: readonly string[],
+): string[] {
+  if (serverAllowedPaths.length === 0) {
+    return [];
+  }
+  if (requestAllowedPaths === undefined) {
+    return [...serverAllowedPaths];
+  }
+  if (requestAllowedPaths.length === 0) {
+    return [];
+  }
+
+  const normalizedServerRoots = serverAllowedPaths.map((root) => path.resolve(root));
+  return requestAllowedPaths.flatMap((requestPath) => {
+    const normalizedRequestPath = path.resolve(requestPath);
+    const allowed = normalizedServerRoots.some((serverRoot) => {
+      const relative = path.relative(serverRoot, normalizedRequestPath);
+      return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    });
+    return allowed ? [normalizedRequestPath] : [];
+  });
 }

@@ -13,8 +13,16 @@ import {
   WebAgentEventEmitter,
   MetricsCollector,
   SecretsRedactor,
+  PLAYWRIGHT_BROWSERS,
+  resolveAdvertisedUploadFiles,
 } from "pilo-core";
-import type { Logger, UserDataCallback, UserDataRequest, UserDataResponse } from "pilo-core";
+import type {
+  FileUploadConfig,
+  Logger,
+  UserDataCallback,
+  UserDataRequest,
+  UserDataResponse,
+} from "pilo-core";
 import { validateBrowser, getValidBrowsers, parseJsonData, parseResourcesList } from "../utils.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -186,6 +194,16 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       process.exit(1);
     }
 
+    const uploadAllowedPaths =
+      (options.uploadAllowedPaths as string[] | undefined) ?? cfg.upload_allowed_paths;
+    const allowFileUpload: false | FileUploadConfig =
+      PLAYWRIGHT_BROWSERS.includes(browserOption as (typeof PLAYWRIGHT_BROWSERS)[number]) &&
+      uploadAllowedPaths?.length > 0
+        ? { allowedPaths: uploadAllowedPaths }
+        : false;
+
+    const advertisedUploadFiles = await resolveAdvertisedUploadFiles(allowFileUpload);
+
     // Create logger
     const loggerType = options.logger ?? cfg.logger;
     const metricsIncremental = options.metricsIncremental ?? cfg.metrics_incremental;
@@ -241,7 +259,13 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
           (options.pwCdpEndpoints as string[] | undefined) ??
           cfg.pw_cdp_endpoints ??
           (cfg.pw_cdp_endpoint ? [cfg.pw_cdp_endpoint] : undefined),
+        cdpConnectRetry: {
+          maxAttempts: options.cdpConnectMaxAttempts ?? cfg.cdp_connect_max_attempts,
+          backoffBaseMs: options.cdpConnectBackoffBaseMs ?? cfg.cdp_connect_backoff_base_ms,
+          backoffMaxMs: options.cdpConnectBackoffMaxMs ?? cfg.cdp_connect_backoff_max_ms,
+        },
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
         navigationRetry: {
           baseTimeoutMs: options.navigationTimeoutMs ?? cfg.navigation_timeout_ms,
           maxTimeoutMs: options.navigationMaxTimeoutMs ?? cfg.navigation_max_timeout_ms,
@@ -307,6 +331,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
     }
 
     // Create WebAgent
+    const searchProvider = options.searchProvider ?? cfg.search_provider;
     const webAgent = new WebAgent(browser, {
       debug: debugMode,
       vision: options.vision ?? cfg.vision,
@@ -317,12 +342,21 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       initialNavigationRetries: options.initialNavigationRetries ?? cfg.initial_navigation_retries,
       maxConsecutiveErrors: options.maxConsecutiveErrors ?? cfg.max_consecutive_errors,
       maxTotalErrors: options.maxTotalErrors ?? cfg.max_total_errors,
-      searchProvider: options.searchProvider ?? cfg.search_provider,
-      searchApiKey: cfg.parallel_api_key,
+      searchProvider,
+      // Only pass a key for providers that use one; browser providers and
+      // "none" don't, so we avoid threading an unrelated key through config.
+      searchApiKey:
+        searchProvider === "exa-api"
+          ? cfg.exa_api_key
+          : searchProvider === "parallel-api"
+            ? cfg.parallel_api_key
+            : undefined,
       tabstackApiKey: options.tabstackApiKey ?? cfg.tabstack_api_key,
       tabstackApiUrl: options.tabstackApiUrl ?? cfg.tabstack_api_url,
       trustedHostnames: options.trustedHostnames ?? cfg.trusted_hostnames,
       unsafeMode: options.unsafe ?? cfg.unsafe_mode,
+      allowFileUpload,
+      advertisedUploadFiles,
       providerConfig,
       logger,
       eventEmitter,

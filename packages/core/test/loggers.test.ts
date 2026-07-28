@@ -10,6 +10,7 @@ import type {
   TaskValidationEventData,
   AIGenerationEventData,
   AIGenerationErrorEventData,
+  ToolExecutionErrorEventData,
   PageNavigationEventData,
   AgentStepEventData,
   ReasoningEventData,
@@ -666,6 +667,27 @@ describe("ConsoleLogger", () => {
       expect(allOutput).toContain("❌ AI generation error:");
       expect(allOutput).toContain("API rate limit exceeded");
     });
+
+    it("should handle TOOL_EXECUTION_ERROR events as a tool failure, not an AI error", () => {
+      const eventData: ToolExecutionErrorEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        error: "locator.click: Timeout 30000ms exceeded",
+        action: "click",
+      };
+
+      emitter.emitEvent({
+        type: WebAgentEventType.TOOL_EXECUTION_ERROR,
+        data: eventData,
+      });
+
+      expect(mockConsole.error).toHaveBeenCalled();
+      const allOutput = mockConsole.error.mock.calls.flat().join(" ");
+      expect(allOutput).toContain("Tool execution failed");
+      expect(allOutput).toContain("locator.click: Timeout 30000ms exceeded");
+      // Must NOT be mislabeled as an AI generation error
+      expect(allOutput).not.toContain("AI generation error");
+    });
   });
 
   describe("Firewall events", () => {
@@ -953,8 +975,10 @@ describe("JSONConsoleLogger", () => {
       expect(imageBlock.type).toBe("image");
       expect(imageBlock.data).toBe("<omitted>");
       expect(imageBlock.size).toBe(fakeJpeg.byteLength);
-      // Raw byte array must not appear in the output
-      expect(output).not.toContain("255"); // 0xff byte value
+      // Raw byte array must not appear in the output. Match the serialized
+      // byte sequence rather than a bare "255" — the latter collides with
+      // the millisecond timestamp in the output and makes this test flaky.
+      expect(output).not.toContain("255,216,255"); // raw fakeJpeg bytes
     });
 
     it("should preserve raw image data when sanitizeGenerationImages is false", () => {
@@ -1178,6 +1202,8 @@ describe("ChalkConsoleLogger", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    console.log = mockConsole.log;
+    mockConsole.log.mockClear();
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     logger = new ChalkConsoleLogger();
     emitter = new WebAgentEventEmitter();
@@ -1185,6 +1211,7 @@ describe("ChalkConsoleLogger", () => {
   });
 
   afterEach(() => {
+    console.log = originalConsole.log;
     logger.dispose();
     warnSpy.mockRestore();
   });
@@ -1195,6 +1222,69 @@ describe("ChalkConsoleLogger", () => {
       .map((c: unknown[]) => c.join(" "))
       .join("\n")
       .replace(/\x1b\[[0-9;]*m/g, "");
+
+  describe("TASK_COMPLETED validationOutcome surfacing", () => {
+    const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+    it("prints force-accept warning when validationOutcome is 'force-accepted'", () => {
+      const eventData: TaskCompleteEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        finalAnswer: "Final answer text",
+        success: true,
+        validationOutcome: "force-accepted",
+      };
+
+      emitter.emitEvent({ type: WebAgentEventType.TASK_COMPLETED, data: eventData });
+
+      const allOutput = mockConsole.log.mock.calls
+        .flat()
+        .map((c) => stripAnsi(String(c)))
+        .join("\n");
+      expect(allOutput).toContain("Final answer text");
+      expect(allOutput).toContain("Validator did not endorse this answer");
+      expect(allOutput).toContain("force-accepted after max validation attempts");
+    });
+
+    it("prints no warning when validationOutcome is 'accepted'", () => {
+      const eventData: TaskCompleteEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        finalAnswer: "Final answer text",
+        success: true,
+        validationOutcome: "accepted",
+      };
+
+      emitter.emitEvent({ type: WebAgentEventType.TASK_COMPLETED, data: eventData });
+
+      const allOutput = mockConsole.log.mock.calls
+        .flat()
+        .map((c) => stripAnsi(String(c)))
+        .join("\n");
+      expect(allOutput).toContain("Final answer text");
+      expect(allOutput).not.toContain("Validator did not endorse");
+      expect(allOutput).not.toContain("force-accepted");
+    });
+
+    it("prints no warning when validationOutcome is undefined", () => {
+      const eventData: TaskCompleteEventData = {
+        timestamp: Date.now(),
+        iterationId: "test-1",
+        finalAnswer: "Final answer text",
+        success: true,
+      };
+
+      emitter.emitEvent({ type: WebAgentEventType.TASK_COMPLETED, data: eventData });
+
+      const allOutput = mockConsole.log.mock.calls
+        .flat()
+        .map((c) => stripAnsi(String(c)))
+        .join("\n");
+      expect(allOutput).toContain("Final answer text");
+      expect(allOutput).not.toContain("Validator did not endorse");
+      expect(allOutput).not.toContain("force-accepted");
+    });
+  });
 
   describe("firewall remediation", () => {
     it("prints all three remediation options with the blocked hostname", () => {

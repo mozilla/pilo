@@ -245,6 +245,15 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
 }
 
 /**
+ * Combine an optional caller abort signal with a fresh timeout signal, so a call
+ * aborts on whichever fires first.
+ */
+function withTimeoutSignal(callerSignal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return callerSignal ? AbortSignal.any([callerSignal, timeoutSignal]) : timeoutSignal;
+}
+
+/**
  * Wrapper for generateObject with retry logic
  *
  * Mirrors generateTextWithRetry's retry/backoff/non-retryable behavior, but for
@@ -252,27 +261,36 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
  * does not accept tools. `NoObjectGeneratedError` (schema/parse failures from
  * the model output) is treated as non-retryable by `isRetryableError`.
  *
- * @param params - Parameters for generateObject call
+ * @param params - Parameters for generateObject call, plus an optional `timeout`
+ *   in milliseconds (see the abort-signal note below)
  * @param retryOptions - Optional retry configuration
  * @returns The generateObject result
  * @throws The last error if all retries fail
  */
 export async function generateObjectWithRetry(
-  params: Parameters<typeof generateObject>[0],
+  params: Parameters<typeof generateObject>[0] & { timeout?: number },
   retryOptions?: RetryOptions,
 ): Promise<Awaited<ReturnType<typeof generateObject>>> {
   type Result = Awaited<ReturnType<typeof generateObject>>;
 
-  // Apply the configured LLM provider timeout via the AI SDK `timeout` option
-  // unless the caller supplied an explicit timeout. The AI SDK aborts the call
-  // if it exceeds this duration (works alongside any provided abortSignal).
-  const paramsWithTimeout = {
-    ...params,
-    timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
-  };
+  // Unlike `generateText`, the AI SDK's `generateObject` does not accept a
+  // `timeout` option (its signature is `Omit<RequestOptions, "timeout">`), so we
+  // enforce the configured LLM provider timeout via an abort signal instead.
+  const { timeout, ...objectParams } = params as { timeout?: number } & Record<string, unknown>;
+  const timeoutMs = timeout ?? getConfigDefaults().llm_provider_timeout_ms;
+  const callerSignal = objectParams.abortSignal as AbortSignal | undefined;
 
-  return retryDriver<Result>(() => generateObject(paramsWithTimeout), {
-    ...retryOptions,
-    getFinishReason: (result) => result.finishReason,
-  });
+  return retryDriver<Result>(
+    () =>
+      // Build the timeout signal per attempt so each retry gets a full budget,
+      // matching how the SDK applies `timeout` to each `generateText` call.
+      generateObject({
+        ...(objectParams as Parameters<typeof generateObject>[0]),
+        abortSignal: withTimeoutSignal(callerSignal, timeoutMs),
+      }) as Promise<Result>,
+    {
+      ...retryOptions,
+      getFinishReason: (result) => result.finishReason,
+    },
+  );
 }

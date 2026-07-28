@@ -84,7 +84,7 @@ export function formatBrowserAction(data: BrowserActionStartedEventData): string
  * Non-user-facing errors include:
  * - Validation errors during retry attempts (below MAX_VALIDATION_RETRIES)
  * - Recoverable browser action errors (agent will retry automatically)
- * - AI generation errors marked as tool errors (agent will retry)
+ * - Tool execution errors (agent will retry automatically)
  *
  * @param event - The realtime event
  * @returns true if error should be shown to user, false otherwise
@@ -102,9 +102,9 @@ export function shouldDisplayError(event: RealtimeEvent): boolean {
     }
   }
 
-  // Filter AI generation errors that are tool errors (will be retried)
-  if (event.type === "ai:generation:error" && isAIGenerationErrorData(event.data)) {
-    return !event.data.isToolError;
+  // Tool execution errors are recoverable retries — never shown to the user
+  if (event.type === "tool:execution:error") {
+    return false;
   }
 
   // Show all other errors by default

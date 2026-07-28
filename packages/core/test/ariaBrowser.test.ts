@@ -8,6 +8,7 @@ describe("AriaBrowser interface", () => {
         "click",
         "hover",
         "fill",
+        "upload_file",
         "focus",
         "check",
         "uncheck",
@@ -36,6 +37,7 @@ describe("AriaBrowser interface", () => {
       expect(PageAction.Click).toBe("click");
       expect(PageAction.Hover).toBe("hover");
       expect(PageAction.Fill).toBe("fill");
+      expect(PageAction.UploadFile).toBe("upload_file");
       expect(PageAction.Focus).toBe("focus");
       expect(PageAction.Check).toBe("check");
       expect(PageAction.Uncheck).toBe("uncheck");
@@ -56,6 +58,7 @@ describe("AriaBrowser interface", () => {
         PageAction.Click,
         PageAction.Hover,
         PageAction.Fill,
+        PageAction.UploadFile,
         PageAction.Focus,
         PageAction.Check,
         PageAction.Uncheck,
@@ -163,6 +166,7 @@ describe("AriaBrowser interface", () => {
     it("should identify actions that require values", () => {
       const valueRequiredActions = [
         PageAction.Fill, // text to fill
+        PageAction.UploadFile, // local file path to upload
         PageAction.Select, // option to select
         PageAction.Wait, // seconds to wait
         PageAction.Goto, // URL to navigate to
@@ -221,6 +225,7 @@ describe("AriaBrowser interface", () => {
       const actionCategories = {
         clicking: [PageAction.Click],
         typing: [PageAction.Fill],
+        uploads: [PageAction.UploadFile],
         selecting: [PageAction.Select],
         checkboxes: [PageAction.Check, PageAction.Uncheck],
         navigation: [PageAction.Goto, PageAction.Back, PageAction.Forward],

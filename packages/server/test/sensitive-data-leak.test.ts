@@ -40,6 +40,7 @@ vi.mock("pilo-core", () => {
         provider: "openai",
         openai_api_key: "sk-test123",
         browser: "chromium",
+        upload_allowed_paths: [],
       })),
     },
     createAIProvider: vi.fn(() => ({})),
@@ -58,6 +59,7 @@ vi.mock("pilo-core", () => {
     SEARCH_PROVIDERS: ["none", "duckduckgo", "google", "bing", "parallel-api"],
     PLAYWRIGHT_BROWSERS: ["firefox", "chrome", "chromium", "safari", "webkit", "edge"],
     withRemoteContext: vi.fn((_headers: unknown, fn: () => unknown) => fn()),
+    resolveAdvertisedUploadFiles: vi.fn().mockResolvedValue([]),
   };
 });
 

