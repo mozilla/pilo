@@ -1206,7 +1206,7 @@ export class WebAgent {
           }
 
           // Await only the properties we actually need
-          const [toolResults, response, finishReason, usage, warnings, providerMetadata, text] =
+          const [toolResults, response, finishReason, usage, warnings, providerMetadata] =
             await Promise.all([
               streamResult.toolResults,
               streamResult.response,
@@ -1214,8 +1214,11 @@ export class WebAgent {
               streamResult.usage,
               streamResult.warnings,
               streamResult.providerMetadata,
-              streamResult.text,
             ]);
+
+          // Only materialize the model's prose on the failure path. When a tool
+          // was called the text is unused, and it can be large.
+          const text = toolResults.length === 0 ? await streamResult.text : "";
 
           const result: ProcessedAIResponse = {
             toolResults,
