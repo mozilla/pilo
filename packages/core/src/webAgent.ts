@@ -249,12 +249,22 @@ type StepOutcome =
   | { flow: "return"; value: { success: boolean; finalAnswer: string; error?: TaskError } }
   | { flow: "next"; needsPageSnapshot: boolean };
 
+/** How much of a no-tool-call prose response to keep for diagnosis. */
+const NO_TOOL_CALL_TEXT_PREVIEW_CHARS = 500;
+
 type StreamTextResultGeneric = StreamTextResult<any, any, never>;
 // HACK: cobble together a type from StreamTextResult with promises resolved
 type ProcessedAIResponse = AwaitedProperties<
   Pick<
     StreamTextResultGeneric,
-    "toolResults" | "response" | "finishReason" | "usage" | "warnings" | "providerMetadata"
+    | "toolResults"
+    | "response"
+    | "finishReason"
+    | "usage"
+    | "warnings"
+    | "providerMetadata"
+    // Only read when no tool was called, to report what the model said instead.
+    | "text"
   >
 >;
 
@@ -1196,7 +1206,7 @@ export class WebAgent {
           }
 
           // Await only the properties we actually need
-          const [toolResults, response, finishReason, usage, warnings, providerMetadata] =
+          const [toolResults, response, finishReason, usage, warnings, providerMetadata, text] =
             await Promise.all([
               streamResult.toolResults,
               streamResult.response,
@@ -1204,6 +1214,7 @@ export class WebAgent {
               streamResult.usage,
               streamResult.warnings,
               streamResult.providerMetadata,
+              streamResult.text,
             ]);
 
           const result: ProcessedAIResponse = {
@@ -1213,6 +1224,7 @@ export class WebAgent {
             usage,
             warnings,
             providerMetadata,
+            text,
           };
 
           aiSpan.setAttribute("pilo.ai.finish_reason", String(finishReason));
@@ -1261,7 +1273,22 @@ export class WebAgent {
 
     // Process tool results
     if (!aiResponse?.toolResults?.length) {
-      console.error("[WebAgent] No tools called in action generation");
+      // The model answered without calling a tool. Recoverable — the error below
+      // is fed back and the next turn usually succeeds — but the turn is spent,
+      // so record why it happened. "stop" means prose instead of a tool call;
+      // "length" means the response was truncated mid-call.
+      const finishReason = String(aiResponse?.finishReason ?? "unknown");
+      const text = aiResponse?.text ?? "";
+      console.error(
+        `[WebAgent] No tools called in action generation ` +
+          `(finishReason=${finishReason}, textLength=${text.length})`,
+      );
+      this.emit(WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL, {
+        iterationId: this.currentIterationId,
+        finishReason,
+        textLength: text.length,
+        textPreview: text.slice(0, NO_TOOL_CALL_TEXT_PREVIEW_CHARS),
+      });
       throw new ToolExecutionError(
         "You must use exactly one tool. Please use one of the available tools.",
         {

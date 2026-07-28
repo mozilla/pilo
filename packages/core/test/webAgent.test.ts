@@ -2079,6 +2079,73 @@ describe("WebAgent", () => {
       expect(
         mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION_ERROR),
       ).toBeUndefined();
+
+      // A diagnostic event must record WHY no tool was called. Without it the
+      // only trace is the corrective message above, which says nothing about
+      // whether the model wrote prose or was truncated mid-call.
+      const noToolCall = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL,
+      );
+      expect(noToolCall).toBeDefined();
+      expect(noToolCall?.data.finishReason).toBe("stop");
+      expect(noToolCall?.data.textLength).toBe("No tools used".length);
+      expect(noToolCall?.data.textPreview).toBe("No tools used");
+    });
+
+    it("should report finishReason=length when a tool call was truncated", async () => {
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {},
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Truncated generation: no tool call, and finishReason says why.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "I will now click the",
+          toolResults: [],
+          finishReason: "length",
+          response: { messages: [] },
+        }) as any,
+      );
+
+      // Recovery turn: a real tool call so the run can terminate.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: { action: "done", result: "Complete", isTerminal: true },
+            },
+          ],
+          response: { messages: [] },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Test", { startingUrl: "https://example.com" });
+
+      const noToolCall = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL,
+      );
+      expect(noToolCall).toBeDefined();
+      expect(noToolCall?.data.finishReason).toBe("length");
+      expect(noToolCall?.data.textPreview).toBe("I will now click the");
     });
 
     it("should handle tool result without output property", async () => {
