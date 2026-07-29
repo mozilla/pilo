@@ -268,6 +268,42 @@ type ProcessedAIResponse = AwaitedProperties<
   >
 >;
 
+/** SPA snapshot readiness guard (see addPageSnapshot). */
+const SNAPSHOT_READINESS_MAX_RETRIES = 3;
+const SNAPSHOT_READINESS_DELAY_MS = 1000;
+
+// Interactive ARIA roles that carry a [ref=…] the agent can actually act on.
+// Anchored to the node's role position — each snapshot line is
+// `<indent>- <role> "<name>" … [ref=E##]` (role first, name after). Matching
+// the role at line-start (after the optional `'` a quote-wrapped key adds)
+// avoids false positives where an interactive word appears inside a
+// non-interactive node's accessible name, e.g. `- generic "button" [ref=E5]`.
+const INTERACTIVE_REF_RE =
+  /^[ \t]*- '?(button|link|textbox|combobox|checkbox|radio|searchbox|slider|switch|spinbutton|menuitem|menuitemcheckbox|menuitemradio|tab|option|listbox)\b[^\n]*\[ref=/m;
+
+/** True if the aria snapshot has at least one interactive element with a ref. */
+export function hasInteractiveRefs(tree: string): boolean {
+  return INTERACTIVE_REF_RE.test(tree);
+}
+
+// A stale/invalid element ref means the DOM changed under the agent and its
+// cached refs are gone. This is the exact phrase the recovery prompt keys on
+// (see prompts.ts — "Invalid element reference … does not exist on the current
+// page"); keep the two in sync.
+const STALE_REF_ERROR_RE = /invalid element reference|does not exist on the current page/i;
+
+/**
+ * After a recoverable tool error, decide whether to force a page-snapshot
+ * refresh on the retry. Only a stale/invalid-ref error warrants it: that is the
+ * one case where the model's cached snapshot is known-bad, and the recovery
+ * prompt has already promised the model a fresh snapshot will arrive. Other
+ * recoverable errors keep the prior behavior (no forced refresh). The loop's
+ * consecutive-error budget bounds any refresh loop.
+ */
+export function shouldRefreshSnapshotAfterError(error: unknown): boolean {
+  return error instanceof Error && STALE_REF_ERROR_RE.test(error.message);
+}
+
 /**
  * Simplified WebAgent with core execution logic
  */
@@ -791,9 +827,18 @@ export class WebAgent {
               };
             }
 
-            // Add error feedback and retry
+            // Add error feedback and retry. On a stale/invalid-ref error the
+            // model's cached snapshot is known-bad and the recovery prompt has
+            // promised it a fresh one, so force a snapshot refresh; otherwise
+            // keep the prior no-refresh behavior. Without this, a recoverable
+            // ref error strands the agent on a frozen snapshot — it "waits" for
+            // a refresh that never comes and confabulates refs until the
+            // consecutive-error budget kills the run.
             this.addErrorFeedback(error);
-            return { flow: "next" as const, needsPageSnapshot: false };
+            return {
+              flow: "next" as const,
+              needsPageSnapshot: shouldRefreshSnapshotAfterError(error),
+            };
           }
         },
       );
@@ -1033,6 +1078,22 @@ export class WebAgent {
 
     const currentUrl = await this.browser.getUrl();
     let currentPageSnapshot = await this.browser.getTreeWithRefs();
+    // SPA readiness guard: a client-rendered page (or one mid client-side
+    // redirect) can yield a snapshot with no actionable elements. Since every
+    // action tool is ref-only, an empty interactive tree strands the agent — it
+    // sees a form in the screenshot but has no ref to act on, and aborts. If the
+    // tree carries no interactive refs, wait briefly and re-capture: the initial
+    // capture above plus up to SNAPSHOT_READINESS_MAX_RETRIES re-captures
+    // (≤ MAX_RETRIES × DELAY_MS of added latency, only on a stranded snapshot).
+    // Runs before redaction so redaction operates on the final, hydrated tree.
+    for (
+      let attempt = 0;
+      attempt < SNAPSHOT_READINESS_MAX_RETRIES && !hasInteractiveRefs(currentPageSnapshot);
+      attempt++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, SNAPSHOT_READINESS_DELAY_MS));
+      currentPageSnapshot = await this.browser.getTreeWithRefs();
+    }
     // Redact caller-data secrets that the page echoes back (e.g. a value just
     // placed via fill_user_data reflected in element.value): ARIA refs are
     // regenerated every snapshot, so per-ref masking is unviable — redact the
