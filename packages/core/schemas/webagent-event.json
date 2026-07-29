@@ -4897,6 +4897,38 @@
       ],
       "type": "object"
     },
+    "NoToolCallDebugEventData": {
+      "additionalProperties": false,
+      "description": "Event data for a generation that returned no tool call at all.\n\nThe agent recovers by feeding the error back to the model, but the turn is spent — so a high rate of these silently drains the iteration budget. The two causes need opposite fixes and are only distinguishable by `finishReason`: \"stop\" means the model answered in prose instead of calling a tool, while \"length\" means it was truncated before the call completed.",
+      "properties": {
+        "finishReason": {
+          "description": "Why the provider stopped generating (e.g. \"stop\", \"length\", \"content-filter\").",
+          "type": "string"
+        },
+        "iterationId": {
+          "type": "string"
+        },
+        "textLength": {
+          "description": "Length of the prose the model returned instead of a tool call.",
+          "type": "number"
+        },
+        "textPreview": {
+          "description": "Leading characters of that prose, for diagnosis. Truncated.",
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "finishReason",
+        "iterationId",
+        "textLength",
+        "textPreview",
+        "timestamp"
+      ],
+      "type": "object"
+    },
     "PageNavigationEventData": {
       "additionalProperties": false,
       "description": "Event data when navigating to a page",
@@ -5988,6 +6020,23 @@
             },
             "type": {
               "const": "system:debug_tool_drop",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/NoToolCallDebugEventData"
+            },
+            "type": {
+              "const": "system:debug_no_tool_call",
               "type": "string"
             }
           },
