@@ -264,6 +264,115 @@ describe("BiDiBrowser", () => {
     });
   });
 
+  describe("searchPage", () => {
+    let browser: BiDiBrowser;
+    let conn: ReturnType<typeof getMockConnection>;
+
+    beforeEach(async () => {
+      browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      conn = getMockConnection(browser);
+    });
+
+    it("forwards pattern through evaluate and parses JSON result", async () => {
+      conn.sendCommand.mockResolvedValueOnce({
+        result: {
+          type: "string",
+          value: JSON.stringify({
+            totalMatches: 2,
+            matches: [
+              { match: "hello", contextBefore: "", contextAfter: "", nearestRef: "E5" },
+              { match: "hello", contextBefore: "say ", contextAfter: "", nearestRef: undefined },
+            ],
+          }),
+        },
+      });
+
+      const result = await browser.searchPage({ pattern: "hello" });
+
+      expect(result.totalMatches).toBe(2);
+      expect(result.matches).toHaveLength(2);
+      expect(result.matches[0].nearestRef).toBe("E5");
+      expect(result.truncated).toBe(false);
+
+      const call = conn.sendCommand.mock.calls.find((c: any[]) => c[0] === "script.evaluate");
+      expect(call).toBeDefined();
+      expect(call[1].expression).toContain('"pattern":"hello"');
+    });
+
+    it("marks truncated when totalMatches exceeds returned matches", async () => {
+      conn.sendCommand.mockResolvedValueOnce({
+        result: {
+          type: "string",
+          value: JSON.stringify({
+            totalMatches: 50,
+            matches: [{ match: "x", contextBefore: "", contextAfter: "", nearestRef: undefined }],
+          }),
+        },
+      });
+
+      const result = await browser.searchPage({ pattern: "x", maxResults: 1 });
+      expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe("findElements", () => {
+    let browser: BiDiBrowser;
+    let conn: ReturnType<typeof getMockConnection>;
+
+    beforeEach(async () => {
+      browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      conn = getMockConnection(browser);
+    });
+
+    it("returns parsed elements on success", async () => {
+      conn.sendCommand.mockResolvedValueOnce({
+        result: {
+          type: "string",
+          value: JSON.stringify({
+            totalMatches: 1,
+            matches: [{ tag: "a", text: "Click", attributes: { href: "/x" }, nearestRef: "E1" }],
+          }),
+        },
+      });
+
+      const result = await browser.findElements({ selector: "a" });
+      expect(result.totalMatches).toBe(1);
+      expect(result.elements[0].tag).toBe("a");
+      expect(result.elements[0].attributes?.href).toBe("/x");
+    });
+
+    it("throws when the in-page script reports a bad selector", async () => {
+      conn.sendCommand.mockResolvedValueOnce({
+        result: {
+          type: "string",
+          value: JSON.stringify({ error: "Invalid selector", kind: "bad-selector" }),
+        },
+      });
+
+      await expect(browser.findElements({ selector: ":::invalid" })).rejects.toThrow(
+        /find_elements failed: Invalid selector/,
+      );
+    });
+
+    it("throws when withinRef cannot be resolved in the frame", async () => {
+      conn.sendCommand.mockResolvedValueOnce({
+        result: {
+          type: "string",
+          value: JSON.stringify({
+            error: 'withinRef "E99" not found in this frame',
+            kind: "within-ref-miss",
+          }),
+        },
+      });
+
+      await expect(browser.findElements({ selector: "a", withinRef: "E99" })).rejects.toThrow(
+        /within.*not found/i,
+      );
+    });
+  });
+
   describe("performAction", () => {
     let browser: BiDiBrowser;
     let conn: ReturnType<typeof getMockConnection>;

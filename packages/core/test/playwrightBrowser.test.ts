@@ -1654,6 +1654,564 @@ describe("PlaywrightBrowser", () => {
     });
   });
 
+  describe("searchPage", () => {
+    let browser: PlaywrightBrowser;
+    let mainFrame: any;
+
+    beforeEach(() => {
+      browser = new PlaywrightBrowser({ browser: "chromium" });
+      mainFrame = { evaluate: vi.fn(), url: vi.fn().mockReturnValue("https://example.com/") };
+      (browser as any).page = {
+        evaluate: vi.fn(),
+        frames: vi.fn().mockReturnValue([mainFrame]),
+        mainFrame: vi.fn().mockReturnValue(mainFrame),
+      };
+    });
+
+    it("throws when browser not started", async () => {
+      const fresh = new PlaywrightBrowser();
+      await expect(fresh.searchPage({ pattern: "x" })).rejects.toThrow("Browser not started");
+    });
+
+    it("returns a literal match with context and nearestRef from the main frame", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 1,
+        matches: [
+          {
+            match: "logout",
+            contextBefore: "click ",
+            contextAfter: " here",
+            nearestRef: "E5",
+          },
+        ],
+      });
+
+      const result = await browser.searchPage({ pattern: "logout" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.truncated).toBe(false);
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0]).toEqual({
+        match: "logout",
+        contextBefore: "click ",
+        contextAfter: " here",
+        nearestRef: "E5",
+        frameUrl: undefined,
+      });
+
+      // Wrapper should forward the resolved opts (with defaults applied)
+      const callArg = (browser as any).page.evaluate.mock.calls[0][1];
+      expect(callArg).toEqual({
+        pattern: "logout",
+        regex: false,
+        caseSensitive: false,
+        contextChars: 80,
+        maxResults: 10,
+      });
+    });
+
+    it("forwards regex and caseSensitive flags to the in-page helper", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({ totalMatches: 0, matches: [] });
+
+      await browser.searchPage({
+        pattern: "Lo[gG]out",
+        regex: true,
+        caseSensitive: true,
+        contextChars: 20,
+        maxResults: 3,
+      });
+
+      const callArg = (browser as any).page.evaluate.mock.calls[0][1];
+      expect(callArg).toEqual({
+        pattern: "Lo[gG]out",
+        regex: true,
+        caseSensitive: true,
+        contextChars: 20,
+        maxResults: 3,
+      });
+    });
+
+    it("marks the result as truncated when totalMatches exceeds maxResults", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 25,
+        matches: Array.from({ length: 10 }, (_, i) => ({
+          match: `m${i}`,
+          contextBefore: "",
+          contextAfter: "",
+          nearestRef: undefined,
+        })),
+      });
+
+      const result = await browser.searchPage({ pattern: "x", maxResults: 10 });
+
+      expect(result.totalMatches).toBe(25);
+      expect(result.matches).toHaveLength(10);
+      expect(result.truncated).toBe(true);
+    });
+
+    it("wraps a bad-regex evaluate rejection in BrowserActionException", async () => {
+      (browser as any).page.evaluate.mockRejectedValue(
+        new Error("SyntaxError: Invalid regular expression"),
+      );
+
+      await expect(browser.searchPage({ pattern: "(", regex: true })).rejects.toThrow(
+        BrowserActionException,
+      );
+      await expect(browser.searchPage({ pattern: "(", regex: true })).rejects.toThrow(
+        /search_page failed/,
+      );
+    });
+
+    it("still throws BrowserDisconnectedError when main-frame evaluate is a disconnect", async () => {
+      (browser as any).page.evaluate.mockRejectedValue(
+        new Error("Target page, context or browser has been closed"),
+      );
+
+      await expect(browser.searchPage({ pattern: "x" })).rejects.toThrow(BrowserDisconnectedError);
+    });
+
+    it("aggregates matches from non-main frames and tags them with frameUrl", async () => {
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [
+            {
+              match: "logout",
+              contextBefore: "the ",
+              contextAfter: " link",
+              nearestRef: "E12",
+            },
+          ],
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 1,
+        matches: [
+          {
+            match: "logout",
+            contextBefore: "",
+            contextAfter: "",
+            nearestRef: "E1",
+          },
+        ],
+      });
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      const result = await browser.searchPage({ pattern: "logout" });
+
+      expect(result.totalMatches).toBe(2);
+      expect(result.matches).toHaveLength(2);
+      expect(result.matches[0].frameUrl).toBeUndefined();
+      expect(result.matches[1].frameUrl).toBe("https://iframe.example/");
+    });
+
+    it("silently skips frames that throw (cross-origin / detached)", async () => {
+      const goodFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [{ match: "foo", contextBefore: "", contextAfter: "", nearestRef: undefined }],
+        }),
+        url: vi.fn().mockReturnValue("https://good.example/"),
+      };
+      const badFrame = {
+        evaluate: vi.fn().mockRejectedValue(new Error("cross-origin")),
+        url: vi.fn().mockReturnValue("https://bad.example/"),
+      };
+      (browser as any).page.evaluate.mockResolvedValue({ totalMatches: 0, matches: [] });
+      (browser as any).page.frames.mockReturnValue([mainFrame, goodFrame, badFrame]);
+
+      const result = await browser.searchPage({ pattern: "foo" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].frameUrl).toBe("https://good.example/");
+    });
+
+    it("stops collecting matches across frames once maxResults is reached but keeps counting totalMatches", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 2,
+        matches: [
+          { match: "a", contextBefore: "", contextAfter: "", nearestRef: undefined },
+          { match: "b", contextBefore: "", contextAfter: "", nearestRef: undefined },
+        ],
+      });
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 3,
+          matches: [
+            { match: "c", contextBefore: "", contextAfter: "", nearestRef: undefined },
+            { match: "d", contextBefore: "", contextAfter: "", nearestRef: undefined },
+            { match: "e", contextBefore: "", contextAfter: "", nearestRef: undefined },
+          ],
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      const result = await browser.searchPage({ pattern: "x", maxResults: 3 });
+
+      expect(result.totalMatches).toBe(5);
+      expect(result.matches).toHaveLength(3);
+      expect(result.truncated).toBe(true);
+      // Order: main frame matches first, then we take 1 from child to fill to 3
+      expect(result.matches.map((m) => m.match)).toEqual(["a", "b", "c"]);
+    });
+  });
+
+  describe("findElements", () => {
+    let browser: PlaywrightBrowser;
+    let mainFrame: any;
+
+    beforeEach(() => {
+      browser = new PlaywrightBrowser({ browser: "chromium" });
+      mainFrame = { evaluate: vi.fn(), url: vi.fn().mockReturnValue("https://example.com/") };
+      (browser as any).page = {
+        evaluate: vi.fn(),
+        frames: vi.fn().mockReturnValue([mainFrame]),
+        mainFrame: vi.fn().mockReturnValue(mainFrame),
+      };
+    });
+
+    it("throws when browser not started", async () => {
+      const fresh = new PlaywrightBrowser();
+      await expect(fresh.findElements({ selector: "a" })).rejects.toThrow("Browser not started");
+    });
+
+    it("returns elements from the main frame with auto-resolved href and nearestRef", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 1,
+        matches: [
+          {
+            tag: "a",
+            text: "Home",
+            attributes: { href: "https://example.com/home" },
+            nearestRef: "E5",
+          },
+        ],
+      });
+
+      const result = await browser.findElements({ selector: "a.nav-link" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.truncated).toBe(false);
+      expect(result.elements).toHaveLength(1);
+      expect(result.elements[0]).toEqual({
+        tag: "a",
+        text: "Home",
+        attributes: { href: "https://example.com/home" },
+        nearestRef: "E5",
+        frameUrl: undefined,
+      });
+
+      // Wrapper should forward the resolved opts (with defaults applied)
+      const callArg = (browser as any).page.evaluate.mock.calls[0][1];
+      expect(callArg).toEqual({
+        selector: "a.nav-link",
+        withinRef: null,
+        attributes: null,
+        maxResults: 20,
+        includeText: true,
+      });
+    });
+
+    it("forwards withinRef, attributes, maxResults, and includeText", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 0,
+        matches: [],
+      });
+
+      await browser.findElements({
+        selector: "[data-id]",
+        withinRef: "E42",
+        attributes: ["data-id", "class"],
+        maxResults: 5,
+        includeText: false,
+      });
+
+      const callArg = (browser as any).page.evaluate.mock.calls[0][1];
+      expect(callArg).toEqual({
+        selector: "[data-id]",
+        withinRef: "E42",
+        attributes: ["data-id", "class"],
+        maxResults: 5,
+        includeText: false,
+      });
+    });
+
+    it("aggregates elements from non-main frames and tags them with frameUrl", async () => {
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [
+            {
+              tag: "img",
+              text: "",
+              attributes: { src: "https://iframe.example/cat.png" },
+              nearestRef: "E12",
+            },
+          ],
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 1,
+        matches: [
+          {
+            tag: "a",
+            text: "Home",
+            attributes: { href: "https://example.com/home" },
+            nearestRef: "E1",
+          },
+        ],
+      });
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      const result = await browser.findElements({ selector: "a, img" });
+
+      expect(result.totalMatches).toBe(2);
+      expect(result.elements).toHaveLength(2);
+      expect(result.elements[0].frameUrl).toBeUndefined();
+      expect(result.elements[1].frameUrl).toBe("https://iframe.example/");
+    });
+
+    it("throws BrowserActionException with the in-page error when selector is invalid (main frame)", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        error: "Failed to execute 'querySelectorAll': '???' is not a valid selector.",
+        kind: "bad-selector",
+      });
+
+      await expect(browser.findElements({ selector: "???" })).rejects.toThrow(
+        BrowserActionException,
+      );
+      await expect(browser.findElements({ selector: "???" })).rejects.toThrow(
+        /find_elements failed:.*not a valid selector/,
+      );
+    });
+
+    it("short-circuits on bad-selector error in a non-main frame", async () => {
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          error: "Failed to execute 'querySelectorAll': '???' is not a valid selector.",
+          kind: "bad-selector",
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.evaluate.mockResolvedValue({ totalMatches: 0, matches: [] });
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      await expect(browser.findElements({ selector: "???" })).rejects.toThrow(
+        BrowserActionException,
+      );
+    });
+
+    it("wraps a thrown evaluate rejection in BrowserActionException", async () => {
+      (browser as any).page.evaluate.mockRejectedValue(new Error("kaboom"));
+
+      await expect(browser.findElements({ selector: "a" })).rejects.toThrow(BrowserActionException);
+      await expect(browser.findElements({ selector: "a" })).rejects.toThrow(/find_elements failed/);
+    });
+
+    it("still throws BrowserDisconnectedError when main-frame evaluate is a disconnect", async () => {
+      (browser as any).page.evaluate.mockRejectedValue(
+        new Error("Target page, context or browser has been closed"),
+      );
+
+      await expect(browser.findElements({ selector: "a" })).rejects.toThrow(
+        BrowserDisconnectedError,
+      );
+    });
+
+    it("skips frames whose withinRef lookup misses and uses one that hits", async () => {
+      // Main frame: withinRef not found here
+      (browser as any).page.evaluate.mockResolvedValue({
+        error: 'withinRef "E42" not found in this frame',
+        kind: "within-ref-miss",
+      });
+      // Child frame: withinRef hits, returns one element
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [
+            {
+              tag: "li",
+              text: "Item",
+              nearestRef: "E43",
+            },
+          ],
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      const result = await browser.findElements({ selector: "li", withinRef: "E42" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.elements).toHaveLength(1);
+      expect(result.elements[0].frameUrl).toBe("https://iframe.example/");
+    });
+
+    it("throws BrowserActionException when withinRef is not found in any frame", async () => {
+      // Main frame: withinRef not found
+      (browser as any).page.evaluate.mockResolvedValue({
+        error: 'withinRef "Z9" not found in this frame',
+        kind: "within-ref-miss",
+      });
+      // Child frame: withinRef not found
+      const childFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          error: 'withinRef "Z9" not found in this frame',
+          kind: "within-ref-miss",
+        }),
+        url: vi.fn().mockReturnValue("https://iframe.example/"),
+      };
+      (browser as any).page.frames.mockReturnValue([mainFrame, childFrame]);
+
+      await expect(browser.findElements({ selector: "a", withinRef: "Z9" })).rejects.toThrow(
+        BrowserActionException,
+      );
+      await expect(browser.findElements({ selector: "a", withinRef: "Z9" })).rejects.toThrow(
+        /find_elements failed: withinRef "Z9" not found/,
+      );
+    });
+
+    it("silently skips frames that throw (cross-origin / detached)", async () => {
+      const goodFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [{ tag: "a", text: "Foo", attributes: undefined, nearestRef: undefined }],
+        }),
+        url: vi.fn().mockReturnValue("https://good.example/"),
+      };
+      const badFrame = {
+        evaluate: vi.fn().mockRejectedValue(new Error("cross-origin")),
+        url: vi.fn().mockReturnValue("https://bad.example/"),
+      };
+      (browser as any).page.evaluate.mockResolvedValue({ totalMatches: 0, matches: [] });
+      (browser as any).page.frames.mockReturnValue([mainFrame, goodFrame, badFrame]);
+
+      const result = await browser.findElements({ selector: "a" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.elements).toHaveLength(1);
+      expect(result.elements[0].frameUrl).toBe("https://good.example/");
+    });
+
+    it("marks the result as truncated when totalMatches exceeds returned elements", async () => {
+      (browser as any).page.evaluate.mockResolvedValue({
+        totalMatches: 50,
+        matches: Array.from({ length: 20 }, (_, i) => ({
+          tag: "li",
+          text: `Item ${i}`,
+          attributes: undefined,
+          nearestRef: undefined,
+        })),
+      });
+
+      const result = await browser.findElements({ selector: "li", maxResults: 20 });
+
+      expect(result.totalMatches).toBe(50);
+      expect(result.elements).toHaveLength(20);
+      expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe("search_page / find_elements frame evaluate timeout", () => {
+    let browser: PlaywrightBrowser;
+
+    beforeEach(() => {
+      browser = new PlaywrightBrowser({ browser: "chromium", ariaFrameEvaluateTimeoutMs: 20 });
+    });
+
+    it("skips a hanging child frame in searchPage and still returns responsive-frame matches", async () => {
+      const mainFrame = { evaluate: vi.fn(), url: vi.fn().mockReturnValue("https://main.test/") };
+      const hangingFrame = {
+        evaluate: vi.fn().mockReturnValue(new Promise(() => {})),
+        url: vi.fn().mockReturnValue("https://ads.test/"),
+      };
+      const goodFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [{ match: "hit", contextBefore: "", contextAfter: "" }],
+        }),
+        url: vi.fn().mockReturnValue("https://good.test/"),
+      };
+      (browser as any).page = {
+        evaluate: vi.fn().mockResolvedValue({ totalMatches: 0, matches: [] }),
+        frames: vi.fn().mockReturnValue([mainFrame, hangingFrame, goodFrame]),
+        mainFrame: vi.fn().mockReturnValue(mainFrame),
+      };
+
+      const result = await browser.searchPage({ pattern: "hit" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].frameUrl).toBe("https://good.test/");
+      expect(hangingFrame.evaluate).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces a searchPage main-frame evaluate timeout as an error (not a disconnect)", async () => {
+      (browser as any).page = {
+        evaluate: vi.fn().mockReturnValue(new Promise(() => {})),
+        frames: vi.fn().mockReturnValue([]),
+        mainFrame: vi.fn(),
+      };
+
+      const error = await browser.searchPage({ pattern: "x" }).then(
+        () => {
+          throw new Error("expected searchPage to reject");
+        },
+        (e) => e,
+      );
+      expect((error as Error).message).toMatch(/timed out/i);
+      expect(error).not.toBeInstanceOf(BrowserDisconnectedError);
+    });
+
+    it("skips a hanging child frame in findElements and still returns responsive-frame elements", async () => {
+      const mainFrame = { evaluate: vi.fn(), url: vi.fn().mockReturnValue("https://main.test/") };
+      const hangingFrame = {
+        evaluate: vi.fn().mockReturnValue(new Promise(() => {})),
+        url: vi.fn().mockReturnValue("https://ads.test/"),
+      };
+      const goodFrame = {
+        evaluate: vi.fn().mockResolvedValue({
+          totalMatches: 1,
+          matches: [{ tag: "a", text: "link" }],
+        }),
+        url: vi.fn().mockReturnValue("https://good.test/"),
+      };
+      (browser as any).page = {
+        evaluate: vi.fn().mockResolvedValue({ totalMatches: 0, matches: [] }),
+        frames: vi.fn().mockReturnValue([mainFrame, hangingFrame, goodFrame]),
+        mainFrame: vi.fn().mockReturnValue(mainFrame),
+      };
+
+      const result = await browser.findElements({ selector: "a" });
+
+      expect(result.totalMatches).toBe(1);
+      expect(result.elements).toHaveLength(1);
+      expect(result.elements[0].frameUrl).toBe("https://good.test/");
+      expect(hangingFrame.evaluate).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces a findElements main-frame evaluate timeout as an error (not a disconnect)", async () => {
+      (browser as any).page = {
+        evaluate: vi.fn().mockReturnValue(new Promise(() => {})),
+        frames: vi.fn().mockReturnValue([]),
+        mainFrame: vi.fn(),
+      };
+
+      const error = await browser.findElements({ selector: "a" }).then(
+        () => {
+          throw new Error("expected findElements to reject");
+        },
+        (e) => e,
+      );
+      expect((error as Error).message).toMatch(/timed out/i);
+      expect(error).not.toBeInstanceOf(BrowserDisconnectedError);
+    });
+  });
+
   describe("getTreeWithRefs frame evaluate timeout", () => {
     let browser: PlaywrightBrowser;
 

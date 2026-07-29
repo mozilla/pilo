@@ -5,7 +5,7 @@
  * Each tool includes description, inputSchema, and execute function.
  */
 
-import { tool, type ToolSet } from "ai";
+import { tool, jsonSchema, type ToolSet } from "ai";
 import { z } from "zod";
 import {
   AriaBrowser,
@@ -18,7 +18,7 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import { buildExtractionPrompt, TOOL_STRINGS } from "../prompts.js";
 import type { ProviderConfig } from "../provider.js";
 import { BrowserException } from "../errors.js";
-import { generateTextWithRetry } from "../utils/retry.js";
+import { generateTextWithRetry, generateObjectWithRetry } from "../utils/retry.js";
 import { wrapExternalContentWithWarning, ExternalContentLabel } from "../utils/promptSecurity.js";
 import {
   assessFill,
@@ -594,13 +594,33 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
       description: TOOL_STRINGS.webActions.extract.description,
       inputSchema: z.object({
         description: z.string().describe(TOOL_STRINGS.webActions.extract.dataDescription),
+        outputSchema: z
+          .record(z.string(), z.any())
+          .optional()
+          .describe(TOOL_STRINGS.webActions.extract.outputSchema),
       }),
-      execute: async ({ description }) => {
+      execute: async ({ description, outputSchema }) => {
         // Extract doesn't use browser.performAction - it's a special AI operation
         context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
           action: "extract",
           value: description,
         });
+
+        // Soft guard: an empty outputSchema {} doesn't constrain the LLM
+        // output and makes the structured branch indistinguishable from the
+        // markdown branch. Models (notably gemini-2.5-flash) tend to pass {}
+        // when asked for outputSchema without supplying real properties.
+        // Silently downgrade to the markdown branch rather than reject — a
+        // hard rejection traps the agent in a retry loop because the model
+        // keeps producing the same empty schema.
+        const effectiveSchema =
+          outputSchema && Object.keys(outputSchema).length > 0 ? outputSchema : undefined;
+        if (outputSchema && !effectiveSchema) {
+          context.eventEmitter.emit(WebAgentEventType.AGENT_STATUS, {
+            message:
+              "extract: outputSchema was empty ({}); falling back to markdown extraction. Provide a real JSON Schema (with type/properties) for structured output.",
+          });
+        }
 
         // Get the page markdown content
         let markdown = await context.browser.getMarkdown();
@@ -615,7 +635,51 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
         // Build extraction prompt
         const prompt = buildExtractionPrompt(description, markdown);
 
-        // Use the provider to extract the data with retry
+        // Structured branch: when a non-empty outputSchema is provided, use
+        // generateObject with jsonSchema() to validate the LLM output against
+        // the schema. Empty {} is downgraded above to undefined and falls
+        // through to the markdown branch.
+        if (effectiveSchema) {
+          const { object } = await generateObjectWithRetry(
+            {
+              ...context.providerConfig,
+              prompt,
+              schema: jsonSchema(effectiveSchema as any),
+              maxOutputTokens: 5000,
+              abortSignal: context.abortSignal,
+              timeout: context.llmProviderTimeoutMs,
+            },
+            {
+              maxAttempts: 3,
+              onRetry: (attempt, error) => {
+                context.eventEmitter.emit(WebAgentEventType.AGENT_STATUS, {
+                  message: `Extract (structured) retry attempt ${attempt} after error: ${error instanceof Error ? error.message : String(error)}`,
+                });
+              },
+            },
+          );
+
+          // Emit the extracted data event (stringified for event consumers
+          // that expect a string payload)
+          context.eventEmitter.emit(WebAgentEventType.AGENT_EXTRACTED, {
+            extractedData: JSON.stringify(object),
+          });
+
+          // `data` is intentionally NOT wrapped in <EXTERNAL-CONTENT> tags
+          // because it's a structured object whose shape is constrained by the
+          // caller-supplied outputSchema (same rationale as
+          // tabstack_extract_json). String values nested inside `data` remain
+          // attacker-controllable — see issue #456 for the residual-risk
+          // discussion. Possible follow-up: per-leaf wrapping or taint tracking.
+          return {
+            success: true,
+            action: "extract",
+            description,
+            data: object,
+          };
+        }
+
+        // Markdown branch (default): use the provider to extract the data with retry
         const extractResponse = await generateTextWithRetry(
           {
             ...context.providerConfig,

@@ -5,7 +5,7 @@
  * Handles transient errors while avoiding retry on non-recoverable errors.
  */
 
-import { generateText } from "ai";
+import { generateText, generateObject, NoObjectGeneratedError } from "ai";
 import {
   DEFAULT_RETRY_MAX_ATTEMPTS,
   DEFAULT_RETRY_INITIAL_DELAY_MS,
@@ -22,10 +22,22 @@ import {
 
 /**
  * Check if an error is retryable
- * Non-retryable: 4xx errors except 429 (rate limit)
+ * Non-retryable:
+ *  - 4xx errors except 429 (rate limit)
+ *  - Auth/permission errors detected by message
+ *  - Structured-output failures from `generateObject` (`NoObjectGeneratedError`):
+ *    the model produced JSON that failed schema validation or parsing. Retrying
+ *    the same prompt against the same schema will not fix this and just burns
+ *    tokens, so we surface immediately.
  */
 function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return true;
+
+  // Structured-output failures are non-retryable: the same prompt + schema will
+  // produce the same failure mode.
+  if (error instanceof NoObjectGeneratedError) {
+    return false;
+  }
 
   const errorAny = error as any;
   const statusCode = errorAny.statusCode || errorAny.status || errorAny.response?.status;
@@ -75,17 +87,33 @@ export interface RetryOptions {
 }
 
 /**
- * Wrapper for generateText with retry logic
- *
- * @param params - Parameters for generateText call
- * @param retryOptions - Optional retry configuration
- * @returns The generateText result
- * @throws The last error if all retries fail
+ * Internal options for the shared retry driver. Wrapper-specific hooks let the
+ * public wrappers (text vs object) plug in their own success validation and
+ * telemetry extraction without leaking concerns into the driver.
  */
-export async function generateTextWithRetry<TOOLS extends Record<string, any> = any>(
-  params: Parameters<typeof generateText<TOOLS>>[0],
-  retryOptions?: RetryOptions,
-): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
+interface RetryDriverOptions<T> extends RetryOptions {
+  /**
+   * Optional post-success validation hook. If it throws, the thrown error is
+   * treated like any other error from `call`: it goes through retry classification.
+   * Used by `generateTextWithRetry` to enforce the `toolChoice: "required"` contract.
+   */
+  validateResult?: (result: T) => void;
+  /**
+   * Optional telemetry extractor. Called on success to record finish_reason on
+   * the span. Different result shapes have different finish-reason locations.
+   */
+  getFinishReason?: (result: T) => unknown;
+}
+
+/**
+ * Shared retry driver. Owns the loop, exponential backoff + jitter,
+ * max-attempts handling, non-retryable short-circuit via `isRetryableError`,
+ * `onRetry` callback dispatch, and span/telemetry recording.
+ *
+ * Wrapper functions (`generateTextWithRetry`, `generateObjectWithRetry`) build a
+ * call closure and supply wrapper-specific hooks via `options`.
+ */
+async function retryDriver<T>(call: () => Promise<T>, options: RetryDriverOptions<T>): Promise<T> {
   return withSpan(SpanName.AI_GENERATE, {}, async (span) => {
     const {
       maxAttempts = DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -93,30 +121,26 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
       maxDelay = DEFAULT_RETRY_MAX_DELAY_MS,
       backoffFactor = DEFAULT_RETRY_BACKOFF_FACTOR,
       onRetry,
-    } = retryOptions || {};
-
-    // Apply the configured LLM provider timeout via the AI SDK `timeout` option
-    // unless the caller supplied an explicit timeout. The AI SDK aborts the call
-    // if it exceeds this duration (works alongside any provided abortSignal).
-    const paramsWithTimeout = {
-      ...params,
-      timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
-    };
+      validateResult,
+      getFinishReason,
+    } = options;
 
     let lastError: unknown;
     let delay = initialDelay;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const result = await generateText(paramsWithTimeout);
+        const result = await call();
 
-        if (params.toolChoice === "required" && !result.toolResults?.length) {
-          throw new Error("Tool call was required but model did not call any tools");
+        if (validateResult) {
+          validateResult(result);
         }
 
         // Record success attributes
         span.setAttribute("pilo.ai.attempts", attempt);
-        span.setAttribute("pilo.ai.finish_reason", String(result.finishReason));
+        if (getFinishReason) {
+          span.setAttribute("pilo.ai.finish_reason", String(getFinishReason(result)));
+        }
         return result;
       } catch (error) {
         lastError = error;
@@ -183,4 +207,90 @@ export async function generateTextWithRetry<TOOLS extends Record<string, any> = 
     recordSanitizedException(span, lastError);
     throw lastError;
   });
+}
+
+/**
+ * Wrapper for generateText with retry logic
+ *
+ * @param params - Parameters for generateText call
+ * @param retryOptions - Optional retry configuration
+ * @returns The generateText result
+ * @throws The last error if all retries fail
+ */
+export async function generateTextWithRetry<TOOLS extends Record<string, any> = any>(
+  params: Parameters<typeof generateText<TOOLS>>[0],
+  retryOptions?: RetryOptions,
+): Promise<Awaited<ReturnType<typeof generateText<TOOLS>>>> {
+  type Result = Awaited<ReturnType<typeof generateText<TOOLS>>>;
+
+  // Apply the configured LLM provider timeout via the AI SDK `timeout` option
+  // unless the caller supplied an explicit timeout. The AI SDK aborts the call
+  // if it exceeds this duration (works alongside any provided abortSignal).
+  const paramsWithTimeout = {
+    ...params,
+    timeout: params.timeout ?? getConfigDefaults().llm_provider_timeout_ms,
+  };
+
+  return retryDriver<Result>(() => generateText(paramsWithTimeout), {
+    ...retryOptions,
+    // When the caller required a tool call, treat a tool-less response as an
+    // error so the retry loop can re-prompt the model.
+    validateResult: (result) => {
+      if (params.toolChoice === "required" && !result.toolResults?.length) {
+        throw new Error("Tool call was required but model did not call any tools");
+      }
+    },
+    getFinishReason: (result) => result.finishReason,
+  });
+}
+
+/**
+ * Combine an optional caller abort signal with a fresh timeout signal, so a call
+ * aborts on whichever fires first.
+ */
+function withTimeoutSignal(callerSignal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return callerSignal ? AbortSignal.any([callerSignal, timeoutSignal]) : timeoutSignal;
+}
+
+/**
+ * Wrapper for generateObject with retry logic
+ *
+ * Mirrors generateTextWithRetry's retry/backoff/non-retryable behavior, but for
+ * structured object generation. No tool-call validation since generateObject
+ * does not accept tools. `NoObjectGeneratedError` (schema/parse failures from
+ * the model output) is treated as non-retryable by `isRetryableError`.
+ *
+ * @param params - Parameters for generateObject call, plus an optional `timeout`
+ *   in milliseconds (see the abort-signal note below)
+ * @param retryOptions - Optional retry configuration
+ * @returns The generateObject result
+ * @throws The last error if all retries fail
+ */
+export async function generateObjectWithRetry(
+  params: Parameters<typeof generateObject>[0] & { timeout?: number },
+  retryOptions?: RetryOptions,
+): Promise<Awaited<ReturnType<typeof generateObject>>> {
+  type Result = Awaited<ReturnType<typeof generateObject>>;
+
+  // Unlike `generateText`, the AI SDK's `generateObject` does not accept a
+  // `timeout` option (its signature is `Omit<RequestOptions, "timeout">`), so we
+  // enforce the configured LLM provider timeout via an abort signal instead.
+  const { timeout, ...objectParams } = params as { timeout?: number } & Record<string, unknown>;
+  const timeoutMs = timeout ?? getConfigDefaults().llm_provider_timeout_ms;
+  const callerSignal = objectParams.abortSignal as AbortSignal | undefined;
+
+  return retryDriver<Result>(
+    () =>
+      // Build the timeout signal per attempt so each retry gets a full budget,
+      // matching how the SDK applies `timeout` to each `generateText` call.
+      generateObject({
+        ...(objectParams as Parameters<typeof generateObject>[0]),
+        abortSignal: withTimeoutSignal(callerSignal, timeoutMs),
+      }) as Promise<Result>,
+    {
+      ...retryOptions,
+      getFinishReason: (result) => result.finishReason,
+    },
+  );
 }

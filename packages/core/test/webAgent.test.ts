@@ -246,6 +246,22 @@ class MockBrowser implements AriaBrowser {
     return fn(mockTab);
   }
 
+  async searchPage(): Promise<{
+    totalMatches: number;
+    truncated: boolean;
+    matches: any[];
+  }> {
+    return { totalMatches: 0, truncated: false, matches: [] };
+  }
+
+  async findElements(): Promise<{
+    totalMatches: number;
+    truncated: boolean;
+    elements: any[];
+  }> {
+    return { totalMatches: 0, truncated: false, elements: [] };
+  }
+
   // Test helpers
   setPageSnapshot(snapshot: string): void {
     this.pageSnapshot = snapshot;

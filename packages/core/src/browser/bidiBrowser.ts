@@ -4,6 +4,12 @@ import {
   PageAction,
   LoadState,
   TemporaryTab,
+  SearchPageOptions,
+  SearchPageResult,
+  SearchPageMatch,
+  FindElementsOptions,
+  FindElementsResult,
+  FindElementsMatch,
   type FieldMetadata,
   type FormSubmissionContext,
   type FormSubmissionTrigger,
@@ -564,6 +570,195 @@ export class BiDiBrowser implements AriaBrowser {
         // Ignore close errors
       }
     }
+  }
+
+  async searchPage(opts: SearchPageOptions): Promise<SearchPageResult> {
+    this.requireContext();
+
+    const evalOpts = {
+      pattern: opts.pattern,
+      regex: opts.regex ?? false,
+      caseSensitive: opts.caseSensitive ?? false,
+      contextChars: opts.contextChars ?? 80,
+      maxResults: opts.maxResults ?? 10,
+    };
+
+    const raw = unwrapBiDiValue(
+      await this.evaluate(`
+        (() => {
+          const params = ${JSON.stringify(evalOpts)};
+          const flags = params.caseSensitive ? "g" : "gi";
+          const re = params.regex
+            ? new RegExp(params.pattern, flags)
+            : new RegExp(params.pattern.replace(/[.*+?^\${}()|[\\]\\\\]/g, "\\\\$&"), flags);
+
+          const matches = [];
+          let totalMatches = 0;
+
+          if (!document.body) {
+            return JSON.stringify({ totalMatches, matches });
+          }
+
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+              const p = node.parentElement;
+              if (!p) return NodeFilter.FILTER_REJECT;
+              const tag = p.tagName;
+              if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            },
+          });
+
+          let node;
+          while ((node = walker.nextNode())) {
+            const text = node.data;
+            re.lastIndex = 0;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+              totalMatches++;
+              if (matches.length < params.maxResults) {
+                const start = Math.max(0, m.index - params.contextChars);
+                const end = Math.min(text.length, m.index + m[0].length + params.contextChars);
+                const parentEl = node.parentElement;
+                const refEl = parentEl && parentEl.closest("[data-pilo-ref]");
+                matches.push({
+                  match: m[0],
+                  contextBefore: text.slice(start, m.index),
+                  contextAfter: text.slice(m.index + m[0].length, end),
+                  nearestRef: refEl ? refEl.getAttribute("data-pilo-ref") : undefined,
+                });
+              }
+              if (m.index === re.lastIndex) re.lastIndex++;
+            }
+          }
+
+          return JSON.stringify({ totalMatches, matches });
+        })()
+      `),
+    );
+
+    if (typeof raw !== "string") {
+      throw new BrowserActionException(
+        "searchPage",
+        `search_page returned non-string (got ${typeof raw})`,
+      );
+    }
+
+    const parsed = JSON.parse(raw) as {
+      totalMatches: number;
+      matches: Array<Omit<SearchPageMatch, "frameUrl">>;
+    };
+
+    const aggregated: SearchPageMatch[] = parsed.matches.map((m) => ({
+      ...m,
+      frameUrl: undefined,
+    }));
+
+    return {
+      totalMatches: parsed.totalMatches,
+      truncated: parsed.totalMatches > aggregated.length,
+      matches: aggregated,
+    };
+  }
+
+  async findElements(opts: FindElementsOptions): Promise<FindElementsResult> {
+    this.requireContext();
+
+    const evalOpts = {
+      selector: opts.selector,
+      withinRef: opts.withinRef ?? null,
+      attributes: opts.attributes ?? null,
+      maxResults: opts.maxResults ?? 20,
+      includeText: opts.includeText ?? true,
+    };
+
+    const raw = unwrapBiDiValue(
+      await this.evaluate(`
+        (() => {
+          const params = ${JSON.stringify(evalOpts)};
+
+          let root = document;
+          if (params.withinRef !== null) {
+            const r = document.querySelector('[data-pilo-ref="' + CSS.escape(params.withinRef) + '"]');
+            if (!r) {
+              return JSON.stringify({
+                error: 'withinRef "' + params.withinRef + '" not found in this frame',
+                kind: "within-ref-miss",
+              });
+            }
+            root = r;
+          }
+
+          let nodeList;
+          try {
+            nodeList = root.querySelectorAll(params.selector);
+          } catch (e) {
+            return JSON.stringify({
+              error: e instanceof Error ? e.message : String(e),
+              kind: "bad-selector",
+            });
+          }
+
+          const totalMatches = nodeList.length;
+          const matches = [];
+          for (let i = 0; i < nodeList.length && matches.length < params.maxResults; i++) {
+            const el = nodeList[i];
+            let attrs;
+            if (params.attributes && params.attributes.length > 0) {
+              attrs = {};
+              for (const name of params.attributes) {
+                const v = el.getAttribute(name);
+                if (v !== null) attrs[name] = v;
+              }
+            }
+            const href = el.href;
+            const src = el.src;
+            if (typeof href === "string" && href) { attrs = attrs || {}; attrs["href"] = href; }
+            if (typeof src === "string" && src) { attrs = attrs || {}; attrs["src"] = src; }
+
+            const refEl = el.closest("[data-pilo-ref]");
+            matches.push({
+              tag: el.tagName.toLowerCase(),
+              text: params.includeText ? (el.textContent || "").trim().slice(0, 500) : undefined,
+              attributes: attrs && Object.keys(attrs).length > 0 ? attrs : undefined,
+              nearestRef: refEl ? refEl.getAttribute("data-pilo-ref") : undefined,
+            });
+          }
+          return JSON.stringify({ totalMatches, matches });
+        })()
+      `),
+    );
+
+    if (typeof raw !== "string") {
+      throw new BrowserActionException(
+        "findElements",
+        `find_elements returned non-string (got ${typeof raw})`,
+      );
+    }
+
+    const outcome = JSON.parse(raw) as
+      | {
+          totalMatches: number;
+          matches: Array<Omit<FindElementsMatch, "frameUrl">>;
+        }
+      | { error: string; kind: "bad-selector" | "within-ref-miss" };
+
+    if ("error" in outcome) {
+      throw new BrowserActionException("findElements", `find_elements failed: ${outcome.error}`);
+    }
+
+    const aggregated: FindElementsMatch[] = outcome.matches.map((m) => ({
+      ...m,
+      frameUrl: undefined,
+    }));
+
+    return {
+      totalMatches: outcome.totalMatches,
+      truncated: outcome.totalMatches > aggregated.length,
+      elements: aggregated,
+    };
   }
 
   /**

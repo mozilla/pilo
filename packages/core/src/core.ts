@@ -7,6 +7,12 @@
 export { WebAgent } from "./webAgent.js";
 export type {
   AriaBrowser,
+  SearchPageOptions,
+  SearchPageMatch,
+  SearchPageResult,
+  FindElementsOptions,
+  FindElementsMatch,
+  FindElementsResult,
   FileUploadConfig,
   FieldMetadata,
   FormSubmissionContext,
