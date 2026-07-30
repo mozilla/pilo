@@ -32,6 +32,12 @@ export interface BiDiBrowserOptions {
   allowFileUpload?: false | FileUploadConfig;
   /** Resource types to abort via native network interception. Default: none blocked. */
   blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
+  /**
+   * Accept TLS certificates that fail verification (default: false). Required
+   * for sandboxes whose sites are served by a private CA the browser image
+   * does not trust. Disables certificate validation for the whole session.
+   */
+  acceptInsecureCerts?: boolean;
 }
 
 /**
@@ -71,12 +77,14 @@ export class BiDiBrowser implements AriaBrowser {
   protected turndown: TurndownService;
   private readonly allowFileUpload: false | FileUploadConfig;
   private readonly blockResources: string[];
+  private readonly acceptInsecureCerts: boolean;
 
   constructor(options: BiDiBrowserOptions = {}) {
     this.bidiUrl = options.bidiUrl;
     this.actionTimeoutMs = options.actionTimeoutMs ?? 30_000;
     this.allowFileUpload = options.allowFileUpload ?? false;
     this.blockResources = options.blockResources ?? [];
+    this.acceptInsecureCerts = options.acceptInsecureCerts ?? false;
     this.turndown = new TurndownService({
       headingStyle: "atx",
       codeBlockStyle: "fenced",
@@ -100,7 +108,9 @@ export class BiDiBrowser implements AriaBrowser {
     }
 
     await this.connection.connect();
-    await this.connection.sendCommand("session.new", { capabilities: {} });
+    await this.connection.sendCommand("session.new", {
+      capabilities: this.acceptInsecureCerts ? { alwaysMatch: { acceptInsecureCerts: true } } : {},
+    });
 
     const treeResult = (await this.connection.sendCommand("browsingContext.getTree", {})) as {
       contexts: Array<{ context: string; url: string; children: unknown[] }>;

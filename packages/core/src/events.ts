@@ -45,6 +45,7 @@ export enum WebAgentEventType {
   SYSTEM_DEBUG_COMPRESSION = "system:debug_compression",
   SYSTEM_DEBUG_MESSAGE = "system:debug_message",
   SYSTEM_DEBUG_TOOL_DROP = "system:debug_tool_drop",
+  SYSTEM_DEBUG_NO_TOOL_CALL = "system:debug_no_tool_call",
 
   // CDP endpoint failover
   CDP_ENDPOINT_CONNECTED = "cdp:endpoint_connected",
@@ -321,6 +322,24 @@ export interface ToolDropDebugEventData extends WebAgentEventData {
 }
 
 /**
+ * Event data for a generation that returned no tool call at all.
+ *
+ * The agent recovers by feeding the error back to the model, but the turn is
+ * spent — so a high rate of these silently drains the iteration budget. The
+ * two causes need opposite fixes and are only distinguishable by
+ * `finishReason`: "stop" means the model answered in prose instead of calling
+ * a tool, while "length" means it was truncated before the call completed.
+ */
+export interface NoToolCallDebugEventData extends WebAgentEventData {
+  /** Why the provider stopped generating (e.g. "stop", "length", "content-filter"). */
+  finishReason: string;
+  /** Length of the prose the model returned instead of a tool call. */
+  textLength: number;
+  /** Leading characters of that prose, for diagnosis. Truncated. */
+  textPreview: string;
+}
+
+/**
  * Event data for waiting notifications
  */
 export interface WaitingEventData extends WebAgentEventData {
@@ -442,6 +461,7 @@ export type WebAgentEvent =
   | { type: WebAgentEventType.SYSTEM_DEBUG_COMPRESSION; data: CompressionDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_MESSAGE; data: MessagesDebugEventData }
   | { type: WebAgentEventType.SYSTEM_DEBUG_TOOL_DROP; data: ToolDropDebugEventData }
+  | { type: WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL; data: NoToolCallDebugEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CONNECTED; data: CdpEndpointConnectedEventData }
   | { type: WebAgentEventType.CDP_ENDPOINT_CYCLE; data: CdpEndpointCycleEventData }
   | { type: WebAgentEventType.BROWSER_RECONNECTED; data: BrowserReconnectedEventData }

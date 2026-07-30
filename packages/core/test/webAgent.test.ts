@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebAgent, WebAgentOptions } from "../src/webAgent.js";
+import {
+  WebAgent,
+  WebAgentOptions,
+  hasInteractiveRefs,
+  shouldRefreshSnapshotAfterError,
+} from "../src/webAgent.js";
 import { InvalidHostnameError } from "../src/security/actionFirewall.js";
 import {
   AriaBrowser,
@@ -12,7 +17,12 @@ import { WebAgentEventEmitter, WebAgentEventType } from "../src/events.js";
 import { LanguageModel, streamText } from "ai";
 import { Logger } from "../src/loggers/types.js";
 import { generateTextWithRetry } from "../src/utils/retry.js";
-import { PlanningError, BrowserDisconnectedError } from "../src/errors.js";
+import {
+  PlanningError,
+  BrowserDisconnectedError,
+  ToolExecutionError,
+  InvalidRefException,
+} from "../src/errors.js";
 import {
   wrapExternalContentWithWarning,
   ExternalContentLabel,
@@ -155,13 +165,13 @@ class MockBrowser implements AriaBrowser {
   browserName = "mock-browser";
   private url = "about:blank";
   private title = "Mock Page";
-  private pageSnapshot = `
-    <div>
-      <button [ref=btn1]>Click me</button>
-      <input [ref=input1] type="text" />
-      <a [ref=link1] href="/page">Link</a>
-    </div>
-  `;
+  // Real aria-snapshot YAML shape (`<indent>- <role> "<name>" [ref=…]`) so the
+  // SPA readiness guard in addPageSnapshot sees interactive refs and doesn't
+  // spuriously retry. Ref IDs are kept short (btn1/input1/link1) for readable
+  // tool-call fixtures below.
+  private pageSnapshot = `- button "Click me" [ref=btn1]
+- textbox "Search" [ref=input1]
+- link "Link" [ref=link1]`;
   private markdown = "# Mock Page\nContent here";
   fieldMetadata = new Map<string, FieldMetadata>();
   formSubmissionContexts = new Map<string, FormSubmissionContext | null>();
@@ -1621,7 +1631,7 @@ describe("WebAgent", () => {
             "page.evaluate: Execution context was destroyed, most likely because of a navigation",
           ),
         )
-        .mockResolvedValue(`<div><button [ref=btn1]>Click me</button></div>`);
+        .mockResolvedValue(`- button "Click me" [ref=btn1]`);
 
       const reconnectSpy = vi.spyOn(webAgent as any, "handleBrowserDisconnect");
 
@@ -2079,6 +2089,73 @@ describe("WebAgent", () => {
       expect(
         mockLogger.events.find((e) => e.type === WebAgentEventType.AI_GENERATION_ERROR),
       ).toBeUndefined();
+
+      // A diagnostic event must record WHY no tool was called. Without it the
+      // only trace is the corrective message above, which says nothing about
+      // whether the model wrote prose or was truncated mid-call.
+      const noToolCall = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL,
+      );
+      expect(noToolCall).toBeDefined();
+      expect(noToolCall?.data.finishReason).toBe("stop");
+      expect(noToolCall?.data.textLength).toBe("No tools used".length);
+      expect(noToolCall?.data.textPreview).toBe("No tools used");
+    });
+
+    it("should report finishReason=length when a tool call was truncated", async () => {
+      // Mock planning
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Planning",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            input: {},
+            output: {
+              successCriteria: "Test task",
+              plan: "1. Complete task",
+            },
+          },
+        ],
+      } as any);
+
+      // Truncated generation: no tool call, and finishReason says why.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "I will now click the",
+          toolResults: [],
+          finishReason: "length",
+          response: { messages: [] },
+        }) as any,
+      );
+
+      // Recovery turn: a real tool call so the run can terminate.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Complete" },
+              output: { action: "done", result: "Complete", isTerminal: true },
+            },
+          ],
+          response: { messages: [] },
+        }) as any,
+      );
+
+      mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+
+      await webAgent.execute("Test", { startingUrl: "https://example.com" });
+
+      const noToolCall = mockLogger.events.find(
+        (e) => e.type === WebAgentEventType.SYSTEM_DEBUG_NO_TOOL_CALL,
+      );
+      expect(noToolCall).toBeDefined();
+      expect(noToolCall?.data.finishReason).toBe("length");
+      expect(noToolCall?.data.textPreview).toBe("I will now click the");
     });
 
     it("should handle tool result without output property", async () => {
@@ -5090,5 +5167,73 @@ describe("WebAgent firewall options", () => {
           unsafeMode: true,
         }),
     ).not.toThrow();
+  });
+});
+
+describe("hasInteractiveRefs (SPA snapshot readiness guard)", () => {
+  it("returns false for a pre-hydration shell with no interactive elements", () => {
+    // The exact sparse tree that stranded the agent on the Mattermost login page,
+    // in the real snapshot YAML format (`<indent>- <role> … [ref=E##]`).
+    const shell = "- generic [ref=E1]:\n  - img [ref=E2]\n  - img [ref=E3]";
+    expect(hasInteractiveRefs(shell)).toBe(false);
+  });
+
+  it("returns true once interactive elements with refs are present", () => {
+    const hydrated =
+      '- generic [ref=E1]:\n  - textbox "Username" [ref=E5]\n  - textbox "Password" [ref=E6]\n  - button "Sign in" [ref=E7]';
+    expect(hasInteractiveRefs(hydrated)).toBe(true);
+  });
+
+  it("treats a link with a ref as interactive", () => {
+    expect(hasInteractiveRefs('- link "Forgot password?" [ref=E9]')).toBe(true);
+  });
+
+  it("ignores an interactive role that has no ref (not yet actionable)", () => {
+    expect(hasInteractiveRefs("- button (no ref rendered)")).toBe(false);
+  });
+
+  it("ignores an interactive word inside a non-interactive node's name", () => {
+    // Regression: `generic` is not actionable even though its accessible name is
+    // "button" — the role, not the name, decides. Anchoring prevents this false positive.
+    expect(hasInteractiveRefs('- generic "button" [ref=E5]')).toBe(false);
+    expect(hasInteractiveRefs('- text "click the link to continue" [ref=E6]')).toBe(false);
+  });
+
+  it("still matches an interactive node whose quoted key was yaml-escaped", () => {
+    // A name containing ": " forces yaml to single-quote the whole key; the role
+    // still leads, so the optional leading quote in the pattern keeps it matching.
+    expect(hasInteractiveRefs(`- 'button "Save: now" [ref=E1]'`)).toBe(true);
+  });
+});
+
+describe("shouldRefreshSnapshotAfterError (recover from stale refs)", () => {
+  it("refreshes on an InvalidRefException (the stale-ref signal)", () => {
+    expect(shouldRefreshSnapshotAfterError(new InvalidRefException("E44"))).toBe(true);
+  });
+
+  it("refreshes on a ToolExecutionError carrying the invalid-ref message", () => {
+    // This is the actual type on the recoverable-error retry path: webActionTools
+    // catches the BrowserException and re-throws it as a ToolExecutionError.
+    const err = new ToolExecutionError(
+      "Invalid element reference 'E44'. The element does not exist on the current page.",
+      { action: "fill", ref: "E44" },
+    );
+    expect(shouldRefreshSnapshotAfterError(err)).toBe(true);
+  });
+
+  it("matches the 'does not exist on the current page' phrasing", () => {
+    expect(
+      shouldRefreshSnapshotAfterError(new Error("Element does not exist on the current page")),
+    ).toBe(true);
+  });
+
+  it("does NOT refresh on an unrelated recoverable tool error", () => {
+    const err = new ToolExecutionError("Click timed out after 5000ms", { action: "click" });
+    expect(shouldRefreshSnapshotAfterError(err)).toBe(false);
+  });
+
+  it("does not throw on non-Error values", () => {
+    expect(shouldRefreshSnapshotAfterError(undefined)).toBe(false);
+    expect(shouldRefreshSnapshotAfterError("Invalid element reference 'E1'")).toBe(false);
   });
 });

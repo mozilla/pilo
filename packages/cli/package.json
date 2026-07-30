@@ -16,17 +16,17 @@
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "pilo-core": "workspace:*",
-    "web-ext": "^10.4.0"
+    "web-ext": "^10.5.0"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^4.0.8",
-    "@ai-sdk/google-vertex": "^5.0.11",
-    "@ai-sdk/openai": "^4.0.8",
-    "@ai-sdk/openai-compatible": "^3.0.5",
-    "@openrouter/ai-sdk-provider": "^2.10.0",
-    "@types/node": "^26.0.0",
-    "ollama-ai-provider-v2": "^3.6.0",
-    "tsx": "^4.23.0",
+    "@ai-sdk/google": "^4.0.14",
+    "@ai-sdk/google-vertex": "^5.0.18",
+    "@ai-sdk/openai": "^4.0.13",
+    "@ai-sdk/openai-compatible": "^3.0.9",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
+    "@types/node": "^26.1.1",
+    "ollama-ai-provider-v2": "^4.0.1",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

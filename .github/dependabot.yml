@@ -11,6 +11,20 @@ updates:
       default-days: 14
     open-pull-requests-limit: 10
     versioning-strategy: increase
+    ignore:
+      # TypeScript 7 is the Go port of the compiler and ships no public
+      # programmatic API (Microsoft has said a new one arrives in 7.1). Every
+      # tool that drives TypeScript through that API breaks on it — for us,
+      # tsup's declaration emit via rollup-plugin-dts, which takes down all of
+      # `pnpm run build` and therefore releases. rollup-plugin-dts still caps
+      # its peer range at `^6.0` and tsup is already at its latest.
+      #
+      # A major bump here is not actionable until that upstream chain moves, so
+      # don't keep proposing one. Minor and patch updates still come through.
+      # Remove this once TS 7.1 lands and rollup-plugin-dts supports it.
+      # See #628 for the upgrade plan; #617 is the bump that broke the build.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       react:
         patterns:
@@ -39,3 +53,13 @@ updates:
       radixui:
         patterns:
           - "@radix-ui/*"
+      # The OpenTelemetry JS packages are released from a shared monorepo and
+      # move in lockstep, so ungrouped they arrive as a burst of near-identical
+      # PRs for one upstream release — e.g. 0.219.0 -> 0.220.0 took three
+      # (#601, #605, #606). Group them into a single PR per release wave.
+      # The three version lines (0.x exporters/sdk-node, 2.x sdk/resources,
+      # 1.x api/semantic-conventions) are independent, so a wave that only
+      # moves one line simply produces a smaller grouped PR.
+      opentelemetry:
+        patterns:
+          - "@opentelemetry/*"
