@@ -9,6 +9,8 @@
  * (downloads Playwright's bundled Firefox binary if not already cached).
  *
  * Run: `pnpm --filter pilo-core run test:integration`
+ * On PowerShell, where the script's `VAR=1 cmd` prefix does not apply:
+ *   `$env:PILO_BIDI_INTEGRATION=1; pnpm --filter pilo-core exec vitest run test/integration`
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";

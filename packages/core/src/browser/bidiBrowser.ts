@@ -170,13 +170,11 @@ export class BiDiBrowser implements AriaBrowser {
     switch (msg.method) {
       case "network.beforeRequestSent": {
         this.inFlightRequests++;
-        // ASSUMED, unverified against a real Firefox (Task 5 Step 1 was
-        // skipped — no live Firefox available in this environment): the
-        // request id lives at params.request.request, the resource
-        // classifier is the Fetch destination at params.request.destination,
-        // and a paused/intercepted request has params.isBlocked === true.
-        // Confirm these field names via the Task 7 smoke script before
-        // relying on this in production.
+        // Field shape verified against a live Firefox by the gated
+        // integration suite (test/integration/bidiFirefox.integration.test.ts):
+        // the request id is params.request.request, the resource classifier is
+        // the Fetch destination at params.request.destination, and a
+        // paused/intercepted request carries params.isBlocked === true.
         const req = (msg.params?.request ?? {}) as { request?: string; destination?: string };
         if (msg.params?.isBlocked === true && req.request) {
           const blocked = this.blockedDestinations().has(String(req.destination));
@@ -625,9 +623,8 @@ export class BiDiBrowser implements AriaBrowser {
           })()
         `);
         // Best-effort settle for lazy-loaded content (mirrors PlaywrightBrowser).
-        // Timeout must exceed NETWORKIDLE_DELAY_MS so the settle can resolve instead of
-        // always timing out; Task 6 will make NetworkIdle event-driven, turning this into
-        // a real bounded network-idle wait.
+        // Timeout must exceed NETWORKIDLE_DELAY_MS so the settle can resolve
+        // rather than always timing out.
         await this.waitForLoadState(LoadState.NetworkIdle, {
           timeout: SCROLL_SETTLE_TIMEOUT_MS,
         }).catch(() => {});
@@ -868,10 +865,11 @@ export class BiDiBrowser implements AriaBrowser {
     }
 
     // NetworkIdle: wait for the in-flight counter to stay at 0 for a quiet window.
-    // NOTE: inFlightRequests is instance-wide, not scoped to `context`, so a
-    // NetworkIdle wait here couples to traffic across all contexts (e.g. a
-    // temporary tab would wait on the main tab's requests too). Acceptable
-    // today because no temp-tab NetworkIdle path exists (see runInTemporaryTab).
+    // NOTE: inFlightRequests is instance-wide, not scoped to `context`. A
+    // NetworkIdle wait therefore couples to traffic across every context, so a
+    // temporary tab (whose waitForLoadState routes here with its own context)
+    // also waits out the main tab's requests. Scoping the counter per context
+    // would require tracking request ids to their originating context.
     return new Promise<void>((resolve, reject) => {
       let cancelled = false;
       let pollTimer: ReturnType<typeof setTimeout> | undefined;

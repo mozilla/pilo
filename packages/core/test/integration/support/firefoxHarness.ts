@@ -12,7 +12,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { readFile, rm } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join, extname, resolve, sep } from "node:path";
 import { firefox } from "playwright";
 
 const MIME: Record<string, string> = {
@@ -33,7 +33,18 @@ export async function serveFixtures(
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
       requests.push(url.pathname);
-      const file = join(dir, url.pathname === "/" ? "index.html" : url.pathname.slice(1));
+      // WHATWG URL already strips and clamps dot segments, so url.pathname
+      // cannot contain `..` — a request for /../../secret arrives as /secret.
+      // The containment check below is belt-and-braces: it keeps "never reads
+      // outside the fixtures dir" a local, checkable property of this handler
+      // rather than an inherited consequence of how the pathname was parsed.
+      const root = resolve(dir);
+      const file = resolve(root, url.pathname === "/" ? "index.html" : `.${url.pathname}`);
+      if (file !== root && !file.startsWith(root + sep)) {
+        res.writeHead(403);
+        res.end("forbidden");
+        return;
+      }
       const body = await readFile(file);
       res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
       res.end(body);
@@ -83,7 +94,10 @@ export async function startFirefoxBiDi(): Promise<{ bidiUrl: string; stop: () =>
     ["--remote-debugging-port", String(port), "--headless", "--no-remote", "--profile", profile],
     { stdio: "ignore" },
   );
-  // Poll the BiDi websocket endpoint until it accepts connections.
+  // Wait until the remote-debugging port accepts TCP connections. This does
+  // not perform a BiDi WebSocket handshake, so the endpoint may briefly accept
+  // a socket before it is ready to speak BiDi; the first command retries cover
+  // that window.
   const bidiUrl = `ws://127.0.0.1:${port}/session`;
   try {
     await waitForPort(port, 20_000);
