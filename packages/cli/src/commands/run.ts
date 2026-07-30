@@ -228,6 +228,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         bidiUrl,
         acceptInsecureCerts: options.bidiAcceptInsecureCerts ?? cfg.bidi_accept_insecure_certs,
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
+        blockResources,
       });
     } else if (browserOption === "foxcloud") {
       const { FoxcloudBrowser } = await import("pilo-core");
@@ -241,6 +243,8 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
         brokerUrl: foxcloudUrl,
         proxyUrl: options.foxcloudProxyUrl ?? cfg.foxcloud_proxy_url,
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
+        allowFileUpload,
+        blockResources,
       });
     } else {
       browser = new PlaywrightBrowser({

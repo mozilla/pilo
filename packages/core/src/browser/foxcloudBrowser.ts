@@ -30,7 +30,11 @@ export class FoxcloudBrowser extends BiDiBrowser {
   private sessionId: string | null = null;
 
   constructor(options: FoxcloudBrowserOptions) {
-    super({ actionTimeoutMs: options.actionTimeoutMs });
+    super({
+      actionTimeoutMs: options.actionTimeoutMs,
+      allowFileUpload: options.allowFileUpload,
+      blockResources: options.blockResources,
+    });
     // Strip a single trailing slash if present
     this.brokerUrl = options.brokerUrl.endsWith("/")
       ? options.brokerUrl.slice(0, -1)

@@ -120,6 +120,31 @@ describe("FoxcloudBrowser", () => {
         method: "POST",
       });
     });
+
+    it("forwards blockResources to the BiDi base class so an intercept is registered", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: "sess-block", state: "RUNNING" }),
+      });
+
+      browser = new FoxcloudBrowser({
+        brokerUrl: "http://localhost:8080",
+        blockResources: ["image"],
+      });
+
+      const conn = (browser as any).connection;
+      conn.sendCommand.mockResolvedValueOnce({}).mockResolvedValueOnce({
+        contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+      });
+
+      await browser.start();
+
+      expect(conn.sendCommand).toHaveBeenCalledWith(
+        "network.addIntercept",
+        expect.objectContaining({ phases: ["beforeRequestSent"] }),
+      );
+    });
   });
 
   describe("shutdown", () => {

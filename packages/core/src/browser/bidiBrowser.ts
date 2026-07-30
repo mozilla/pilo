@@ -1,12 +1,18 @@
+import * as fs from "node:fs/promises";
+import { EventEmitter } from "node:events";
+import * as path from "node:path";
 import TurndownService from "turndown";
 import {
   AriaBrowser,
   PageAction,
   LoadState,
   TemporaryTab,
+  SCROLL_DIRECTIONS,
+  type ScrollDirection,
   type FieldMetadata,
   type FormSubmissionContext,
   type FormSubmissionTrigger,
+  type FileUploadConfig,
 } from "./ariaBrowser.js";
 import { BiDiConnection } from "./bidiConnection.js";
 import { ARIA_TREE_SCRIPT } from "./ariaTree/bundle.js";
@@ -15,12 +21,17 @@ import { withSpan, SpanStatusCode, SpanName } from "../telemetry/tracing.js";
 
 const PAGE_SETTLE_TIME_MS = 1000;
 const NETWORKIDLE_DELAY_MS = 500;
+const SCROLL_SETTLE_TIMEOUT_MS = 1000;
 
 export interface BiDiBrowserOptions {
   /** WebDriver BiDi WebSocket URL (can be provided later in start()) */
   bidiUrl?: string;
   /** Timeout for browser actions in milliseconds (default: 30000) */
   actionTimeoutMs?: number;
+  /** File-upload allowlist. `false` (default) disables uploads. */
+  allowFileUpload?: false | FileUploadConfig;
+  /** Resource types to abort via native network interception. Default: none blocked. */
+  blockResources?: Array<"image" | "stylesheet" | "font" | "media" | "manifest">;
   /**
    * Accept TLS certificates that fail verification (default: false). Required
    * for sandboxes whose sites are served by a private CA the browser image
@@ -58,15 +69,21 @@ export class BiDiBrowser implements AriaBrowser {
 
   protected connection: BiDiConnection;
   protected currentContext: string | null = null;
+  protected inFlightRequests = 0;
+  protected loadEvents = new EventEmitter();
 
   private readonly actionTimeoutMs: number;
   private bidiUrl: string | undefined;
   protected turndown: TurndownService;
+  private readonly allowFileUpload: false | FileUploadConfig;
+  private readonly blockResources: string[];
   private readonly acceptInsecureCerts: boolean;
 
   constructor(options: BiDiBrowserOptions = {}) {
     this.bidiUrl = options.bidiUrl;
     this.actionTimeoutMs = options.actionTimeoutMs ?? 30_000;
+    this.allowFileUpload = options.allowFileUpload ?? false;
+    this.blockResources = options.blockResources ?? [];
     this.acceptInsecureCerts = options.acceptInsecureCerts ?? false;
     this.turndown = new TurndownService({
       headingStyle: "atx",
@@ -103,6 +120,91 @@ export class BiDiBrowser implements AriaBrowser {
       this.currentContext = treeResult.contexts[0].context;
     } else {
       throw new Error("BiDiBrowser: no browsing contexts available after session.new");
+    }
+
+    // BiDiConnection.close() does not remove listeners registered on the
+    // connection's EventEmitter, so a fresh start() on the same instance
+    // (Foxcloud park/resume reconnects without constructing a new browser)
+    // would otherwise stack up duplicate "event" listeners and leave
+    // inFlightRequests carrying over from the prior session. Reset both here
+    // so start() is safe to call more than once.
+    this.connection.removeAllListeners("event");
+    this.inFlightRequests = 0;
+
+    this.connection.on("event", (msg: { method: string; params: Record<string, unknown> }) =>
+      this.onBiDiEvent(msg),
+    );
+
+    if (this.blockResources.length > 0) {
+      await this.connection.sendCommand("network.addIntercept", {
+        phases: ["beforeRequestSent"],
+      });
+    }
+
+    await this.subscribe([
+      "browsingContext.load",
+      "browsingContext.domContentLoaded",
+      "network.beforeRequestSent",
+      "network.responseCompleted",
+      "network.fetchError",
+    ]);
+  }
+
+  /** Sends session.subscribe for the given BiDi event names. */
+  protected async subscribe(events: string[]): Promise<void> {
+    await this.connection.sendCommand("session.subscribe", { events });
+  }
+
+  /**
+   * Maps Pilo's `blockResources` entries to Fetch `destination` values, which
+   * is how a native-intercepted `network.beforeRequestSent` classifies the
+   * resource (per the Fetch spec's request destination enum).
+   */
+  private blockedDestinations(): Set<string> {
+    const map: Record<string, string[]> = {
+      image: ["image"],
+      stylesheet: ["style"],
+      font: ["font"],
+      media: ["audio", "video"],
+      manifest: ["manifest"],
+    };
+    return new Set(this.blockResources.flatMap((r) => map[r] ?? []));
+  }
+
+  /**
+   * Routes id-less BiDi events emitted by the connection: tracks in-flight
+   * network requests and re-emits per-context load signals on `loadEvents`.
+   */
+  protected onBiDiEvent(msg: { method: string; params: Record<string, unknown> }): void {
+    const ctx = msg.params?.context as string | undefined;
+    switch (msg.method) {
+      case "network.beforeRequestSent": {
+        this.inFlightRequests++;
+        // Field shape verified against a live Firefox by the gated
+        // integration suite (test/integration/bidiFirefox.integration.test.ts):
+        // the request id is params.request.request, the resource classifier is
+        // the Fetch destination at params.request.destination, and a
+        // paused/intercepted request carries params.isBlocked === true.
+        const req = (msg.params?.request ?? {}) as { request?: string; destination?: string };
+        if (msg.params?.isBlocked === true && req.request) {
+          const blocked = this.blockedDestinations().has(String(req.destination));
+          const cmd = blocked ? "network.failRequest" : "network.continueRequest";
+          // Fire-and-forget: the interception must be resolved so the page
+          // proceeds, but a resolution failure here shouldn't crash the router.
+          void this.connection.sendCommand(cmd, { request: req.request }).catch(() => {});
+        }
+        break;
+      }
+      case "network.responseCompleted":
+      case "network.fetchError":
+        this.inFlightRequests = Math.max(0, this.inFlightRequests - 1);
+        break;
+      case "browsingContext.load":
+        if (ctx) this.loadEvents.emit(`load:${ctx}`);
+        break;
+      case "browsingContext.domContentLoaded":
+        if (ctx) this.loadEvents.emit(`domcontentloaded:${ctx}`);
+        break;
     }
   }
 
@@ -281,19 +383,15 @@ export class BiDiBrowser implements AriaBrowser {
     });
   }
 
-  // Action-firewall introspection. NOT yet implemented for the BiDi backend —
-  // porting PlaywrightBrowser's in-page field/form logic is a follow-up and is
-  // untestable without a live BiDi session. Until then these are deliberately
-  // fail-safe, never fail-open:
-  //   - getFieldMetadata reports a generic freeform text input, so the firewall
-  //     classifies every BiDi-driven fill as non-operational and blocks it on
-  //     untrusted pages (it is allowed on caller-trusted hosts, where the
-  //     firewall bypasses field classification anyway).
-  //   - getFormSubmissionContext returns null, so no submitter context is
-  //     produced. This cannot weaken protection because no agent-filled freeform
-  //     value reaches a field on an untrusted page in the first place.
+  // Action-firewall introspection. Ports PlaywrightBrowser's in-page
+  // field/form classification logic to `script.evaluate`. Both methods are
+  // deliberately fail-safe, never fail-open: on element-not-found or any
+  // eval/parse error, getFieldMetadata falls back to a generic freeform text
+  // input (the firewall then classifies the fill as non-operational and
+  // blocks it on untrusted pages), and getFormSubmissionContext falls back to
+  // null (no submitter context is produced).
   async getFieldMetadata(ref: string): Promise<FieldMetadata> {
-    return {
+    const fallback: FieldMetadata = {
       ref,
       tagName: "input",
       inputType: "text",
@@ -307,13 +405,148 @@ export class BiDiBrowser implements AriaBrowser {
       formAction: null,
       formMethod: null,
     };
+    if (!this.currentContext) return fallback;
+    try {
+      const jsRef = JSON.stringify(ref);
+      const raw = unwrapBiDiValue(
+        await this.evaluate(`
+          (() => {
+            const refMap = globalThis.__piloRefMap;
+            let el = refMap?.get(${jsRef});
+            if (el && !el.isConnected) el = null;
+            if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+            if (!el) return null;
+
+            const getElementForm = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement || node instanceof HTMLButtonElement)
+                ? node.form : node.closest('form');
+            const getElementName = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement || node instanceof HTMLButtonElement)
+                ? (node.name || null) : node.getAttribute('name');
+            const getElementLabel = (node) => {
+              const ariaLabel = node.getAttribute('aria-label');
+              if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
+              const labelledBy = node.getAttribute('aria-labelledby');
+              if (labelledBy) {
+                const text = labelledBy.split(/\\s+/)
+                  .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim() || '')
+                  .filter(Boolean).join(' ');
+                if (text) return text;
+              }
+              if ('labels' in node) {
+                const text = Array.from(node.labels || [])
+                  .map((l) => l.textContent?.trim() || '').filter(Boolean).join(' ');
+                if (text) return text;
+              }
+              return null;
+            };
+            const getElementPlaceholder = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement)
+                ? (node.placeholder || null) : null;
+            const getElementAutocomplete = (node) =>
+              (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ||
+               node instanceof HTMLSelectElement) ? (node.autocomplete || null) : null;
+
+            const input = el instanceof HTMLInputElement ? el : null;
+            const form = getElementForm(el);
+            return JSON.stringify({
+              ref: ${jsRef},
+              tagName: el.tagName.toLowerCase(),
+              inputType: input?.type?.toLowerCase() ?? null,
+              role: el.getAttribute('role'),
+              name: getElementName(el),
+              label: getElementLabel(el),
+              placeholder: getElementPlaceholder(el),
+              autocomplete: getElementAutocomplete(el),
+              isContentEditable: el.isContentEditable,
+              formId: form?.id || null,
+              formAction: form?.action || null,
+              formMethod: form?.method?.toLowerCase() || null,
+            });
+          })()
+        `),
+      );
+      if (typeof raw !== "string") return fallback;
+      return JSON.parse(raw) as FieldMetadata;
+    } catch {
+      return fallback;
+    }
   }
 
   async getFormSubmissionContext(
-    _ref: string,
-    _trigger?: FormSubmissionTrigger,
+    ref: string,
+    trigger: FormSubmissionTrigger = "click",
   ): Promise<FormSubmissionContext | null> {
-    return null;
+    if (!this.currentContext) return null;
+    try {
+      const jsRef = JSON.stringify(ref);
+      const jsTrigger = JSON.stringify(trigger);
+      const raw = unwrapBiDiValue(
+        await this.evaluate(`
+          (() => {
+            const refMap = globalThis.__piloRefMap;
+            let el = refMap?.get(${jsRef});
+            if (el && !el.isConnected) el = null;
+            if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+            if (!el) return null;
+            const trigger = ${jsTrigger};
+
+            const canSubmitForm = (node, t) => {
+              if (t === 'click') {
+                if (node instanceof HTMLButtonElement) return node.type === 'submit';
+                if (node instanceof HTMLInputElement) return node.type === 'submit' || node.type === 'image';
+                return false;
+              }
+              if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) return false;
+              if (!(node instanceof HTMLInputElement)) return false;
+              return !['button','checkbox','color','file','hidden','radio','range','reset','submit'].includes(node.type);
+            };
+            const getSubmissionForm = (node) =>
+              (node instanceof HTMLButtonElement || node instanceof HTMLInputElement ||
+               node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement)
+                ? node.form : node.closest('form');
+
+            if (!canSubmitForm(el, trigger)) return null;
+            const form = getSubmissionForm(el);
+            if (!form) return null;
+
+            const fields = Array.from(form.elements)
+              .filter((f) => f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement || f instanceof HTMLSelectElement)
+              .filter((f) => !f.disabled)
+              .map((f) => ({
+                ref: f.getAttribute('data-pilo-ref'),
+                name: f.name || null,
+                tagName: f.tagName.toLowerCase(),
+                inputType: f instanceof HTMLInputElement ? f.type.toLowerCase() : null,
+                autocomplete: 'autocomplete' in f ? (f.autocomplete || null) : null,
+              }));
+
+            const submitterActionUrl = (() => {
+              if (!(el instanceof HTMLButtonElement) && !(el instanceof HTMLInputElement)) return null;
+              if (el instanceof HTMLInputElement && el.type !== 'submit' && el.type !== 'image') return null;
+              if (el instanceof HTMLButtonElement && el.type !== 'submit') return null;
+              if (!el.hasAttribute('formaction')) return null;
+              return el.formAction || null;
+            })();
+
+            return JSON.stringify({
+              submitterRef: ${jsRef},
+              formId: form.id || null,
+              actionUrl: form.action || null,
+              submitterActionUrl,
+              method: form.method?.toLowerCase() || null,
+              fields,
+            });
+          })()
+        `),
+      );
+      if (typeof raw !== "string") return null;
+      return JSON.parse(raw) as FormSubmissionContext;
+    } catch {
+      return null;
+    }
   }
 
   async performAction(ref: string, action: PageAction, value?: string): Promise<void> {
@@ -371,6 +604,42 @@ export class BiDiBrowser implements AriaBrowser {
       case PageAction.Forward:
         await this.goForward();
         return;
+      case PageAction.Scroll: {
+        if (!value) {
+          throw new BrowserActionException("scroll", "PageAction.Scroll requires a direction");
+        }
+        if (!SCROLL_DIRECTIONS.includes(value as ScrollDirection)) {
+          throw new BrowserActionException("scroll", `Unsupported scroll direction: ${value}`);
+        }
+        const jsDir = JSON.stringify(value);
+        await this.evaluate(`
+          (() => {
+            switch (${jsDir}) {
+              case "down":
+                window.scrollBy({ left: 0, top: window.innerHeight, behavior: "instant" });
+                return;
+              case "up":
+                window.scrollBy({ left: 0, top: -window.innerHeight, behavior: "instant" });
+                return;
+              case "top":
+                window.scrollTo({ left: 0, top: 0, behavior: "instant" });
+                return;
+              case "bottom":
+                window.scrollTo({ left: 0, top: document.documentElement.scrollHeight, behavior: "instant" });
+                return;
+              default:
+                throw new Error("Unsupported scroll direction: " + ${jsDir});
+            }
+          })()
+        `);
+        // Best-effort settle for lazy-loaded content (mirrors PlaywrightBrowser).
+        // Timeout must exceed NETWORKIDLE_DELAY_MS so the settle can resolve
+        // rather than always timing out.
+        await this.waitForLoadState(LoadState.NetworkIdle, {
+          timeout: SCROLL_SETTLE_TIMEOUT_MS,
+        }).catch(() => {});
+        return;
+      }
       case PageAction.Done:
       case PageAction.Abort:
       case PageAction.Extract:
@@ -399,6 +668,15 @@ export class BiDiBrowser implements AriaBrowser {
     );
     if (found !== true) {
       throw new InvalidRefException(ref);
+    }
+
+    // UploadFile resolves its own file-input node via a dedicated script.evaluate
+    // (with resultOwnership: "root") and dispatches the native input.setFiles command.
+    // It runs after the generic found-check above so a bad/stale ref still throws
+    // InvalidRefException like every other element action.
+    if (action === PageAction.UploadFile) {
+      await this.uploadFile(ref, value);
+      return;
     }
 
     // Build the action-specific JS to run on the already-located element.
@@ -454,6 +732,76 @@ export class BiDiBrowser implements AriaBrowser {
     }
   }
 
+  private async resolveAllowedUploadPath(inputPath: string): Promise<string> {
+    if (!this.allowFileUpload || this.allowFileUpload.allowedPaths.length === 0) {
+      throw new BrowserActionException("upload_file", "upload_disabled");
+    }
+    const resolvedPath = path.resolve(inputPath);
+    let stat;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+    if (!stat.isFile()) {
+      throw new BrowserActionException("upload_file", "upload_path_not_file");
+    }
+    const realPath = await fs.realpath(resolvedPath);
+    for (const allowedRoot of this.allowFileUpload.allowedPaths) {
+      try {
+        const realRoot = await fs.realpath(path.resolve(allowedRoot));
+        const relative = path.relative(realRoot, realPath);
+        if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+          return realPath;
+        }
+      } catch {
+        // Missing/unreadable allowlist root cannot match.
+      }
+    }
+    throw new BrowserActionException("upload_file", "upload_path_not_allowed");
+  }
+
+  private async resolveFileInputSharedId(ref: string): Promise<string | null> {
+    const jsRef = JSON.stringify(ref);
+    const raw = (await this.connection.sendCommand("script.evaluate", {
+      expression: `
+        (() => {
+          const refMap = globalThis.__piloRefMap;
+          let el = refMap?.get(${jsRef});
+          if (el && !el.isConnected) el = null;
+          if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+          if (!el) return null;
+          if (el instanceof HTMLInputElement && el.type.toLowerCase() === 'file') return el;
+          return el.querySelector('input[type=file]') || null;
+        })()
+      `,
+      target: { context: this.requireContext() },
+      awaitPromise: true,
+      resultOwnership: "root",
+    })) as { result?: { type?: string; sharedId?: string } };
+    const node = raw?.result;
+    if (node && node.type === "node" && typeof node.sharedId === "string") {
+      return node.sharedId;
+    }
+    return null;
+  }
+
+  private async uploadFile(ref: string, value?: string): Promise<void> {
+    if (!value) {
+      throw new BrowserActionException("upload_file", "upload_path_required");
+    }
+    const uploadPath = await this.resolveAllowedUploadPath(value);
+    const sharedId = await this.resolveFileInputSharedId(ref);
+    if (!sharedId) {
+      throw new BrowserActionException("upload_file", "upload_target_not_file_input");
+    }
+    await this.connection.sendCommand("input.setFiles", {
+      context: this.requireContext(),
+      element: { sharedId },
+      files: [uploadPath],
+    });
+  }
+
   async getRefIdentity(ref: string): Promise<{ role: string; name: string } | null> {
     if (!this.currentContext) return null;
     try {
@@ -495,38 +843,79 @@ export class BiDiBrowser implements AriaBrowser {
   ): Promise<void> {
     const timeout = options?.timeout ?? this.actionTimeoutMs;
 
-    await this.evaluate(
-      `
-      new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error('Timeout waiting for ${state} after ${timeout}ms')), ${timeout});
-        const finish = () => { clearTimeout(timeoutId); resolve(true); };
+    if (state === LoadState.DOMContentLoaded || state === LoadState.Load) {
+      const readyState = String(
+        unwrapBiDiValue(await this.evaluate(`document.readyState`, context)) ?? "",
+      );
 
-        ${
-          state === LoadState.DOMContentLoaded
-            ? `
-          if (document.readyState === 'interactive' || document.readyState === 'complete') {
-            finish();
-          } else {
-            document.addEventListener('DOMContentLoaded', finish, { once: true });
-          }`
-            : state === LoadState.Load
-              ? `
-          if (document.readyState === 'complete') {
-            finish();
-          } else {
-            window.addEventListener('load', finish, { once: true });
-          }`
-              : /* NetworkIdle */ `
-          if (document.readyState === 'complete') {
-            setTimeout(finish, ${NETWORKIDLE_DELAY_MS});
-          } else {
-            window.addEventListener('load', () => setTimeout(finish, ${NETWORKIDLE_DELAY_MS}), { once: true });
-          }`
+      if (
+        state === LoadState.DOMContentLoaded &&
+        (readyState === "interactive" || readyState === "complete")
+      ) {
+        return;
+      }
+      if (state === LoadState.Load && readyState === "complete") {
+        return;
+      }
+
+      const eventName =
+        state === LoadState.Load ? `load:${context}` : `domcontentloaded:${context}`;
+
+      return new Promise<void>((resolve, reject) => {
+        const listener = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          this.loadEvents.off(eventName, listener);
+          reject(new Error(`Timeout waiting for ${state} after ${timeout}ms`));
+        }, timeout);
+        this.loadEvents.once(eventName, listener);
+      });
+    }
+
+    // NetworkIdle: wait for the in-flight counter to stay at 0 for a quiet window.
+    // NOTE: inFlightRequests is instance-wide, not scoped to `context`. A
+    // NetworkIdle wait therefore couples to traffic across every context, so a
+    // temporary tab (whose waitForLoadState routes here with its own context)
+    // also waits out the main tab's requests. Scoping the counter per context
+    // would require tracking request ids to their originating context.
+    return new Promise<void>((resolve, reject) => {
+      let cancelled = false;
+      let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const timer = setTimeout(() => {
+        cancelled = true;
+        if (pollTimer) clearTimeout(pollTimer);
+        reject(new Error(`Timeout waiting for ${state} after ${timeout}ms`));
+      }, timeout);
+
+      const finish = () => {
+        cancelled = true;
+        clearTimeout(timer);
+        if (pollTimer) clearTimeout(pollTimer);
+        resolve();
+      };
+
+      const poll = () => {
+        if (!cancelled) pollTimer = setTimeout(check, 50);
+      };
+
+      const check = () => {
+        if (cancelled) return;
+        if (this.inFlightRequests === 0) {
+          pollTimer = setTimeout(() => {
+            if (cancelled) return;
+            if (this.inFlightRequests === 0) finish();
+            else poll();
+          }, NETWORKIDLE_DELAY_MS);
+        } else {
+          poll();
         }
-      })
-    `,
-      context,
-    );
+      };
+
+      check();
+    });
   }
 
   async runInTemporaryTab<T>(fn: (tab: TemporaryTab) => Promise<T>): Promise<T> {

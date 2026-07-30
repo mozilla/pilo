@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head>
+    <title>blocking fixture</title>
+  </head>
+  <body>
+    <h1>network blocking fixture</h1>
+    <!-- The server records every request it receives. When blockResources
+         includes "image", BiDi interception aborts this request before it
+         reaches the network, so the server never logs /blocked-image.png. -->
+    <img src="/blocked-image.png" alt="probe" width="10" height="10" />
+  </body>
+</html>

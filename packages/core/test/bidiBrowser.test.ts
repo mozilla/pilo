@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { BiDiBrowser, unwrapBiDiValue } from "../src/browser/bidiBrowser.js";
 import { PageAction, LoadState } from "../src/browser/ariaBrowser.js";
@@ -108,6 +109,27 @@ describe("BiDiBrowser", () => {
       const browser = new BiDiBrowser();
       await expect(browser.start()).rejects.toThrow();
     });
+
+    it("is idempotent across repeated calls (Foxcloud park/resume)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+
+      await browser.start();
+      (browser as any).inFlightRequests = 5;
+
+      await browser.start();
+
+      expect(conn.removeAllListeners).toHaveBeenCalledWith("event");
+      expect((browser as any).inFlightRequests).toBe(0);
+    });
   });
 
   describe("navigation", () => {
@@ -120,7 +142,7 @@ describe("BiDiBrowser", () => {
 
     it("goto sends browsingContext.navigate", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goto("https://example.com");
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.navigate",
@@ -152,7 +174,7 @@ describe("BiDiBrowser", () => {
 
     it("goBack sends browsingContext.traverseHistory with delta -1", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goBack();
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.traverseHistory",
@@ -165,7 +187,7 @@ describe("BiDiBrowser", () => {
 
     it("goForward sends browsingContext.traverseHistory with delta 1", async () => {
       const conn = getMockConnection(browser);
-      conn.sendCommand.mockResolvedValue({});
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
       await browser.goForward();
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.traverseHistory",
@@ -221,7 +243,7 @@ describe("BiDiBrowser", () => {
 
     it("evaluates a load state check script", async () => {
       conn.sendCommand.mockResolvedValue({
-        result: { type: "boolean", value: true },
+        result: { type: "string", value: "complete" },
       });
 
       await browser.waitForLoadState(LoadState.Load);
@@ -233,6 +255,96 @@ describe("BiDiBrowser", () => {
           awaitPromise: true,
         }),
       );
+    });
+  });
+
+  describe("event-driven waitForLoadState", () => {
+    it("DOMContentLoaded resolves immediately when readyState is already interactive", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      await expect(
+        browser.waitForLoadState(LoadState.DOMContentLoaded, { timeout: 1000 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("Load waits for the browsingContext.load event when not yet complete", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      const p = browser.waitForLoadState(LoadState.Load, { timeout: 2000 });
+      // Simulate Firefox firing the load event for the current context.
+      setTimeout(
+        () =>
+          b.onBiDiEvent({ method: "browsingContext.load", params: { context: b.currentContext } }),
+        10,
+      );
+      await expect(p).resolves.toBeUndefined();
+    });
+
+    it("NetworkIdle resolves once the in-flight counter is quiet", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      (browser as any).inFlightRequests = 0;
+      await expect(
+        browser.waitForLoadState(LoadState.NetworkIdle, { timeout: 2000 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("rejects on timeout when the event never fires", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      await expect(browser.waitForLoadState(LoadState.Load, { timeout: 50 })).rejects.toThrow(
+        /Timeout waiting for/,
+      );
+    });
+
+    it("DOMContentLoaded waits for the browsingContext.domContentLoaded event when not yet ready", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      const p = browser.waitForLoadState(LoadState.DOMContentLoaded, { timeout: 2000 });
+      setTimeout(
+        () =>
+          b.onBiDiEvent({
+            method: "browsingContext.domContentLoaded",
+            params: { context: b.currentContext },
+          }),
+        10,
+      );
+      await expect(p).resolves.toBeUndefined();
+    });
+
+    it("removes the load-event listener after a timeout so it does not leak", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "loading" } });
+      const b = browser as any;
+      await expect(browser.waitForLoadState(LoadState.Load, { timeout: 50 })).rejects.toThrow(
+        /Timeout waiting for/,
+      );
+      expect(b.loadEvents.listenerCount(`load:${b.currentContext}`)).toBe(0);
+    });
+
+    it("rejects on timeout for NetworkIdle and stops the poll loop", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
+      (browser as any).inFlightRequests = 1;
+      await expect(
+        browser.waitForLoadState(LoadState.NetworkIdle, { timeout: 60 }),
+      ).rejects.toThrow(/Timeout waiting for/);
     });
   });
 
@@ -303,6 +415,10 @@ describe("BiDiBrowser", () => {
       });
       // Second evaluate: click action
       conn.sendCommand.mockResolvedValueOnce({ result: { type: "undefined" } });
+      // Post-click ensureOptimizedPageLoad: readyState checks for DOMContentLoaded and Load,
+      // both already "complete" so they resolve via the fast path without waiting on events.
+      conn.sendCommand.mockResolvedValueOnce({ result: { type: "string", value: "complete" } });
+      conn.sendCommand.mockResolvedValueOnce({ result: { type: "string", value: "complete" } });
 
       await browser.performAction("E1", PageAction.Click);
 
@@ -366,16 +482,72 @@ describe("BiDiBrowser", () => {
     });
 
     it("goto action delegates to this.goto()", async () => {
-      conn.sendCommand.mockResolvedValue({
-        url: "https://example.com",
-        navigation: "nav-1",
-      });
+      conn.sendCommand.mockResolvedValue({ result: { type: "string", value: "complete" } });
 
       await browser.performAction("", PageAction.Goto, "https://example.com");
 
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.navigate",
         expect.objectContaining({ url: "https://example.com" }),
+      );
+    });
+  });
+
+  describe("performAction — Scroll", () => {
+    it("scrolls the viewport down via script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) =>
+        method === "script.evaluate"
+          ? Promise.resolve({ result: { type: "undefined" } })
+          : Promise.resolve(undefined),
+      );
+
+      await browser.performAction("", PageAction.Scroll, "down");
+
+      const evalCall = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "script.evaluate",
+      );
+      expect(evalCall).toBeDefined();
+      const expression = String((evalCall![1] as { expression: string }).expression);
+      expect(expression).toContain("window.scrollBy");
+      expect(expression).toContain('switch ("down")');
+    });
+
+    it("scrolls to the top via script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) =>
+        method === "script.evaluate"
+          ? Promise.resolve({ result: { type: "undefined" } })
+          : Promise.resolve(undefined),
+      );
+
+      await browser.performAction("", PageAction.Scroll, "top");
+
+      const evalCall = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "script.evaluate",
+      );
+      expect(evalCall).toBeDefined();
+      const expression = String((evalCall![1] as { expression: string }).expression);
+      expect(expression).toContain("window.scrollTo");
+      expect(expression).toContain('switch ("top")');
+    });
+
+    it("throws when direction is missing", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      await expect(browser.performAction("", PageAction.Scroll)).rejects.toThrow(/direction/i);
+    });
+
+    it("throws on an unsupported direction (host-side validation)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      // No script.evaluate should be needed — validation happens before dispatch.
+      await expect(browser.performAction("", PageAction.Scroll, "sideways")).rejects.toThrow(
+        /unsupported scroll direction/i,
       );
     });
   });
@@ -431,6 +603,316 @@ describe("BiDiBrowser", () => {
       expect(conn.sendCommand).toHaveBeenCalledWith(
         "browsingContext.close",
         expect.objectContaining({ context: "temp-ctx-2" }),
+      );
+    });
+  });
+
+  describe("performAction — UploadFile", () => {
+    const NODE = { type: "node", sharedId: "node-file-1" };
+
+    function mockUpload(browser: BiDiBrowser, node: unknown = NODE) {
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation(
+        (method: string, params?: { resultOwnership?: string }) => {
+          if (method === "script.evaluate") {
+            // resolveFileInputSharedId requests resultOwnership: "root" and reads the node
+            // from result; the generic element-found check omits it and expects a boolean.
+            if (params?.resultOwnership === "root") {
+              return Promise.resolve({ result: node });
+            }
+            return Promise.resolve({ result: { type: "boolean", value: true } });
+          }
+          if (method === "input.setFiles") return Promise.resolve({});
+          return Promise.resolve(undefined);
+        },
+      );
+      return conn;
+    }
+
+    it("sends input.setFiles with the resolved sharedId and absolute path", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      const conn = mockUpload(browser);
+
+      // Use this very test file as a guaranteed-existing regular file under cwd.
+      const target = "test/bidiBrowser.test.ts";
+      await browser.performAction("file1", PageAction.UploadFile, target);
+
+      const setFiles = conn.sendCommand.mock.calls.find(
+        (c: unknown[]) => c[0] === "input.setFiles",
+      );
+      expect(setFiles).toBeDefined();
+      const params = setFiles![1] as { element: { sharedId: string }; files: string[] };
+      expect(params.element.sharedId).toBe("node-file-1");
+      expect(isAbsolute(params.files[0])).toBe(true);
+      expect(params.files[0].endsWith("bidiBrowser.test.ts")).toBe(true);
+    });
+
+    it("throws upload_path_required when value is missing", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      mockUpload(browser);
+      await expect(browser.performAction("file1", PageAction.UploadFile)).rejects.toThrow(
+        /upload_path_required/,
+      );
+    });
+
+    it("throws upload_disabled when no allowlist is configured", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      mockUpload(browser);
+      await expect(
+        browser.performAction("file1", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow(/upload_disabled/);
+    });
+
+    it("throws upload_target_not_file_input when node resolution returns non-node", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      mockUpload(browser, { type: "null" });
+      await expect(
+        browser.performAction("file1", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow(/upload_target_not_file_input/);
+    });
+
+    it("throws InvalidRefException when the ref cannot be found (bad-ref parity)", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        allowFileUpload: { allowedPaths: [process.cwd()] },
+      });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation(
+        (method: string, params?: { resultOwnership?: string }) => {
+          if (method === "script.evaluate") {
+            if (params?.resultOwnership === "root") {
+              return Promise.resolve({ result: NODE });
+            }
+            // Generic element-found check reports the element as missing.
+            return Promise.resolve({ result: { type: "boolean", value: false } });
+          }
+          return Promise.resolve(undefined);
+        },
+      );
+
+      await expect(
+        browser.performAction("missing-ref", PageAction.UploadFile, "test/bidiBrowser.test.ts"),
+      ).rejects.toThrow("Invalid element reference");
+    });
+  });
+
+  describe("getFieldMetadata (BiDi)", () => {
+    it("returns page-derived metadata parsed from script.evaluate", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      const meta = {
+        ref: "r1",
+        tagName: "input",
+        inputType: "email",
+        role: null,
+        name: "email",
+        label: "Email",
+        placeholder: null,
+        autocomplete: "email",
+        isContentEditable: false,
+        formId: "login",
+        formAction: "https://example.com/login",
+        formMethod: "post",
+      };
+      conn.sendCommand.mockResolvedValue({
+        result: { type: "string", value: JSON.stringify(meta) },
+      });
+
+      const result = await browser.getFieldMetadata("r1");
+      expect(result).toEqual(meta);
+    });
+
+    it("falls back to the generic stub when the element is not found (null result)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "null" } });
+
+      const result = await browser.getFieldMetadata("missing");
+      expect(result.tagName).toBe("input");
+      expect(result.inputType).toBe("text");
+      expect(result.ref).toBe("missing");
+    });
+  });
+
+  describe("getFormSubmissionContext (BiDi)", () => {
+    it("returns parsed submission context", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      const ctx = {
+        submitterRef: "btn1",
+        formId: "login",
+        actionUrl: "https://example.com/login",
+        submitterActionUrl: null,
+        method: "post",
+        fields: [
+          { ref: "r1", name: "email", tagName: "input", inputType: "email", autocomplete: "email" },
+        ],
+      };
+      conn.sendCommand.mockResolvedValue({
+        result: { type: "string", value: JSON.stringify(ctx) },
+      });
+
+      const result = await browser.getFormSubmissionContext("btn1", "click");
+      expect(result).toEqual(ctx);
+    });
+
+    it("returns null when the script yields null (non-submitter)", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue({ result: { type: "null" } });
+
+      const result = await browser.getFormSubmissionContext("btn1", "click");
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("event subscription + routing", () => {
+    it("subscribe() sends session.subscribe with the event list", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      await (browser as any).subscribe(["browsingContext.load"]);
+      expect(conn.sendCommand).toHaveBeenCalledWith("session.subscribe", {
+        events: ["browsingContext.load"],
+      });
+    });
+
+    it("router increments/decrements the in-flight counter", () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const b = browser as any;
+      expect(b.inFlightRequests).toBe(0);
+      b.onBiDiEvent({ method: "network.beforeRequestSent", params: { context: "c1" } });
+      b.onBiDiEvent({ method: "network.beforeRequestSent", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(2);
+      b.onBiDiEvent({ method: "network.responseCompleted", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(1);
+      b.onBiDiEvent({ method: "network.fetchError", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(0);
+      // never goes negative
+      b.onBiDiEvent({ method: "network.responseCompleted", params: { context: "c1" } });
+      expect(b.inFlightRequests).toBe(0);
+    });
+
+    it("router re-emits load signals per context", () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222" });
+      const b = browser as any;
+      const seen: string[] = [];
+      b.loadEvents.on("load:c1", () => seen.push("load"));
+      b.onBiDiEvent({ method: "browsingContext.load", params: { context: "c1" } });
+      expect(seen).toEqual(["load"]);
+    });
+  });
+
+  describe("network resource blocking", () => {
+    function makeBrowser() {
+      return new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        blockResources: ["image", "stylesheet"],
+      });
+    }
+
+    it("registers an intercept in start()", async () => {
+      const browser = makeBrowser();
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+      await browser.start();
+      expect(conn.sendCommand).toHaveBeenCalledWith(
+        "network.addIntercept",
+        expect.objectContaining({ phases: ["beforeRequestSent"] }),
+      );
+    });
+
+    it("does not register an intercept when blockResources is empty", async () => {
+      const browser = new BiDiBrowser({ bidiUrl: "ws://localhost:9222", blockResources: [] });
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+      await browser.start();
+      // No mockReset() here (unlike startBrowser()) — we need the real call
+      // history from start() to make this assertion meaningful.
+      expect(conn.sendCommand).not.toHaveBeenCalledWith("network.addIntercept", expect.anything());
+    });
+
+    it("fails a blocked resource type and continues others", async () => {
+      const browser = makeBrowser();
+      await startBrowser(browser);
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      const b = browser as any;
+
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          isBlocked: true,
+          request: { request: "req-img", destination: "image" },
+        },
+      });
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          isBlocked: true,
+          request: { request: "req-doc", destination: "document" },
+        },
+      });
+
+      expect(conn.sendCommand).toHaveBeenCalledWith("network.failRequest", { request: "req-img" });
+      expect(conn.sendCommand).toHaveBeenCalledWith("network.continueRequest", {
+        request: "req-doc",
+      });
+    });
+
+    it("does not act on non-intercepted requests", () => {
+      const browser = makeBrowser();
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockResolvedValue(undefined);
+      const b = browser as any;
+
+      b.onBiDiEvent({
+        method: "network.beforeRequestSent",
+        params: {
+          context: "c1",
+          request: { request: "req-img", destination: "image" },
+        },
+      });
+
+      expect(conn.sendCommand).not.toHaveBeenCalledWith("network.failRequest", expect.anything());
+      expect(conn.sendCommand).not.toHaveBeenCalledWith(
+        "network.continueRequest",
+        expect.anything(),
       );
     });
   });
