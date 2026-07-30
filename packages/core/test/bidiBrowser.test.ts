@@ -64,6 +64,28 @@ describe("BiDiBrowser", () => {
       expect((browser as any).currentContext).toBe("ctx-1");
     });
 
+    it("requests acceptInsecureCerts when configured", async () => {
+      const browser = new BiDiBrowser({
+        bidiUrl: "ws://localhost:9222",
+        acceptInsecureCerts: true,
+      });
+      const conn = getMockConnection(browser);
+      conn.sendCommand.mockImplementation((method: string) => {
+        if (method === "session.new") return Promise.resolve({});
+        if (method === "browsingContext.getTree")
+          return Promise.resolve({
+            contexts: [{ context: "ctx-1", url: "about:blank", children: [] }],
+          });
+        return Promise.resolve(undefined);
+      });
+
+      await browser.start();
+
+      expect(conn.sendCommand).toHaveBeenCalledWith("session.new", {
+        capabilities: { alwaysMatch: { acceptInsecureCerts: true } },
+      });
+    });
+
     it("accepts bidiUrl override in start()", async () => {
       const browser = new BiDiBrowser();
       const conn = getMockConnection(browser);

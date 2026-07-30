@@ -89,6 +89,7 @@ export interface PiloConfig {
   // Browser Configuration
   browser?: Browser;
   bidi_url?: string;
+  bidi_accept_insecure_certs?: boolean;
   foxcloud_url?: string;
   foxcloud_proxy_url?: string;
   channel?: string;
@@ -169,6 +170,7 @@ export interface PiloConfigResolved {
   // Browser Configuration
   browser: Browser;
   bidi_url?: string;
+  bidi_accept_insecure_certs?: boolean;
   foxcloud_url?: string;
   foxcloud_proxy_url?: string;
   channel?: string;
@@ -374,6 +376,15 @@ export const FIELDS: Record<ConfigKey, FieldDef> = {
     placeholder: "url",
     env: ["PILO_BIDI_URL"],
     description: "WebSocket URL for BiDi browser (use with --browser bidi)",
+    category: "browser",
+  },
+  bidi_accept_insecure_certs: {
+    default: false,
+    type: "boolean",
+    cli: "--bidi-accept-insecure-certs",
+    env: ["PILO_BIDI_ACCEPT_INSECURE_CERTS"],
+    description:
+      "Accept TLS certificates that fail verification in BiDi mode (use with --browser bidi). Needed for sandboxes served by a private CA. WARNING: disables certificate validation for the whole session; do not use against the public web.",
     category: "browser",
   },
   foxcloud_url: {
