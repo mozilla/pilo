@@ -170,7 +170,7 @@ export interface PiloConfigResolved {
   // Browser Configuration
   browser: Browser;
   bidi_url?: string;
-  bidi_accept_insecure_certs?: boolean;
+  bidi_accept_insecure_certs: boolean;
   foxcloud_url?: string;
   foxcloud_proxy_url?: string;
   channel?: string;
