@@ -158,6 +158,7 @@ describe("ConfigManager", () => {
         "llm_provider_timeout_ms",
         "browser",
         "bidi_url",
+        "bidi_accept_insecure_certs",
         "foxcloud_url",
         "foxcloud_proxy_url",
         "channel",

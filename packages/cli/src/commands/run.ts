@@ -226,6 +226,7 @@ async function executeRunCommand(task: string, options: any): Promise<void> {
       }
       browser = new BiDiBrowser({
         bidiUrl,
+        acceptInsecureCerts: options.bidiAcceptInsecureCerts ?? cfg.bidi_accept_insecure_certs,
         actionTimeoutMs: options.actionTimeoutMs ?? cfg.action_timeout_ms,
       });
     } else if (browserOption === "foxcloud") {
