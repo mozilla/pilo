@@ -310,8 +310,8 @@ importers:
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
     devDependencies:
       '@fontsource-variable/geist':
-        specifier: ^5.2.9
-        version: 5.2.9
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource-variable/geist-mono':
         specifier: ^5.2.8
         version: 5.2.8
@@ -975,8 +975,8 @@ packages:
   '@fontsource-variable/geist-mono@5.2.8':
     resolution: {integrity: sha512-KI5bj+hkkRiHttYHmccotUZ80ZuZyai+RwI1d7UId0clkx/jXxlo8qYK8j54WzmpBjtMoEMPyllV7faDcj+6RA==}
 
-  '@fontsource-variable/geist@5.2.9':
-    resolution: {integrity: sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ==}
+  '@fontsource-variable/geist@5.3.0':
+    resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -5210,7 +5210,7 @@ snapshots:
 
   '@fontsource-variable/geist-mono@5.2.8': {}
 
-  '@fontsource-variable/geist@5.2.9': {}
+  '@fontsource-variable/geist@5.3.0': {}
 
   '@fregante/relaxed-json@2.0.0': {}
 
