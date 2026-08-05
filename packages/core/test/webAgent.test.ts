@@ -4761,6 +4761,147 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("click");
     });
 
+    // ---------------------------------------------------------------------
+    // REPRO for #640. Delete or invert these two once the fix lands.
+    //
+    // The sibling test below asserts that legitimate repeated SCROLLS must not
+    // abort. These two show the same principle is violated for clicks: a date
+    // picker's "next month" button must be pressed N times to reach a month N
+    // ahead, every press succeeds, and the page changes every time — and the
+    // detector still calls it a loop, because the signature carries no page
+    // state.
+    //
+    // This is the state-blind half of the #430 signature change: dropping the
+    // ref made genuine loops detectable (good) and made legitimate repeats
+    // indistinguishable from them (this bug). #430 named the missing
+    // counterweight — "detection of stagnant pages ... a useful signal separate
+    // from repeated actions" — and it was never implemented.
+    // ---------------------------------------------------------------------
+    /** Snapshot of a date picker showing `month`, with the Next-month control. */
+    const calendarSnapshot = (month: string) =>
+      `- heading "${month}"\n- button "Next month" [ref=E94]\n- button "Previous month" [ref=E93]`;
+
+    /** One successful click on the same semantic control the real traces show. */
+    const nextMonthClick = (i: number) =>
+      createMockStreamResponse({
+        text: "Advance the calendar one month",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: `click_next_month_${i}`,
+            toolName: "click",
+            input: { ref: "E94" },
+            output: {
+              success: true,
+              action: "click",
+              ref: "E94",
+              // Signature becomes `click:button:next month:` every turn.
+              targetIdentity: { role: "button", name: "Next month" },
+            },
+          },
+        ],
+        response: { messages: [{ role: "assistant", content: "Advance month" }] },
+      }) as any;
+
+    /** Calendar advances a month per click, so the page genuinely changes. */
+    const MONTHS = [
+      "September 2026",
+      "October 2026",
+      "November 2026",
+      "December 2026",
+      "January 2027",
+    ];
+
+    function primePagingRun() {
+      mockGenerateTextWithRetry.mockResolvedValueOnce({
+        text: "Plan",
+        toolResults: [
+          {
+            type: "tool-result",
+            toolCallId: "plan_1",
+            toolName: "create_plan",
+            output: {
+              successCriteria: "Reach December 2026 in the date picker",
+              plan: "1. Click Next month until December 2026 is shown",
+            },
+          },
+        ],
+      } as any);
+
+      const snapshots = vi.spyOn(mockBrowser, "getTreeWithRefs");
+      for (const month of MONTHS) {
+        snapshots.mockResolvedValueOnce(calendarSnapshot(month));
+      }
+      snapshots.mockResolvedValue(calendarSnapshot(MONTHS[MONTHS.length - 1]));
+
+      for (let i = 0; i < MONTHS.length; i++) {
+        mockStreamText.mockReturnValueOnce(nextMonthClick(i));
+      }
+    }
+
+    it("REPRO #640: aborts while paging a date picker, though every click succeeds and the page changes", async () => {
+      primePagingRun();
+
+      const result = await webAgent.execute("Find a hotel for December 2026", {
+        startingUrl: "https://www.booking.com",
+      });
+
+      // The bug. Four legitimate month advances read as a stuck loop.
+      expect(result.success).toBe(false);
+      expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+      expect(result.finalAnswer).toContain("click");
+      // Only THREE presses actually execute: the 4th trips the abort, which
+      // returns actionExecuted:false. So the agent can advance the calendar at
+      // most 3 months from the month it lands on — while the eval's Booking
+      // tasks ask for check-ins 2-5 months out.
+      expect(result.stats.actions).toBe(3);
+    });
+
+    it("REPRO #640: raising max_repeated_actions lets the same paging run through", async () => {
+      // The other half of the proposed repro (`--max-repeated-actions 12`):
+      // if the guard is what blocks paging, relaxing it must unblock it. This
+      // isolates the guard from any site-side explanation.
+      await webAgent.close();
+      webAgent = new WebAgent(mockBrowser, {
+        ...options,
+        maxRepeatedActions: 12,
+        maxIterations: 30,
+      });
+
+      primePagingRun();
+      // Once past the picker the agent finishes normally.
+      mockStreamText.mockReturnValueOnce(
+        createMockStreamResponse({
+          text: "Done",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "done_1",
+              toolName: "done",
+              input: { result: "Reached December 2026" },
+              output: { action: "done", result: "Reached December 2026", isTerminal: true },
+            },
+          ],
+          response: { messages: [{ role: "assistant", content: "Done" }] },
+        }) as any,
+      );
+
+      const result = await webAgent.execute("Find a hotel for December 2026", {
+        startingUrl: "https://www.booking.com",
+      });
+
+      // The guard no longer fires, and every paging click now executes — 5 of 5
+      // rather than stopping at 4. That is the whole claim: the repetition guard,
+      // not the site and not the picker, is what blocks the run.
+      expect(result.finalAnswer).not.toContain("Excessive repetition");
+      expect(result.stats.actions).toBeGreaterThan(MONTHS.length - 1);
+
+      // Deliberately not asserting overall task success. Getting there would mean
+      // faithfully mocking a terminal turn plus whatever validation follows, which
+      // is orthogonal to #640 — and a mocked "it passed" would prove nothing about
+      // the real Booking task anyway. The live run in the issue is what settles that.
+    });
+
     it("should not flag legitimate repeated scroll actions", async () => {
       // Scroll repeats with the same direction are legitimate workflow
       // (traversing an infinite-scroll feed). The detector must exempt them.
