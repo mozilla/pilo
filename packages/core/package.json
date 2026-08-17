@@ -44,7 +44,7 @@
     "cross-fetch": "^4.1.0",
     "eventemitter3": "^5.0.4",
     "liquidjs": "^10.28.0",
-    "nanoid": "^6.0.0",
+    "nanoid": "^6.0.1",
     "ollama-ai-provider-v2": "^4.0.1",
     "playwright": "1.62.1",
     "turndown": "^7.2.2",
