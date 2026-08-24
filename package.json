@@ -55,7 +55,7 @@
     "@ai-sdk/google-vertex": "^5.0.38",
     "@ai-sdk/openai": "^4.0.27",
     "@ai-sdk/openai-compatible": "^3.0.20",
-    "@ghostery/adblocker-playwright": "^2.18.1",
+    "@ghostery/adblocker-playwright": "^2.18.2",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "ai": "^7.0.48",
     "chalk": "^6.0.0",
