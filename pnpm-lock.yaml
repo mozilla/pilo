@@ -359,13 +359,13 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^2.1.0
-        version: 2.1.0(hono@4.12.34)
+        version: 2.1.0(hono@4.13.5)
       '@hono/node-ws':
         specifier: ^1.3.0
-        version: 1.3.1(@hono/node-server@2.1.0(hono@4.12.34))(hono@4.12.34)
+        version: 1.3.1(@hono/node-server@2.1.0(hono@4.13.5))(hono@4.13.5)
       '@hono/sentry':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.12.34)
+        version: 1.2.2(hono@4.13.5)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -388,8 +388,8 @@ importers:
         specifier: ^1.43.0
         version: 1.43.0
       hono:
-        specifier: ^4.12.34
-        version: 4.12.34
+        specifier: ^4.13.5
+        version: 4.13.5
       pilo-core:
         specifier: workspace:*
         version: link:../core
@@ -3323,8 +3323,8 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
-  hono@4.12.34:
-    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
     engines: {node: '>=16.9.0'}
 
   hookable@6.1.1:
@@ -5554,22 +5554,22 @@ snapshots:
       protobufjs: 7.6.5
       yargs: 17.7.3
 
-  '@hono/node-server@2.1.0(hono@4.12.34)':
+  '@hono/node-server@2.1.0(hono@4.13.5)':
     dependencies:
-      hono: 4.12.34
+      hono: 4.13.5
 
-  '@hono/node-ws@1.3.1(@hono/node-server@2.1.0(hono@4.12.34))(hono@4.12.34)':
+  '@hono/node-ws@1.3.1(@hono/node-server@2.1.0(hono@4.13.5))(hono@4.13.5)':
     dependencies:
-      '@hono/node-server': 2.1.0(hono@4.12.34)
-      hono: 4.12.34
+      '@hono/node-server': 2.1.0(hono@4.13.5)
+      hono: 4.13.5
       ws: 8.21.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@hono/sentry@1.2.2(hono@4.12.34)':
+  '@hono/sentry@1.2.2(hono@4.13.5)':
     dependencies:
-      hono: 4.12.34
+      hono: 4.13.5
       toucan-js: 4.1.1
 
   '@humanfs/core@0.19.2':
@@ -7669,7 +7669,7 @@ snapshots:
 
   has-flag@4.0.0: {}
 
-  hono@4.12.34: {}
+  hono@4.13.5: {}
 
   hookable@6.1.1: {}
 
