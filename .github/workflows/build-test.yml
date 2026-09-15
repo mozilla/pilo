@@ -449,7 +449,7 @@ jobs:
         run: pnpm --filter pilo-extension exec playwright install-deps chromium
 
       - name: Run extension e2e tests
-        run: pnpm --filter pilo-extension run test:e2e:headless:chrome
+        run: pnpm --filter pilo-extension run test:e2e:headless
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
