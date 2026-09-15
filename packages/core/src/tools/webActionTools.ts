@@ -8,9 +8,9 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import {
-  AriaBrowser,
-  FieldMetadata,
-  FileUploadConfig,
+  type AriaBrowser,
+  type FieldMetadata,
+  type FileUploadConfig,
   PageAction,
   SCROLL_DIRECTIONS,
 } from "../browser/ariaBrowser.js";

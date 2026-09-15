@@ -1,6 +1,6 @@
 import { WebAgentEventEmitter, WebAgentEventType } from "../events.js";
 import type { WebAgentEvent } from "../events.js";
-import { Logger } from "./types.js";
+import type { Logger } from "./types.js";
 
 /**
  * Events that are excluded by default from JSON console output

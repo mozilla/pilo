@@ -21,7 +21,7 @@ import type {
   ToolExecutionErrorEventData,
   FirewallBlockedNonInteractiveEventData,
 } from "../events.js";
-import { Logger } from "./types.js";
+import type { Logger } from "./types.js";
 
 /**
  * Basic console logger that outputs plain text to the console

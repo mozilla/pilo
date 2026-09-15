@@ -1,4 +1,4 @@
-import { test as base, chromium, BrowserContext } from "@playwright/test";
+import { test as base, chromium, type BrowserContext } from "@playwright/test";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
