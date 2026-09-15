@@ -19,5 +19,10 @@ packages/core/schemas/
 # WXT framework auto-generated files
 packages/extension/.wxt/
 
+# Playwright e2e artifacts (gitignored, but prettier still walks them,
+# so a local e2e run would otherwise fail `format:check`)
+packages/extension/playwright-report/
+packages/extension/test-results/
+
 # Dependencies
 node_modules/
