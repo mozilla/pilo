@@ -11,7 +11,7 @@ test.describe("Sidepanel", () => {
     await page.waitForLoadState("networkidle");
 
     // Verify settings page is shown (extension auto-redirects when no API key)
-    await expect(page.getByText("Pilo Settings")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
     await expect(page.getByText("API Key")).toBeVisible();
     await expect(page.getByText("Save Settings")).toBeVisible();
   });
@@ -24,8 +24,8 @@ test.describe("Sidepanel", () => {
     await page.goto(sidepanelUrl);
     await page.waitForLoadState("networkidle");
 
-    // Click "Back to Chat" button
-    await page.getByText("Back to Chat").click();
+    // Click the "Back to chat" button
+    await page.getByRole("button", { name: "Back to chat" }).click();
 
     // Wait for chat view to appear
     await page.waitForLoadState("networkidle");
@@ -45,7 +45,7 @@ test.describe("Sidepanel", () => {
     await expect(sendButton).toBeDisabled();
 
     // Verify settings button is visible
-    const settingsButton = page.getByTestId("settings-button");
+    const settingsButton = page.getByRole("button", { name: "Open settings" });
     await expect(settingsButton).toBeVisible();
   });
 
@@ -55,7 +55,7 @@ test.describe("Sidepanel", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to chat view
-    await page.getByText("Back to Chat").click();
+    await page.getByRole("button", { name: "Back to chat" }).click();
     await page.waitForLoadState("networkidle");
 
     const taskInput = page.getByTestId("task-input");
@@ -77,15 +77,15 @@ test.describe("Sidepanel", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to chat view first
-    await page.getByText("Back to Chat").click();
+    await page.getByRole("button", { name: "Back to chat" }).click();
     await page.waitForLoadState("networkidle");
 
     // Click settings button
-    const settingsButton = page.getByTestId("settings-button");
+    const settingsButton = page.getByRole("button", { name: "Open settings" });
     await settingsButton.click();
 
     // Should be back on settings page
-    await expect(page.getByText("Pilo Settings")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
     await expect(page.getByText("API Key")).toBeVisible();
   });
 });
