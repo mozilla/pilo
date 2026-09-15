@@ -1,4 +1,4 @@
-import { ModelMessage } from "ai";
+import type { ModelMessage } from "ai";
 import { EventEmitter } from "eventemitter3";
 import type { FormFieldRequest } from "./types/interactive.js";
 import type { TaskExecutionResult } from "./webAgent.js";

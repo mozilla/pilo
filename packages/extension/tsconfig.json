@@ -5,6 +5,14 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    // WXT 0.21's generated tsconfig enables these; opting out keeps the
+    // extension typecheck aligned with the rest of the monorepo (it also
+    // compiles pilo-core sources via the paths aliases below).
+    // Whether to adopt them monorepo-wide is tracked in
+    // https://github.com/mozilla/pilo/issues/688
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": false,
+    "noFallthroughCasesInSwitch": false,
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "WebWorker"],
     "paths": {

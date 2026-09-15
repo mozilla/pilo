@@ -2,7 +2,7 @@ import { ExtensionBrowser } from "./ExtensionBrowser";
 import { EventStoreLogger } from "../shared/EventStoreLogger";
 
 // Import shared code - browser-safe imports only
-import { WebAgent, Logger } from "pilo-core/core";
+import { WebAgent, type Logger } from "pilo-core/core";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

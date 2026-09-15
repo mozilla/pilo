@@ -1,4 +1,4 @@
-import { LanguageModel } from "ai";
+import type { LanguageModel } from "ai";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

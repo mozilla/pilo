@@ -7,18 +7,18 @@
  * - Validator: Context validation and task completion checking
  */
 
-import { streamText, ModelMessage, StreamTextResult } from "ai";
+import { streamText, type ModelMessage, type StreamTextResult } from "ai";
 import type { ProviderConfig } from "./provider.js";
-import { AriaBrowser, FileUploadConfig, PageAction } from "./browser/ariaBrowser.js";
+import { type AriaBrowser, type FileUploadConfig, PageAction } from "./browser/ariaBrowser.js";
 import {
-  BrowserReconnectedEventData,
-  CdpEndpointConnectedEventData,
-  CdpEndpointCycleEventData,
+  type BrowserReconnectedEventData,
+  type CdpEndpointConnectedEventData,
+  type CdpEndpointCycleEventData,
   WebAgentEventEmitter,
   WebAgentEventType,
 } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
-import { Logger } from "./loggers/types.js";
+import type { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import {
   BrowserDisconnectedError,

@@ -1,4 +1,5 @@
-import { Liquid, Template } from "liquidjs";
+import { Liquid } from "liquidjs";
+import type { Template } from "liquidjs";
 
 const engine = new Liquid({
   cache: false, // Disable caching since we're managing parsing ourselves

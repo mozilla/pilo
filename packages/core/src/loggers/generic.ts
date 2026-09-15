@@ -1,5 +1,5 @@
 import { WebAgentEventEmitter } from "../events.js";
-import { Logger } from "./types.js";
+import type { Logger } from "./types.js";
 
 /**
  * Generic logger that forwards all events to a callback function
