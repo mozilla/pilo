@@ -21,7 +21,7 @@ export class MetricsCollector extends LoggerWrapper {
     super(wrappedLogger);
   }
 
-  initialize(emitter: WebAgentEventEmitter): void {
+  override initialize(emitter: WebAgentEventEmitter): void {
     this.stepCount = 0;
     this.aiGenerationCount = 0;
     this.aiGenerationErrorCount = 0;
@@ -39,7 +39,7 @@ export class MetricsCollector extends LoggerWrapper {
     super.initialize(emitter);
   }
 
-  dispose(): void {
+  override dispose(): void {
     if (this.emitter) {
       this.eventCounts.clear();
       this.emitter.off("*", this.handleEventCount);

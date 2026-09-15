@@ -544,7 +544,7 @@ export class WebAgentEventEmitter extends EventEmitter {
   /**
    * Override emit to also trigger wildcard listeners
    */
-  emit(event: string | symbol, ...args: any[]): boolean {
+  override emit(event: string | symbol, ...args: any[]): boolean {
     const result = super.emit(event, ...args);
     // Also emit to wildcard listeners if this isn't already a wildcard event
     if (event !== "*") {
