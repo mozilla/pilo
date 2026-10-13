@@ -23,10 +23,10 @@
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "tsx": "^4.23.13",
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.0",
