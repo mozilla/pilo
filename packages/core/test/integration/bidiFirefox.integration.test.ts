@@ -60,8 +60,6 @@ describe.skipIf(!ENABLED)("BiDiBrowser integration (real Firefox)", () => {
   it("reads link URLs via getLinkUrl without navigating", async () => {
     const pageUrl = `${site.baseUrl}/links.html`;
     await browser.goto(pageUrl);
-    // Refs are hardcoded in the fixture (see the upload test for why we skip
-    // getTreeWithRefs()).
 
     // Root-relative href resolves against the origin, path kept intact.
     await expect(browser.getLinkUrl("rootLink")).resolves.toEqual({
