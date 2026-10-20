@@ -244,6 +244,10 @@ class MockBrowser implements AriaBrowser {
     return null;
   }
 
+  async getLinkUrl(_ref: string): Promise<{ url: string; rawHref: string } | null> {
+    return null;
+  }
+
   async waitForLoadState(): Promise<void> {}
 
   async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {

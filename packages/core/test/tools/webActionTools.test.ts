@@ -113,6 +113,10 @@ class MockBrowser implements AriaBrowser {
     return null;
   }
 
+  async getLinkUrl(_ref: string): Promise<{ url: string; rawHref: string } | null> {
+    return null;
+  }
+
   async waitForLoadState(): Promise<void> {}
 
   async runInTemporaryTab<T>(fn: (tab: any) => Promise<T>): Promise<T> {
@@ -186,6 +190,7 @@ describe("Web Action Tools", () => {
       expect(tools.forward).toBeDefined();
       expect(tools.scroll).toBeDefined();
       expect(tools.extract).toBeDefined();
+      expect(tools.get_link_url).toBeDefined();
       expect(tools.done).toBeDefined();
       expect(tools.abort).toBeDefined();
     });
@@ -1096,6 +1101,88 @@ describe("Web Action Tools", () => {
         }),
         expect.any(Object),
       );
+    });
+  });
+
+  describe("Get Link URL Action", () => {
+    const PNM_LINK = {
+      url: "https://www.pnm.com/documents/d/pnm.com/pnm-an-650-effective-april-27-2026-pdf",
+      rawHref: "/documents/d/pnm.com/pnm-an-650-effective-april-27-2026-pdf",
+    };
+
+    it("returns the resolved URL and raw href without clicking", async () => {
+      const getLinkUrlSpy = vi.spyOn(mockBrowser, "getLinkUrl").mockResolvedValueOnce(PNM_LINK);
+      const performActionSpy = vi.spyOn(mockBrowser, "performAction");
+      const emitSpy = vi.spyOn(eventEmitter, "emit");
+
+      const result = await tools.get_link_url.execute({ ref: "E408" });
+
+      expect(getLinkUrlSpy).toHaveBeenCalledWith("E408");
+      expect(performActionSpy).not.toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(WebAgentEventType.AGENT_ACTION, {
+        action: "get_link_url",
+        ref: "E408",
+      });
+      expect(result.success).toBe(true);
+      expect(result.action).toBe("get_link_url");
+      expect(result.ref).toBe("E408");
+      expect(result.url).toContain(PNM_LINK.url);
+      expect(result.rawHref).toContain(PNM_LINK.rawHref);
+    });
+
+    it('wraps the URL in <EXTERNAL-CONTENT label="extract-result">', async () => {
+      vi.spyOn(mockBrowser, "getLinkUrl").mockResolvedValueOnce(PNM_LINK);
+
+      const result = await tools.get_link_url.execute({ ref: "E408" });
+
+      expect(result.url).toMatch(
+        /<EXTERNAL-CONTENT label="extract-result">[\s\S]*<\/EXTERNAL-CONTENT>/,
+      );
+    });
+
+    it("returns a recoverable failure when the ref is not a link", async () => {
+      vi.spyOn(mockBrowser, "getLinkUrl").mockResolvedValueOnce(null);
+
+      const result = await tools.get_link_url.execute({ ref: "E1" });
+
+      expect(result.success).toBe(false);
+      expect(result.isRecoverable).toBe(true);
+      expect(result.error).toBe("Element E1 is not a link with an href");
+    });
+
+    it("returns a recoverable failure for an invalid ref", async () => {
+      vi.spyOn(mockBrowser, "getLinkUrl").mockRejectedValueOnce(new InvalidRefException("E999"));
+
+      const result = await tools.get_link_url.execute({ ref: "E999" });
+
+      expect(result.success).toBe(false);
+      expect(result.isRecoverable).toBe(true);
+      expect(result.ref).toBe("E999");
+      expect(result.error).toContain("E999");
+    });
+
+    it("rethrows non-browser errors", async () => {
+      vi.spyOn(mockBrowser, "getLinkUrl").mockRejectedValueOnce(new Error("boom"));
+
+      await expect(tools.get_link_url.execute({ ref: "E1" })).rejects.toThrow("boom");
+    });
+
+    it("redacts caller-data secrets echoed into the URL", async () => {
+      const SECRET = "super-secret-membership-42";
+      vi.spyOn(mockBrowser, "getLinkUrl").mockResolvedValueOnce({
+        url: `https://example.com/account?code=${SECRET}`,
+        rawHref: `/account?code=${SECRET}`,
+      });
+      const dataTools: any = createWebActionTools({
+        ...context,
+        sensitiveValues: new Set([SECRET]),
+      });
+
+      const result = await dataTools.get_link_url.execute({ ref: "E5" });
+
+      expect(result.url).not.toContain(SECRET);
+      expect(result.rawHref).not.toContain(SECRET);
+      expect(result.url).toContain("[hidden]");
     });
   });
 

@@ -1479,7 +1479,14 @@ export class WebAgent {
   // Fill keeps the current snapshot so refs and agent-filled provenance remain
   // valid for a following submit check. This trades off immediate visibility
   // into dynamic validation UI until a later action refreshes the snapshot.
-  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set(["extract", "webSearch", "fill"]);
+  // get_link_url is a read-only lookup; refreshing would also clip its result
+  // (truncateOldExternalContent) before the agent can report it.
+  private static readonly ACTIONS_WITHOUT_PAGE_REFRESH = new Set([
+    "extract",
+    "webSearch",
+    "fill",
+    "get_link_url",
+  ]);
 
   private static shouldRefreshPageSnapshotAfterAction(action: string): boolean {
     return !WebAgent.ACTIONS_WITHOUT_PAGE_REFRESH.has(action);

@@ -16,6 +16,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { BiDiBrowser, PageAction, LoadState } from "../../src/index.js";
+import { InvalidRefException } from "../../src/errors.js";
 import { serveFixtures, startFirefoxBiDi } from "./support/firefoxHarness.js";
 
 const ENABLED = process.env.PILO_BIDI_INTEGRATION === "1";
@@ -54,6 +55,29 @@ describe.skipIf(!ENABLED)("BiDiBrowser integration (real Firefox)", () => {
     ).evaluate("document.getElementById('count').textContent");
     // count is a BiDi typed value; assert the file registered.
     expect(JSON.stringify(count)).toContain("1");
+  }, 30_000);
+
+  it("reads link URLs via getLinkUrl without navigating", async () => {
+    const pageUrl = `${site.baseUrl}/links.html`;
+    await browser.goto(pageUrl);
+
+    // Root-relative href resolves against the origin, path kept intact.
+    await expect(browser.getLinkUrl("rootLink")).resolves.toEqual({
+      url: `${site.baseUrl}/documents/d/pnm.com/pnm-an-650-effective-april-27-2026-pdf`,
+      rawHref: "/documents/d/pnm.com/pnm-an-650-effective-april-27-2026-pdf",
+    });
+
+    // A ref on a descendant resolves to the enclosing link; <base> is honoured.
+    await expect(browser.getLinkUrl("childSpan")).resolves.toEqual({
+      url: `${site.baseUrl}/docs/rider.pdf`,
+      rawHref: "../rider.pdf",
+    });
+
+    await expect(browser.getLinkUrl("notLink")).resolves.toBeNull();
+    await expect(browser.getLinkUrl("missingRef")).rejects.toBeInstanceOf(InvalidRefException);
+
+    // Reading hrefs must not activate the link.
+    expect(await browser.getUrl()).toBe(pageUrl);
   }, 30_000);
 });
 

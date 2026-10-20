@@ -71,6 +71,10 @@ export const TOOL_STRINGS = {
       dataDescription:
         "Describe what information to extract. Focus on content, not element references.",
     },
+    getLinkUrl: {
+      description:
+        "Get the destination URL of a link without clicking it. Returns the absolute URL as resolved by the browser. Use this whenever you need a link's URL — the page snapshot does not show link URLs.",
+    },
     done: {
       description: "Complete the task with your final answer",
       result:
@@ -199,6 +203,7 @@ function buildToolExamples(
     `- forward() - ${TOOL_STRINGS.webActions.forward.description}`,
     `- scroll({"direction": "down"}) - ${TOOL_STRINGS.webActions.scroll.description}`,
     `- extract({"description": "data to extract"}) - ${TOOL_STRINGS.webActions.extract.description}`,
+    `- get_link_url({"ref": "${TOOL_STRINGS.webActions.common.elementRefExample}"}) - ${TOOL_STRINGS.webActions.getLinkUrl.description}`,
   ];
 
   if (hasFileUpload) {
@@ -375,6 +380,7 @@ Analyze the current page state and determine your next action based on previous 
 - The accessibility tree shows currently loaded elements; if expected content is missing, use scroll() to reveal more of the page or wait() to let dynamic content load
 - Clear obstructing modals/popups first
 - Prefer click() over goto() for page navigation
+- When a task asks for a link's URL, call get_link_url() on the link's ref and report the result verbatim; never reconstruct a URL from link text, file names, or familiar URL patterns
 - Submit forms via enter() or submit button after filling
 - Find alternative elements if primary ones aren't available
 - When click() fails due to element interception, try focus() first, then keyboard navigation (Tab, Enter, arrow keys), or press Escape to dismiss overlapping overlays

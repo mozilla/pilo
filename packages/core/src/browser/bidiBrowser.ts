@@ -10,6 +10,7 @@ import {
   SCROLL_DIRECTIONS,
   type ScrollDirection,
   type FieldMetadata,
+  type LinkUrl,
   type FormSubmissionContext,
   type FormSubmissionTrigger,
   type FileUploadConfig,
@@ -825,6 +826,42 @@ export class BiDiBrowser implements AriaBrowser {
       // is advisory for repetition detection — log nothing, just bail out.
       return null;
     }
+  }
+
+  async getLinkUrl(ref: string): Promise<LinkUrl | null> {
+    this.requireContext();
+    const jsRef = JSON.stringify(ref);
+    let raw: unknown;
+    try {
+      raw = unwrapBiDiValue(
+        await this.evaluate(`
+          (() => {
+            const refMap = globalThis.__piloRefMap;
+            let el = refMap?.get(${jsRef});
+            if (el && !el.isConnected) el = null;
+            if (!el) el = document.querySelector('[data-pilo-ref=' + ${jsRef} + ']');
+            if (!el) return JSON.stringify({ found: false });
+            const link = el.closest('a[href], area[href]');
+            return JSON.stringify({
+              found: true,
+              link: link ? { url: link.href, rawHref: link.getAttribute('href') ?? '' } : null,
+            });
+          })()
+        `),
+      );
+    } catch (error) {
+      throw new BrowserActionException(
+        "getLinkUrl",
+        `Failed to get link URL: ${error instanceof Error ? error.message : String(error)}`,
+        { ref, originalError: error },
+      );
+    }
+    if (typeof raw !== "string") {
+      throw new BrowserActionException("getLinkUrl", "Failed to get link URL: no result", { ref });
+    }
+    const parsed = JSON.parse(raw) as { found: boolean; link?: LinkUrl | null };
+    if (!parsed.found) throw new InvalidRefException(ref);
+    return parsed.link ?? null;
   }
 
   async waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void> {

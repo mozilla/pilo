@@ -651,6 +651,56 @@ export function createWebActionTools(context: WebActionContext): ToolSet {
       },
     }),
 
+    get_link_url: tool({
+      description: TOOL_STRINGS.webActions.getLinkUrl.description,
+      inputSchema: z.object({
+        ref: z.string().describe(TOOL_STRINGS.webActions.common.elementRef),
+      }),
+      execute: async ({ ref }) => {
+        // Read-only DOM lookup: reads the href off the ref'd element rather
+        // than asking a model to find it in markdown, so the URL is exact.
+        context.eventEmitter.emit(WebAgentEventType.AGENT_ACTION, {
+          action: "get_link_url",
+          ref,
+        });
+
+        let link;
+        try {
+          link = await context.browser.getLinkUrl(ref);
+        } catch (error) {
+          if (error instanceof BrowserException) {
+            return failedActionResult("get_link_url", error.message, context, ref);
+          }
+          throw error;
+        }
+
+        if (!link) {
+          return failedActionResult(
+            "get_link_url",
+            `Element ${ref} is not a link with an href`,
+            context,
+            ref,
+          );
+        }
+
+        // Same redaction as extract: a caller secret echoed into a URL (e.g. a
+        // query string) must not re-enter the model context.
+        let { url, rawHref } = link;
+        if (context.sensitiveValues && context.sensitiveValues.size > 0) {
+          url = redactSensitiveValues(url, context.sensitiveValues);
+          rawHref = redactSensitiveValues(rawHref, context.sensitiveValues);
+        }
+
+        return {
+          success: true,
+          action: "get_link_url",
+          ref,
+          url: wrapExternalContentWithWarning(url, ExternalContentLabel.ExtractResult),
+          rawHref: wrapExternalContentWithWarning(rawHref, ExternalContentLabel.ExtractResult),
+        };
+      },
+    }),
+
     done: tool({
       description: TOOL_STRINGS.webActions.done.description,
       inputSchema: z.object({
