@@ -18,6 +18,7 @@ import {
   FileUploadConfig,
   FieldMetadata,
   FormSubmissionTrigger,
+  LinkUrl,
   FormSubmissionContext,
   LoadState,
   PageAction,
@@ -994,6 +995,26 @@ export class PlaywrightBrowser implements AriaBrowser {
       // The page may have navigated or torn down the identity map. Identity
       // is advisory for repetition detection — log nothing, just bail out.
       return null;
+    }
+  }
+
+  async getLinkUrl(ref: string): Promise<LinkUrl | null> {
+    const locator = await this.validateElementRef(ref);
+
+    try {
+      // `link.href` is resolved by the browser against the document base URL,
+      // so callers never have to reconstruct absolute URLs themselves.
+      return await locator.evaluate((element): LinkUrl | null => {
+        const link = element.closest("a[href], area[href]") as
+          HTMLAnchorElement | HTMLAreaElement | null;
+        return link ? { url: link.href, rawHref: link.getAttribute("href") ?? "" } : null;
+      });
+    } catch (error) {
+      throw new BrowserActionException(
+        "getLinkUrl",
+        `Failed to get link URL: ${error instanceof Error ? error.message : String(error)}`,
+        { ref, originalError: error },
+      );
     }
   }
 

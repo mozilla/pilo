@@ -62,6 +62,11 @@ export interface TemporaryTab {
   waitForLoadState(state: LoadState, options?: { timeout?: number }): Promise<void>;
 }
 
+export interface LinkUrl {
+  url: string;
+  rawHref: string;
+}
+
 export interface FieldMetadata {
   ref: string;
   tagName: string;
@@ -154,6 +159,14 @@ export interface AriaBrowser {
    * the ref string itself churns between snapshots.
    */
   getRefIdentity(ref: string): Promise<{ role: string; name: string } | null>;
+
+  /**
+   * Returns the destination of a link ref without activating it. `url` is the
+   * browser-resolved absolute URL (honours <base>); `rawHref` is the attribute
+   * as authored. Returns null if the ref is not a link, or inside one, with an
+   * href. Throws InvalidRefException if the ref is not in the DOM.
+   */
+  getLinkUrl(ref: string): Promise<LinkUrl | null>;
 
   /**
    * Waits for a specific load state of the page

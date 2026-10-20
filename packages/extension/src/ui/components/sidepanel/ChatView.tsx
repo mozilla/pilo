@@ -259,6 +259,8 @@ export default function ChatView({ currentTab }: ChatViewProps): ReactElement {
           if (isAgentActionData(eventData) && taskId) {
             if (eventData.action === "extract") {
               addMessageAndScroll("status", "Extracting data", taskId);
+            } else if (eventData.action === "get_link_url") {
+              addMessageAndScroll("status", "Reading link URL", taskId);
             }
           }
         }

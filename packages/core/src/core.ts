@@ -11,6 +11,7 @@ export type {
   FieldMetadata,
   FormSubmissionContext,
   FormSubmissionTrigger,
+  LinkUrl,
 } from "./browser/ariaBrowser.js";
 export { PageAction, LoadState } from "./browser/ariaBrowser.js";
 export type { TaskExecutionResult, TaskError, WebAgentOptions } from "./webAgent.js";

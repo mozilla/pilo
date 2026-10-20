@@ -4,6 +4,7 @@ import type {
   FieldMetadata,
   FormSubmissionContext,
   FormSubmissionTrigger,
+  LinkUrl,
 } from "pilo-core/core";
 import { BrowserActionException, InvalidRefException, PageAction, LoadState } from "pilo-core/core";
 import type { Tabs } from "webextension-polyfill";
@@ -555,11 +556,14 @@ export class ExtensionBrowser implements AriaBrowser {
   private unwrapMetadataResult<T>(
     result: MetadataScriptResult<T> | undefined,
     ref: string,
-    action: "getFieldMetadata" | "getFormSubmissionContext",
+    action: "getFieldMetadata" | "getFormSubmissionContext" | "getLinkUrl",
   ): T {
     if (!result) {
-      const actionDescription =
-        action === "getFieldMetadata" ? "get field metadata" : "get form submission context";
+      const actionDescription = {
+        getFieldMetadata: "get field metadata",
+        getFormSubmissionContext: "get form submission context",
+        getLinkUrl: "get link URL",
+      }[action];
       throw new BrowserActionException(
         action,
         `Failed to ${actionDescription}: script returned no result`,
@@ -602,6 +606,50 @@ export class ExtensionBrowser implements AriaBrowser {
       // identity map isn't available, bail out rather than failing the
       // surrounding action.
       return null;
+    }
+  }
+
+  async getLinkUrl(ref: string): Promise<LinkUrl | null> {
+    try {
+      const tab = await this.getActiveTab();
+      await this.ensureContentScript();
+
+      const results = await browser.scripting.executeScript({
+        target: { tabId: tab.id! },
+        func: (elementRef: string): MetadataScriptResult<LinkUrl | null> => {
+          const element = document.querySelector(`[data-pilo-ref="${elementRef}"]`);
+          if (!element) {
+            return {
+              success: false,
+              error: `Element with ref ${elementRef} not found in DOM`,
+              errorType: "invalid-ref",
+            };
+          }
+          // `link.href` is resolved by the browser against the document base URL.
+          const link = element.closest("a[href], area[href]") as
+            HTMLAnchorElement | HTMLAreaElement | null;
+          return {
+            success: true,
+            data: link ? { url: link.href, rawHref: link.getAttribute("href") ?? "" } : null,
+          };
+        },
+        args: [ref],
+      });
+
+      return this.unwrapMetadataResult(
+        results[0]?.result as MetadataScriptResult<LinkUrl | null> | undefined,
+        ref,
+        "getLinkUrl",
+      );
+    } catch (error) {
+      if (error instanceof InvalidRefException || error instanceof BrowserActionException) {
+        throw error;
+      }
+      throw new BrowserActionException(
+        "getLinkUrl",
+        `Failed to get link URL: ${error instanceof Error ? error.message : String(error)}`,
+        { ref, originalError: error },
+      );
     }
   }
 
