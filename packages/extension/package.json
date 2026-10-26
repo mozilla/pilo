@@ -30,7 +30,7 @@
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-slot": "^1.3.3",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/webextension-polyfill": "^0.12.5",
+    "@types/webextension-polyfill": "^0.12.6",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -53,7 +53,7 @@
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.6",
+    "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/turndown": "^5.0.6",
@@ -61,7 +61,7 @@
     "happy-dom": "^20.12.0",
     "tw-animate-css": "^1.3.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.4",
     "wxt": "0.21.4"
   },
   "packageManager": "pnpm@9.0.0"
