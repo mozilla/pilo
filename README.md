@@ -12,12 +12,11 @@ AI-powered web automation that lets you control browsers using natural language.
 
 ## About Tabstack
 
-Pilo is part of [Tabstack](https://tabstack.ai), Mozilla's browsing infrastructure for AI agents. Tabstack provides the web execution layer that enables AI agents to automate workflows and turn web content into clean, structured data.
+Pilo is the open-source automation engine behind [Tabstack](https://tabstack.ai) Automate. Tabstack lets your model research live sources, extract the data it needs, and automate web tasks, without you building its web stack. Never trained on. Private by default. Built by Mozilla.
 
 **Learn more:**
 
 - [Tabstack Website](https://tabstack.ai)
-- [Introduction to Tabstack](https://tabstack.ai/blog/intro-browsing-infrastructure-ai-agents)
 
 **Community:**
 
