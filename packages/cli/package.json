@@ -12,7 +12,7 @@
     "pilo": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.5.2",
+    "@inquirer/prompts": "^8.7.2",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "pilo-core": "workspace:*",
