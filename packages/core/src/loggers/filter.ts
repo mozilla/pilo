@@ -15,7 +15,7 @@ export abstract class LoggerFilter extends LoggerWrapper {
   private filteredEmitter: WebAgentEventEmitter | null = null;
   private handleEvent: ((eventType: string, data: any) => void) | null = null;
 
-  initialize(emitter: WebAgentEventEmitter): void {
+  override initialize(emitter: WebAgentEventEmitter): void {
     if (this.emitter) {
       this.dispose();
     }
@@ -36,7 +36,7 @@ export abstract class LoggerFilter extends LoggerWrapper {
     this.wrappedLogger.initialize(this.filteredEmitter);
   }
 
-  dispose(): void {
+  override dispose(): void {
     if (this.emitter && this.handleEvent) {
       this.emitter.off("*", this.handleEvent);
       this.wrappedLogger.dispose();

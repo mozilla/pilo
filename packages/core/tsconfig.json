@@ -21,6 +21,8 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
 
     // Interop and compatibility
     "skipLibCheck": true,
