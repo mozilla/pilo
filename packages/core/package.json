@@ -52,7 +52,7 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "@opentelemetry/api": "^1.9.1"
+    "@opentelemetry/api": "^1.10.0"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/api": {
@@ -60,7 +60,7 @@
     }
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/api": "^1.10.0",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.4.0",
     "@types/turndown": "^5.0.6",
