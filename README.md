@@ -575,3 +575,7 @@ For developer setup, workspace commands, and contribution guidelines, see [CONTR
 ## Contributing
 
 Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
+
+## Feedback
+
+Found a bug in Pilo or have an idea? [Open an issue](https://github.com/mozilla/pilo/issues/new/choose) here. For problems with the hosted Tabstack API, SDKs, CLI, or docs, use [tabstack-feedback](https://github.com/Mozilla-Ocho/tabstack-feedback/issues/new/choose). Never paste API keys or personal data.
