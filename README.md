@@ -478,6 +478,12 @@ Results appear as commit status checks with links to detailed HTML reports. See 
 | `--tabstack-api-key <key>`      | Tabstack API key for cloud extraction tools                | -                       | `--tabstack-api-key your-key`              |
 | `--tabstack-api-url <url>`      | Tabstack API base URL                                      | https://api.tabstack.ai | `--tabstack-api-url http://localhost:8080` |
 
+### Repetition Detection
+
+Repeated clicks can advance a calendar or pager while keeping the same button identity. A newly observed URL or accessibility snapshot resets the click repetition count; returning to a state already visited during the same repeated-click sequence does not. Regenerated element refs and ARIA `timer` / `marquee` regions are excluded from the comparison.
+
+Other actions retain action/value-based repetition checks. Page-state progress is a heuristic: changing content outside the excluded regions can still appear as progress. `--max-iterations` remains the overall task limit.
+
 ### Environment Variables
 
 All configuration options can be set via environment variables (dev mode only; not available in production npm installs).

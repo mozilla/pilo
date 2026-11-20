@@ -4765,6 +4765,160 @@ describe("WebAgent", () => {
       expect(result.finalAnswer).toContain("click");
     });
 
+    describe("progress-aware repetition", () => {
+      afterEach(() => {
+        // Aborted runs leave scripted model responses unused.
+        mockStreamText.mockReset();
+        mockGenerateTextWithRetry.mockReset();
+      });
+
+      function primeRepeatedClicks(
+        snapshot: (actions: number, reads: number) => string,
+        clicks = 8,
+        url?: (actions: number) => string,
+      ) {
+        mockGenerateTextWithRetry.mockResolvedValueOnce({
+          text: "Plan",
+          toolResults: [
+            {
+              type: "tool-result",
+              toolCallId: "plan_calendar",
+              toolName: "create_plan",
+              output: {
+                successCriteria: "Reach the requested month",
+                plan: "Advance the calendar",
+              },
+            },
+          ],
+        } as any);
+        let actions = 0;
+        let reads = 0;
+        vi.spyOn(mockBrowser, "getTreeWithRefs").mockImplementation(async () =>
+          snapshot(actions, reads++),
+        );
+        if (url) vi.spyOn(mockBrowser, "getUrl").mockImplementation(async () => url(actions));
+        for (let i = 0; i < clicks; i++) {
+          mockStreamText.mockImplementationOnce(() => {
+            actions++;
+            return createMockStreamResponse({
+              toolResults: [
+                {
+                  type: "tool-result",
+                  toolCallId: `calendar_${i}`,
+                  toolName: "click",
+                  input: { ref: "E94" },
+                  output: {
+                    success: true,
+                    action: "click",
+                    ref: "E94",
+                    targetIdentity: { role: "button", name: "Next month" },
+                  },
+                },
+              ],
+              response: { messages: [{ role: "assistant", content: "Advance month" }] },
+            });
+          });
+        }
+        mockStreamText.mockReturnValueOnce(
+          createMockStreamResponse({
+            toolResults: [
+              {
+                type: "tool-result",
+                toolCallId: "done_calendar",
+                toolName: "done",
+                output: { action: "done", result: "Reached the requested month", isTerminal: true },
+              },
+            ],
+            response: { messages: [{ role: "assistant", content: "Done" }] },
+          }),
+        );
+        mockGenerateTextWithRetry.mockResolvedValueOnce(mockValidationResponse("complete"));
+      }
+
+      it("should allow repeated calendar clicks when each snapshot advances the month", async () => {
+        const months = [
+          "September 2026",
+          "October 2026",
+          "November 2026",
+          "December 2026",
+          "January 2027",
+          "February 2027",
+        ];
+        primeRepeatedClicks(
+          (actions) => `- heading "${months[actions]}"\n- button "Next month" [ref=E94]`,
+          5,
+        );
+        const result = await webAgent.execute("Advance the calendar five months", {
+          startingUrl: "https://example.com/calendar",
+        });
+        expect(result.finalAnswer).not.toContain("Excessive repetition");
+        expect(result.success).toBe(true);
+        expect(result.stats.actions).toBe(5);
+        expect(
+          mockLogger.events.some((event) => event.type === WebAgentEventType.TASK_ABORTED),
+        ).toBe(false);
+      });
+
+      it("should stop a stagnant calendar despite timer updates and ref churn", async () => {
+        primeRepeatedClicks(
+          (_actions, reads) =>
+            `- heading "September 2026"\n- timer:\n  - text: "Elapsed ${reads} seconds"\n- button "Next month" [ref=E${reads}]`,
+        );
+        const result = await webAgent.execute("Advance the calendar five months", {
+          startingUrl: "https://example.com/calendar",
+        });
+        expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+        expect(mockStreamText).toHaveBeenCalledTimes(5);
+      });
+
+      it("should not treat changing refs alone as progress", async () => {
+        primeRepeatedClicks(
+          (_actions, reads) => `- heading "September 2026"\n- button "Next month" [ref=E${reads}]`,
+        );
+        const result = await webAgent.execute("Advance the calendar", {
+          startingUrl: "https://example.com/calendar",
+        });
+        expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+        expect(mockStreamText).toHaveBeenCalledTimes(5);
+      });
+
+      it("should stop when repeated clicks cycle between previously visited pages", async () => {
+        primeRepeatedClicks(
+          (actions) =>
+            `- heading "${actions % 2 ? "October" : "September"} 2026"\n- button "Next month" [ref=E94]`,
+        );
+        const result = await webAgent.execute("Reach February 2027", {
+          startingUrl: "https://example.com/calendar",
+        });
+        expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+        expect(mockStreamText).toHaveBeenCalledTimes(6);
+      });
+
+      it("should still stop if the calendar makes progress and then stalls", async () => {
+        primeRepeatedClicks(
+          (actions) => `- heading "Month ${Math.min(actions, 3)}"\n- button "Next month" [ref=E94]`,
+        );
+        const result = await webAgent.execute("Advance the calendar", {
+          startingUrl: "https://example.com/calendar",
+        });
+        expect(result.finalAnswer).toContain("Aborted: Excessive repetition");
+        expect(mockStreamText).toHaveBeenCalledTimes(8);
+      });
+
+      it("should recognize navigation progress even when page contents stay the same", async () => {
+        primeRepeatedClicks(
+          () => '- button "Next month" [ref=E94]',
+          5,
+          (actions) => `https://example.com/calendar?month=${actions}`,
+        );
+        const result = await webAgent.execute("Advance the calendar five months", {
+          startingUrl: "https://example.com/calendar?month=0",
+        });
+        expect(result.success).toBe(true);
+        expect(result.stats.actions).toBe(5);
+      });
+    });
+
     it("should not flag legitimate repeated scroll actions", async () => {
       // Scroll repeats with the same direction are legitimate workflow
       // (traversing an infinite-scroll feed). The detector must exempt them.
@@ -4950,6 +5104,11 @@ describe("WebAgent", () => {
       } as any);
 
       const variants = ["hello", "HELLO ", " Hello", "hello", "HELLO"];
+      let snapshotRead = 0;
+      vi.spyOn(mockBrowser, "getTreeWithRefs").mockImplementation(async () => {
+        const value = variants[Math.min(snapshotRead++, variants.length - 1)];
+        return `- textbox "Search" [ref=input1]: ${JSON.stringify(value)}`;
+      });
       for (let i = 0; i < variants.length; i++) {
         mockStreamText.mockReturnValueOnce(
           createMockStreamResponse({
