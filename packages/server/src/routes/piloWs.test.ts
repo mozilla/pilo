@@ -80,7 +80,8 @@ vi.mock("../taskRunner.js", () => ({
 }));
 
 import { createPiloWsRoute, type ActiveWS } from "./piloWs.js";
-import type { UpgradeWebSocket, WSContext } from "hono/ws";
+import type { Context, MiddlewareHandler, Next } from "hono";
+import type { WSEvents, WSContext } from "hono/ws";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -94,11 +95,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 function createTestHarness(activeConnections = new Set<ActiveWS>()) {
   let handlerFactory: (c: any) => any;
 
-  const fakeUpgradeWebSocket: UpgradeWebSocket = (factory) => {
+  function fakeUpgradeWebSocket(
+    factory: (c: Context) => WSEvents | Promise<WSEvents>,
+  ): MiddlewareHandler;
+  function fakeUpgradeWebSocket(c: Context, events: WSEvents): never;
+  function fakeUpgradeWebSocket(factory: Context | ((c: Context) => WSEvents | Promise<WSEvents>)) {
+    if (typeof factory !== "function") {
+      throw new Error("The test harness only supports factory-based WebSocket upgrades");
+    }
     handlerFactory = factory;
     // Return a no-op Hono handler (the route is registered but we call handlers directly)
-    return async (c, next) => next();
-  };
+    return async (_c: Context, next: Next) => next();
+  }
 
   createPiloWsRoute(fakeUpgradeWebSocket, activeConnections);
 
@@ -350,10 +358,8 @@ describe("piloWs", () => {
 
     it("should not send error when task is aborted", async () => {
       // Simulate abort by having runTask reject after onClose triggers the abort
-      let rejectTask: (err: Error) => void;
       mockRunTask.mockImplementation(({ abortSignal }) => {
         return new Promise((_, reject) => {
-          rejectTask = reject;
           abortSignal.addEventListener("abort", () => {
             reject(new Error("aborted"));
           });
@@ -460,9 +466,7 @@ describe("piloWs", () => {
     });
 
     it("should resolve a pending request when matched", async () => {
-      let capturedCallback: any;
       mockRunTask.mockImplementation(async ({ onUserDataRequired }) => {
-        capturedCallback = onUserDataRequired;
         // Simulate pilo-core calling the callback
         const response = await onUserDataRequired({
           requestId: "req-123",
@@ -495,7 +499,6 @@ describe("piloWs", () => {
 
   describe("timeout", () => {
     it("should reject pending request after timeout", async () => {
-      let taskPromise: Promise<any>;
       mockRunTask.mockImplementation(async ({ onUserDataRequired }) => {
         try {
           await onUserDataRequired({
