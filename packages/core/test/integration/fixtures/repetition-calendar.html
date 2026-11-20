@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Calendar repetition fixture</title>
+  </head>
+  <body>
+    <main id="calendar"></main>
+    <script>
+      const mode = new URLSearchParams(location.search).get("mode");
+      const months = [
+        "September 2026",
+        "October 2026",
+        "November 2026",
+        "December 2026",
+        "January 2027",
+        "February 2027",
+      ];
+      let clicks = 0;
+      function render() {
+        const index = mode === "stalled" ? 0 : mode === "cycle" ? clicks % 2 : Math.min(clicks, 5);
+        document.getElementById("calendar").innerHTML = `
+          <h1>${months[index]}</h1>
+          <button type="button">Next month</button>
+          <div role="timer">Elapsed ${clicks} seconds</div>`;
+        document.querySelector("button").onclick = () => {
+          clicks++;
+          render();
+        };
+      }
+      render();
+    </script>
+  </body>
+</html>

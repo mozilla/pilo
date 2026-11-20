@@ -18,6 +18,7 @@ import {
   WebAgentEventType,
 } from "./events.js";
 import { SnapshotCompressor } from "./snapshotCompressor.js";
+import { ActionRepetitionTracker } from "./actionRepetition.js";
 import type { Logger } from "./loggers/types.js";
 import { ConsoleLogger } from "./loggers/console.js";
 import {
@@ -222,8 +223,7 @@ interface ExecutionState {
   success: boolean;
   finalAnswer: string | null;
   error?: TaskError;
-  lastAction?: string;
-  actionRepeatCount: number;
+  repetition: ActionRepetitionTracker;
   validationAttempts: number;
   validationOutcome?: "accepted" | "force-accepted";
 }
@@ -720,7 +720,7 @@ export class WebAgent {
                 }
                 agentFilledRefs.clear();
                 operationalRefs.clear();
-                await this.addPageSnapshot();
+                await this.addPageSnapshot(executionState);
               }
 
               return await this.generateAndProcessAction(task, allTools, executionState);
@@ -1072,7 +1072,7 @@ export class WebAgent {
   /**
    * Add page snapshot to the conversation
    */
-  private async addPageSnapshot(): Promise<void> {
+  private async addPageSnapshot(executionState: ExecutionState): Promise<void> {
     // First, truncate old snapshots to keep context size manageable
     this.truncateOldExternalContent();
 
@@ -1122,6 +1122,7 @@ export class WebAgent {
 
     // Get current page info
     const currentPageInfo = await this.getCurrentPageInfo();
+    executionState.repetition.recordSnapshot(currentPageInfo.url, currentPageSnapshot);
 
     // Build the text content for the snapshot
     const snapshotMessage = buildPageSnapshotPrompt(
@@ -1511,8 +1512,7 @@ export class WebAgent {
     // count doesn't carry across them (an exempt action between two clicks
     // is treated as progress, not as a transparent gap).
     if (WebAgent.REPETITION_EXEMPT_ACTIONS.has(actionOutput.action)) {
-      executionState.actionRepeatCount = 0;
-      executionState.lastAction = undefined;
+      executionState.repetition.reset();
       return null;
     }
 
@@ -1527,21 +1527,24 @@ export class WebAgent {
       actionOutput.targetIdentity,
     );
 
-    // Check if this is the same action as the last one
-    if (executionState.lastAction === currentActionSignature) {
-      executionState.actionRepeatCount++;
-
+    // Repeated clicks may advance a pager without changing their identity.
+    // Keep value-based actions (e.g. equivalent fills) on the original guard.
+    const repeatCount = executionState.repetition.observe(
+      currentActionSignature,
+      actionOutput.action === "click",
+    );
+    if (repeatCount > 0) {
       // Check if we've exceeded the repetition limit
-      if (executionState.actionRepeatCount > this.maxRepeatedActions) {
+      if (repeatCount > this.maxRepeatedActions) {
         // First time over limit: add warning message
-        if (executionState.actionRepeatCount === REPETITION_WARNING_THRESHOLD) {
-          const warningMessage = `You have repeated the same action (${actionOutput.action}) ${executionState.actionRepeatCount} times. Please try a different approach or action to make progress on the task.`;
+        if (repeatCount === REPETITION_WARNING_THRESHOLD) {
+          const warningMessage = `You have repeated the same action (${actionOutput.action}) ${repeatCount} times. Please try a different approach or action to make progress on the task.`;
           this.messages.push({ role: "user", content: warningMessage });
 
           // Emit warning event
           this.emit(WebAgentEventType.AGENT_STATUS, {
             message: `Warning: Repeated action detected - ${currentActionSignature}`,
-            repeatCount: executionState.actionRepeatCount,
+            repeatCount,
             iterationId: this.currentIterationId,
           });
 
@@ -1556,8 +1559,8 @@ export class WebAgent {
         }
 
         // Second time over limit: abort the task
-        if (executionState.actionRepeatCount >= REPETITION_ABORT_THRESHOLD) {
-          const abortReason = `Excessive repetition of action '${actionOutput.action}' (${executionState.actionRepeatCount} times). The agent appears to be stuck in a loop.`;
+        if (repeatCount >= REPETITION_ABORT_THRESHOLD) {
+          const abortReason = `Excessive repetition of action '${actionOutput.action}' (${repeatCount} times). The agent appears to be stuck in a loop.`;
           const abortMessage = `Aborted: ${abortReason}`;
 
           // Emit abort event
@@ -1578,10 +1581,6 @@ export class WebAgent {
           };
         }
       }
-    } else {
-      // Different action - reset counter and update last action
-      executionState.actionRepeatCount = 0;
-      executionState.lastAction = currentActionSignature;
     }
 
     // No intervention needed
@@ -2159,7 +2158,7 @@ export class WebAgent {
       startTime: Date.now(),
       success: false,
       finalAnswer: null,
-      actionRepeatCount: 0,
+      repetition: new ActionRepetitionTracker(),
       validationAttempts: 0,
     };
   }
@@ -2237,8 +2236,7 @@ export class WebAgent {
         this.initializeSystemPromptAndTask(task);
 
         // Reset repetition tracking to avoid false "stuck in loop" detection.
-        executionState.actionRepeatCount = 0;
-        executionState.lastAction = undefined;
+        executionState.repetition.reset();
 
         // Refresh page state from the newly navigated browser.
         await this.updatePageState();
