@@ -441,7 +441,7 @@ git checkout -b evals/partial/my-experiment
 git push origin evals/partial/my-experiment
 ```
 
-Results appear as commit status checks with links to detailed HTML reports. See [pilo-evals-judge/docs/pilo-evaluations.md](https://github.com/Mozilla-Ocho/pilo-evals-judge/blob/main/docs/pilo-evaluations.md) for complete documentation.
+Results appear as commit status checks with links to detailed HTML reports. See [ichabod-evals/docs/pilo-evaluations.md](https://github.com/Mozilla-Ocho/ichabod-evals/blob/main/docs/pilo-evaluations.md) for complete documentation.
 
 ## Configuration Reference
 
