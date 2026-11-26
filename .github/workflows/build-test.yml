@@ -363,7 +363,7 @@ jobs:
         run: pnpm --filter pilo-server run test
 
       - name: Build server
-        run: pnpm --filter pilo-server run build:deploy
+        run: pnpm --filter pilo-server run build
 
   extension:
     runs-on: ubuntu-latest
